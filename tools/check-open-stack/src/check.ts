@@ -1,12 +1,12 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LibraryError, loadLibrary, type Library } from '@montagio/presets';
 import { ALLOWED_WEIGHT_LICENSES, parseLock, type LockEntry } from '@montagio/registry';
 import { parse as parseYaml } from 'yaml';
 
 export type Violation = {
-  rule: 'weight-license' | 'node-not-allowed' | 'forbidden-pattern' | 'library';
+  rule: 'weight-license' | 'weight-file' | 'node-not-allowed' | 'forbidden-pattern' | 'library';
   file: string;
   detail: string;
 };
@@ -18,6 +18,8 @@ export type OpenStackReport = {
   violations: Violation[];
 };
 
+/** Input values that name a model weight file. */
+const WEIGHT_FILE = /\.(safetensors|sft|ckpt|pt|pth|bin|gguf|onnx)$/i;
 const SOURCE_EXTENSIONS = /\.(ts|tsx|js|mjs|cjs)$/;
 const SKIPPED_DIRS = new Set(['node_modules', '.next', 'dist', 'test-results', 'playwright-report']);
 
@@ -96,12 +98,42 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
     }
   }
 
+  // Weight files actually loaded: every file a workflow node or a preset LoRA
+  // names must be a lock entry (whose license was checked above) and, for a
+  // model's workflow, one of that model's declared weights.
+  const lockFiles = new Map(lock.map((entry) => [entry.file, entry]));
+  const allowedFilesFor = (workflowPath: string): { files: Set<string>; owner: string } => {
+    const owners = library ? [...library.models.values()].filter((model) => model.workflow === workflowPath) : [];
+    if (owners.length === 0) return { files: new Set(lockFiles.keys()), owner: 'any lock entry' };
+    const ids = new Set(owners.flatMap((model) => model.weights));
+    return {
+      files: new Set(lock.filter((entry) => ids.has(entry.id)).map((entry) => entry.file)),
+      owner: `the declared weights of ${owners.map((model) => model.id).join(', ')}`,
+    };
+  };
+  for (const [presetId, preset] of library?.presets ?? []) {
+    for (const lora of preset.loras) {
+      if (!lockFiles.has(lora.file)) {
+        violations.push({
+          rule: 'weight-file',
+          file: library?.presetFiles.get(presetId) ?? `presets/${presetId}.yaml`,
+          detail: `LoRA "${lora.file}" is not in registry/models.lock.yaml`,
+        });
+      }
+    }
+  }
+
   // Workflow nodes: allow-list only, so partner nodes and unknown nodes are refused.
   const allowed = await readYaml<{ nodes: { class_type: string }[] }>(join(configDir, 'allowed-nodes.yaml'));
   const allowedNodes = new Set(allowed.nodes.map((node) => node.class_type));
   for (const path of await listFiles(join(root, 'workflows'))) {
     if (!path.endsWith('.json')) continue;
-    const workflow = JSON.parse(await readFile(path, 'utf8')) as Record<string, { class_type?: string }>;
+    const workflow = JSON.parse(await readFile(path, 'utf8')) as Record<
+      string,
+      { class_type?: string; inputs?: Record<string, unknown> }
+    >;
+    const workflowPath = relative(root, path).split(sep).join('/');
+    const { files, owner } = allowedFilesFor(workflowPath);
     for (const [id, node] of Object.entries(workflow)) {
       if (!node.class_type || !allowedNodes.has(node.class_type)) {
         violations.push({
@@ -109,6 +141,15 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
           file: relative(root, path),
           detail: `node ${id} uses "${node.class_type ?? '(none)'}", which is not in allowed-nodes.yaml`,
         });
+      }
+      for (const value of Object.values(node.inputs ?? {})) {
+        if (typeof value === 'string' && WEIGHT_FILE.test(value) && !files.has(value)) {
+          violations.push({
+            rule: 'weight-file',
+            file: relative(root, path),
+            detail: `node ${id} loads "${value}", which is not one of ${owner}`,
+          });
+        }
       }
     }
   }

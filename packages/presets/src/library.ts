@@ -7,6 +7,8 @@ import type { Preset } from './schema';
 
 export type Library = {
   presets: Map<string, Preset>;
+  /** Repository-relative file of each preset, e.g. "presets/crash-push.yaml". */
+  presetFiles: Map<string, string>;
   models: Map<string, ModelEntry>;
   lock: Map<string, LockEntry>;
   /** Workflow templates keyed by the model's `workflow` path, e.g. "workflows/wan22-fun-camera.api.json". */
@@ -42,6 +44,7 @@ export async function loadLibrary(root: string): Promise<Library> {
   const problems: string[] = [];
   const warnings: string[] = [];
   const presets = new Map<string, Preset>();
+  const presetFiles = new Map<string, string>();
   const models = new Map<string, ModelEntry>();
   const lock = new Map<string, LockEntry>();
   const templates = new Map<string, ApiWorkflow>();
@@ -52,6 +55,7 @@ export async function loadLibrary(root: string): Promise<Library> {
       const preset = parsePreset(await readFile(join(presetsDir, name), 'utf8'), `presets/${name}`);
       if (presets.has(preset.id)) problems.push(`presets/${name}: duplicate preset id "${preset.id}"`);
       presets.set(preset.id, preset);
+      presetFiles.set(preset.id, `presets/${name}`);
     } catch (error) {
       problems.push((error as Error).message);
     }
@@ -108,5 +112,5 @@ export async function loadLibrary(root: string): Promise<Library> {
   }
 
   if (problems.length > 0) throw new LibraryError(problems);
-  return { presets, models, lock, templates, warnings };
+  return { presets, presetFiles, models, lock, templates, warnings };
 }

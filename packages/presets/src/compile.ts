@@ -83,6 +83,10 @@ export function compileJob(
   else if (model.capabilities.includes('i2v')) cameraMode = 'prompt';
   else throw new CompileError(`model ${model.id} cannot render capability ${preset.capability}`);
 
+  if (preset.loras.length > 0) {
+    // Never drop a LoRA silently: the clip would not be what the preset promises.
+    throw new CompileError(`preset ${preset.id} uses LoRAs, which are not supported yet`);
+  }
   if (!inputs.imageRef) throw new CompileError(`preset ${preset.id} needs a start image (imageRef)`);
 
   const resolution = pick(inputs.resolution, preset.defaults.resolution, model.limits.resolutions, 'resolution', model.id);

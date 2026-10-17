@@ -47,6 +47,24 @@ test('partner node fails', async () => {
   );
 });
 
+test('a workflow loading a file that is not a declared weight of its model fails', async () => {
+  const r = await checkOpenStack(fixture('dirty-file'));
+  expect(r.violations).toContainEqual(
+    expect.objectContaining({ rule: 'weight-file', detail: expect.stringContaining('flux1-dev.safetensors') }),
+  );
+});
+
+test('a preset LoRA missing from the lock fails', async () => {
+  const r = await checkOpenStack(fixture('dirty-lora'));
+  expect(r.violations).toContainEqual(
+    expect.objectContaining({
+      rule: 'weight-file',
+      file: expect.stringMatching(/crash-push\.yaml$/),
+      detail: expect.stringContaining('some-nc-lora.safetensors'),
+    }),
+  );
+});
+
 test('closed API host in source fails', async () => {
   const r = await checkOpenStack(fixture('dirty-code'));
   expect(r.violations).toContainEqual(

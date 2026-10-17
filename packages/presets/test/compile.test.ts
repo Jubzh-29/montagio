@@ -114,6 +114,16 @@ test('i2v without image is refused', () => {
   expect(() => compileJob(preset, funCamera, template, { seed: 1, aspect: '16:9' })).toThrow(CompileError);
 });
 
+test('a preset with LoRAs is refused instead of silently ignoring them', () => {
+  const withLora = parsePreset(
+    `${read('crash-push.yaml')}loras:\n  - { file: style.safetensors, strength: 0.8 }\n`,
+    'lora.yaml',
+  );
+  expect(() => compileJob(withLora, funCamera, template, { imageRef: 'u.png', seed: 1, aspect: '16:9' })).toThrow(
+    /LoRA/,
+  );
+});
+
 test('an image-only model is refused for a camera preset', () => {
   const t2i: ModelEntry = { ...funCamera, kind: 'image', capabilities: ['t2i'] };
   expect(() => compileJob(preset, t2i, template, { imageRef: 'u.png', seed: 1, aspect: '16:9' })).toThrow(
