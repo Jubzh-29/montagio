@@ -38,3 +38,17 @@ test('a shot can be removed and the list is capped at three', async ({ page }) =
   await expect(shots).toHaveCount(2);
   await expect(shots.nth(1)).toContainText('Slow Push');
 });
+
+test('each shot can carry its own optional text', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Sequence' }).click();
+  await page.setInputFiles('input[type=file]', sampleImage);
+  for (const name of ['Crash Push', 'Pan Left']) await page.getByRole('button', { name }).click();
+  await page.getByLabel('Scene (optional)').fill('a harbour at dawn');
+  await page.getByRole('textbox', { name: 'Text for shot 2' }).fill('the fog lifts');
+  const request = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/api/sequences'));
+  await page.getByRole('button', { name: /^Generate film/ }).click();
+  const body = (await request).postDataJSON() as { shots: { presetId: string; userPrompt?: string }[] };
+  expect(body.shots[0]).toMatchObject({ presetId: 'crash-push', userPrompt: 'a harbour at dawn' });
+  expect(body.shots[1]).toMatchObject({ presetId: 'pan-left', userPrompt: 'a harbour at dawn, the fog lifts' });
+});

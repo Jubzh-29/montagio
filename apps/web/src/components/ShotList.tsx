@@ -9,11 +9,13 @@ export function ShotList({
   presets,
   max,
   onRemove,
+  onPromptChange,
 }: {
-  shots: string[];
+  shots: { presetId: string; prompt: string }[];
   presets: PresetSummary[];
   max: number;
   onRemove: (index: number) => void;
+  onPromptChange: (index: number, text: string) => void;
 }) {
   const { t } = useI18n();
   const nameOf = (id: string) => presets.find((preset) => preset.id === id)?.name ?? id;
@@ -26,10 +28,10 @@ export function ShotList({
         <p className={styles.hint}>{t('sequenceHint')}</p>
       ) : (
         <ol className={styles.shotList}>
-          {shots.map((id, index) => (
-            <li key={`${id}-${index}`} className={styles.shot}>
+          {shots.map((shot, index) => (
+            <li key={`${shot.presetId}-${index}`} className={styles.shot}>
               <span className={styles.shotNumber}>{index + 1}</span>
-              <span className={styles.shotName}>{nameOf(id)}</span>
+              <span className={styles.shotName}>{nameOf(shot.presetId)}</span>
               <button
                 type="button"
                 className={styles.shotRemove}
@@ -38,6 +40,15 @@ export function ShotList({
               >
                 ×
               </button>
+              <input
+                type="text"
+                className={styles.shotPrompt}
+                aria-label={t('shotPrompt', { i: index + 1 })}
+                placeholder={t('shotPromptPlaceholder')}
+                maxLength={300}
+                value={shot.prompt}
+                onChange={(event) => onPromptChange(index, event.target.value)}
+              />
             </li>
           ))}
         </ol>

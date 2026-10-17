@@ -52,5 +52,7 @@
   "assembling": "Montage du film…",
   "downloadFilm": "Télécharger le film",
   "downloadVertical": "Télécharger en 9:16",
-  "removeShot": "Retirer le plan {i}"
+  "removeShot": "Retirer le plan {i}",
+  "shotPrompt": "Texte du plan {i}",
+  "shotPromptPlaceholder": "Facultatif : ce qui se passe dans ce plan"
 }

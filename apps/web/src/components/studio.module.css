@@ -621,3 +621,22 @@
   border-color: var(--line-strong);
   color: var(--ink);
 }
+
+.shotPrompt {
+  grid-column: 1 / -1;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--bg);
+  font-size: var(--text-s);
+  transition: border-color var(--dur) var(--ease-out);
+}
+
+.shotPrompt::placeholder {
+  color: var(--ink-faint);
+}
+
+.shotPrompt:hover {
+  border-color: var(--line-strong);
+}

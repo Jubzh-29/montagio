@@ -52,5 +52,7 @@
   "assembling": "Assembling the film…",
   "downloadFilm": "Download film",
   "downloadVertical": "Download 9:16",
-  "removeShot": "Remove shot {i}"
+  "removeShot": "Remove shot {i}",
+  "shotPrompt": "Text for shot {i}",
+  "shotPromptPlaceholder": "Optional: what happens in this shot"
 }

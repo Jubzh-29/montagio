@@ -25,6 +25,9 @@ const ASSEMBLY_ESTIMATE_S = 5;
 
 type Mode = 'single' | 'sequence';
 
+/** A shot being composed: its camera move and its own optional text. */
+type ShotDraft = { presetId: string; prompt: string };
+
 /** A render in progress or finished: a single generation or a sequence of shots. */
 type Job =
   | { status: 'idle' }
@@ -64,7 +67,7 @@ export function Studio() {
   const [presets, setPresets] = useState<PresetSummary[]>([]);
   const [models, setModels] = useState<ModelSummary[]>([]);
   const [presetId, setPresetId] = useState<string | null>(null);
-  const [shots, setShots] = useState<string[]>([]);
+  const [shots, setShots] = useState<ShotDraft[]>([]);
   const [modelId, setModelId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [upload, setUpload] = useState<UploadState>({ status: 'idle' });
@@ -176,7 +179,7 @@ export function Studio() {
 
   const onPreset = (id: string) => {
     if (mode === 'single') setPresetId(id);
-    else setShots((current) => (current.length < MAX_SHOTS ? [...current, id] : current));
+    else setShots((current) => (current.length < MAX_SHOTS ? [...current, { presetId: id, prompt: '' }] : current));
   };
 
   const ready = upload.status === 'ready' && modelId !== null && !busy;
@@ -211,7 +214,11 @@ export function Studio() {
     } else {
       void submit('sequence', {
         imageRef: upload.imageRef,
-        shots: shots.map((id) => ({ presetId: id, modelId, userPrompt })),
+        shots: shots.map((shot) => ({
+          presetId: shot.presetId,
+          modelId,
+          userPrompt: [userPrompt, shot.prompt.trim()].filter(Boolean).join(', ') || undefined,
+        })),
       });
     }
   };
@@ -315,6 +322,9 @@ export function Studio() {
               presets={presets}
               max={MAX_SHOTS}
               onRemove={(index) => setShots((current) => current.filter((_, i) => i !== index))}
+              onPromptChange={(index, text) =>
+                setShots((current) => current.map((shot, i) => (i === index ? { ...shot, prompt: text } : shot)))
+              }
             />
           )}
           <ModelPicker models={models} selectedId={modelId} onSelect={setModelId} />
