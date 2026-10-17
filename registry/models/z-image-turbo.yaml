@@ -1,0 +1,22 @@
+schema: montagio/model@0.1
+id: z-image-turbo
+name: Z-Image Turbo
+kind: image
+tier: fast
+capabilities: [t2i]
+license: Apache-2.0
+weights: [z-image-turbo, qwen3-4b, flux-ae]
+workflow: workflows/z-image-turbo.api.json
+bindings:
+  prompt: { node: "6", field: text }
+  negative: { node: "7", field: text }
+  seed: { node: "10", field: seed }
+  width: { node: "5", field: width }
+  height: { node: "5", field: height }
+limits:
+  resolutions: [480p, 720p]
+  fps: [16]
+  max_duration_s: 1
+estimate_s:
+  480p: 6
+  720p: 12

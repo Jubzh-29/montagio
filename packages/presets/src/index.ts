@@ -10,3 +10,4 @@ export {
   type CompiledParams,
   type JobInputs,
 } from './compile';
+export { loadLibrary, LibraryError, type Library } from './library';
