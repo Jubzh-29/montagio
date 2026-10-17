@@ -12,7 +12,10 @@ import { POST as postUpload } from '@/app/api/uploads/route';
 import { GET as getWorkflow } from '@/app/api/workflows/[id]/route';
 import { GET as getMedia } from '@/app/media/[...path]/route';
 import { galleryOrder, presetPreviewUrl } from '@/server/gallery';
+import { mediaFileFor } from '@/server/generations';
+import { resetServicesForTests } from '@/server/services';
 import { loadLibrary } from '@montagio/presets';
+import { readTags } from '@montagio/sequence';
 import {
   bigPng,
   generationRequest,
@@ -138,13 +141,47 @@ describe('generations', () => {
     expect(missing.status).toBe(404);
   });
 
-  test('a finished demo job exposes a /media/ output url', async () => {
+  test('a finished clip is a tagged copy under data/', async () => {
     process.env.MONTAGIO_DEMO_DURATION_MS = '0';
     const imageRef = await uploadedImageRef();
     const { id } = await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'k6'))).json();
     const rec = await (await getGeneration(new Request('http://localhost/x'), params({ id }))).json();
-    expect(rec).toMatchObject({ state: 'succeeded', progress: 1, outputUrl: '/media/demo-assets/clips/crash-push.mp4' });
+    expect(rec).toMatchObject({ state: 'succeeded', progress: 1, outputUrl: `/media/data/generations/${id}/clip.mp4` });
+    expect(await readTags(mediaFileFor(rec.outputUrl)!)).toMatchObject({ comment: 'AI-generated' });
+  }, 30_000);
+
+  test('a missing FFmpeg is refused before any render', async () => {
+    process.env.MONTAGIO_FFMPEG = 'ffmpeg-does-not-exist';
+    try {
+      const imageRef = await uploadedImageRef();
+      const res = await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'noff'));
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: 'ffmpeg-missing' });
+      expect(existsSync(join(dataDir(), 'generations'))).toBe(false);
+    } finally {
+      delete process.env.MONTAGIO_FFMPEG;
+    }
   });
+
+  test('a clip FFmpeg cannot read is delivered untagged instead of failing', async () => {
+    process.env.MONTAGIO_DEMO_DURATION_MS = '0';
+    const clips = join(dataDir(), 'demo-clips');
+    mkdirSync(clips, { recursive: true });
+    writeFileSync(join(clips, '_default.mp4'), 'not a video at all');
+    process.env.MONTAGIO_DEMO_CLIPS = clips;
+    resetServicesForTests();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const imageRef = await uploadedImageRef();
+      const { id } = await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'garbage'))).json();
+      const rec = await (await getGeneration(new Request('http://localhost/x'), params({ id }))).json();
+      expect(rec).toMatchObject({ state: 'succeeded', outputUrl: expect.stringMatching(/demo-clips\/_default\.mp4$/) });
+      expect(logged).toHaveBeenCalled();
+    } finally {
+      logged.mockRestore();
+      delete process.env.MONTAGIO_DEMO_CLIPS;
+    }
+  }, 30_000);
 
   test('cancel moves a running job to canceled', async () => {
     const imageRef = await uploadedImageRef();

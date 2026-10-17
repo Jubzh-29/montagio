@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { rename, rm } from 'node:fs/promises';
 
 export class SequenceToolError extends Error {
   override name = 'SequenceToolError';
@@ -53,6 +54,45 @@ export async function probe(
   return { width: stream.width, height: stream.height, duration_s: Number(json.format?.duration ?? 0), fps };
 }
 
+/** The mention every exported video carries (spec §13: C2PA comes after the contest). */
+export const AI_METADATA = {
+  comment: 'AI-generated',
+  description: 'AI-generated video made with Montagio, an open-source camera-move studio running open-weights models.',
+} as const;
+
+/** Drop the source's tags (a pod path, an encoder string) and write the AI mention as standard MP4 tags. */
+function metadataArgs(): string[] {
+  return ['-map_metadata', '-1', ...Object.entries(AI_METADATA).flatMap(([key, value]) => ['-metadata', `${key}=${value}`])];
+}
+
+/** The container-level tags of a media file, as ffprobe reads them. */
+export async function readTags(media: string): Promise<Record<string, string>> {
+  const out = await run(ffprobe(), ['-v', 'error', '-show_entries', 'format_tags', '-of', 'json', media]);
+  return (JSON.parse(out) as { format?: { tags?: Record<string, string> } }).format?.tags ?? {};
+}
+
+/**
+ * Copy a clip into an MP4 that carries the AI mention, without re-encoding.
+ * Whatever the source container (ComfyUI's SaveWEBM writes WebM), the result is
+ * an MP4; it is written next to `out` first, so `out` is never half-written.
+ */
+export async function tagClip(input: string, out: string): Promise<void> {
+  const partial = `${out}.part`;
+  try {
+    await run(ffmpeg(), [
+      '-loglevel', 'error', '-y',
+      '-i', input,
+      '-map', '0:v', '-map', '0:a?', '-c', 'copy',
+      ...metadataArgs(),
+      '-movflags', '+faststart',
+      '-f', 'mp4', partial,
+    ]);
+    await rename(partial, out);
+  } finally {
+    await rm(partial, { force: true });
+  }
+}
+
 /** Write the last frame of a clip as a PNG: seek near the end, keep overwriting until the final frame. */
 export async function extractLastFrame(video: string, outPng: string): Promise<void> {
   await run(ffmpeg(), ['-loglevel', 'error', '-y', '-sseof', '-1', '-i', video, '-update', '1', '-q:v', '1', outPng]);
@@ -82,6 +122,7 @@ export async function concatClips(
     '-map', '[out]',
     '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast',
     '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an',
+    ...metadataArgs(),
     out,
   ]);
 }
@@ -101,6 +142,7 @@ export async function exportVertical(input: string, out: string): Promise<void> 
     '-map', '[out]',
     '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast',
     '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an',
+    ...metadataArgs(),
     out,
   ]);
 }

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { probe } from '@montagio/sequence';
+import { probe, readTags } from '@montagio/sequence';
 import { POST as postSequence } from '@/app/api/sequences/route';
 import { GET as getSequence } from '@/app/api/sequences/[id]/route';
 import { POST as cancelSequenceRoute } from '@/app/api/sequences/[id]/cancel/route';
@@ -117,6 +117,8 @@ describe('flow', () => {
       width: 720,
       height: 1280,
     });
+    expect(await readTags(join(dataDir(), 'sequences', created.id, 'film.mp4'))).toMatchObject({ comment: 'AI-generated' });
+    expect(await readTags(join(dataDir(), 'sequences', created.id, 'film-9x16.mp4'))).toMatchObject({ comment: 'AI-generated' });
   }, 90_000);
 
   test('same key twice -> same sequence (201 then 200)', async () => {

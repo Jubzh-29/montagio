@@ -1,6 +1,8 @@
 import { randomInt, randomUUID } from 'node:crypto';
+import { access } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { compileJob, CompileError } from '@montagio/presets';
+import { ensureTools, tagClip } from '@montagio/sequence';
 import { getEnv } from './env';
 import { getServices } from './services';
 import {
@@ -43,8 +45,13 @@ type CreateResult = { record: GenerationRecord; created: boolean };
 // Creations in flight, keyed by idempotency key and shared by every route
 // bundle of this process: a retry that arrives while the first request is
 // still running waits for it instead of starting a second render.
-const holder = globalThis as typeof globalThis & { __montagioInflight?: Map<string, Promise<CreateResult>> };
+const holder = globalThis as typeof globalThis & {
+  __montagioInflight?: Map<string, Promise<CreateResult>>;
+  __montagioTaggedClips?: Map<string, Promise<string | undefined>>;
+};
 const inflight = (holder.__montagioInflight ??= new Map());
+// One tagging per finished clip and per process, whichever poll sees the success first.
+const taggedClips = (holder.__montagioTaggedClips ??= new Map());
 
 export async function createGeneration(input: CreateGenerationInput): Promise<CreateResult> {
   const pending = inflight.get(input.idempotencyKey);
@@ -93,6 +100,12 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
   const { backend } = getServices();
   const seed = input.seed ?? randomInt(0, 2 ** 32);
   const { preset, model, upload, compiled } = await resolveJob(input, seed);
+  // Every delivered clip is tagged by FFmpeg: without it, refuse before a second of GPU is spent.
+  try {
+    await ensureTools();
+  } catch {
+    throw new GenerationError('ffmpeg-missing');
+  }
 
   const id = randomUUID();
   await saveWorkflow(id, compiled.workflow);
@@ -160,12 +173,36 @@ export async function getGeneration(id: string): Promise<GenerationRecord | null
     updatedAt: new Date().toISOString(),
   };
   if (job.state === 'succeeded' && job.outputPath) {
-    const url = mediaUrlFor(job.outputPath);
+    const url = await deliverClip(record.id, job.outputPath);
     if (url) updated.outputUrl = url;
   }
   if (job.state === 'failed') updated.error = job.error ?? 'failed';
   await saveRecord(updated);
   return updated;
+}
+
+/**
+ * URL of the clip the user gets: a copy of the backend's output that carries the
+ * AI-generated mention, under data/generations/<id>/clip.mp4. If FFmpeg cannot
+ * write it, the render is not lost: the raw output is delivered untagged and the
+ * error goes to the server log.
+ */
+function deliverClip(id: string, outputPath: string): Promise<string | undefined> {
+  const clip = join(getEnv().data, 'generations', id, 'clip.mp4');
+  let delivery = taggedClips.get(clip);
+  if (!delivery) {
+    delivery = (async () => {
+      try {
+        await access(clip).catch(() => tagClip(outputPath, clip));
+        return mediaUrlFor(clip);
+      } catch (error) {
+        console.error(`[montagio] generation ${id}: the AI-generated mention could not be written, clip delivered untagged`, error);
+        return mediaUrlFor(outputPath);
+      }
+    })();
+    taggedClips.set(clip, delivery);
+  }
+  return delivery;
 }
 
 export async function cancelGeneration(id: string): Promise<GenerationRecord | null> {
