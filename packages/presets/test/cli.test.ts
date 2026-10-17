@@ -98,3 +98,29 @@ test('a file named twice is validated once', async () => {
   expect(await runCli(['preset', 'validate', good, good], io)).toBe(0);
   expect(lines).toEqual([`✓ ${good}`]);
 });
+
+describe('file encoding (the ComfyUI node pack reads presets as strict UTF-8)', () => {
+  const text = () => readFileSync(good, 'utf8').replace(/^description: .*$/m, 'description: Révèle la scène.');
+  const write = (name: string, bytes: Buffer) => {
+    const path = join(mkdtempSync(join(tmpdir(), 'montagio-cli-enc-')), name);
+    writeFileSync(path, bytes);
+    return path;
+  };
+
+  test('a Windows-1252 file is refused instead of read with replacement characters', async () => {
+    const path = write('latin.yaml', Buffer.from(text(), 'latin1'));
+    expect(await runCli(['preset', 'validate', path], io)).toBe(1);
+    expect(lines).toEqual([`✗ ${path}`, '  - file is not UTF-8 text: save it as UTF-8']);
+  });
+
+  test('a UTF-16 file is refused with the same advice', async () => {
+    const path = write('utf16.yaml', Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text(), 'utf16le')]));
+    expect(await runCli(['preset', 'validate', path], io)).toBe(1);
+    expect(lines).toEqual([`✗ ${path}`, '  - file is UTF-16 text: save it as UTF-8']);
+  });
+
+  test('a UTF-8 file with a byte order mark is valid', async () => {
+    const path = write('bom.yaml', Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(text(), 'utf8')]));
+    expect(await runCli(['preset', 'validate', path], io)).toBe(0);
+  });
+});

@@ -25,6 +25,23 @@ async function presetFiles(arg: string, cwd: string): Promise<{ shown: string; p
   return names.map((name) => ({ shown: join(arg, name), path: join(path, name) }));
 }
 
+/**
+ * The text of a preset file, decoded as strict UTF-8 like the ComfyUI node pack
+ * does: a lenient read would turn a Windows-1252 "é" into U+FFFD and pass a file
+ * that ComfyUI refuses. A UTF-8 byte order mark is dropped.
+ */
+async function readPresetText(path: string): Promise<{ text: string } | { problem: string }> {
+  const bytes = await readFile(path);
+  if ((bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0xfe && bytes[1] === 0xff)) {
+    return { problem: 'file is UTF-16 text: save it as UTF-8' };
+  }
+  try {
+    return { text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) };
+  } catch {
+    return { problem: 'file is not UTF-8 text: save it as UTF-8' };
+  }
+}
+
 export async function runCli(argv: string[], io: CliIo): Promise<number> {
   const [group, command, ...args] = argv;
   if (group !== 'preset' || command !== 'validate' || args.length === 0) {
@@ -62,7 +79,8 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   // loadLibrary refuses a folder where two files share a preset id: so does the check.
   const ids = new Map<string, string>();
   for (const file of files) {
-    const result = validatePreset(await readFile(file.path, 'utf8'), file.shown, library);
+    const read = await readPresetText(file.path);
+    const result = 'text' in read ? validatePreset(read.text, file.shown, library) : { ok: false as const, problems: [read.problem] };
     const problems = result.ok ? [] : result.problems;
     if (result.ok) {
       const other = ids.get(result.preset.id);
