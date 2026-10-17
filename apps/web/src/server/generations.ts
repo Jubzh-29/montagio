@@ -33,9 +33,23 @@ export type CreateGenerationInput = {
   idempotencyKey: string;
 };
 
-export async function createGeneration(
-  input: CreateGenerationInput,
-): Promise<{ record: GenerationRecord; created: boolean }> {
+type CreateResult = { record: GenerationRecord; created: boolean };
+
+// Creations in flight, keyed by idempotency key and shared by every route
+// bundle of this process: a retry that arrives while the first request is
+// still running waits for it instead of starting a second render.
+const holder = globalThis as typeof globalThis & { __montagioInflight?: Map<string, Promise<CreateResult>> };
+const inflight = (holder.__montagioInflight ??= new Map());
+
+export async function createGeneration(input: CreateGenerationInput): Promise<CreateResult> {
+  const pending = inflight.get(input.idempotencyKey);
+  if (pending) return { record: (await pending).record, created: false };
+  const creation = createGenerationOnce(input).finally(() => inflight.delete(input.idempotencyKey));
+  inflight.set(input.idempotencyKey, creation);
+  return creation;
+}
+
+async function createGenerationOnce(input: CreateGenerationInput): Promise<CreateResult> {
   const previous = await lookupKey(input.idempotencyKey);
   if (previous && Date.now() - Date.parse(previous.createdAt) < IDEMPOTENCY_WINDOW_MS) {
     const record = await readRecord(previous.id);

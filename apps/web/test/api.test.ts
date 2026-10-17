@@ -103,6 +103,16 @@ describe('generations', () => {
     expect((await b.json()).id).toBe((await a.json()).id);
   });
 
+  test('two concurrent requests with the same key create a single generation', async () => {
+    const imageRef = await uploadedImageRef();
+    const [a, b] = await Promise.all([
+      postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'race')),
+      postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'race')),
+    ]);
+    expect([a.status, b.status].sort()).toEqual([200, 201]);
+    expect((await a.json()).id).toBe((await b.json()).id);
+  });
+
   test('GET reflects backend progress, then 404 for an unknown id', async () => {
     const imageRef = await uploadedImageRef();
     const { id } = await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'k5'))).json();
