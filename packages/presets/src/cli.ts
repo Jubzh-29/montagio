@@ -1,14 +1,11 @@
 /**
- * Montagio command line (spec §4.3).
- *
- *   npm run montagio -- preset validate presets/my-move.yaml
- *   npm run montagio -- preset validate presets          # every *.yaml / *.yml in a folder
+ * Montagio command line (spec §4.3), without side effects: `montagio.ts` is the
+ * entry point that runs it.
  *
  * Exit code: 0 when every file is valid, 1 when one is not, 2 on a usage error.
  */
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import { LibraryError, loadLibrary } from './library';
 import { validatePreset } from './validate';
 
@@ -72,23 +69,4 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     }
   }
   return failed ? 1 : 0;
-}
-
-const isEntryPoint = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
-if (isEntryPoint) {
-  runCli(process.argv.slice(2), {
-    // `npm run` changes directory to the repository root; resolve paths against where npm was called.
-    cwd: process.env.INIT_CWD ?? process.cwd(),
-    root: process.env.MONTAGIO_ROOT ?? fileURLToPath(new URL('../../../', import.meta.url)),
-    out: (line) => console.log(line),
-    err: (line) => console.error(line),
-  }).then(
-    (code) => {
-      process.exitCode = code;
-    },
-    (error: unknown) => {
-      console.error(`montagio: ${(error as Error).message}`);
-      process.exitCode = 2;
-    },
-  );
 }

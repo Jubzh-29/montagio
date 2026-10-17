@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -66,4 +66,20 @@ test('the npm script runs end to end', () => {
   });
   expect(res.status, res.stderr).toBe(0);
   expect(res.stdout).toContain('✓');
+}, 60_000);
+
+test('the npm script entry runs when the repository is reached through a junction or symlink', () => {
+  // Node resolves the main module's import.meta.url through realpath but keeps argv[1] as given,
+  // so an "am I the entry point?" guard silently skips main() behind a link.
+  const script = (JSON.parse(readFileSync(join(repoRoot(), 'package.json'), 'utf8')) as { scripts: Record<string, string> })
+    .scripts.montagio!;
+  const entry = script.replace(/^tsx\s+/, '');
+  const link = join(mkdtempSync(join(tmpdir(), 'montagio-link-')), 'repo');
+  symlinkSync(repoRoot(), link, 'junction');
+  const res = spawnSync(process.execPath, ['--import', 'tsx', join(link, entry), 'preset', 'validate', bad], {
+    cwd: link,
+    encoding: 'utf8',
+  });
+  expect(res.status, res.stderr).toBe(1);
+  expect(res.stdout).toContain(`✗ ${bad}`);
 }, 60_000);
