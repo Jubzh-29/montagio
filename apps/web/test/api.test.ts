@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { POST as postGenerations } from '@/app/api/generations/route';
 import { GET as getGeneration } from '@/app/api/generations/[id]/route';
 import { POST as cancelGeneration } from '@/app/api/generations/[id]/cancel/route';
@@ -8,7 +11,7 @@ import { GET as getPresetYaml } from '@/app/api/presets/[id]/yaml/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
 import { GET as getWorkflow } from '@/app/api/workflows/[id]/route';
 import { GET as getMedia } from '@/app/media/[...path]/route';
-import { galleryOrder } from '@/server/gallery';
+import { galleryOrder, presetPreviewUrl } from '@/server/gallery';
 import {
   bigPng,
   generationRequest,
@@ -192,6 +195,19 @@ describe('downloads and catalog', () => {
       'crash-push', 'slow-push', 'pull-back-reveal', 'pan-left', 'pan-right', 'tilt-up', 'tilt-down',
       'rise-and-push', 'drift-left-push', 'pull-back-tilt-up', 'push-and-settle', 'breathing',
     ]);
+  });
+
+  test('a preset whose preview file is missing gets no previewUrl', async () => {
+    const list = (await (await getPresets()).json()) as { id: string; previewUrl?: string }[];
+    expect(list.find((preset) => preset.id === 'crash-push')).not.toHaveProperty('previewUrl');
+  });
+
+  test('previewUrl points at the preview only when its file exists', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'montagio-previews-'));
+    mkdirSync(join(root, 'presets', 'previews'), { recursive: true });
+    writeFileSync(join(root, 'presets', 'previews', 'here.mp4'), 'x');
+    expect(await presetPreviewUrl(root, 'previews/here.mp4')).toBe('/media/presets/previews/here.mp4');
+    expect(await presetPreviewUrl(root, 'previews/missing.mp4')).toBeUndefined();
   });
 
   test('presets missing from the gallery order follow, by id', () => {

@@ -55,19 +55,21 @@ function PresetTile({
     <button type="button" className={styles.preset} aria-pressed={selected} onClick={onSelect}>
       <span className={styles.presetMedia}>
         <MoveGlyph poses={preset.poses} speed={preset.speed} />
-        <video
-          className={styles.presetPreview}
-          data-ready={previewReady}
-          src={preset.previewUrl}
-          muted
-          loop
-          autoPlay
-          playsInline
-          preload="metadata"
-          aria-hidden="true"
-          onLoadedData={() => setPreviewReady(true)}
-          onError={() => setPreviewReady(false)}
-        />
+        {preset.previewUrl && (
+          <video
+            className={styles.presetPreview}
+            data-ready={previewReady}
+            src={preset.previewUrl}
+            muted
+            loop
+            autoPlay
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+            onLoadedData={() => setPreviewReady(true)}
+            onError={() => setPreviewReady(false)}
+          />
+        )}
       </span>
       <span className={styles.presetText}>
         <span className={styles.presetName}>{preset.name}</span>

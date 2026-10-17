@@ -117,3 +117,14 @@ test('the Generate button is reachable without scrolling on a laptop screen', as
   await expect(page.getByRole('button', { name: 'Crash Push' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeInViewport();
 });
+
+test('the gallery requests no preview video that does not exist yet', async ({ page }) => {
+  const previews: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/media/presets/previews/')) previews.push(request.url());
+  });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Crash Push' })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  expect(previews).toEqual([]);
+});

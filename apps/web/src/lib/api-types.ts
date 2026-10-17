@@ -2,7 +2,8 @@ export type PresetSummary = {
   id: string;
   name: string;
   description: string;
-  previewUrl: string;
+  /** Absent while the preset has no preview file yet. */
+  previewUrl?: string;
   poses: string[];
   speed: number;
   defaultModel: string;
