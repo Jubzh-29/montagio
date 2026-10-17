@@ -11,3 +11,4 @@ export {
   type JobInputs,
 } from './compile';
 export { loadLibrary, LibraryError, type Library } from './library';
+export { validatePreset, type PresetValidation } from './validate';

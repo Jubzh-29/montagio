@@ -40,7 +40,13 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-export async function loadLibrary(root: string): Promise<Library> {
+/**
+ * Read and cross-check the repository library. `presets: false` skips
+ * `presets/`, so a tool that checks preset files one by one (`montagio preset
+ * validate`) still gets the models, the lock and the templates when one of
+ * those files is broken.
+ */
+export async function loadLibrary(root: string, opts: { presets?: boolean } = {}): Promise<Library> {
   const problems: string[] = [];
   const warnings: string[] = [];
   const presets = new Map<string, Preset>();
@@ -50,7 +56,7 @@ export async function loadLibrary(root: string): Promise<Library> {
   const templates = new Map<string, ApiWorkflow>();
 
   const presetsDir = join(root, 'presets');
-  for (const name of await yamlFiles(presetsDir)) {
+  for (const name of opts.presets === false ? [] : await yamlFiles(presetsDir)) {
     try {
       const preset = parsePreset(await readFile(join(presetsDir, name), 'utf8'), `presets/${name}`);
       if (presets.has(preset.id)) problems.push(`presets/${name}: duplicate preset id "${preset.id}"`);
