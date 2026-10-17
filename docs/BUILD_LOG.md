@@ -9,3 +9,4 @@ A dated record of how Montagio is built during the challenge window.
 - Library content: 3 provisional presets (Crash Push, Slow Push, Pan Left), 3 models (Wan 2.2 Fun Camera, Wan 2.2 5B, Z-Image Turbo).
 - **Provisional:** `workflows/*.api.json` are hand-written templates and `registry/models.lock.yaml` holds repository-level URLs. Both are replaced after GPU session S1 by workflows exported from a running ComfyUI and by exact file URLs + sha256, with every license re-read at the source.
 - Studio screen (monitor with viewfinder marks, camera-move glyphs, model picker with licenses, REC tally accent), open-stack page, EN/FR, demo mode end to end with Playwright.
+- Sequence package: FFmpeg helpers for the last frame, the montage and the 9:16 cut.

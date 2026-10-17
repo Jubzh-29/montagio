@@ -13,6 +13,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint -w @montagio/web
@@ -27,6 +28,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: npm ci
       - run: npx playwright install --with-deps chromium
         working-directory: apps/web
