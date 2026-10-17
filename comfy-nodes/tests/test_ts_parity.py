@@ -19,16 +19,20 @@ def test_constants_match(ts):
     assert list(CAMERA_POSES) == ts["constants"]["CAMERA_POSES"]
 
 
-def test_constants_task_3_will_compare_are_exported(ts):
+def test_bridge_constants_have_the_expected_shape(ts):
+    """Shape only: test_params.py compares the values with the pack's tables."""
     constants = ts["constants"]
-    assert set(constants["CAMERA_POSE_VALUES"]) == set(CAMERA_POSES) == set(constants["CAMERA_POSE_PROMPTS"])
-    assert {aspect: sorted(by_resolution) for aspect, by_resolution in constants["dimensions"].items()} == {
-        "16:9": ["480p", "720p"], "9:16": ["480p", "720p"], "1:1": ["480p", "720p"],
-    }
-    assert constants["dimensions"]["16:9"]["480p"] == {"width": 832, "height": 480}
-    assert constants["frameCount"]["5"]["16"] == 81 and len(constants["frameCount"]) == 9
-    assert all(set(by_fps) == {"16", "24"} for by_fps in constants["frameCount"].values())
-    assert {"width": 1920, "height": 1080, "aspect": "16:9"} in constants["pickAspect"]
+    assert set(constants) == {"CAMERA_POSES", "CAMERA_POSE_VALUES", "CAMERA_POSE_PROMPTS", "dimensions", "frameCount", "pickAspect"}
+    poses = set(constants["CAMERA_POSES"])
+    assert poses and set(constants["CAMERA_POSE_VALUES"]) == poses == set(constants["CAMERA_POSE_PROMPTS"])
+    assert all(isinstance(text, str) for table in ("CAMERA_POSE_VALUES", "CAMERA_POSE_PROMPTS") for text in constants[table].values())
+    assert constants["dimensions"]
+    for by_resolution in constants["dimensions"].values():
+        assert by_resolution and all(set(size) == {"width", "height"} for size in by_resolution.values())
+        assert all(isinstance(value, int) for size in by_resolution.values() for value in size.values())
+    assert constants["frameCount"]
+    assert all(by_fps and all(isinstance(n, int) for n in by_fps.values()) for by_fps in constants["frameCount"].values())
+    assert constants["pickAspect"] and all(set(entry) == {"width", "height", "aspect"} for entry in constants["pickAspect"])
 
 
 def test_case_names_are_unique():  # the bridge answers by name

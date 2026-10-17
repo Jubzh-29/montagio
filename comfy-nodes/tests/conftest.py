@@ -28,3 +28,11 @@ def ts_case(ts, name):
         if answer["name"] == name:
             return answer
     raise KeyError(f"the bridge sent no answer for case {name!r}")
+
+
+def ts_compile(ts, request):
+    """The app's compileJob answer for one request of COMPILE: its params, or {"error": message}."""
+    try:
+        return ts["compile"][COMPILE.index(request)]
+    except ValueError:
+        raise KeyError("this request is not in tests/parity_cases.COMPILE, so the bridge did not run it") from None

@@ -10,6 +10,7 @@ bug in the pack: fix preset.py, never the tables.
 import re
 from pathlib import Path
 
+from montagio_nodes.preset import CAMERA_POSES
 from tests.bridge import find_monorepo
 
 BASE = (Path(__file__).parent / "fixtures" / "crash-push.yaml").read_text(encoding="utf-8")
@@ -208,13 +209,109 @@ def _monorepo_presets():
     return [(f"presets/{file.name}", file.read_bytes().decode("utf-8")) for file in files]
 
 
+# (file name, yaml text) of every preset the monorepo ships; the compiler parity tests run on each
+MONOREPO_PRESETS = _monorepo_presets()
+
 # (name, yaml text); the bridge answers by name
 CASES: list[tuple[str, str]] = (
     [(f"reject {n:02d} {where}: {_short(b)}", edit(a, b)) for n, (a, b, where) in enumerate(REJECTED)]
     + [(f"accept {n:02d} {'.'.join(map(str, path))}: {_short(b)}", edit(a, b)) for n, (a, b, path, _) in enumerate(ACCEPTED)]
     + [(f"shape: {title}", text) for title, text in SHAPES]
-    + _monorepo_presets()
+    + MONOREPO_PRESETS
 )
 
-# compile requests of the compiler parity tests (filled in by the compiler task)
-COMPILE: list[dict] = []
+
+# --- compiler parity (test_params.py) --------------------------------------------------
+# The bridge runs the app's compileJob on each request of COMPILE, and test_params.py compares
+# what comes out with what the pack computes. The requests are built here and the tests build
+# the same ones again: conftest.ts_compile finds the answer by equality and fails on a request
+# that is not listed. The pack does not apply the model limits (spec section 4), so the presets
+# run against the fun-camera model stay within them: at most 5 s, at 16 fps.
+
+FUN_CAMERA = "wan22-i2v-a14b-fun-camera"  # has a camera node: the pack's parametric mode
+WAN_5B = "wan22-ti2v-5b"  # no camera control: the pack's prompt mode (and it renders at 24 fps)
+ASPECT_CHOICES = ("16:9", "9:16", "1:1")
+RESOLUTION_CHOICES = ("480p", "720p")
+USER_PROMPT = "a cat on a sofa"
+
+# every ordered pair of distinct moves the schema accepts (a pair never holds "static")
+POSE_PAIRS = [(a, b) for a in CAMERA_POSES for b in CAMERA_POSES if a != b and "static" not in (a, b)]
+
+SUFFIX = '"dynamic camera push-in, cinematic, sharp focus on subject"'
+NEGATIVE = '"blurry, distorted, warped faces, extra limbs, flicker, low quality"'
+# YAML escapes: U+001C and U+0085 are white space for Python's str.strip() but not for the
+# trim() of JavaScript, and U+FEFF is the other way round
+ODD_SPACES = r"\x1c\x85﻿"
+
+# (title, yaml text): presets that each exercise one input of the compiler
+PRESET_VARIANTS = (
+    [(f"single pose {pose}", edit("poses: [zoom_in]", f"poses: [{pose}]")) for pose in CAMERA_POSES]
+    + [(f"duration {seconds} s", edit("duration_s: 5", f"duration_s: {seconds}")) for seconds in (2, 3, 4, 5)]
+    + [(f"speed {speed}", edit("speed: 1.5", f"speed: {speed}")) for speed in (0.1, 1, 3)]
+    + [
+        ("default resolution 720p", edit("resolution: 480p", "resolution: 720p")),
+        ("minimal preset (static, no prompt block)", MINIMAL),
+        ("empty suffix", edit(SUFFIX, '""')),
+        ("blank suffix", edit(SUFFIX, r'"  \t "')),
+        ("padded suffix", edit(SUFFIX, r'"  padded suffix \n "')),
+        ("suffix between odd spaces", edit(SUFFIX, f'"{ODD_SPACES}suffix{ODD_SPACES}"')),
+        ("empty negative", edit(NEGATIVE, '""')),
+        ("padded negative", edit(NEGATIVE, r'"  keep my spaces \n"')),
+    ]
+)
+
+# (title, what the user typed in the prompt box)
+USER_PROMPTS = [
+    ("plain", USER_PROMPT),
+    ("padded", "  a cat on a sofa \n"),
+    ("empty", ""),
+    ("blank", " \t\n "),
+    ("unicode spaces", " 　 a cat  "),
+    ("line separators", " a cat "),
+    ("byte order mark", "﻿a cat﻿"),
+    ("file separators", "\x1ca cat\x1f"),
+    ("next line", "\x85a cat\x85"),
+    ("inner commas", "a cat, a dog,"),
+]
+
+LORA_BLOCK = "loras:\n  - { file: style.safetensors, strength: 0.8 }\n"
+
+
+def compile_request(preset_yaml, model, aspect="16:9", resolution=None, user_prompt=None):
+    """One request for the bridge; a resolution or a prompt left out is an input left unset."""
+    request = {"preset_yaml": preset_yaml, "model": model, "aspect": aspect}
+    if resolution is not None:
+        request["resolution"] = resolution
+    if user_prompt is not None:
+        request["userPrompt"] = user_prompt
+    return request
+
+
+COMPILE: list[dict] = (
+    # test_compile_parity_fun_camera: every preset of the monorepo, every aspect, every resolution
+    [
+        compile_request(text, FUN_CAMERA, aspect, resolution, "a cat")
+        for _, text in MONOREPO_PRESETS
+        for aspect in ASPECT_CHOICES
+        for resolution in RESOLUTION_CHOICES
+    ]
+    # test_compile_parity_variants and test_compile_parity_prompt_mode_5b
+    + [compile_request(text, FUN_CAMERA, user_prompt=USER_PROMPT) for _, text in PRESET_VARIANTS]
+    + [compile_request(text, WAN_5B, "1:1", user_prompt=USER_PROMPT) for _, text in MONOREPO_PRESETS + PRESET_VARIANTS]
+    # test_compile_parity_user_prompts
+    + [
+        compile_request(text, model, user_prompt=prompt)
+        for _, prompt in USER_PROMPTS
+        for text in (BASE, MINIMAL)
+        for model in (FUN_CAMERA, WAN_5B)
+    ]
+    + [compile_request(BASE, FUN_CAMERA), compile_request(BASE, WAN_5B)]
+    # test_two_poses_parity
+    + [
+        compile_request(edit("poses: [zoom_in]", f"poses: [{a}, {b}]"), model, user_prompt=USER_PROMPT)
+        for a, b in POSE_PAIRS
+        for model in (FUN_CAMERA, WAN_5B)
+    ]
+    # test_loras_parity
+    + [compile_request(BASE + LORA_BLOCK, model, user_prompt=USER_PROMPT) for model in (FUN_CAMERA, WAN_5B)]
+)
