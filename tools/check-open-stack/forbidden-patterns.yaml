@@ -1,6 +1,7 @@
 # Regular expressions that must never appear in Montagio source code: closed
 # generation APIs and the Comfy Router. Scanned in apps/, infra/, packages/*/src
-# and tools/*/src (.ts, .tsx, .js, .mjs, .cjs).
+# and tools/*/src (.ts, .tsx, .js, .mjs, .cjs), and in comfy-nodes/ (the same
+# extensions plus .py).
 schema: montagio/forbidden-patterns@0.1
 patterns:
   - { pattern: 'api\.openai\.com', reason: closed OpenAI API }

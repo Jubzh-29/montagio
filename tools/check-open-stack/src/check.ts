@@ -20,8 +20,18 @@ export type OpenStackReport = {
 
 /** Input values that name a model weight file. */
 const WEIGHT_FILE = /\.(safetensors|sft|ckpt|pt|pth|bin|gguf|onnx)$/i;
-const SOURCE_EXTENSIONS = /\.(ts|tsx|js|mjs|cjs)$/;
-const SKIPPED_DIRS = new Set(['node_modules', '.next', 'dist', 'test-results', 'playwright-report']);
+const SOURCE_EXTENSIONS = /\.(ts|tsx|js|mjs|cjs|py)$/;
+const SKIPPED_DIRS = new Set([
+  'node_modules',
+  '.next',
+  'dist',
+  'test-results',
+  'playwright-report',
+  '__pycache__',
+  '.pytest_cache',
+  '.venv',
+  'venv',
+]);
 
 async function readYaml<T>(path: string): Promise<T> {
   return parseYaml(await readFile(path, 'utf8')) as T;
@@ -49,6 +59,40 @@ async function listFiles(dir: string): Promise<string[]> {
 /** `from 'x'`, `import('x')` and `require('x')` specifiers. */
 const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)['"]([^'"]+)['"]/g;
 
+type ClosedList = { name: string; reason: string }[];
+
+/**
+ * Looks a package up in a forbidden-package list and returns the reason it is closed.
+ * "scope/*" matches every package of an npm scope. `normalize` is applied to both the
+ * list's names and the queried name (npm names are compared as written).
+ */
+function closedMatcher(packages: ClosedList, normalize: (name: string) => string = (name) => name) {
+  const closed = packages.map(({ name, reason }) => ({ name: normalize(name), reason }));
+  return (pkg: string): string | undefined => {
+    const wanted = normalize(pkg);
+    return closed.find(({ name }) => (name.endsWith('/*') ? wanted.startsWith(name.slice(0, -1)) : wanted === name))?.reason;
+  };
+}
+
+/** PEP 503 name normalization: lowercase, runs of "-", "_" and "." folded to "-". */
+const normalizePypiName = (name: string): string => name.toLowerCase().replace(/[-_.]+/g, '-');
+
+/**
+ * The distributions a requirements.txt asks for, PEP 503 normalized. Comments, blank
+ * lines and option lines (-r, -e, --index-url, ...) are skipped; versions, extras,
+ * markers and URLs after the name are dropped.
+ */
+function requirementNames(text: string): string[] {
+  const names: string[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/(^|\s)#.*$/, '').trim();
+    if (!line || line.startsWith('-')) continue;
+    const name = /^[A-Za-z0-9][A-Za-z0-9._-]*(?=$|[\s[;=<>!~@(,])/.exec(line)?.[0];
+    if (name) names.push(normalizePypiName(name));
+  }
+  return names;
+}
+
 /** The repository's package.json files: root, apps/*, packages/*, tools/*, infra/*. */
 async function packageManifests(root: string): Promise<string[]> {
   const manifests = [join(root, 'package.json')];
@@ -75,10 +119,11 @@ async function packageManifests(root: string): Promise<string[]> {
 
 /**
  * Directories whose source code must stay free of closed APIs. Infra scripts
- * (GPU session tooling) sit at the root of their folder, so infra/ is scanned whole.
+ * (GPU session tooling) sit at the root of their folder, so infra/ is scanned whole;
+ * so is comfy-nodes/, the ComfyUI node pack (Python, plus its TypeScript test bridge).
  */
 async function sourceDirs(root: string): Promise<string[]> {
-  const dirs = [join(root, 'apps'), join(root, 'infra')];
+  const dirs = [join(root, 'apps'), join(root, 'infra'), join(root, 'comfy-nodes')];
   for (const group of ['packages', 'tools']) {
     try {
       for (const entry of await readdir(join(root, group), { withFileTypes: true })) {
@@ -185,13 +230,8 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
   }
 
   // Closed-API SDKs: never declared as a dependency, never imported.
-  const closedPackages = await readYaml<{ packages: { name: string; reason: string }[] }>(
-    join(configDir, 'forbidden-packages.yaml'),
-  );
-  const closedReason = (pkg: string): string | undefined =>
-    closedPackages.packages.find(({ name }) =>
-      name.endsWith('/*') ? pkg.startsWith(name.slice(0, -1)) : pkg === name,
-    )?.reason;
+  const closedPackages = await readYaml<{ packages: ClosedList }>(join(configDir, 'forbidden-packages.yaml'));
+  const closedReason = closedMatcher(closedPackages.packages);
   for (const manifest of await packageManifests(root)) {
     const json = JSON.parse(await readFile(manifest, 'utf8')) as Record<string, Record<string, string> | undefined>;
     for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
@@ -202,6 +242,24 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
         }
       }
     }
+  }
+
+  // The ComfyUI node pack declares its Python dependencies in requirements.txt,
+  // checked against the PyPI list (names collide with npm ones, so the lists stay apart).
+  const closedPythonPackages = await readYaml<{ packages: ClosedList }>(
+    join(configDir, 'forbidden-python-packages.yaml'),
+  );
+  const closedPythonReason = closedMatcher(closedPythonPackages.packages, normalizePypiName);
+  const requirementsFile = join('comfy-nodes', 'requirements.txt');
+  let requirements = '';
+  try {
+    requirements = await readFile(join(root, requirementsFile), 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  for (const name of requirementNames(requirements)) {
+    const reason = closedPythonReason(name);
+    if (reason) violations.push({ rule: 'closed-package', file: requirementsFile, detail: `requires "${name}" (${reason})` });
   }
 
   // Source code: no closed API host, no Comfy Router, no closed-API SDK import.
@@ -218,6 +276,8 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
           violations.push({ rule: 'forbidden-pattern', file: relative(root, path), detail: `${reason} (/${regex.source}/)` });
         }
       }
+      // JS import syntax means nothing in Python, and the npm list does not apply to it.
+      if (path.endsWith('.py')) continue;
       for (const match of text.matchAll(IMPORT_SPECIFIER)) {
         const specifier = match[1] ?? '';
         const pkg = specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0]!;

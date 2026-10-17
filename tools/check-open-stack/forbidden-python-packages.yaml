@@ -1,0 +1,25 @@
+# PyPI packages that exist to call closed generation or model APIs. They carry
+# their API hosts inside site-packages, so the host patterns cannot see them:
+# listing one in comfy-nodes/requirements.txt fails `check-open-stack`.
+# Names are compared after PEP 503 normalization (lowercase, runs of "-", "_" and
+# "." folded to "-"). Kept apart from forbidden-packages.yaml on purpose: a name
+# can mean different things on npm and on PyPI (npm "groq" is an unrelated query
+# language), so neither list is derived from the other.
+schema: montagio/forbidden-python-packages@0.1
+packages:
+  - { name: openai, reason: closed OpenAI API }
+  - { name: anthropic, reason: closed Anthropic API }
+  - { name: google-generativeai, reason: closed Google Gemini API }
+  - { name: google-genai, reason: closed Google Gemini API }
+  - { name: google-cloud-aiplatform, reason: closed Google Vertex AI API }
+  - { name: replicate, reason: closed Replicate API }
+  - { name: fal-client, reason: closed fal.ai API }
+  - { name: runwayml, reason: closed Runway API }
+  - { name: lumaai, reason: closed Luma API }
+  - { name: mistralai, reason: closed Mistral API }
+  - { name: cohere, reason: closed Cohere API }
+  - { name: groq, reason: closed Groq API }
+  - { name: elevenlabs, reason: closed ElevenLabs API }
+  # A choice reviewers may contest: boto3 is the generic AWS SDK, but it is also
+  # how Bedrock is reached, and the pack has no reason to talk to AWS.
+  - { name: boto3, reason: 'AWS SDK, carries Bedrock' }
