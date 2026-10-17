@@ -11,3 +11,4 @@ A dated record of how Montagio is built during the challenge window.
 - Studio screen (monitor with viewfinder marks, camera-move glyphs, model picker with licenses, REC tally accent), open-stack page, EN/FR, demo mode end to end with Playwright.
 - Sequence package: FFmpeg helpers for the last frame, the montage and the 9:16 cut.
 - Sequences API: 2-3 shots chained from each shot's last frame (poll-driven state machine, resumable montage), 16:9 film and 9:16 cut.
+- Sequence mode in the Studio: pick 2-3 camera moves in order, watch shot-by-shot progress, download the 16:9 film or the 9:16 cut.

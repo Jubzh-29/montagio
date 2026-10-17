@@ -2,7 +2,10 @@
 
 import { useState, type DragEvent } from 'react';
 import { useI18n } from '@/i18n';
-import type { GenerationRecord } from '@/lib/api-types';
+import type { JobState } from '@/lib/api-types';
+
+/** What the monitor needs from a generation or a sequence. */
+export type TrackedJob = { id: string; state: JobState; progress: number; outputUrl?: string; error?: string };
 import styles from './studio.module.css';
 
 export type UploadState =
@@ -14,7 +17,7 @@ export type UploadState =
 export type GenerationState =
   | { status: 'idle' }
   | { status: 'submitting' }
-  | { status: 'tracking'; record: GenerationRecord }
+  | { status: 'tracking'; record: TrackedJob }
   | { status: 'error'; message: string };
 
 export function Monitor({
@@ -24,6 +27,7 @@ export function Monitor({
   onSample,
   onCancel,
   onRetry,
+  statusLabel,
 }: {
   upload: UploadState;
   generation: GenerationState;
@@ -31,6 +35,8 @@ export function Monitor({
   onSample: () => void;
   onCancel: () => void;
   onRetry: () => void;
+  /** Replaces the default running text, e.g. "Shot 2/3 — 40%". */
+  statusLabel?: string;
 }) {
   const { t } = useI18n();
   const [dragging, setDragging] = useState(false);
@@ -113,8 +119,8 @@ export function Monitor({
           <div className={styles.renderStatus} aria-live="polite">
             <span className={styles.recDot} aria-hidden="true" />
             {generation.status === 'submitting' || record?.state === 'queued'
-              ? t('queued')
-              : t('running', { p: percent })}
+              ? statusLabel ?? t('queued')
+              : statusLabel ?? t('running', { p: percent })}
             <button type="button" className={styles.buttonGhost} onClick={onCancel} disabled={!record}>
               {t('cancel')}
             </button>

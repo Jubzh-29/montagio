@@ -41,5 +41,16 @@
   "backToStudio": "Retour au studio",
   "errorUpload413": "Cette image dépasse 10 Mo.",
   "errorUpload415": "Utilisez une image PNG, JPEG ou WebP.",
-  "errorGeneric": "Une erreur est survenue. Réessayez."
+  "errorGeneric": "Une erreur est survenue. Réessayez.",
+  "modeSingle": "Plan unique",
+  "modeSequence": "Séquence",
+  "modeLabel": "Mode",
+  "shots": "Plans",
+  "sequenceHint": "Choisissez 2 ou 3 mouvements de caméra, dans l'ordre.",
+  "generateFilm": "Générer le film (~{s} s)",
+  "shotProgress": "Plan {i}/{n} — {p} %",
+  "assembling": "Montage du film…",
+  "downloadFilm": "Télécharger le film",
+  "downloadVertical": "Télécharger en 9:16",
+  "removeShot": "Retirer le plan {i}"
 }

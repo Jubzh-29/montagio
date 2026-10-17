@@ -41,5 +41,16 @@
   "backToStudio": "Back to the studio",
   "errorUpload413": "This image is larger than 10 MB.",
   "errorUpload415": "Use a PNG, JPEG or WebP image.",
-  "errorGeneric": "Something went wrong. Please try again."
+  "errorGeneric": "Something went wrong. Please try again.",
+  "modeSingle": "Single shot",
+  "modeSequence": "Sequence",
+  "modeLabel": "Mode",
+  "shots": "Shots",
+  "sequenceHint": "Pick 2 or 3 camera moves, in order.",
+  "generateFilm": "Generate film (~{s}s)",
+  "shotProgress": "Shot {i}/{n} — {p}%",
+  "assembling": "Assembling the film…",
+  "downloadFilm": "Download film",
+  "downloadVertical": "Download 9:16",
+  "removeShot": "Remove shot {i}"
 }

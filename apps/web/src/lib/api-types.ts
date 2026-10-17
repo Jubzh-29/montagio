@@ -39,3 +39,14 @@ export type OpenStackReport = {
 };
 
 export const TERMINAL_STATES: ReadonlySet<JobState> = new Set(['succeeded', 'failed', 'canceled']);
+
+export type SequenceSummary = {
+  id: string;
+  state: 'running' | 'assembling' | 'succeeded' | 'failed' | 'canceled';
+  shots: { presetId: string; state: string }[];
+  currentShot: number;
+  progress: number;
+  outputUrl?: string;
+  verticalUrl?: string;
+  error?: string;
+};

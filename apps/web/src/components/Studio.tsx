@@ -5,28 +5,70 @@ import { useI18n } from '@/i18n';
 import {
   TERMINAL_STATES,
   type GenerationRecord,
+  type JobState,
   type ModelSummary,
   type PresetSummary,
+  type SequenceSummary,
   type UploadResult,
 } from '@/lib/api-types';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
-import { Monitor, type GenerationState, type UploadState } from './Monitor';
+import { Monitor, type GenerationState, type TrackedJob, type UploadState } from './Monitor';
 import { PresetGallery } from './PresetGallery';
+import { ShotList } from './ShotList';
 import styles from './studio.module.css';
 
 const POLL_MS = 1000;
 const MAX_POLL_FAILURES = 4;
+const MAX_SHOTS = 3;
+const ASSEMBLY_ESTIMATE_S = 5;
+
+type Mode = 'single' | 'sequence';
+
+/** A render in progress or finished: a single generation or a sequence of shots. */
+type Job =
+  | { status: 'idle' }
+  | { status: 'submitting' }
+  | { status: 'tracking'; kind: 'generation'; record: GenerationRecord }
+  | { status: 'tracking'; kind: 'sequence'; record: SequenceSummary }
+  | { status: 'error'; message: string };
+
+type Tracked = Extract<Job, { status: 'tracking' }>;
+
+const SEQUENCE_STATE: Record<SequenceSummary['state'], JobState> = {
+  running: 'running',
+  assembling: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  canceled: 'canceled',
+};
+
+function trackedJob(job: Tracked): TrackedJob {
+  if (job.kind === 'generation') return job.record;
+  const { id, progress, outputUrl, error } = job.record;
+  return { id, progress, outputUrl, error, state: SEQUENCE_STATE[job.record.state] };
+}
+
+const endpoint = (job: Tracked) => `/api/${job.kind === 'sequence' ? 'sequences' : 'generations'}/${job.record.id}`;
+
+/** The same job, marked as lost by the server (404). */
+function lostJob(job: Tracked): Job {
+  return job.kind === 'generation'
+    ? { ...job, record: { ...job.record, state: 'failed', error: 'lost' } }
+    : { ...job, record: { ...job.record, state: 'failed', error: 'lost' } };
+}
 
 export function Studio() {
   const { t } = useI18n();
+  const [mode, setMode] = useState<Mode>('single');
   const [presets, setPresets] = useState<PresetSummary[]>([]);
   const [models, setModels] = useState<ModelSummary[]>([]);
   const [presetId, setPresetId] = useState<string | null>(null);
+  const [shots, setShots] = useState<string[]>([]);
   const [modelId, setModelId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [upload, setUpload] = useState<UploadState>({ status: 'idle' });
-  const [generation, setGeneration] = useState<GenerationState>({ status: 'idle' });
+  const [job, setJob] = useState<Job>({ status: 'idle' });
   const submitting = useRef(false);
   const pollFailures = useRef(0);
   const [pollRetry, setPollRetry] = useState(0);
@@ -43,7 +85,7 @@ export function Studio() {
         setPresetId((current) => current ?? presetList[0]?.id ?? null);
         setModelId((current) => current ?? presetList[0]?.defaultModel ?? null);
       })
-      .catch(() => setGeneration({ status: 'error', message: t('errorGeneric') }));
+      .catch(() => setJob({ status: 'error', message: t('errorGeneric') }));
     // t only changes with the language; the catalog is fetched once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -52,32 +94,33 @@ export function Studio() {
     if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
   }, []);
 
-  const record = generation.status === 'tracking' ? generation.record : undefined;
-  const busy =
-    generation.status === 'submitting' || (record !== undefined && !TERMINAL_STATES.has(record.state));
+  const tracked = job.status === 'tracking' ? job : undefined;
+  const view = tracked ? trackedJob(tracked) : undefined;
+  const busy = job.status === 'submitting' || (view !== undefined && !TERMINAL_STATES.has(view.state));
 
-  // Poll the current generation until it reaches a terminal state. A 404 means
-  // the server lost it (data wiped, restart); 5xx and network errors are
-  // retried with a growing delay, then surfaced as an error.
+  // Poll the current job until it reaches a terminal state. A 404 means the
+  // server lost it (data wiped, restart); 5xx and network errors are retried
+  // with a growing delay, then surfaced as an error.
   useEffect(() => {
-    if (!record || TERMINAL_STATES.has(record.state)) return;
+    if (!tracked || !view || TERMINAL_STATES.has(view.state)) return;
     const delay = POLL_MS * (pollFailures.current + 1);
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/generations/${record.id}`);
+        const res = await fetch(endpoint(tracked));
         if (res.status === 404) {
           pollFailures.current = 0;
-          setGeneration({ status: 'tracking', record: { ...record, state: 'failed', error: 'lost' } });
+          setJob(lostJob(tracked));
           return;
         }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         pollFailures.current = 0;
-        setGeneration({ status: 'tracking', record: (await res.json()) as GenerationRecord });
+        const record = await res.json();
+        setJob({ ...tracked, record } as Tracked);
       } catch {
         pollFailures.current += 1;
         if (pollFailures.current >= MAX_POLL_FAILURES) {
           pollFailures.current = 0;
-          setGeneration({ status: 'error', message: t('errorGeneric') });
+          setJob({ status: 'error', message: t('errorGeneric') });
         } else {
           setPollRetry((n) => n + 1);
         }
@@ -86,7 +129,7 @@ export function Studio() {
     return () => clearTimeout(timer);
     // t only changes with the language and is read when the error is shown.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [record, pollRetry]);
+  }, [tracked?.record, pollRetry]);
 
   const busyRef = useRef(false);
   useEffect(() => {
@@ -104,7 +147,7 @@ export function Studio() {
       if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
       const localUrl = URL.createObjectURL(file);
       localUrlRef.current = localUrl;
-      setGeneration({ status: 'idle' });
+      setJob({ status: 'idle' });
       setUpload({ status: 'uploading', localUrl });
       const form = new FormData();
       form.set('image', file);
@@ -131,43 +174,75 @@ export function Studio() {
     await onFile(new File([await res.blob()], 'sample.png', { type: 'image/png' }));
   };
 
-  const canGenerate = upload.status === 'ready' && presetId !== null && modelId !== null && !busy;
+  const onPreset = (id: string) => {
+    if (mode === 'single') setPresetId(id);
+    else setShots((current) => (current.length < MAX_SHOTS ? [...current, id] : current));
+  };
 
-  const generate = async () => {
-    if (submitting.current || !canGenerate || upload.status !== 'ready') return;
+  const ready = upload.status === 'ready' && modelId !== null && !busy;
+  const canGenerate = mode === 'single' ? ready && presetId !== null : ready && shots.length >= 2;
+
+  const submit = async (kind: Tracked['kind'], body: unknown) => {
     submitting.current = true;
-    setGeneration({ status: 'submitting' });
+    setJob({ status: 'submitting' });
     try {
-      const res = await fetch('/api/generations', {
+      const res = await fetch(kind === 'sequence' ? '/api/sequences' : '/api/generations', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
-        body: JSON.stringify({ presetId, modelId, imageRef: upload.imageRef, userPrompt: prompt.trim() || undefined }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
-        setGeneration({ status: 'error', message: t('errorGeneric') });
+        setJob({ status: 'error', message: t('errorGeneric') });
         return;
       }
-      setGeneration({ status: 'tracking', record: (await res.json()) as GenerationRecord });
+      setJob({ status: 'tracking', kind, record: await res.json() } as Tracked);
     } catch {
-      setGeneration({ status: 'error', message: t('errorGeneric') });
+      setJob({ status: 'error', message: t('errorGeneric') });
     } finally {
       submitting.current = false;
     }
   };
 
+  const generate = () => {
+    if (submitting.current || !canGenerate || upload.status !== 'ready') return;
+    const userPrompt = prompt.trim() || undefined;
+    if (mode === 'single') {
+      void submit('generation', { presetId, modelId, imageRef: upload.imageRef, userPrompt });
+    } else {
+      void submit('sequence', {
+        imageRef: upload.imageRef,
+        shots: shots.map((id) => ({ presetId: id, modelId, userPrompt })),
+      });
+    }
+  };
+
   const cancel = async () => {
-    if (!record) return;
+    if (!tracked) return;
     try {
-      const res = await fetch(`/api/generations/${record.id}/cancel`, { method: 'POST' });
-      if (res.status === 404) setGeneration({ status: 'tracking', record: { ...record, state: 'failed', error: 'lost' } });
-      else if (res.ok) setGeneration({ status: 'tracking', record: (await res.json()) as GenerationRecord });
+      const res = await fetch(`${endpoint(tracked)}/cancel`, { method: 'POST' });
+      if (res.status === 404) setJob(lostJob(tracked));
+      else if (res.ok) setJob({ ...tracked, record: await res.json() } as Tracked);
     } catch {
       // the next poll reports the real state
     }
   };
 
+  const monitorState: GenerationState =
+    job.status === 'tracking' ? { status: 'tracking', record: trackedJob(job) } : job;
+  const statusLabel =
+    tracked?.kind === 'sequence' && tracked.record.state === 'assembling'
+      ? t('assembling')
+      : tracked?.kind === 'sequence'
+        ? t('shotProgress', {
+            i: tracked.record.currentShot + 1,
+            n: tracked.record.shots.length,
+            p: Math.round(tracked.record.progress * 100),
+          })
+        : undefined;
+
   const selectedModel = models.find((model) => model.id === modelId);
   const estimate = selectedModel?.estimate_s['480p'] ?? 0;
+  const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
 
   return (
     <>
@@ -176,31 +251,72 @@ export function Studio() {
         <section className={styles.stage} aria-label="Monitor">
           <Monitor
             upload={upload}
-            generation={generation}
+            generation={monitorState}
             onFile={onFile}
             onSample={loadSample}
             onCancel={cancel}
-            onRetry={() => setGeneration({ status: 'idle' })}
+            onRetry={() => setJob({ status: 'idle' })}
+            statusLabel={statusLabel}
           />
-          {record?.state === 'succeeded' && (
+          {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
             <div className={styles.actions}>
-              {record.outputUrl && (
-                <a className={styles.buttonSecondary} href={record.outputUrl} download>
+              {tracked.record.outputUrl && (
+                <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download>
                   {t('download')}
                 </a>
               )}
-              <a className={styles.buttonSecondary} href={`/api/workflows/${record.id}`} download>
+              <a className={styles.buttonSecondary} href={`/api/workflows/${tracked.record.id}`} download>
                 {t('openInComfy')}
               </a>
-              <a className={styles.buttonSecondary} href={`/api/presets/${record.presetId}/yaml`} download>
+              <a className={styles.buttonSecondary} href={`/api/presets/${tracked.record.presetId}/yaml`} download>
                 {t('remix')}
               </a>
+            </div>
+          )}
+          {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
+            <div className={styles.actions}>
+              {tracked.record.outputUrl && (
+                <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download>
+                  {t('downloadFilm')}
+                </a>
+              )}
+              {tracked.record.verticalUrl && (
+                <a className={styles.buttonSecondary} href={tracked.record.verticalUrl} download>
+                  {t('downloadVertical')}
+                </a>
+              )}
             </div>
           )}
         </section>
 
         <aside className={styles.panel}>
-          <PresetGallery presets={presets} selectedId={presetId} onSelect={setPresetId} />
+          <div className={styles.modes} role="group" aria-label={t('modeLabel')}>
+            {(['single', 'sequence'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                className={styles.mode}
+                aria-pressed={mode === value}
+                disabled={busy}
+                onClick={() => setMode(value)}
+              >
+                {value === 'single' ? t('modeSingle') : t('modeSequence')}
+              </button>
+            ))}
+          </div>
+          <PresetGallery
+            presets={presets}
+            selectedId={mode === 'single' ? presetId : null}
+            onSelect={onPreset}
+          />
+          {mode === 'sequence' && (
+            <ShotList
+              shots={shots}
+              presets={presets}
+              max={MAX_SHOTS}
+              onRemove={(index) => setShots((current) => current.filter((_, i) => i !== index))}
+            />
+          )}
           <ModelPicker models={models} selectedId={modelId} onSelect={setModelId} />
           <div className={styles.panelSection}>
             <label htmlFor="scene-prompt" className={styles.sectionTitle}>
@@ -218,7 +334,7 @@ export function Studio() {
           </div>
           <div className={styles.generateBlock}>
             <button type="button" className={styles.buttonPrimary} disabled={!canGenerate} onClick={generate}>
-              {t('generate', { s: estimate })}
+              {mode === 'single' ? t('generate', { s: estimate }) : t('generateFilm', { s: filmEstimate })}
             </button>
             {upload.status !== 'ready' && <p className={styles.hint}>{t('generateHint')}</p>}
             <p className={styles.note}>{t('localNote')}</p>

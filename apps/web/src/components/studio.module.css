@@ -530,3 +530,94 @@
 .buttonLink:hover {
   color: var(--ink);
 }
+
+/* Mode switch: single shot or sequence */
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+
+.mode {
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+}
+
+.mode:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.mode[aria-pressed='true'] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.mode:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Shot list: an ordered sequence, so numbers carry meaning */
+.shotList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shot {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+}
+
+.shotNumber {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--rec-soft);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.shotName {
+  font-weight: 600;
+  font-size: var(--text-s);
+}
+
+.shotRemove {
+  width: 28px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: var(--text-l);
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+}
+
+.shotRemove:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
