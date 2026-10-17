@@ -30,7 +30,7 @@ const keyFile = (key: string) =>
   join(generationsDir(), '_keys', `${createHash('sha256').update(key).digest('hex')}.json`);
 
 /** Write to a temporary file, then rename: readers never see a half-written record. */
-async function writeAtomic(path: string, content: string): Promise<void> {
+export async function writeAtomic(path: string, content: string): Promise<void> {
   const tmp = `${path}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
   await writeFile(tmp, content);
   for (let attempt = 0; ; attempt++) {

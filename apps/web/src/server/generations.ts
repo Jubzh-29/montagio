@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import { relative, sep } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { compileJob, CompileError } from '@montagio/presets';
 import { getEnv } from './env';
 import { getServices } from './services';
@@ -16,7 +16,7 @@ import { readUploadMeta } from './uploads';
 export const IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
 const TERMINAL = new Set(['succeeded', 'failed', 'canceled']);
 
-export type GenerationErrorCode = 'unknown-preset' | 'unknown-image' | 'model-incompatible';
+export type GenerationErrorCode = 'unknown-preset' | 'unknown-image' | 'model-incompatible' | 'invalid-shots';
 
 export class GenerationError extends Error {
   constructor(readonly code: GenerationErrorCode) {
@@ -120,6 +120,18 @@ export function mediaUrlFor(absolutePath: string): string | undefined {
     if (rel && !rel.startsWith('..') && !rel.includes(':')) return `/media/${prefix}/${rel.split(sep).join('/')}`;
   }
   return undefined;
+}
+
+/** Inverse of mediaUrlFor: the file behind a /media/data or /media/demo-assets URL, or null. */
+export function mediaFileFor(url: string | undefined): string | null {
+  const match = /^\/media\/(data|demo-assets)\/(.+)$/.exec(url ?? '');
+  if (!match) return null;
+  const segments = match[2]!.split('/');
+  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..' || /[\\:\u0000]/.test(segment))) {
+    return null;
+  }
+  const { root, data } = getEnv();
+  return join(match[1] === 'data' ? data : join(root, 'demo-assets'), ...segments);
 }
 
 export async function getGeneration(id: string): Promise<GenerationRecord | null> {

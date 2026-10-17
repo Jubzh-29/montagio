@@ -25,18 +25,25 @@ function run(tool: Tool, args: string[]): Promise<string> {
   });
 }
 
-export async function probe(media: string): Promise<{ width: number; height: number; duration_s: number }> {
+export async function probe(
+  media: string,
+): Promise<{ width: number; height: number; duration_s: number; fps: number }> {
   const out = await run(ffprobe(), [
     '-v', 'error',
     '-select_streams', 'v:0',
-    '-show_entries', 'stream=width,height:format=duration',
+    '-show_entries', 'stream=width,height,r_frame_rate:format=duration',
     '-of', 'json',
     media,
   ]);
-  const json = JSON.parse(out) as { streams?: { width?: number; height?: number }[]; format?: { duration?: string } };
+  const json = JSON.parse(out) as {
+    streams?: { width?: number; height?: number; r_frame_rate?: string }[];
+    format?: { duration?: string };
+  };
   const stream = json.streams?.[0];
   if (!stream?.width || !stream.height) throw new SequenceToolError(`no video stream in ${media}`);
-  return { width: stream.width, height: stream.height, duration_s: Number(json.format?.duration ?? 0) };
+  const [num, den] = (stream.r_frame_rate ?? '0/1').split('/').map(Number);
+  const fps = num && den ? num / den : 0;
+  return { width: stream.width, height: stream.height, duration_s: Number(json.format?.duration ?? 0), fps };
 }
 
 /** Write the last frame of a clip as a PNG: seek near the end, keep overwriting until the final frame. */

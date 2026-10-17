@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { extname, join } from 'node:path';
 import { pickAspect, type Aspect } from '@montagio/presets';
 import { imageSize } from 'image-size';
 import { getEnv } from './env';
@@ -11,6 +11,7 @@ const EXTENSIONS: Record<string, 'png' | 'jpg' | 'webp'> = {
   'image/jpeg': 'jpg',
   'image/webp': 'webp',
 };
+const FILE_EXTENSIONS: Record<string, 'png' | 'jpg' | 'webp'> = { '.png': 'png', '.jpg': 'jpg', '.jpeg': 'jpg', '.webp': 'webp' };
 const SNIFFED: Record<string, string> = { png: 'png', jpg: 'jpg', webp: 'webp' };
 
 export type UploadMeta = { imageRef: string; width: number; height: number; aspect: Aspect };
@@ -28,8 +29,17 @@ export async function saveUpload(file: File): Promise<UploadMeta> {
   const ext = EXTENSIONS[file.type];
   if (!ext) throw new UploadError(415, 'only PNG, JPEG and WebP images are accepted');
   if (file.size > MAX_UPLOAD_BYTES) throw new UploadError(413, 'images are limited to 10 MB');
+  return storeImage(new Uint8Array(await file.arrayBuffer()), ext);
+}
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
+/** Store an image produced on the server (e.g. the last frame of a shot) as an ordinary upload. */
+export async function saveUploadFromFile(path: string): Promise<UploadMeta> {
+  const ext = FILE_EXTENSIONS[extname(path).toLowerCase()];
+  if (!ext) throw new UploadError(415, `unsupported image file ${path}`);
+  return storeImage(new Uint8Array(await readFile(path)), ext);
+}
+
+async function storeImage(bytes: Uint8Array, ext: 'png' | 'jpg' | 'webp'): Promise<UploadMeta> {
   let width: number | undefined;
   let height: number | undefined;
   let sniffed: string | undefined;
