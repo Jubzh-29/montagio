@@ -1,6 +1,6 @@
 # Regular expressions that must never appear in Montagio source code: closed
-# generation APIs and the Comfy Router. Scanned in apps/, packages/*/src and
-# tools/*/src (.ts, .tsx, .js, .mjs, .cjs).
+# generation APIs and the Comfy Router. Scanned in apps/, infra/, packages/*/src
+# and tools/*/src (.ts, .tsx, .js, .mjs, .cjs).
 schema: montagio/forbidden-patterns@0.1
 patterns:
   - { pattern: 'api\.openai\.com', reason: closed OpenAI API }
@@ -16,3 +16,7 @@ patterns:
   - { pattern: 'ComfyRouter', reason: Comfy Router (proprietary model routing) }
   - { pattern: '\.router\b', reason: Comfy SDK router namespace }
   - { pattern: '\[\s*[''"`]router[''"`]\s*\]', reason: Comfy SDK router namespace (indexed access) }
+  # @comfyorg/sdk 0.5.0 exposes the Router as comfy.models.* (run, submit, subscribe, handle)
+  - { pattern: '\bmodels\.(run|submit|subscribe|handle)\s*\(', reason: Comfy Router (comfy.models.* in @comfyorg/sdk) }
+  - { pattern: '/v2/models/', reason: Comfy Router REST route }
+  - { pattern: 'COMFY_ROUTER_BASE_URL', reason: Comfy Router host setting of @comfyorg/sdk }

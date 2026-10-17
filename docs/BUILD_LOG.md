@@ -12,3 +12,4 @@ A dated record of how Montagio is built during the challenge window.
 - Sequence package: FFmpeg helpers for the last frame, the montage and the 9:16 cut.
 - Sequences API: 2-3 shots chained from each shot's last frame (poll-driven state machine, resumable montage), 16:9 film and 9:16 cut.
 - Sequence mode in the Studio: pick 2-3 camera moves in order, watch shot-by-shot progress, download the 16:9 film or the 9:16 cut.
+- GPU session tooling (`infra/runpod/`): pod bootstrap (ComfyUI v0.41.0 with `--disable-partner-nodes`, comfy-api-proxy 0.1.6, pinned PyTorch and Node.js), weight downloader that resolves exact Hugging Face files, checks sha256 and proposes a lock patch, and an SDK smoke test with timing and VRAM. `check-open-stack` now scans `infra/` and catches the SDK's Router namespace (`comfy.models.*`). Session guide: `docs/S1_CHECKLIST.md`.

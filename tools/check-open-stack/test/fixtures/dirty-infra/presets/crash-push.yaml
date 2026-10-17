@@ -1,0 +1,20 @@
+schema: montagio/preset@0.1
+id: crash-push
+name: Crash Push
+description: Fast push toward the subject, ending tight.
+preview: previews/crash-push.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-camera
+camera:
+  poses: [zoom_in]
+  speed: 1.5
+prompt:
+  suffix: "dynamic camera push-in, cinematic, sharp focus on subject"
+  negative: "blurry, distorted, extra limbs"
+defaults:
+  duration_s: 5
+  resolution: 480p
+  fps: 16
+models:
+  preferred: wan22-i2v-a14b-fun-camera
