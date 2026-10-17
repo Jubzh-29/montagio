@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { POST as postGenerations } from '@/app/api/generations/route';
@@ -12,6 +12,7 @@ import { POST as postUpload } from '@/app/api/uploads/route';
 import { GET as getWorkflow } from '@/app/api/workflows/[id]/route';
 import { GET as getMedia } from '@/app/media/[...path]/route';
 import { galleryOrder, presetPreviewUrl } from '@/server/gallery';
+import { loadLibrary } from '@montagio/presets';
 import {
   bigPng,
   generationRequest,
@@ -197,9 +198,16 @@ describe('downloads and catalog', () => {
     ]);
   });
 
-  test('a preset whose preview file is missing gets no previewUrl', async () => {
+  test('the presets list has a previewUrl exactly for the presets whose preview file exists', async () => {
+    // True today (no preview yet) and after GPU session S3 commits presets/previews/*.mp4.
+    const root = process.env.MONTAGIO_ROOT!;
+    const lib = await loadLibrary(root);
     const list = (await (await getPresets()).json()) as { id: string; previewUrl?: string }[];
-    expect(list.find((preset) => preset.id === 'crash-push')).not.toHaveProperty('previewUrl');
+    for (const item of list) {
+      const preview = lib.presets.get(item.id)!.preview;
+      const expected = existsSync(join(root, 'presets', ...preview.split('/'))) ? `/media/presets/${preview}` : undefined;
+      expect(item.previewUrl, item.id).toBe(expected);
+    }
   });
 
   test('previewUrl points at the preview only when its file exists', async () => {

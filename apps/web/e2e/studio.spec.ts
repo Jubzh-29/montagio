@@ -118,13 +118,15 @@ test('the Generate button is reachable without scrolling on a laptop screen', as
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeInViewport();
 });
 
-test('the gallery requests no preview video that does not exist yet', async ({ page }) => {
-  const previews: string[] = [];
-  page.on('request', (request) => {
-    if (request.url().includes('/media/presets/previews/')) previews.push(request.url());
+test('the gallery requests no preview video that does not exist', async ({ page }) => {
+  // Missing previews must not be requested at all: on a slow server, a dozen 404s hold the
+  // browser's six connections and stall the app's own calls. Existing previews may load.
+  const missing: string[] = [];
+  page.on('response', (response) => {
+    if (response.url().includes('/media/presets/previews/') && response.status() === 404) missing.push(response.url());
   });
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Crash Push' })).toBeVisible();
   await page.waitForLoadState('networkidle');
-  expect(previews).toEqual([]);
+  expect(missing).toEqual([]);
 });
