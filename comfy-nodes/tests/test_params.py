@@ -34,6 +34,7 @@ from montagio_nodes.wan import WAN_CAMERA_POSES
 from tests.bridge import find_monorepo
 from tests.conftest import ts_compile
 from tests.parity_cases import (
+    ALL_JS_WHITE_SPACE,
     ASPECT_CHOICES,
     BASE,
     BEYOND_PRESETS,
@@ -231,8 +232,15 @@ def test_blank_parts_are_left_out():
 
 def test_trim_is_the_one_of_javascript():
     # U+FEFF is trimmed by JavaScript (not by str.strip), U+001C and U+0085 are kept (str.strip drops them)
-    p = compute_params(CRASH, aspect="16:9", prompt="﻿\x85a cat\x1c﻿")
+    p = compute_params(CRASH, aspect="16:9", prompt="\ufeff\x85a cat\x1c\ufeff")
     assert p.prompt == "\x85a cat\x1c, dynamic camera push-in, cinematic, sharp focus on subject"
+
+
+def test_trim_removes_every_white_space_of_javascript_and_keeps_the_inner_ones():
+    assert len(set(ALL_JS_WHITE_SPACE)) == 25
+    spaced = ALL_JS_WHITE_SPACE + "a cat" + ALL_JS_WHITE_SPACE + "on a sofa" + ALL_JS_WHITE_SPACE
+    p = compute_params(CRASH, aspect="16:9", prompt=spaced)
+    assert p.prompt == "a cat" + ALL_JS_WHITE_SPACE + "on a sofa, dynamic camera push-in, cinematic, sharp focus on subject"
 
 
 @pytest.mark.parametrize(

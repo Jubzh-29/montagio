@@ -95,7 +95,7 @@ The `preset` menu lists three kinds of folders, in this order of priority:
 
 When two folders hold a file with the same name, the first folder wins. A user file with the same name as a bundled preset replaces it in the menu: copy a bundled preset into the user folder and edit it to remix it.
 
-Files in sub-folders are listed with their relative path, such as `mine/slow-push.yaml`. A name that leads outside the preset folders is refused.
+Files in sub-folders are listed with their relative path, such as `mine/slow-push.yaml`. Folders whose name starts with a dot, such as `.git` and `.github` in a cloned repository, are skipped. A name that leads outside the preset folders, or into a dot folder, is refused.
 
 A new file shows up in the menu when the frontend refreshes the node definitions, with no restart. An edit to a preset file is picked up on the next run when the `preset` menu of the Load node is used directly.
 
@@ -122,7 +122,7 @@ npm run test:nodes                                  # python -m pytest comfy-nod
 
 The tests do not need ComfyUI or a GPU: a small fake of `comfy_api` stands in for it. The parity suite compares the Python reader and the Python outputs with the app's real `parsePreset` and `compileJob`, which it runs through a `tsx` bridge. Without the repository around the pack (a standalone checkout), these tests are skipped. `MONTAGIO_REQUIRE_TS_PARITY=1` turns a skip into a failure, which is how CI runs them.
 
-`presets/` holds copies of the repository's `presets/*.yaml`, because the Registry publishes only this folder. Refresh them with `python comfy-nodes/scripts/sync_presets.py` (add `--check` to only list the differences). A test fails when the copies differ from the originals.
+`presets/` holds copies of the repository's `presets/*.yaml` and `presets/*.yml`, because the Registry publishes only this folder. Refresh them with `python comfy-nodes/scripts/sync_presets.py` (add `--check` to only list the differences). A test fails when the copies differ from the originals.
 
 ## Publishing
 

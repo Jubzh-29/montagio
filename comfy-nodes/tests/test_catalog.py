@@ -127,6 +127,44 @@ def test_a_folder_named_like_a_preset_is_not_a_preset(tmp_path):
     assert list_presets([tmp_path]) == ["dir.yaml/inner.yaml"]
 
 
+@pytest.fixture
+def repo_clone(tmp_path):
+    """A preset folder that is the clone of a repository: .git/ and .github/ beside the presets."""
+    touch(tmp_path / ".git" / "x" / "config.yaml")
+    touch(tmp_path / ".github" / "workflows" / "ci.yml")
+    touch(tmp_path / "sub" / ".cache" / "c.yaml")
+    touch(tmp_path / "sub" / "b.yaml")
+    touch(tmp_path / "a.yaml")
+    return tmp_path
+
+
+def test_dot_folders_are_not_listed(repo_clone):
+    assert list_presets([repo_clone]) == ["a.yaml", "sub/b.yaml"]
+
+
+def test_dot_folders_are_not_even_walked(repo_clone, monkeypatch):
+    import montagio_nodes.catalog as catalog
+
+    walked = []
+    real_walk = os.walk
+
+    def spy(top, *args, **kwargs):
+        for current, subfolders, files in real_walk(top, *args, **kwargs):
+            walked.append(Path(current).relative_to(repo_clone).as_posix())
+            yield current, subfolders, files  # the same list: the pruning of list_presets reaches os.walk
+
+    monkeypatch.setattr(catalog.os, "walk", spy)
+    list_presets([repo_clone])
+    assert sorted(walked) == [".", "sub"]
+
+
+@pytest.mark.parametrize("name", [".git/x/config.yaml", ".github/workflows/ci.yml", ".github\\workflows\\ci.yml", "sub/.cache/c.yaml"])
+def test_a_name_through_a_dot_folder_is_refused_as_the_menu_hides_it(repo_clone, name):
+    assert _parts(name) is None
+    with pytest.raises(PresetError, match=r"preset not found or outside the preset folders"):
+        resolve_preset(name, [repo_clone])
+
+
 # --- resolving ------------------------------------------------------------------
 
 
@@ -329,13 +367,34 @@ def test_sync_copies_yaml_and_license_byte_for_byte(tmp_path, sync):
     (src / "b.yaml").write_bytes(b"id: b\n")
     (src / "LICENSE").write_bytes(b"licence\r\ntext")
     (src / "notes.txt").write_bytes(b"left behind")
-    (src / "c.yml").write_bytes(b"left behind")
+    (src / "c.yml").write_bytes(b"id: c\n")
+    (src / "d.YAML").write_bytes(b"left behind")  # the app reads /\.ya?ml$/: lowercase only
     changes = sync(src, dst)
-    assert sorted(path.name for path in dst.iterdir()) == ["LICENSE", "a.yaml", "b.yaml"]
+    assert sorted(path.name for path in dst.iterdir()) == ["LICENSE", "a.yaml", "b.yaml", "c.yml"]
     assert (dst / "a.yaml").read_bytes() == crlf
     assert (dst / "LICENSE").read_bytes() == b"licence\r\ntext"
-    assert len(changes) == 3 and all(isinstance(change, str) for change in changes)
-    assert all(any(name in change for change in changes) for name in ("a.yaml", "b.yaml", "LICENSE"))
+    assert len(changes) == 4 and all(isinstance(change, str) for change in changes)
+    assert all(any(name in change for change in changes) for name in ("a.yaml", "b.yaml", "c.yml", "LICENSE"))
+
+
+def test_sync_ships_yml_presets_and_removes_stale_ones(tmp_path, sync):
+    src, dst = tmp_path / "src", tmp_path / "dst"
+    touch(src / "new.yml", "new")
+    touch(dst / "stale.yml")
+    touch(dst / "Other.YML")  # not a name the app reads: left alone, like any other file
+    changes = sync(src, dst)
+    assert (dst / "new.yml").read_text("utf-8") == "new"
+    assert not (dst / "stale.yml").exists() and (dst / "Other.YML").exists()
+    assert sorted(changes) == ["add new.yml", "remove stale.yml"]
+
+
+@pytest.mark.parametrize(
+    "name,shipped",
+    [("a.yaml", True), ("a.yml", True), ("a.b.yml", True), ("a.YAML", False), ("a.Yml", False), ("a.yaml.bak", False), ("a.yamll", False), ("a.json", False)],
+)
+def test_sync_takes_the_files_the_app_library_reads(tmp_path, sync, name, shipped):  # loadLibrary: /\.ya?ml$/
+    touch(tmp_path / "src" / name)
+    assert sync(tmp_path / "src", tmp_path / "dst") == ([f"add {name}"] if shipped else [])
 
 
 def test_sync_twice_changes_nothing_the_second_time(tmp_path, sync):

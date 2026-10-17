@@ -9,7 +9,8 @@ A preset name arrives from a workflow file, so it is untrusted. It must be a pla
 relative path: no drive, no root, no ".." and nothing that leads out of its folder, on
 whatever system the pack runs on (a workflow written on Windows runs on a Linux pod and
 the other way round). Both "/" and "\\" separate the parts of a name, and the names the
-menu lists always use "/".
+menu lists always use "/". Folders whose name starts with a dot (.git, .github) are
+neither listed nor reached.
 """
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -35,6 +36,8 @@ def _parts(name):
     if not parts or any(not part.strip(" .") for part in parts):
         return None
     if any(PureWindowsPath(part).drive for part in parts):  # "sub/C:x.yaml"
+        return None
+    if any(part.startswith(".") for part in parts[:-1]):  # ".git/x.yaml": a dot folder, which the menu skips
         return None
     if PurePosixPath(parts[-1]).suffix.lower() not in PRESET_EXTENSIONS:
         return None
@@ -63,7 +66,10 @@ def list_presets(dirs):
         root = Path(folder)
         if not root.is_dir():
             continue
-        for current, _, files in os.walk(root):
+        for current, subfolders, files in os.walk(root):
+            # a preset folder may be the clone of a repository: its .git, .github... hold no presets
+            # (ComfyUI's own file lists skip .git too)
+            subfolders[:] = [sub for sub in subfolders if not sub.startswith(".")]
             for file_name in files:
                 name = "/".join(Path(current, file_name).relative_to(root).parts)
                 parts = _parts(name)

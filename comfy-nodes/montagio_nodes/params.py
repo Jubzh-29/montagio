@@ -45,9 +45,12 @@ _DEFAULT_ASPECT = "16:9"  # with no start image to look at
 
 # What String.prototype.trim removes in JavaScript (WhiteSpace and LineTerminator). It is not the
 # set of str.strip(): that one also drops U+001C..U+001F and U+0085 and keeps U+FEFF.
+# The 25 characters, written as escapes so that none is invisible: the five ASCII controls, the
+# space, no-break space, ogham space mark, U+2000..U+200A (en quad to hair space), line and
+# paragraph separators, narrow no-break space, medium mathematical space, ideographic space, BOM.
 _JS_WHITE_SPACE = (
-    "\t\n\x0b\x0c\r              "
-    "    　﻿"
+    "\t\n\x0b\x0c\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000\ufeff"
 )
 
 

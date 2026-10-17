@@ -2,7 +2,7 @@
 """Copy the monorepo's presets into the pack, byte for byte.
 
 The Comfy Registry publishes only the pack folder, so the pack ships its own copy of
-presets/*.yaml (CC-BY-4.0) and of presets/LICENSE. The copy is made by this script and
+presets/*.yaml and *.yml (CC-BY-4.0) and of presets/LICENSE. The copy is made by this script and
 never by hand: tests/test_catalog.py fails when the bundled folder differs from the
 monorepo's.
 
@@ -11,6 +11,7 @@ monorepo's.
     python comfy-nodes/scripts/sync_presets.py SRC DST    # other folders
 """
 import argparse
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -19,21 +20,23 @@ PACK_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_SRC = PACK_DIR.parent / "presets"
 DEFAULT_DST = PACK_DIR / "presets"
 LICENSE_NAME = "LICENSE"
+# the preset files the app's loadLibrary reads (packages/presets/src/library.ts): /\.ya?ml$/, lowercase only
+PRESET_FILE = re.compile(r"\.ya?ml\Z")
 
 
 def _yaml_files(folder):
-    """The *.yaml files directly in `folder`, by name."""
+    """The preset files directly in `folder` (*.yaml and *.yml, as the app reads them), by name."""
     if not folder.is_dir():
         return {}
-    return {path.name: path for path in sorted(folder.iterdir()) if path.suffix == ".yaml" and path.is_file()}
+    return {path.name: path for path in sorted(folder.iterdir()) if PRESET_FILE.search(path.name) and path.is_file()}
 
 
 def sync(src, dst, *, dry_run=False):
-    """Make `dst` hold the same *.yaml files and the same LICENSE as `src`, and return the changes.
+    """Make `dst` hold the same preset files and the same LICENSE as `src`, and return the changes.
 
-    The changes are strings ("add x.yaml", "update x.yaml", "remove x.yaml"). A *.yaml of `dst`
-    that `src` does not have is removed; any other file of `dst` is left alone. With `dry_run`
-    nothing is written, the changes are only listed.
+    The changes are strings ("add x.yaml", "update x.yml", "remove x.yaml"). A preset file of
+    `dst` that `src` does not have is removed; any other file of `dst` is left alone. With
+    `dry_run` nothing is written, the changes are only listed.
     """
     src, dst = Path(src), Path(dst)
     if not src.is_dir():  # an unreachable source must not look like "every preset was deleted"

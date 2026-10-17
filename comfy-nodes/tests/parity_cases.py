@@ -305,7 +305,7 @@ SUFFIX = '"dynamic camera push-in, cinematic, sharp focus on subject"'
 NEGATIVE = '"blurry, distorted, warped faces, extra limbs, flicker, low quality"'
 # YAML escapes: U+001C and U+0085 are white space for Python's str.strip() but not for the
 # trim() of JavaScript, and U+FEFF is the other way round
-ODD_SPACES = r"\x1c\x85﻿"
+ODD_SPACES = r"\x1c\x85\ufeff"
 
 # (title, yaml text): presets that each exercise one input of the compiler
 PRESET_VARIANTS = (
@@ -317,11 +317,21 @@ PRESET_VARIANTS = (
         ("minimal preset (static, no prompt block)", MINIMAL),
         ("empty suffix", edit(SUFFIX, '""')),
         ("blank suffix", edit(SUFFIX, r'"  \t "')),
-        ("padded suffix", edit(SUFFIX, r'"  padded suffix \n "')),
+        ("padded suffix", edit(SUFFIX, r'"  padded suffix \n\u00a0"')),
         ("suffix between odd spaces", edit(SUFFIX, f'"{ODD_SPACES}suffix{ODD_SPACES}"')),
         ("empty negative", edit(NEGATIVE, '""')),
         ("padded negative", edit(NEGATIVE, r'"  keep my spaces \n"')),
     ]
+)
+
+# The 25 characters the trim() of JavaScript removes (WhiteSpace and LineTerminator), typed here
+# again rather than taken from params.py: the five ASCII controls, the space, no-break space,
+# ogham space mark, en quad to hair space, line and paragraph separators, narrow no-break space,
+# medium mathematical space, ideographic space and the BOM.
+ALL_JS_WHITE_SPACE = (
+    "\t\n\x0b\x0c\r \u00a0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000\ufeff"
 )
 
 # (title, what the user typed in the prompt box)
@@ -330,12 +340,13 @@ USER_PROMPTS = [
     ("padded", "  a cat on a sofa \n"),
     ("empty", ""),
     ("blank", " \t\n "),
-    ("unicode spaces", " 　 a cat  "),
-    ("line separators", " a cat "),
-    ("byte order mark", "﻿a cat﻿"),
+    ("unicode spaces", "\u00a0\u3000 a cat \u2003"),
+    ("line separators", "\u2028a cat\u2029"),
+    ("byte order mark", "\ufeffa cat\ufeff"),
     ("file separators", "\x1ca cat\x1f"),
     ("next line", "\x85a cat\x85"),
     ("inner commas", "a cat, a dog,"),
+    ("every JavaScript white space", ALL_JS_WHITE_SPACE + "a cat" + ALL_JS_WHITE_SPACE + "on a sofa" + ALL_JS_WHITE_SPACE),
 ]
 
 LORA_BLOCK = "loras:\n  - { file: style.safetensors, strength: 0.8 }\n"
