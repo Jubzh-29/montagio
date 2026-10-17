@@ -6,7 +6,7 @@ const PORT = 3100;
 
 // Every run starts with a cold Turbopack dev cache, as in CI: a cache warmed on
 // another commit makes pages reload in a loop after a branch switch or merge.
-const RESET_DEV_CACHE = `node -e "require('node:fs').rmSync('.next/dev/cache/turbopack', { recursive: true, force: true, maxRetries: 5 })"`;
+export const RESET_DEV_CACHE = `node -e "require('node:fs').rmSync('.next/dev/cache/turbopack', { recursive: true, force: true, maxRetries: 5 })"`;
 
 export default defineConfig({
   testDir: './e2e',

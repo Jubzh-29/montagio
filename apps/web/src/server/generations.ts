@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import { access } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
+import { BackendError, type BackendErrorCode } from '@montagio/comfy-adapter';
 import { compileJob, CompileError } from '@montagio/presets';
 import { ensureTools, tagClip } from '@montagio/sequence';
 import { getEnv } from './env';
@@ -109,10 +110,15 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
 
   const id = randomUUID();
   await saveWorkflow(id, compiled.workflow);
+  // The start image travels as a file: the backend uploads it and binds it to the loader node.
+  const imageBinding = model.bindings.image;
   const { backendJobId } = await backend.submit({
     workflow: compiled.workflow,
     presetId: preset.id,
     idempotencyKey: input.idempotencyKey,
+    ...(imageBinding
+      ? { files: [{ node: imageBinding.node, field: imageBinding.field, path: join(getEnv().data, ...input.imageRef.split('/')) }] }
+      : {}),
   });
   const now = new Date().toISOString();
   const record: GenerationRecord = {
@@ -134,6 +140,22 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
   await saveRecord(record);
   await rememberKey(input.idempotencyKey, id, now);
   return { record, created: true };
+}
+
+const BACKEND_STATUS: Record<BackendErrorCode, number> = {
+  'workflow-rejected': 422,
+  'backend-unavailable': 503,
+  'backend-error': 502,
+};
+
+/** The HTTP answer for a known failure of a create route, or null for an unexpected error. */
+export function failureResponse(error: unknown): Response | null {
+  if (error instanceof GenerationError) {
+    // A missing FFmpeg is the server's problem, not the request's.
+    return Response.json({ error: error.code }, { status: error.code === 'ffmpeg-missing' ? 503 : 400 });
+  }
+  if (error instanceof BackendError) return Response.json({ error: error.code }, { status: BACKEND_STATUS[error.code] });
+  return null;
 }
 
 /** Public URL for a file produced by a backend (data/ or demo-assets/ only). */

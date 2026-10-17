@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { JobState } from '@montagio/comfy-adapter';
+import { BackendError, type JobState } from '@montagio/comfy-adapter';
 import type { Aspect } from '@montagio/presets';
 import {
   concatClips,
@@ -247,6 +247,7 @@ export function advanceSequence(id: string): Promise<SequenceRecord | null> {
 /** Stable error code for failures a retry cannot fix, or null for transient ones. */
 function permanentErrorCode(error: unknown): string | null {
   if (error instanceof GenerationError) return error.code;
+  if (error instanceof BackendError && !error.retryable) return error.code;
   if (error instanceof SequenceToolError) return error.code === 'tool-missing' ? 'ffmpeg-missing' : 'ffmpeg-failed';
   if (error instanceof UploadError) return 'frame-unreadable';
   return null;

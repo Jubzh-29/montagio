@@ -144,6 +144,12 @@ Deux URL du lock actuel ne contenaient pas le fichier : `Qwen/Qwen3-4B` (poids d
 
 Si un test s'arrête sur `✗ node … is not one of: …`, c'est la vérification préalable contre `/object_info` : elle a trouvé un fichier absent ou une valeur refusée, et n'a rien envoyé au GPU. Ctrl+C annule aussi le rendu en cours sur le GPU.
 
+> **Facultatif : le Studio en mode local sur le pod.** Une fois le proxy lancé, l'app peut lui envoyer ses rendus :
+> ```bash
+> MONTAGIO_BACKEND=local COMFY_BASE_URL=http://127.0.0.1:8189 npm run dev -w @montagio/web
+> ```
+> Ouvrez-la depuis votre PC par un tunnel SSH (`-L 3000:127.0.0.1:3000`, même commande que dans « Dépannage »), puis http://127.0.0.1:3000. Tant que `workflows/*.api.json` sont provisoires, un refus `workflow-rejected` est le résultat attendu : le détail se lit dans la console du serveur. L'app exige FFmpeg avant chaque rendu, et `bootstrap.sh` ne l'installe pas : `apt-get update && apt-get install -y ffmpeg`.
+
 ## 6. Les questions à trancher
 
 ### Q1. Poses et combinaisons supportées par le node caméra

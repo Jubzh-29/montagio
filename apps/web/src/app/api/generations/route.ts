@@ -1,4 +1,4 @@
-import { createGeneration, GenerationError } from '@/server/generations';
+import { createGeneration, failureResponse } from '@/server/generations';
 
 type Body = { presetId?: unknown; modelId?: unknown; imageRef?: unknown; userPrompt?: unknown; seed?: unknown };
 
@@ -29,10 +29,8 @@ export async function POST(request: Request) {
     });
     return Response.json(record, { status: created ? 201 : 200 });
   } catch (error) {
-    if (error instanceof GenerationError) {
-      // A missing FFmpeg is the server's problem, not the request's.
-      return Response.json({ error: error.code }, { status: error.code === 'ffmpeg-missing' ? 503 : 400 });
-    }
+    const failure = failureResponse(error);
+    if (failure) return failure;
     throw error;
   }
 }
