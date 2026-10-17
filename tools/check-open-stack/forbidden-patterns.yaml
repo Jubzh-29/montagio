@@ -11,7 +11,6 @@ patterns:
   - { pattern: 'fal\.run', reason: closed fal.ai queue API }
   - { pattern: 'api\.replicate\.com', reason: closed Replicate API }
   - { pattern: 'api\.bfl\.ai', reason: closed Black Forest Labs API }
-  - { pattern: 'api\.higgsfield\.ai', reason: closed generation platform API }
   - { pattern: 'api\.runwayml\.com', reason: closed Runway API }
   - { pattern: 'api\.lumalabs\.ai', reason: closed Luma API }
   - { pattern: 'ComfyRouter', reason: Comfy Router (proprietary model routing) }
