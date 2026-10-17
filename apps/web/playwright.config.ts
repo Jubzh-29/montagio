@@ -17,7 +17,8 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: `${RESET_DEV_CACHE} && npx next dev --port ${PORT}`,
-    url: `http://localhost:${PORT}/api/models`,
+    // The readiness probe runs the open-stack scan once, and the route memoizes it, before the first test.
+    url: `http://localhost:${PORT}/api/open-stack`,
     reuseExistingServer: false,
     timeout: 180_000,
     env: {
