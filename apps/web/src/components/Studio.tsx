@@ -88,8 +88,19 @@ export function Studio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [record, pollRetry]);
 
+  const busyRef = useRef(false);
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+  const uploadToken = useRef(0);
+
   const onFile = useCallback(
     async (file: File) => {
+      // Swapping the photo mid-render would orphan a running job.
+      if (busyRef.current) return;
+      // Only the most recent upload may update the state: a slow earlier
+      // upload must not replace a newer photo.
+      const token = ++uploadToken.current;
       if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
       const localUrl = URL.createObjectURL(file);
       localUrlRef.current = localUrl;
@@ -97,15 +108,18 @@ export function Studio() {
       setUpload({ status: 'uploading', localUrl });
       const form = new FormData();
       form.set('image', file);
+      const settle = (next: UploadState) => {
+        if (token === uploadToken.current) setUpload(next);
+      };
       try {
         const res = await fetch('/api/uploads', { method: 'POST', body: form });
-        if (res.status === 413) return setUpload({ status: 'error', message: t('errorUpload413') });
-        if (res.status === 415) return setUpload({ status: 'error', message: t('errorUpload415') });
-        if (!res.ok) return setUpload({ status: 'error', message: t('errorGeneric') });
+        if (res.status === 413) return settle({ status: 'error', message: t('errorUpload413') });
+        if (res.status === 415) return settle({ status: 'error', message: t('errorUpload415') });
+        if (!res.ok) return settle({ status: 'error', message: t('errorGeneric') });
         const result = (await res.json()) as UploadResult;
-        setUpload({ status: 'ready', localUrl, imageRef: result.imageRef });
+        settle({ status: 'ready', localUrl, imageRef: result.imageRef });
       } catch {
-        setUpload({ status: 'error', message: t('errorGeneric') });
+        settle({ status: 'error', message: t('errorGeneric') });
       }
     },
     [t],

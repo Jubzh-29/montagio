@@ -43,6 +43,7 @@ export function Monitor({
   const onDrop = (event: DragEvent) => {
     event.preventDefault();
     setDragging(false);
+    if (rendering) return;
     const file = event.dataTransfer.files[0];
     if (file) onFile(file);
   };
@@ -63,6 +64,7 @@ export function Monitor({
         type="file"
         accept="image/png,image/jpeg,image/webp"
         className="visually-hidden"
+        disabled={rendering}
         onChange={(event) => {
           const file = event.target.files?.[0];
           if (file) onFile(file);

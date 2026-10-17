@@ -81,3 +81,32 @@ test('repeated server errors while polling end in an error state', async ({ page
   await expect(page.getByRole('alert').filter({ hasText: 'Something went wrong' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeEnabled();
 });
+
+test('a slow first upload cannot replace a newer photo', async ({ page }) => {
+  let uploads = 0;
+  await page.route('**/api/uploads', async (route) => {
+    uploads += 1;
+    if (uploads === 1) await new Promise((resolve) => setTimeout(resolve, 2500));
+    await route.continue();
+  });
+  const refs: string[] = [];
+  page.on('response', async (response) => {
+    if (response.url().endsWith('/api/uploads')) refs.push(((await response.json()) as { imageRef: string }).imageRef);
+  });
+  await page.goto('/');
+  await page.setInputFiles('input[type=file]', sampleImage);
+  await page.setInputFiles('input[type=file]', sampleImage);
+  await expect.poll(() => refs.length, { timeout: 10_000 }).toBe(2);
+  const newest = refs[0]!; // the second upload answers first
+  const body = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/api/generations'));
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  expect(((await body).postDataJSON() as { imageRef: string }).imageRef).toBe(newest);
+});
+
+test('the photo cannot be swapped while a render is running', async ({ page }) => {
+  await page.goto('/');
+  await page.setInputFiles('input[type=file]', sampleImage);
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.getByRole('progressbar')).toBeVisible();
+  await expect(page.locator('input[type=file]')).toBeDisabled();
+});
