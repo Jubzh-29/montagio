@@ -3,13 +3,9 @@ import { expect, test } from '@playwright/test';
 
 const sampleImage = resolve(__dirname, '../../../demo-assets/images/sample-16x9.png');
 
-// Without a generated open-stack-report.json (fresh checkout, CI), /api/open-stack scans the
-// repository on every request: on a cold dev server the badge can take longer than 5 s.
-const openStackBadge = { timeout: 15_000 };
-
 test('studio happy path in demo mode', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('link', { name: /open weights — verified/ })).toBeVisible(openStackBadge);
+  await expect(page.getByRole('link', { name: /open weights — verified/ })).toBeVisible();
   await page.setInputFiles('input[type=file]', sampleImage);
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await page.getByRole('button', { name: /^Generate/ }).click();
@@ -45,7 +41,7 @@ test('french toggle', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'FR' }).click();
   await expect(page.getByRole('button', { name: /^Générer/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: /open weights — vérifié/ })).toBeVisible(openStackBadge);
+  await expect(page.getByRole('link', { name: /open weights — vérifié/ })).toBeVisible();
 });
 
 test('open stack page lists three Apache-2.0 models', async ({ page }) => {
