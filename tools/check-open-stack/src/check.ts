@@ -49,10 +49,10 @@ async function listFiles(dir: string): Promise<string[]> {
 /** `from 'x'`, `import('x')` and `require('x')` specifiers. */
 const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)['"]([^'"]+)['"]/g;
 
-/** The repository's package.json files: root, apps/*, packages/*, tools/*. */
+/** The repository's package.json files: root, apps/*, packages/*, tools/*, infra/*. */
 async function packageManifests(root: string): Promise<string[]> {
   const manifests = [join(root, 'package.json')];
-  for (const group of ['apps', 'packages', 'tools']) {
+  for (const group of ['apps', 'packages', 'tools', 'infra']) {
     try {
       for (const entry of await readdir(join(root, group), { withFileTypes: true })) {
         if (entry.isDirectory()) manifests.push(join(root, group, entry.name, 'package.json'));
@@ -73,9 +73,12 @@ async function packageManifests(root: string): Promise<string[]> {
   return present;
 }
 
-/** Directories whose source code must stay free of closed APIs. */
+/**
+ * Directories whose source code must stay free of closed APIs. Infra scripts
+ * (GPU session tooling) sit at the root of their folder, so infra/ is scanned whole.
+ */
 async function sourceDirs(root: string): Promise<string[]> {
-  const dirs = [join(root, 'apps')];
+  const dirs = [join(root, 'apps'), join(root, 'infra')];
   for (const group of ['packages', 'tools']) {
     try {
       for (const entry of await readdir(join(root, group), { withFileTypes: true })) {

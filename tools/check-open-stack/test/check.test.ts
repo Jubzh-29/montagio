@@ -92,6 +92,22 @@ test('importing a closed-API SDK or indexing the router fails', async () => {
   );
 });
 
+test('infra scripts are scanned, and the SDK router namespace or route fails', async () => {
+  const r = await checkOpenStack(fixture('dirty-infra'));
+  expect(r.violations).toContainEqual(
+    expect.objectContaining({
+      rule: 'closed-package',
+      file: expect.stringMatching(/infra[\\/]x[\\/]package\.json$/),
+      detail: expect.stringContaining('"openai"'),
+    }),
+  );
+  const smoke = r.violations.filter((v) => v.rule === 'forbidden-pattern' && /infra[\\/]x[\\/]smoke\.ts$/.test(v.file));
+  expect(smoke.map((v) => v.detail)).toEqual([
+    expect.stringContaining('comfy.models'),
+    expect.stringContaining('REST route'),
+  ]);
+});
+
 test('cli writes the report and exits 1 on violations', () => {
   const out = join(mkdtempSync(join(tmpdir(), 'montagio-report-')), 'nested', 'r.json');
   const res = spawnSync(process.execPath, ['--import', 'tsx', cliPath, fixture('dirty-node'), '--out', out], {
