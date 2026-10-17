@@ -203,6 +203,13 @@ describe('media', () => {
     expect((await media(['data', '..', '..', 'package.json'])).status).toBe(400);
   });
 
+  test('a decoded UNC or absolute segment is refused (Windows admin share)', async () => {
+    expect((await media(['data', '//localhost/C$/Windows/win.ini'])).status).toBe(400);
+    expect((await media(['demo-assets', '/etc/hosts'])).status).toBe(400);
+    expect((await media(['data', ''])).status).toBe(400);
+    expect((await media(['data', '.', 'x.png'])).status).toBe(400);
+  });
+
   test('only data/ and demo-assets/ are served', async () => {
     expect((await media(['presets', 'crash-push.yaml'])).status).toBe(400);
   });

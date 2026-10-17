@@ -1,5 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
-import { extname, join, relative, resolve } from 'node:path';
+import { extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { getEnv } from '@/server/env';
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -10,6 +10,16 @@ const CONTENT_TYPES: Record<string, string> = {
   '.webp': 'image/webp',
   '.json': 'application/json',
 };
+
+/**
+ * Next decodes %2F inside catch-all segments, so a single segment can carry
+ * "//host/share/..." (a Windows UNC path) or "/etc/...". Each segment must be a
+ * plain file or folder name: not empty, not "." or "..", and free of
+ * separators, drive colons and NUL.
+ */
+function isSafeSegment(segment: string): boolean {
+  return segment !== '' && segment !== '.' && segment !== '..' && !/[/\\:\u0000]/.test(segment);
+}
 
 /** Only these top-level folders are ever served. */
 function baseFor(prefix: string | undefined): string | null {
@@ -28,12 +38,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ path
     if (rest[0] !== 'previews') base = null;
     rest.shift();
   }
-  if (!base || rest.length === 0 || rest.some((segment) => segment === '..' || segment.includes('\\') || segment.includes(':'))) {
+  if (!base || rest.length === 0 || !rest.every(isSafeSegment)) {
     return Response.json({ error: 'bad-path' }, { status: 400 });
   }
   const file = resolve(base, ...rest);
   const rel = relative(base, file);
-  if (!rel || rel.startsWith('..')) return Response.json({ error: 'bad-path' }, { status: 400 });
+  if (!rel || rel.startsWith('..') || isAbsolute(rel)) return Response.json({ error: 'bad-path' }, { status: 400 });
 
   let size: number;
   try {
