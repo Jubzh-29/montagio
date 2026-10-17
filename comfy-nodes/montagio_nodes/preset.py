@@ -6,11 +6,19 @@ reference. A preset it refuses is refused here, a preset it accepts comes out wi
 the same values and the same defaults, and a bad preset is reported as
 "<source>: <path>: <message>".
 
-The parser is PyYAML, so a few rare corners of YAML text are still PyYAML's: tabs used
-as separators, control characters, NEL/LS/PS line breaks and a "%YAML 1.1" directive
-are not read like the npm library reads them, a bare "!" tag written right before a
-"," "]" or "}" of a flow collection is taken for part of the tag, and PyYAML does not
-insist that the continuation lines of a quoted scalar or a flow collection are indented.
+The parser is PyYAML. Small overrides of its scanner make a tab separate tokens like a space,
+as in the npm library, and never indent a line. A few rare corners of YAML text are still
+PyYAML's:
+
+- refused here, accepted by the app: a tab right after a tag ("!!str<TAB>x") or inside a
+  directive line, control characters, and NEL/LS/PS line breaks;
+- accepted here, refused by the app: continuation lines of a quoted scalar or of a flow
+  collection that are not indented past their block (PyYAML does not check it; in a
+  quoted scalar, a tab alone before such a line passes too), a lone CR taken for a line
+  break, and a document whose aliases expand about 100 times or more (the npm library
+  refuses it, a guard against alias bombs; PyYAML does not count them);
+- a "%YAML 1.1" directive is not read like the npm library reads it, and a bare "!" tag
+  written right before a "," "]" or "}" of a flow collection is taken for part of the tag.
 """
 import math
 import re
@@ -97,6 +105,11 @@ def _construct_merge_tagged(loader, node):
     return _Symbol() if isinstance(node, yaml.ScalarNode) else _construct_unresolved(loader, node)
 
 
+_BREAKS = "\r\n\x85\u2028\u2029"  # what PyYAML reads as a line break
+_END_OF_LINE = "\0" + _BREAKS  # "\0" is the end of the text for PyYAML's reader
+_BLOCK_SCALAR = "while scanning a block scalar"
+
+
 class _CoreLoader(yaml.SafeLoader):
     """SafeLoader without PyYAML's YAML 1.1 extras (yes/no, dates, sexagesimals, implicit "<<" merge).
 
@@ -105,6 +118,127 @@ class _CoreLoader(yaml.SafeLoader):
     """
 
     yaml_implicit_resolvers = {}
+
+    # --- tabs. PyYAML skips only spaces between tokens. The npm library, like YAML 1.2, also
+    # takes a tab for white space, but never for indentation. The overrides of PyYAML's
+    # scanner do the same; the "tab:" cases of tests/parity_cases.py pin them against the app.
+
+    def _tab_is_white_space(self):
+        """Whether the tab at the reading position separates tokens, rather than indenting a line."""
+        # back to the start of its line (load_yaml gives the loader a str: PyYAML keeps it whole in buffer)
+        before = self.pointer - 1
+        while before >= 0 and self.buffer[before] not in _BREAKS:
+            if self.buffer[before] not in " \t\uFEFF":
+                return True  # something comes before it on its line
+            before -= 1
+        length = 0
+        while self.peek(length) in " \t":
+            length += 1
+        after = self.peek(length)
+        if after in "#" + _END_OF_LINE:
+            return True  # a blank line, or a comment line
+        if not self.flow_level:
+            return False  # in a block, a tab that starts a line is indentation
+        # in a flow collection, the spaces before the tab must indent the line past the block the
+        # collection sits in; the line of its closing bracket may stay at that block's level
+        return self.column > self.indent or (self.column == self.indent and self.flow_level == 1 and after in "]}")
+
+    def scan_to_next_token(self):
+        # PyYAML's loop, where a run of white space may also hold tabs. After such a tab the line
+        # cannot start a block key or a "-" entry: the npm library takes that tab for indentation,
+        # and PyYAML's own TODO in this method gives the same rule.
+        if self.index == 0 and self.peek() == "\uFEFF":
+            self.forward()
+        while True:
+            while self.peek() == " ":
+                self.forward()
+            if self.peek() == "\t" and self._tab_is_white_space():  # then so is the rest of the run
+                if not self.flow_level:
+                    self.allow_simple_key = False
+                while self.peek() in " \t":
+                    self.forward()
+            if self.peek() == "#":
+                while self.peek() not in _END_OF_LINE:
+                    self.forward()
+            if not self.scan_line_break():
+                return
+            if not self.flow_level:
+                self.allow_simple_key = True
+
+    def _at_document_marker(self):
+        return self.prefix(3) in ("---", "...") and self.peek(3) in " \t" + _END_OF_LINE
+
+    def scan_plain_spaces(self, indent, start_mark):
+        # PyYAML's, with tabs as white space: inside a line, before its end, and after the
+        # indentation of a continuation line (never as that indentation)
+        length = 0
+        while self.peek(length) in " \t":
+            length += 1
+        whitespaces = self.prefix(length)
+        self.forward(length)
+        if self.peek() not in _BREAKS:
+            return [whitespaces] if whitespaces else []
+        line_break = self.scan_line_break()
+        self.allow_simple_key = True
+        if self._at_document_marker():
+            return None
+        breaks = []
+        while self.peek() in " " + _BREAKS or (self.peek() == "\t" and self.column >= indent):
+            if self.peek() in " \t":
+                self.forward()
+            else:
+                breaks.append(self.scan_line_break())
+                if self._at_document_marker():
+                    return None
+        if line_break != "\n":
+            return [line_break] + breaks
+        return breaks or [" "]
+
+    def scan_block_scalar_indicators(self, start_mark):
+        # PyYAML's: "+" or "-" and an indentation digit, in either order, then white space,
+        # which may be a tab, or the end of the line
+        chomping = increment = None
+        for _ in range(2):
+            ch = self.peek()
+            if ch in "+-" and chomping is None:
+                chomping = ch == "+"
+            elif ch in "0123456789" and increment is None:
+                if ch == "0":
+                    problem = "expected indentation indicator in the range 1-9, but found 0"
+                    raise yaml.scanner.ScannerError(_BLOCK_SCALAR, start_mark, problem, self.get_mark())
+                increment = int(ch)
+            else:
+                break
+            self.forward()
+        ch = self.peek()
+        if ch not in " \t" + _END_OF_LINE:
+            problem = f"expected chomping or indentation indicators, but found {ch!r}"
+            raise yaml.scanner.ScannerError(_BLOCK_SCALAR, start_mark, problem, self.get_mark())
+        return chomping, increment
+
+    def scan_block_scalar_ignored_line(self, start_mark):
+        # PyYAML's, with tabs as white space before the comment or the end of the header line
+        while self.peek() in " \t":
+            self.forward()
+        if self.peek() == "#":
+            while self.peek() not in _END_OF_LINE:
+                self.forward()
+        ch = self.peek()
+        if ch not in _END_OF_LINE:
+            problem = f"expected a comment or a line break, but found {ch!r}"
+            raise yaml.scanner.ScannerError(_BLOCK_SCALAR, start_mark, problem, self.get_mark())
+        self.scan_line_break()
+
+    def scan_block_scalar(self, style):
+        token = super().scan_block_scalar(style)
+        # PyYAML stops at the first line indented less than the scalar. The npm library reads a
+        # tab that starts that line (after its spaces) as a line of the scalar, and refuses it.
+        if self.peek() == "\t":
+            problem = "found a tab in a line less indented than the block scalar"
+            raise yaml.scanner.ScannerError(_BLOCK_SCALAR, token.start_mark, problem, self.get_mark())
+        return token
+
+    # --- composing and constructing
 
     def compose_node(self, parent, index):
         # an anchor may be defined again, an alias meaning the nearest definition before it (PyYAML refuses)

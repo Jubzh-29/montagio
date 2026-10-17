@@ -11,7 +11,7 @@ import re
 import pytest
 
 from montagio_nodes.preset import PresetError, load_yaml, parse_preset
-from tests.parity_cases import ACCEPTED, BASE, MINIMAL, MODELS_BLOCK, NO_DEFAULTS_NO_SPEED, REJECTED, SURROGATE_PAIR, edit
+from tests.parity_cases import ACCEPTED, BASE, MINIMAL, MODELS_BLOCK, NO_DEFAULTS_NO_SPEED, REJECTED, SURROGATE_PAIR, TABS, edit
 
 
 def test_parses_crash_push_with_defaults():
@@ -222,3 +222,39 @@ def test_exotic_yaml_is_a_preset_error_not_a_crash(text):
 def test_python_object_tags_are_never_executed():
     with pytest.raises(PresetError):
         parse_preset("id: !!python/object/apply:os.system ['echo no']", "evil.yaml")
+
+
+@pytest.mark.parametrize("title,text,path,expected", TABS, ids=[case[0] for case in TABS])
+def test_tabs_separate_like_spaces_but_never_indent(title, text, path, expected):
+    if path is None:  # the app refuses it as invalid YAML too
+        with pytest.raises(PresetError, match=r"^tabs\.yaml: invalid YAML"):
+            parse_preset(text, "tabs.yaml")
+        return
+    value = parse_preset(text, "tabs.yaml")
+    for key in path:
+        value = value[key]
+    assert value == expected
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("a: 1\t", {"a": 1}),
+        ("a:\t1\t# one", {"a": 1}),
+        ("a: b\tc", {"a": "b\tc"}),
+        ("a: [\tb,\tc\t]\t", {"a": ["b", "c"]}),
+        ("a: {\tb:\tc\t}", {"a": {"b": "c"}}),
+        ("a:\n  b: 1\n\t\n\t# note\n  c: 2", {"a": {"b": 1, "c": 2}}),
+        ("- \tb", ["b"]),
+        ("a: |\t# literal\n  x\ty\n", {"a": "x\ty\n"}),
+        ("a: >2-\t\n   x", {"a": " x"}),
+    ],
+)
+def test_tab_separators_in_plain_yaml(text, expected):
+    assert load_yaml(text, "t") == expected
+
+
+@pytest.mark.parametrize("text", ["a:\n\tb: 1", "a:\n  \tb: 1", "-\tb: c", "- \t- b", "? \tb: c\n: d", "a: b\n\tc"])
+def test_a_tab_is_never_indentation(text):
+    with pytest.raises(PresetError, match=r"^t: invalid YAML"):
+        load_yaml(text, "t")

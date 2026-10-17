@@ -53,7 +53,7 @@ In this order:
 
 Sizes, width x height: 480p is 832x480 (16:9), 480x832 (9:16) or 640x640 (1:1); 720p is 1280x720, 720x1280 or 960x960.
 
-The node reads a preset with the same rules as the app. A preset the app would refuse stops the run with an error that names the file and the field.
+The node reads a preset with the same rules as the app, apart from a few rare YAML spellings (see [Differences with the Montagio app](#differences-with-the-montagio-app)). A preset the app refuses for its content, such as a value out of range or an unknown key, stops the run with an error that names the file and the field.
 
 ## Wiring
 
@@ -101,12 +101,13 @@ A new file shows up in the menu when the frontend refreshes the node definitions
 
 ## Differences with the Montagio app
 
-The values are the app's own (a test compares them), with these exceptions:
+The node accepts the presets the app accepts, and its values are the app's own (tests compare both with the app's code), with these exceptions:
 
 - **Model limits are not applied.** The app trims a job to what its model can render, such as the allowed fps and the maximum duration. The node does not know which model follows, so it outputs the preset's values as they are.
 - **A preset with two camera moves is refused in `parametric` mode.** `WanCameraEmbedding` takes one move. The error says so and suggests `camera_mode` `prompt`. A node for combined moves is planned.
 - **`prompt` mode gives a neutral camera.** For models without camera control, such as Wan 2.2 5B, `camera_pose` is `Static` and `speed` is 1.0, and the moves go into the `prompt` output as words. The node cannot see the graph, so it does not know whether `camera_pose` is linked: in this mode, do not link `camera_pose` if you want a driven camera.
 - **Presets with LoRAs are refused**, as in the app. A clip that dropped the LoRA would not be what the preset promises.
+- **A few rare YAML spellings with tabs.** A tab works as a separator, as in the app: after a colon, before a comment, at the end of a line, inside a value, or on a blank line. A tab used as indentation is refused, as in the app. Two spellings still differ: a tab right after a tag (`!!str<TAB>text`) or inside a `%YAML` directive line is refused by the node but accepted by the app, and a quoted text that goes on over lines indented with a tab alone is accepted by the node but refused by the app. Indent with spaces and a file reads the same in both. The other rare corners are listed at the top of `montagio_nodes/preset.py`.
 - **Known gap on the app side.** The app's compiler (`packages/presets/src/compile.ts`) currently joins two moves as `Pan Up + Zoom In`, a value `WanCameraEmbedding` would reject. It is tracked separately and the node does not copy it.
 
 ## Development

@@ -194,6 +194,67 @@ SHAPES = [
     ("python object tag", edit("id: crash-push", "id: !!python/object/apply:os.system ['echo no']")),
 ]
 
+TAB = "\t"
+SUFFIX_LINE = 'suffix: "dynamic camera push-in, cinematic, sharp focus on subject"'
+# (title, yaml text, path into the parsed preset, expected value): tabs as hand editing leaves them.
+# A tab separates like a space, except as indentation; a path of None means that the app refuses the
+# text as invalid YAML too. They also run in SHAPES, against the app's own parser.
+TABS = [
+    ("a trailing tab", edit("speed: 1.5", "speed: 1.5" + TAB), ("camera", "speed"), 1.5),
+    ("a tab before a comment", edit("speed: 1.5", "speed: 1.5" + TAB + "# fast"), ("camera", "speed"), 1.5),
+    ("a tab between key and value", edit("speed: 1.5", "speed:" + TAB + "1.5"), ("camera", "speed"), 1.5),
+    ("a space, a tab and a space after a colon", edit("speed: 1.5", "speed: " + TAB + " 1.5"), ("camera", "speed"), 1.5),
+    ("a tab before a colon", edit("speed: 1.5", "speed" + TAB + ": 1.5"), ("camera", "speed"), 1.5),
+    ("a tab inside a plain scalar", edit("name: Crash Push", "name: Crash" + TAB + "Push"), ("name",), "Crash" + TAB + "Push"),
+    ("tabs and a space inside a plain scalar", edit("name: Crash Push", "name: Crash" + TAB * 2 + " Push"), ("name",), "Crash" + TAB * 2 + " Push"),
+    ("a tab then # inside a plain scalar starts a comment", edit("name: Crash Push", "name: Crash" + TAB + "#Push"), ("name",), "Crash"),
+    ("tabs inside a flow sequence", edit("poses: [zoom_in]", "poses: [" + TAB + "pan_up," + TAB + "zoom_in" + TAB + "]"), ("camera", "poses"), ["pan_up", "zoom_in"]),
+    ("a tab after a flow sequence", edit("poses: [zoom_in]", "poses: [zoom_in]" + TAB), ("camera", "poses"), ["zoom_in"]),
+    ("a tab after a quoted scalar", edit("name: Crash Push", 'name: "Crash Push"' + TAB + "# quoted"), ("name",), "Crash Push"),
+    ("a tab after a key that opens a block", edit("camera:", "camera:" + TAB + "# the move"), ("camera", "poses"), ["zoom_in"]),
+    ("a tab after a dash", edit("poses: [zoom_in]", "poses:\n    -" + TAB + "zoom_in"), ("camera", "poses"), ["zoom_in"]),
+    (
+        "a tab after a block scalar indicator",
+        edit(SUFFIX_LINE, "suffix: >-" + TAB + "# folded\n    dynamic camera push-in,\n    cinematic"),
+        ("prompt", "suffix"),
+        "dynamic camera push-in, cinematic",
+    ),
+    (
+        "a tab after an anchor and after an alias",
+        BASE.replace("name: Crash Push", "name: &n" + TAB + "Crash Push").replace("author: montagio-community", "author: *n" + TAB),
+        ("author",),
+        "Crash Push",
+    ),
+    ("a trailing tab on every line", BASE.replace("\n", TAB + "\n"), ("prompt", "negative"), "blurry, distorted, warped faces, extra limbs, flicker, low quality"),
+    ("tabs and CRLF line endings", edit("speed: 1.5", "speed:" + TAB + "1.5" + TAB + "# fast").replace("\n", "\r\n"), ("camera", "speed"), 1.5),
+    ("a tab-only blank line", edit("capability: i2v-camera\n", "capability: i2v-camera\n" + TAB + "\n"), ("capability",), "i2v-camera"),
+    ("a blank line of spaces and a tab inside a block", edit("  speed: 1.5\n", "  speed: 1.5\n  " + TAB + "\n"), ("camera", "speed"), 1.5),
+    ("a comment line that starts with a tab", edit("capability: i2v-camera\n", "capability: i2v-camera\n" + TAB + "# the move\n"), ("capability",), "i2v-camera"),
+    ("a tab-only first line", TAB + "\n" + BASE, ("id",), "crash-push"),
+    (
+        "a continuation line indented with spaces, then a tab",
+        edit(DESCRIPTION, "description: Fast push\n  " + TAB + "toward the subject."),
+        ("description",),
+        "Fast push toward the subject.",
+    ),
+    ("a blank line of spaces and a tab inside a plain scalar", edit(DESCRIPTION, "description: Fast push\n  " + TAB + "\n  toward"), ("description",), "Fast push\ntoward"),
+    ("a flow sequence line indented with spaces, then a tab", edit("poses: [zoom_in]", "poses: [pan_up,\n   " + TAB + "zoom_in]"), ("camera", "poses"), ["pan_up", "zoom_in"]),
+    ("a closing bracket line at the level of its key, then a tab", edit("poses: [zoom_in]", "poses: [\n    zoom_in\n  " + TAB + "]"), ("camera", "poses"), ["zoom_in"]),
+    # a tab is never indentation
+    ("a tab as indentation", edit("  speed: 1.5", TAB + "speed: 1.5"), None, None),
+    ("spaces, then a tab as indentation", edit("  speed: 1.5", "  " + TAB + "speed: 1.5"), None, None),
+    ("a tab as the indentation of a continuation line", edit(DESCRIPTION, "description: Fast push\n" + TAB + "toward"), None, None),
+    ("a tab-only line inside a plain scalar", edit(DESCRIPTION, "description: Fast push\n" + TAB + "\n  toward"), None, None),
+    ("a tab between a dash and a key", edit(MODELS_BLOCK, "loras:\n  -" + TAB + "file: a.safetensors\n    strength: 1\n" + MODELS_BLOCK), None, None),
+    ("a tab between a dash and a nested dash", edit("poses: [zoom_in]", "poses:\n    - " + TAB + "- zoom_in"), None, None),
+    ("a flow sequence line that starts with a tab", edit("poses: [zoom_in]", "poses: [pan_up,\n" + TAB + "zoom_in]"), None, None),
+    ("a flow sequence line not indented enough before a tab", edit("poses: [zoom_in]", "poses: [pan_up,\n  " + TAB + "zoom_in]"), None, None),
+    # the npm library reads a tab that starts the line after a block scalar as a line of that scalar
+    ("a tab-only line after a block scalar", edit(SUFFIX_LINE, "suffix: >-\n    dynamic camera push-in\n" + TAB), None, None),
+    ("a comment line with a tab after a block scalar", edit(SUFFIX_LINE, "suffix: |\n    dynamic camera push-in\n\n  " + TAB + "# end"), None, None),
+]
+SHAPES += [(f"tab: {title}", text) for title, text, _, _ in TABS]
+
 
 def _short(text):
     shown = repr(text)

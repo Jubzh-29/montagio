@@ -39,14 +39,31 @@ def test_case_names_are_unique():  # the bridge answers by name
     assert len({name for name, _ in CASES}) == len(CASES)
 
 
+def verdict_mismatch(got, expected):
+    """Why the pack and the app disagree: the error of whichever side refused the text."""
+    verdict = {True: "accepts", False: "refuses"}
+    lines = [f"the pack {verdict[got['ok']]} it, the app {verdict[expected['ok']]} it"]
+    lines += [f"{side} error: {answer['error']}" for side, answer in (("pack", got), ("app", expected)) if answer.get("error")]
+    return "\n".join(lines)
+
+
+def test_verdict_mismatch_shows_the_error_of_each_side():
+    assert verdict_mismatch({"ok": False, "error": "x: invalid YAML (tab)"}, {"ok": True}) == (
+        "the pack refuses it, the app accepts it\npack error: x: invalid YAML (tab)"
+    )
+    assert verdict_mismatch({"ok": True}, {"ok": False, "error": "x: name: Too big"}) == (
+        "the pack accepts it, the app refuses it\napp error: x: name: Too big"
+    )
+
+
 @pytest.mark.parametrize("name,text", CASES, ids=[c[0] for c in CASES])
 def test_parse_parity(ts, name, text):
     expected = ts_case(ts, name)
     try:
         got = {"ok": True, "preset": parse_preset(text, name)}
-    except PresetError:
-        got = {"ok": False}
-    assert got["ok"] == expected["ok"], expected.get("error")
+    except PresetError as error:
+        got = {"ok": False, "error": str(error)}
+    assert got["ok"] == expected["ok"], verdict_mismatch(got, expected)
     if got["ok"]:
         assert got["preset"] == expected["preset"]
 
