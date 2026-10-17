@@ -1,0 +1,21 @@
+schema: montagio/preset@0.1
+id: pan-left
+name: Pan Left
+description: Smooth lateral move to the left.
+preview: previews/pan-left.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-camera
+camera:
+  poses: [pan_left]
+  speed: 1.0
+prompt:
+  suffix: "smooth lateral camera pan to the left, cinematic tracking shot"
+  negative: "blurry, distorted, warped faces, extra limbs, flicker, low quality"
+defaults:
+  duration_s: 5
+  resolution: 480p
+  fps: 16
+models:
+  preferred: wan22-i2v-a14b-fun-camera
+  fallback: wan22-ti2v-5b
