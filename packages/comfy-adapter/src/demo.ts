@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ApiWorkflow } from '@montagio/presets';
-import type { BackendJob, GenerationBackend } from './backend';
+import type { BackendJob, GenerationBackend, SubmitJob } from './backend';
 
 type DemoJob = { presetId: string; startedAt: number; canceledAt?: number };
 
@@ -20,7 +19,8 @@ export class DemoBackend implements GenerationBackend {
     this.now = opts.now ?? Date.now;
   }
 
-  async submit(job: { workflow: ApiWorkflow; presetId: string; idempotencyKey: string }): Promise<{ backendJobId: string }> {
+  /** `files` is ignored: the demo renders nothing. */
+  async submit(job: SubmitJob): Promise<{ backendJobId: string }> {
     const backendJobId = `demo-${createHash('sha256').update(job.idempotencyKey).digest('hex').slice(0, 12)}`;
     if (!this.jobs.has(backendJobId)) {
       this.jobs.set(backendJobId, { presetId: job.presetId, startedAt: this.now() });

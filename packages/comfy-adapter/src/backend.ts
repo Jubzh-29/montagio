@@ -14,9 +14,17 @@ export type BackendJob = {
 
 export type BackendKind = 'demo' | 'local' | 'hosted';
 
+/** A compiled workflow to run, plus the local files its loader nodes need (the start image). */
+export type SubmitJob = {
+  workflow: ApiWorkflow;
+  presetId: string;
+  idempotencyKey: string;
+  files?: { node: string; field: string; path: string }[];
+};
+
 export interface GenerationBackend {
   readonly kind: BackendKind;
-  submit(job: { workflow: ApiWorkflow; presetId: string; idempotencyKey: string }): Promise<{ backendJobId: string }>;
+  submit(job: SubmitJob): Promise<{ backendJobId: string }>;
   get(backendJobId: string): Promise<BackendJob>;
   cancel(backendJobId: string): Promise<void>;
 }

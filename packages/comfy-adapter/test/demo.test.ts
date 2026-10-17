@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createBackend, DemoBackend } from '../src/index';
 
@@ -72,8 +75,22 @@ test('factory builds the demo backend by default', () => {
   expect(createBackend({ MONTAGIO_DEMO_CLIPS: fixtureClips }).kind).toBe('demo');
 });
 
-test('factory refuses local until plan 2', () => {
-  expect(() => createBackend({ MONTAGIO_BACKEND: 'local' })).toThrow(/plan 2/);
+test('local needs an explicit COMFY_BASE_URL', () => {
+  expect(() => createBackend({ MONTAGIO_BACKEND: 'local' })).toThrow(/COMFY_BASE_URL/);
+  expect(() => createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: '  ' })).toThrow(/COMFY_BASE_URL/);
+});
+
+test('local refuses a Comfy-hosted URL', () => {
+  expect(() => createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: 'https://cloud.comfy.org' })).toThrow(/refused/);
+});
+
+test('local builds the Comfy backend', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'montagio-factory-'));
+  expect(createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: 'http://127.0.0.1:8189', MONTAGIO_DATA: tmp }).kind).toBe('local');
+});
+
+test('hosted is not available yet', () => {
+  expect(() => createBackend({ MONTAGIO_BACKEND: 'hosted' })).toThrow(/not available yet/);
 });
 
 test('factory refuses an unknown backend', () => {
