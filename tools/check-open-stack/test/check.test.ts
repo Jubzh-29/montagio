@@ -72,6 +72,26 @@ test('closed API host in source fails', async () => {
   );
 });
 
+test('a closed-API SDK declared as a dependency fails', async () => {
+  const r = await checkOpenStack(fixture('dirty-package'));
+  const closed = r.violations.filter((v) => v.rule === 'closed-package');
+  expect(closed.map((v) => v.detail)).toEqual([
+    expect.stringContaining('"openai"'),
+    expect.stringContaining('"@fal-ai/client"'),
+  ]);
+  expect(closed[0]?.file).toMatch(/packages[\\/]x[\\/]package\.json$/);
+});
+
+test('importing a closed-API SDK or indexing the router fails', async () => {
+  const r = await checkOpenStack(fixture('dirty-import'));
+  expect(r.violations).toContainEqual(
+    expect.objectContaining({ rule: 'closed-package', file: expect.stringMatching(/src[\\/]gen\.ts$/) }),
+  );
+  expect(r.violations).toContainEqual(
+    expect.objectContaining({ rule: 'forbidden-pattern', file: expect.stringMatching(/src[\\/]route\.ts$/) }),
+  );
+});
+
 test('cli writes the report and exits 1 on violations', () => {
   const out = join(mkdtempSync(join(tmpdir(), 'montagio-report-')), 'nested', 'r.json');
   const res = spawnSync(process.execPath, ['--import', 'tsx', cliPath, fixture('dirty-node'), '--out', out], {

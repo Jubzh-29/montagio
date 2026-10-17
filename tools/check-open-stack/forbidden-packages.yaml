@@ -1,0 +1,21 @@
+# npm packages that exist to call closed generation or model APIs. They carry
+# their API hosts inside node_modules, so the host patterns cannot see them:
+# declaring one in a package.json or importing one fails `check-open-stack`.
+# "scope/*" matches every package of an npm scope.
+schema: montagio/forbidden-packages@0.1
+packages:
+  - { name: openai, reason: closed OpenAI API }
+  - { name: '@anthropic-ai/sdk', reason: closed Anthropic API }
+  - { name: '@google/genai', reason: closed Google Gemini API }
+  - { name: '@google/generative-ai', reason: closed Google Gemini API }
+  - { name: '@google-cloud/vertexai', reason: closed Google Vertex AI API }
+  - { name: '@aws-sdk/client-bedrock-runtime', reason: closed AWS Bedrock API }
+  - { name: replicate, reason: closed Replicate API }
+  - { name: '@fal-ai/*', reason: closed fal.ai API }
+  - { name: '@runwayml/*', reason: closed Runway API }
+  - { name: lumaai, reason: closed Luma API }
+  - { name: '@mistralai/mistralai', reason: closed Mistral API }
+  - { name: cohere-ai, reason: closed Cohere API }
+  - { name: groq-sdk, reason: closed Groq API }
+  - { name: elevenlabs, reason: closed ElevenLabs API }
+  - { name: '@elevenlabs/*', reason: closed ElevenLabs API }

@@ -15,4 +15,5 @@ patterns:
   - { pattern: 'api\.runwayml\.com', reason: closed Runway API }
   - { pattern: 'api\.lumalabs\.ai', reason: closed Luma API }
   - { pattern: 'ComfyRouter', reason: Comfy Router (proprietary model routing) }
-  - { pattern: '\.router\.', reason: Comfy SDK router namespace }
+  - { pattern: '\.router\b', reason: Comfy SDK router namespace }
+  - { pattern: '\[\s*[''"`]router[''"`]\s*\]', reason: Comfy SDK router namespace (indexed access) }

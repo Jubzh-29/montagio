@@ -6,7 +6,7 @@ import { ALLOWED_WEIGHT_LICENSES, parseLock, type LockEntry } from '@montagio/re
 import { parse as parseYaml } from 'yaml';
 
 export type Violation = {
-  rule: 'weight-license' | 'weight-file' | 'node-not-allowed' | 'forbidden-pattern' | 'library';
+  rule: 'weight-license' | 'weight-file' | 'node-not-allowed' | 'forbidden-pattern' | 'closed-package' | 'library';
   file: string;
   detail: string;
 };
@@ -44,6 +44,33 @@ async function listFiles(dir: string): Promise<string[]> {
     }
   }
   return files;
+}
+
+/** `from 'x'`, `import('x')` and `require('x')` specifiers. */
+const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)['"]([^'"]+)['"]/g;
+
+/** The repository's package.json files: root, apps/*, packages/*, tools/*. */
+async function packageManifests(root: string): Promise<string[]> {
+  const manifests = [join(root, 'package.json')];
+  for (const group of ['apps', 'packages', 'tools']) {
+    try {
+      for (const entry of await readdir(join(root, group), { withFileTypes: true })) {
+        if (entry.isDirectory()) manifests.push(join(root, group, entry.name, 'package.json'));
+      }
+    } catch {
+      // group absent
+    }
+  }
+  const present: string[] = [];
+  for (const manifest of manifests) {
+    try {
+      await readFile(manifest);
+      present.push(manifest);
+    } catch {
+      // no manifest in this folder
+    }
+  }
+  return present;
 }
 
 /** Directories whose source code must stay free of closed APIs. */
@@ -154,7 +181,27 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
     }
   }
 
-  // Source code: no closed API host, no Comfy Router.
+  // Closed-API SDKs: never declared as a dependency, never imported.
+  const closedPackages = await readYaml<{ packages: { name: string; reason: string }[] }>(
+    join(configDir, 'forbidden-packages.yaml'),
+  );
+  const closedReason = (pkg: string): string | undefined =>
+    closedPackages.packages.find(({ name }) =>
+      name.endsWith('/*') ? pkg.startsWith(name.slice(0, -1)) : pkg === name,
+    )?.reason;
+  for (const manifest of await packageManifests(root)) {
+    const json = JSON.parse(await readFile(manifest, 'utf8')) as Record<string, Record<string, string> | undefined>;
+    for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+      for (const pkg of Object.keys(json[field] ?? {})) {
+        const reason = closedReason(pkg);
+        if (reason) {
+          violations.push({ rule: 'closed-package', file: relative(root, manifest), detail: `${field} declares "${pkg}" (${reason})` });
+        }
+      }
+    }
+  }
+
+  // Source code: no closed API host, no Comfy Router, no closed-API SDK import.
   const forbidden = await readYaml<{ patterns: { pattern: string; reason: string }[] }>(
     join(configDir, 'forbidden-patterns.yaml'),
   );
@@ -166,6 +213,14 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
       for (const { regex, reason } of patterns) {
         if (regex.test(text)) {
           violations.push({ rule: 'forbidden-pattern', file: relative(root, path), detail: `${reason} (/${regex.source}/)` });
+        }
+      }
+      for (const match of text.matchAll(IMPORT_SPECIFIER)) {
+        const specifier = match[1] ?? '';
+        const pkg = specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0]!;
+        const reason = closedReason(pkg);
+        if (reason) {
+          violations.push({ rule: 'closed-package', file: relative(root, path), detail: `imports "${pkg}" (${reason})` });
         }
       }
     }

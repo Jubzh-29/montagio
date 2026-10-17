@@ -1,0 +1,9 @@
+{
+  "name": "x",
+  "dependencies": {
+    "openai": "^6.0.0"
+  },
+  "devDependencies": {
+    "@fal-ai/client": "^1.0.0"
+  }
+}
