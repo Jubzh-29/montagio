@@ -18,6 +18,13 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint -w @montagio/web
       - run: npm test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r comfy-nodes/requirements-dev.txt
+      - run: npm run test:nodes
+        env:
+          MONTAGIO_REQUIRE_TS_PARITY: '1'
       - run: npm run check:open-stack
 
   e2e:
