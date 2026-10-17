@@ -67,3 +67,10 @@ test('every repository preset validates against its preferred and fallback model
     expect(validatePreset(await readFile(join(repoRoot(), file), 'utf8'), file, lib), id).toMatchObject({ ok: true });
   }
 });
+
+test('the library holds the twelve launch presets of spec §6', () => {
+  expect([...lib.presets.keys()].sort()).toEqual([
+    'breathing', 'crash-push', 'drift-left-push', 'pan-left', 'pan-right', 'pull-back-reveal',
+    'pull-back-tilt-up', 'push-and-settle', 'rise-and-push', 'slow-push', 'tilt-down', 'tilt-up',
+  ]);
+});

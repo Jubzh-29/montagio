@@ -1,0 +1,23 @@
+# Draft (plan 2b): provisional name and settings, tuned in GPU session S2.
+# Note: preset schema v0.1 has no timing; the rhythm lives in the speed and the prompt only.
+schema: montagio/preset@0.1
+id: breathing
+name: Breathing
+description: A barely visible push in and out that keeps a still shot alive.
+preview: previews/breathing.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-camera
+camera:
+  poses: [zoom_in]
+  speed: 0.2
+prompt:
+  suffix: "barely perceptible breathing camera, gentle micro push in and out, calm and steady"
+  negative: "blurry, distorted, warped faces, extra limbs, flicker, low quality"
+defaults:
+  duration_s: 5
+  resolution: 480p
+  fps: 16
+models:
+  preferred: wan22-i2v-a14b-fun-camera
+  fallback: wan22-ti2v-5b

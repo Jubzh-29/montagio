@@ -1,9 +1,10 @@
+import { galleryOrder } from '@/server/gallery';
 import { getServices } from '@/server/services';
 
 export async function GET() {
   const lib = await getServices().library;
   return Response.json(
-    [...lib.presets.values()].map((preset) => ({
+    galleryOrder([...lib.presets.values()]).map((preset) => ({
       id: preset.id,
       name: preset.name,
       description: preset.description,

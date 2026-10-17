@@ -1,0 +1,22 @@
+# Draft (plan 2b): provisional name and settings, tuned in GPU session S2.
+schema: montagio/preset@0.1
+id: pan-right
+name: Pan Right
+description: Smooth lateral move to the right.
+preview: previews/pan-right.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-camera
+camera:
+  poses: [pan_right]
+  speed: 1.0
+prompt:
+  suffix: "smooth lateral camera move to the right, cinematic tracking shot"
+  negative: "blurry, distorted, warped faces, extra limbs, flicker, low quality"
+defaults:
+  duration_s: 5
+  resolution: 480p
+  fps: 16
+models:
+  preferred: wan22-i2v-a14b-fun-camera
+  fallback: wan22-ti2v-5b

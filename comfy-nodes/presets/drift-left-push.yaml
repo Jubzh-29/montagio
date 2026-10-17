@@ -1,0 +1,23 @@
+# Draft (plan 2b): provisional name and settings, tuned in GPU session S2.
+# Note: the core WanCameraEmbedding node takes a single pose and the Montagio node pack refuses combined moves; GPU session S1 decides how this preset renders.
+schema: montagio/preset@0.1
+id: drift-left-push
+name: Drift Left Push
+description: Drifts left while easing in toward the subject.
+preview: previews/drift-left-push.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-camera
+camera:
+  poses: [pan_left, zoom_in]
+  speed: 0.8
+prompt:
+  suffix: "camera drifts left while easing in, smooth cinematic tracking"
+  negative: "blurry, distorted, warped faces, extra limbs, flicker, low quality"
+defaults:
+  duration_s: 5
+  resolution: 480p
+  fps: 16
+models:
+  preferred: wan22-i2v-a14b-fun-camera
+  fallback: wan22-ti2v-5b

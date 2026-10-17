@@ -1,0 +1,24 @@
+# Draft (plan 2b): provisional name and settings, tuned in GPU session S2.
+# Note: the core WanCameraEmbedding node takes a single pose and the Montagio node pack refuses combined moves; GPU session S1 decides how this preset renders.
+# Note: "Pan Up" / "Pan Down" of WanCameraEmbedding move the camera (translation) rather than rotate it; GPU session S1 decides how a tilt renders.
+schema: montagio/preset@0.1
+id: pull-back-tilt-up
+name: Pull Back & Tilt Up
+description: Pulls away and looks up, opening the shot to the sky.
+preview: previews/pull-back-tilt-up.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-camera
+camera:
+  poses: [zoom_out, pan_up]
+  speed: 1.0
+prompt:
+  suffix: "camera pulls back and tilts up, epic cinematic reveal"
+  negative: "blurry, distorted, warped faces, extra limbs, flicker, low quality"
+defaults:
+  duration_s: 5
+  resolution: 480p
+  fps: 16
+models:
+  preferred: wan22-i2v-a14b-fun-camera
+  fallback: wan22-ti2v-5b

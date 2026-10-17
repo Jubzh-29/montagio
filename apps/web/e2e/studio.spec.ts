@@ -39,7 +39,7 @@ test('double click sends a single generation', async ({ page }) => {
 
 test('french toggle', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'FR' }).click();
+  await page.getByRole('button', { name: 'FR', exact: true }).click();
   await expect(page.getByRole('button', { name: /^Générer/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /open weights — vérifié/ })).toBeVisible();
 });
@@ -109,4 +109,11 @@ test('the photo cannot be swapped while a render is running', async ({ page }) =
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.getByRole('progressbar')).toBeVisible();
   await expect(page.locator('input[type=file]')).toBeDisabled();
+});
+
+test('the Generate button is reachable without scrolling on a laptop screen', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Crash Push' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: /^Generate/ })).toBeInViewport();
 });

@@ -1,0 +1,23 @@
+# Draft (plan 2b): provisional name and settings, tuned in GPU session S2.
+# Note: the core WanCameraEmbedding node takes a single pose and the Montagio node pack refuses combined moves; GPU session S1 decides how this preset renders.
+schema: montagio/preset@0.1
+id: rise-and-push
+name: Rise & Push
+description: Rises above the subject while pushing in.
+preview: previews/rise-and-push.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-camera
+camera:
+  poses: [pan_up, zoom_in]
+  speed: 1.0
+prompt:
+  suffix: "camera rises while pushing in, sweeping cinematic crane move"
+  negative: "blurry, distorted, warped faces, extra limbs, flicker, low quality"
+defaults:
+  duration_s: 5
+  resolution: 480p
+  fps: 16
+models:
+  preferred: wan22-i2v-a14b-fun-camera
+  fallback: wan22-ti2v-5b

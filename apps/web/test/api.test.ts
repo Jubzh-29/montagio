@@ -8,6 +8,7 @@ import { GET as getPresetYaml } from '@/app/api/presets/[id]/yaml/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
 import { GET as getWorkflow } from '@/app/api/workflows/[id]/route';
 import { GET as getMedia } from '@/app/media/[...path]/route';
+import { galleryOrder } from '@/server/gallery';
 import {
   bigPng,
   generationRequest,
@@ -183,6 +184,20 @@ describe('downloads and catalog', () => {
     expect(list).toContainEqual(
       expect.objectContaining({ id: 'crash-push', name: 'Crash Push', poses: ['zoom_in'], defaultModel: 'wan22-i2v-a14b-fun-camera' }),
     );
+  });
+
+  test('presets come in gallery order: the families of spec §6, Crash Push first', async () => {
+    const list = (await (await getPresets()).json()) as { id: string }[];
+    expect(list.map((preset) => preset.id)).toEqual([
+      'crash-push', 'slow-push', 'pull-back-reveal', 'pan-left', 'pan-right', 'tilt-up', 'tilt-down',
+      'rise-and-push', 'drift-left-push', 'pull-back-tilt-up', 'push-and-settle', 'breathing',
+    ]);
+  });
+
+  test('presets missing from the gallery order follow, by id', () => {
+    expect(galleryOrder([{ id: 'zeta' }, { id: 'breathing' }, { id: 'alpha' }, { id: 'crash-push' }]).map((p) => p.id)).toEqual([
+      'crash-push', 'breathing', 'alpha', 'zeta',
+    ]);
   });
 
   test('preset YAML downloads as an attachment', async () => {
