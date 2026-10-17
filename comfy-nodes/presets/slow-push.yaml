@@ -1,0 +1,21 @@
+schema: montagio/preset@0.1
+id: slow-push
+name: Slow Push
+description: Slow, steady push-in that builds tension.
+preview: previews/slow-push.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-camera
+camera:
+  poses: [zoom_in]
+  speed: 0.6
+prompt:
+  suffix: "slow cinematic push-in, smooth steady camera, shallow depth of field"
+  negative: "blurry, distorted, warped faces, extra limbs, flicker, low quality"
+defaults:
+  duration_s: 5
+  resolution: 480p
+  fps: 16
+models:
+  preferred: wan22-i2v-a14b-fun-camera
+  fallback: wan22-ti2v-5b

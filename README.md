@@ -4,6 +4,8 @@
 
 Montagio is an open-source studio for cinematic camera moves: drop a photo, pick a camera preset, get a clip. Every preset is an open, versioned file that compiles into a ComfyUI workflow you can inspect, remix and run anywhere.
 
+The [ComfyUI node pack](comfy-nodes/README.md) loads the same preset files in a ComfyUI graph and in ComfyUI's App Mode.
+
 > Status: **pre-alpha** — under active construction (October 2026).
 
 ## Principles
@@ -19,6 +21,7 @@ Montagio is an open-source studio for cinematic camera moves: drop a photo, pick
 | App and server (`apps/`, root) | AGPL-3.0-only |
 | Libraries (`packages/*`, `tools/*`) | Apache-2.0 |
 | GPU session tooling (`infra/*`) | Apache-2.0 |
+| ComfyUI node pack (`comfy-nodes/`) | GPL-3.0-only |
 | Preset library (`presets/`) | CC-BY-4.0 |
 
 Model weights keep their own licenses (Apache-2.0 or MIT for everything the official distribution references) and are downloaded from their official repositories, never bundled.

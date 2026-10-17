@@ -1,0 +1,27 @@
+# Publishes the ComfyUI node pack (comfy-nodes/) to the Comfy Registry.
+# Manual only: it runs when someone starts it from the Actions tab, never on a push.
+# Needs the repository secret REGISTRY_ACCESS_TOKEN, and PublisherId and Repository filled in
+# comfy-nodes/pyproject.toml (see comfy-nodes/README.md, "Publishing").
+name: Publish ComfyUI node pack
+
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # pinned: this job holds the Registry token
+      - run: pip install comfy-cli==1.22.0
+      - run: comfy --skip-prompt --no-enable-telemetry env
+      # the token reaches the shell through the environment, never pasted into the command line
+      - run: comfy node publish --token "$REGISTRY_ACCESS_TOKEN"
+        working-directory: comfy-nodes
+        env:
+          REGISTRY_ACCESS_TOKEN: ${{ secrets.REGISTRY_ACCESS_TOKEN }}

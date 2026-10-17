@@ -1,0 +1,25 @@
+[project]
+name = "montagio"
+description = "ComfyUI nodes that read Montagio camera presets and apply them to image-to-video workflows."
+version = "0.1.0"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+dependencies = ["PyYAML>=6.0"]
+classifiers = ["Operating System :: OS Independent"]
+
+[project.urls]
+# TODO: real repository URL before publishing
+Repository = "https://github.com/OWNER/montagio"
+
+[tool.comfy]
+# TODO: Comfy Registry publisher id before publishing
+PublisherId = ""
+DisplayName = "Montagio Camera Presets"
+Icon = ""
+requires-comfyui = ">=0.41.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# the folder name "comfy-nodes" has a dash and is not importable as a package, hence importlib mode
+addopts = "--import-mode=importlib"
+pythonpath = ["."]

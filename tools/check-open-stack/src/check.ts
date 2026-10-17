@@ -20,8 +20,18 @@ export type OpenStackReport = {
 
 /** Input values that name a model weight file. */
 const WEIGHT_FILE = /\.(safetensors|sft|ckpt|pt|pth|bin|gguf|onnx)$/i;
-const SOURCE_EXTENSIONS = /\.(ts|tsx|js|mjs|cjs)$/;
-const SKIPPED_DIRS = new Set(['node_modules', '.next', 'dist', 'test-results', 'playwright-report']);
+const SOURCE_EXTENSIONS = /\.(ts|tsx|js|mjs|cjs|py)$/;
+const SKIPPED_DIRS = new Set([
+  'node_modules',
+  '.next',
+  'dist',
+  'test-results',
+  'playwright-report',
+  '__pycache__',
+  '.pytest_cache',
+  '.venv',
+  'venv',
+]);
 
 async function readYaml<T>(path: string): Promise<T> {
   return parseYaml(await readFile(path, 'utf8')) as T;
@@ -49,6 +59,164 @@ async function listFiles(dir: string): Promise<string[]> {
 /** `from 'x'`, `import('x')` and `require('x')` specifiers. */
 const IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)['"]([^'"]+)['"]/g;
 
+type ClosedList = { name: string; reason: string }[];
+
+/**
+ * Looks a package up in a forbidden-package list and returns the reason it is closed.
+ * "scope/*" matches every package of an npm scope. `normalize` is applied to both the
+ * list's names and the queried name (npm names are compared as written).
+ */
+function closedMatcher(packages: ClosedList, normalize: (name: string) => string = (name) => name) {
+  const closed = packages.map(({ name, reason }) => ({ name: normalize(name), reason }));
+  return (pkg: string): string | undefined => {
+    const wanted = normalize(pkg);
+    return closed.find(({ name }) => (name.endsWith('/*') ? wanted.startsWith(name.slice(0, -1)) : wanted === name))?.reason;
+  };
+}
+
+/** PEP 503 name normalization: lowercase, runs of "-", "_" and "." folded to "-". */
+const normalizePypiName = (name: string): string => name.toLowerCase().replace(/[-_.]+/g, '-');
+
+/**
+ * The distributions a requirements.txt asks for, PEP 503 normalized. Comments, blank
+ * lines and option lines (-r, -e, --index-url, ...) are skipped; versions, extras,
+ * markers and URLs after the name are dropped.
+ */
+function requirementNames(text: string): string[] {
+  const names: string[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/(^|\s)#.*$/, '').trim();
+    if (!line || line.startsWith('-')) continue;
+    const name = /^[A-Za-z0-9][A-Za-z0-9._-]*(?=$|[\s[;=<>!~@(,])/.exec(line)?.[0];
+    if (name) names.push(normalizePypiName(name));
+  }
+  return names;
+}
+
+type TomlToken = { kind: 'string' | 'word' | 'punct' | 'eol'; text: string };
+
+/**
+ * Just enough TOML lexing to find an array of strings: comments dropped, basic, literal
+ * and triple-quoted strings decoded (escapes loosely: the next character is kept),
+ * bare keys as words, and `[ ] = , { }` as punctuation.
+ */
+function tomlTokens(text: string): TomlToken[] {
+  const tokens: TomlToken[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i]!;
+    if (ch === '#') {
+      while (i < text.length && text[i] !== '\n') i++;
+    } else if (ch === '\n') {
+      tokens.push({ kind: 'eol', text: '' });
+      i++;
+    } else if (ch === '"' || ch === "'") {
+      const quote = text.startsWith(ch.repeat(3), i) ? ch.repeat(3) : ch;
+      let value = '';
+      i += quote.length;
+      while (i < text.length && !text.startsWith(quote, i) && !(quote.length === 1 && text[i] === '\n')) {
+        if (ch === '"' && text[i] === '\\') i++;
+        value += text[i] ?? '';
+        i++;
+      }
+      if (text.startsWith(quote, i)) i += quote.length;
+      tokens.push({ kind: 'string', text: value });
+    } else if (/[\w.-]/.test(ch)) {
+      const start = i;
+      while (i < text.length && /[\w.-]/.test(text[i]!)) i++;
+      tokens.push({ kind: 'word', text: text.slice(start, i) });
+    } else {
+      if ('[]=,{}'.includes(ch)) tokens.push({ kind: 'punct', text: ch });
+      i++;
+    }
+  }
+  return tokens;
+}
+
+/**
+ * The strings of `dependencies = [ ... ]` under `[project]` in a pyproject.toml, which is
+ * what the Comfy Registry publishes. A `dependencies` key of any other table is not read.
+ */
+function pyprojectDependencies(text: string): string[] {
+  const tokens = tomlTokens(text);
+  const found: string[] = [];
+  let table = '';
+  let i = 0;
+  while (i < tokens.length) {
+    const token = tokens[i]!;
+    const next = tokens[i + 1];
+    if (token.kind === 'punct' && token.text === '[') {
+      // `[table]` or `[[array.of.tables]]`: the rest of the line names the table
+      const parts: string[] = [];
+      for (i++; i < tokens.length && tokens[i]!.kind !== 'eol'; i++) {
+        if (tokens[i]!.kind === 'word' || tokens[i]!.kind === 'string') parts.push(tokens[i]!.text);
+      }
+      table = parts.join('');
+    } else if ((token.kind === 'word' || token.kind === 'string') && next?.kind === 'punct' && next.text === '=') {
+      const wanted = (table ? `${table}.${token.text}` : token.text) === 'project.dependencies';
+      let depth = 0;
+      for (i += 2; i < tokens.length; i++) {
+        const value = tokens[i]!;
+        if (value.kind === 'punct') depth += '[{'.includes(value.text) ? 1 : ']}'.includes(value.text) ? -1 : 0;
+        else if (value.kind === 'eol' && depth <= 0) break;
+        else if (value.kind === 'string' && wanted) found.push(value.text);
+      }
+    } else {
+      i++;
+    }
+  }
+  return found;
+}
+
+/** Python dependency files of the ComfyUI pack (relative to comfy-nodes/) and how each one lists its requirements. */
+const PYTHON_MANIFESTS: { file: string; names: (text: string) => string[] }[] = [
+  { file: 'requirements.txt', names: requirementNames },
+  { file: 'requirements-dev.txt', names: requirementNames },
+  { file: 'pyproject.toml', names: (text) => requirementNames(pyprojectDependencies(text).join('\n')) },
+];
+
+/**
+ * `import a.b, c as d` and `from a import b, c as d` statements at the start of a line.
+ * The anchor keeps prose, strings and comments out; the price is that a docstring line
+ * that itself begins with "import openai" is read as an import (accepted false positive).
+ */
+const PYTHON_IMPORT = /^[ \t]*import[ \t]+([^\n#;]+)/gm;
+const PYTHON_FROM_IMPORT = /^[ \t]*from[ \t]+([\w.]+)[ \t]+import[ \t]*(\([^)]*\)|[^\n]*)/gm;
+
+/**
+ * Modules a Python source imports, in source order. `from a import b` yields `a` and `a.b`,
+ * since b may be a submodule (`from google import genai`). Relative imports are local code.
+ */
+function pythonImports(text: string): string[] {
+  const found: { index: number; modules: string[] }[] = [];
+  const names = (list: string): string[] =>
+    list
+      .replace(/#[^\n]*/g, '')
+      .replace(/[()]/g, '')
+      .split(',')
+      .map((item) => item.trim().split(/\s+/)[0] ?? '')
+      .filter((name) => /^[A-Za-z_][\w.]*$/.test(name));
+  for (const match of text.matchAll(PYTHON_IMPORT)) {
+    found.push({ index: match.index, modules: names(match[1] ?? '') });
+  }
+  for (const match of text.matchAll(PYTHON_FROM_IMPORT)) {
+    const module = match[1] ?? '';
+    if (module.startsWith('.')) continue;
+    found.push({ index: match.index, modules: [module, ...names(match[2] ?? '').map((name) => `${module}.${name}`)] });
+  }
+  return found.sort((a, b) => a.index - b.index).flatMap(({ modules }) => modules);
+}
+
+/** A file's text, or "" when it does not exist; any other read error is real. */
+async function readIfPresent(path: string): Promise<string> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return '';
+    throw error;
+  }
+}
+
 /** The repository's package.json files: root, apps/*, packages/*, tools/*, infra/*. */
 async function packageManifests(root: string): Promise<string[]> {
   const manifests = [join(root, 'package.json')];
@@ -75,10 +243,11 @@ async function packageManifests(root: string): Promise<string[]> {
 
 /**
  * Directories whose source code must stay free of closed APIs. Infra scripts
- * (GPU session tooling) sit at the root of their folder, so infra/ is scanned whole.
+ * (GPU session tooling) sit at the root of their folder, so infra/ is scanned whole;
+ * so is comfy-nodes/, the ComfyUI node pack (Python, plus its TypeScript test bridge).
  */
 async function sourceDirs(root: string): Promise<string[]> {
-  const dirs = [join(root, 'apps'), join(root, 'infra')];
+  const dirs = [join(root, 'apps'), join(root, 'infra'), join(root, 'comfy-nodes')];
   for (const group of ['packages', 'tools']) {
     try {
       for (const entry of await readdir(join(root, group), { withFileTypes: true })) {
@@ -185,13 +354,8 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
   }
 
   // Closed-API SDKs: never declared as a dependency, never imported.
-  const closedPackages = await readYaml<{ packages: { name: string; reason: string }[] }>(
-    join(configDir, 'forbidden-packages.yaml'),
-  );
-  const closedReason = (pkg: string): string | undefined =>
-    closedPackages.packages.find(({ name }) =>
-      name.endsWith('/*') ? pkg.startsWith(name.slice(0, -1)) : pkg === name,
-    )?.reason;
+  const closedPackages = await readYaml<{ packages: ClosedList }>(join(configDir, 'forbidden-packages.yaml'));
+  const closedReason = closedMatcher(closedPackages.packages);
   for (const manifest of await packageManifests(root)) {
     const json = JSON.parse(await readFile(manifest, 'utf8')) as Record<string, Record<string, string> | undefined>;
     for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
@@ -203,6 +367,26 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
       }
     }
   }
+
+  // The ComfyUI node pack declares its Python dependencies in requirements.txt,
+  // requirements-dev.txt and pyproject.toml (the [project].dependencies the Comfy Registry
+  // publishes), checked against the PyPI list (names collide with npm ones, so the lists
+  // stay apart).
+  const closedPythonPackages = await readYaml<{ packages: (ClosedList[number] & { imports?: string[] })[] }>(
+    join(configDir, 'forbidden-python-packages.yaml'),
+  );
+  const closedPythonReason = closedMatcher(closedPythonPackages.packages, normalizePypiName);
+  for (const { file, names } of PYTHON_MANIFESTS) {
+    const manifest = join('comfy-nodes', file);
+    for (const name of names(await readIfPresent(join(root, manifest)))) {
+      const reason = closedPythonReason(name);
+      if (reason) violations.push({ rule: 'closed-package', file: manifest, detail: `requires "${name}" (${reason})` });
+    }
+  }
+  // Python modules that belong to those packages, as listed by `imports` (default: the name).
+  const closedPythonModules = closedPythonPackages.packages.flatMap(({ name, imports, reason }) =>
+    (imports ?? [name]).map((module) => ({ module, reason })),
+  );
 
   // Source code: no closed API host, no Comfy Router, no closed-API SDK import.
   const forbidden = await readYaml<{ patterns: { pattern: string; reason: string }[] }>(
@@ -217,6 +401,19 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
         if (regex.test(text)) {
           violations.push({ rule: 'forbidden-pattern', file: relative(root, path), detail: `${reason} (/${regex.source}/)` });
         }
+      }
+      // JS import syntax means nothing in Python, and the npm list does not apply to it:
+      // Python files get their own import check, against the PyPI list's modules.
+      if (path.endsWith('.py')) {
+        const reported = new Set<string>();
+        for (const imported of pythonImports(text)) {
+          const closed = closedPythonModules.find(({ module }) => imported === module || imported.startsWith(`${module}.`));
+          if (closed && !reported.has(closed.module)) {
+            reported.add(closed.module);
+            violations.push({ rule: 'closed-package', file: relative(root, path), detail: `imports "${closed.module}" (${closed.reason})` });
+          }
+        }
+        continue;
       }
       for (const match of text.matchAll(IMPORT_SPECIFIER)) {
         const specifier = match[1] ?? '';

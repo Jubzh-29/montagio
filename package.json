@@ -17,6 +17,7 @@
   "scripts": {
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "test:nodes": "python -m pytest comfy-nodes -q",
     "check:open-stack": "tsx tools/check-open-stack/src/cli.ts . --out apps/web/public/open-stack-report.json"
   },
   "devDependencies": {
