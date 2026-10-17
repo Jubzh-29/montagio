@@ -1,25 +1,31 @@
 # PyPI packages that exist to call closed generation or model APIs. They carry
 # their API hosts inside site-packages, so the host patterns cannot see them:
-# listing one in comfy-nodes/requirements.txt fails `check-open-stack`.
+# declaring one in comfy-nodes/requirements.txt, requirements-dev.txt or the
+# [project].dependencies of pyproject.toml, or importing one from a .py file,
+# fails `check-open-stack`.
 # Names are compared after PEP 503 normalization (lowercase, runs of "-", "_" and
 # "." folded to "-"). Kept apart from forbidden-packages.yaml on purpose: a name
 # can mean different things on npm and on PyPI (npm "groq" is an unrelated query
 # language), so neither list is derived from the other.
+# `imports` lists the module(s) a package provides, which often differ from its
+# name; an import matches by module prefix on dot boundaries (`google.genai`
+# matches `google.genai.types` and `from google import genai`, never `google`
+# alone). Without `imports`, the package name is the module name.
 schema: montagio/forbidden-python-packages@0.1
 packages:
-  - { name: openai, reason: closed OpenAI API }
-  - { name: anthropic, reason: closed Anthropic API }
-  - { name: google-generativeai, reason: closed Google Gemini API }
-  - { name: google-genai, reason: closed Google Gemini API }
-  - { name: google-cloud-aiplatform, reason: closed Google Vertex AI API }
-  - { name: replicate, reason: closed Replicate API }
-  - { name: fal-client, reason: closed fal.ai API }
-  - { name: runwayml, reason: closed Runway API }
-  - { name: lumaai, reason: closed Luma API }
-  - { name: mistralai, reason: closed Mistral API }
-  - { name: cohere, reason: closed Cohere API }
-  - { name: groq, reason: closed Groq API }
-  - { name: elevenlabs, reason: closed ElevenLabs API }
+  - { name: openai, imports: [openai], reason: closed OpenAI API }
+  - { name: anthropic, imports: [anthropic], reason: closed Anthropic API }
+  - { name: google-generativeai, imports: [google.generativeai], reason: closed Google Gemini API }
+  - { name: google-genai, imports: [google.genai], reason: closed Google Gemini API }
+  - { name: google-cloud-aiplatform, imports: [google.cloud.aiplatform, vertexai], reason: closed Google Vertex AI API }
+  - { name: replicate, imports: [replicate], reason: closed Replicate API }
+  - { name: fal-client, imports: [fal_client], reason: closed fal.ai API }
+  - { name: runwayml, imports: [runwayml], reason: closed Runway API }
+  - { name: lumaai, imports: [lumaai], reason: closed Luma API }
+  - { name: mistralai, imports: [mistralai], reason: closed Mistral API }
+  - { name: cohere, imports: [cohere], reason: closed Cohere API }
+  - { name: groq, imports: [groq], reason: closed Groq API }
+  - { name: elevenlabs, imports: [elevenlabs], reason: closed ElevenLabs API }
   # A choice reviewers may contest: boto3 is the generic AWS SDK, but it is also
   # how Bedrock is reached, and the pack has no reason to talk to AWS.
-  - { name: boto3, reason: 'AWS SDK, carries Bedrock' }
+  - { name: boto3, imports: [boto3, botocore], reason: 'AWS SDK, carries Bedrock' }

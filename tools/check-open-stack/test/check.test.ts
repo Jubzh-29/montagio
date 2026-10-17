@@ -213,6 +213,142 @@ test('JS import syntax is not read in Python files', async () => {
   expect(r.violations.filter((v) => v.rule === 'closed-package')).toEqual([]);
 });
 
+const closedDetails = (r: Awaited<ReturnType<typeof checkOpenStack>>, file: string) =>
+  r.violations.filter((v) => v.rule === 'closed-package' && v.file === join('comfy-nodes', file)).map((v) => v.detail);
+
+test('a closed SDK declared only in pyproject.toml [project].dependencies fails', async () => {
+  const root = scratchRepo({
+    'comfy-nodes/pyproject.toml': [
+      '[project]',
+      'name = "montagio"',
+      'description = "dependencies = [\\"groq\\"] is prose here, and so is # this"',
+      'dependencies = [',
+      '  "PyYAML>=6.0",  # kept',
+      "  'Google_GenAI >= 1.0 ; python_version >= \"3.10\"',",
+      '  # "replicate" is commented out',
+      '  "openai[all]>=1.0",',
+      ']',
+      '',
+      '[project.urls]',
+      'Repository = "https://example.invalid/montagio"',
+    ].join('\n'),
+  });
+  const r = await checkOpenStack(root);
+  expect(closedDetails(r, 'pyproject.toml')).toEqual([
+    'requires "google-genai" (closed Google Gemini API)',
+    'requires "openai" (closed OpenAI API)',
+  ]);
+});
+
+test('pyproject.toml: only [project].dependencies is read, never a same-named key of another table', async () => {
+  const root = scratchRepo({
+    'comfy-nodes/pyproject.toml': [
+      '[tool.x]',
+      'dependencies = ["openai"]',
+      '',
+      '[tool.y.dependencies]',
+      'anthropic = "1.0"',
+      '',
+      '[project]',
+      'dependencies = ["groq>=0.4"]',
+      '',
+      '[project.optional-dependencies]',
+      'dependencies = ["mistralai"]',
+    ].join('\r\n'),
+  });
+  const r = await checkOpenStack(root);
+  expect(closedDetails(r, 'pyproject.toml')).toEqual(['requires "groq" (closed Groq API)']);
+});
+
+test('a closed SDK in requirements-dev.txt fails', async () => {
+  const root = scratchRepo({
+    'comfy-nodes/requirements.txt': 'PyYAML>=6.0\n',
+    'comfy-nodes/requirements-dev.txt': 'pytest>=8\nReplicate==0.30  # eval helper\n',
+  });
+  const r = await checkOpenStack(root);
+  expect(closedDetails(r, 'requirements-dev.txt')).toEqual(['requires "replicate" (closed Replicate API)']);
+  expect(closedDetails(r, 'requirements.txt')).toEqual([]);
+});
+
+test('the Python manifests may be absent, but an unreadable one fails loudly', async () => {
+  const none = await checkOpenStack(scratchRepo({ 'comfy-nodes/pack.py': 'x = 1\n' }));
+  expect(none.violations.filter((v) => v.rule === 'closed-package')).toEqual([]);
+  // a directory where pyproject.toml should be: EISDIR, not ENOENT
+  const broken = scratchRepo({ 'comfy-nodes/pyproject.toml/keep': '' });
+  await expect(checkOpenStack(broken)).rejects.toThrow();
+});
+
+test('importing a closed Python SDK fails, whatever the import form', async () => {
+  const r = await checkOpenStack(fixture('dirty-comfy-imports'));
+  const imports = r.violations.filter((v) => v.rule === 'closed-package' && /comfy-nodes[\\/]sdk\.py$/.test(v.file));
+  expect(imports.map((v) => v.detail)).toEqual([
+    'imports "openai" (closed OpenAI API)',
+    'imports "google.genai" (closed Google Gemini API)',
+    'imports "boto3" (AWS SDK, carries Bedrock)',
+  ]);
+});
+
+test('Python imports are matched by module prefix on dot boundaries, from the explicit module map', async () => {
+  const root = scratchRepo({
+    'comfy-nodes/closed.py': [
+      'from google import genai',
+      'from google.cloud import aiplatform, storage as gcs',
+      'from google import (',
+      '    generativeai as old,  # legacy',
+      ')',
+      'import vertexai',
+      'from botocore.exceptions import ClientError',
+      'import fal_client as fal',
+      'import os, cohere',
+      'try:',
+      '    import elevenlabs.client',
+      'except ImportError:',
+      '    pass',
+    ].join('\n'),
+    'comfy-nodes/open.py': [
+      'import google',
+      'import google.protobuf',
+      'from google import protobuf',
+      'from google.cloud import storage',
+      'import google.genaix',
+      'from google.genaix import y',
+      'import openai_utils',
+      'from . import openai',
+      'from .openai import client',
+      'import yaml',
+      '# import anthropic',
+      'x = "import mistralai"',
+    ].join('\n'),
+  });
+  const r = await checkOpenStack(root);
+  const flagged = (file: string) =>
+    r.violations.filter((v) => v.rule === 'closed-package' && v.file === join('comfy-nodes', file)).map((v) => v.detail);
+  expect(flagged('closed.py')).toEqual([
+    'imports "google.genai" (closed Google Gemini API)',
+    'imports "google.cloud.aiplatform" (closed Google Vertex AI API)',
+    'imports "google.generativeai" (closed Google Gemini API)',
+    'imports "vertexai" (closed Google Vertex AI API)',
+    'imports "botocore" (AWS SDK, carries Bedrock)',
+    'imports "fal_client" (closed fal.ai API)',
+    'imports "cohere" (closed Cohere API)',
+    'imports "elevenlabs" (closed ElevenLabs API)',
+  ]);
+  expect(flagged('open.py')).toEqual([]);
+});
+
+test('prose in a Python docstring or a comment does not count as an import', async () => {
+  const root = scratchRepo({
+    'comfy-nodes/doc.py': [
+      '"""This node can not call a closed API:',
+      'we do not import openai here, nor from anthropic import Client.',
+      '"""',
+      'name = "boto3"  # import boto3 would be a bug',
+    ].join('\n'),
+  });
+  const r = await checkOpenStack(root);
+  expect(r.violations.filter((v) => v.rule === 'closed-package')).toEqual([]);
+});
+
 test('cli writes the report and exits 1 on violations', () => {
   const out = join(mkdtempSync(join(tmpdir(), 'montagio-report-')), 'nested', 'r.json');
   const res = spawnSync(process.execPath, ['--import', 'tsx', cliPath, fixture('dirty-node'), '--out', out], {
