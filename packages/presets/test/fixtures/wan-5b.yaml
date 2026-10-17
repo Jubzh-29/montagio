@@ -1,0 +1,23 @@
+schema: montagio/model@0.1
+id: wan22-ti2v-5b
+name: Wan 2.2 5B
+kind: video
+tier: fast
+capabilities: [i2v]
+license: Apache-2.0
+weights: [wan22-ti2v-5b, umt5-xxl-fp8, wan22-vae]
+workflow: workflows/wan22-ti2v-5b.api.json
+bindings:
+  image: { node: "3", field: image }
+  prompt: { node: "6", field: text }
+  negative: { node: "7", field: text }
+  seed: { node: "10", field: seed }
+  width: { node: "20", field: width }
+  height: { node: "20", field: height }
+  frames: { node: "20", field: length }
+limits:
+  resolutions: [480p, 720p]
+  fps: [24]
+  max_duration_s: 5
+estimate_s:
+  480p: 40

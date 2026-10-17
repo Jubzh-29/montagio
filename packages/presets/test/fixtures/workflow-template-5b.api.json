@@ -1,0 +1,7 @@
+{
+  "3": { "class_type": "LoadImage", "inputs": { "image": "placeholder.png" } },
+  "6": { "class_type": "CLIPTextEncode", "inputs": { "text": "" } },
+  "7": { "class_type": "CLIPTextEncode", "inputs": { "text": "" } },
+  "10": { "class_type": "KSampler", "inputs": { "seed": 0 } },
+  "20": { "class_type": "Wan22ImageToVideoLatent", "inputs": { "width": 1280, "height": 704, "length": 121 } }
+}
