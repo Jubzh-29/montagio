@@ -10,6 +10,8 @@ export const RESET_DEV_CACHE = `node -e "require('node:fs').rmSync('.next/dev/ca
 
 export default defineConfig({
   testDir: './e2e',
+  // Compiles every route once the server is up, so no test pays a cold compile.
+  globalSetup: './e2e/warm-up.ts',
   timeout: 60_000,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
