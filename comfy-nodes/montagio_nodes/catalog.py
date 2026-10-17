@@ -14,7 +14,7 @@ menu lists always use "/".
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from montagio_nodes.preset import PresetError
+from .preset import PresetError
 
 PRESET_EXTENSIONS = (".yaml", ".yml")
 BUNDLED_DIR = Path(__file__).resolve().parent.parent / "presets"
