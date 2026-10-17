@@ -33,14 +33,17 @@ export async function saveUpload(file: File): Promise<UploadMeta> {
   let width: number | undefined;
   let height: number | undefined;
   let sniffed: string | undefined;
+  let orientation: number | undefined;
   try {
-    ({ width, height, type: sniffed } = imageSize(bytes));
+    ({ width, height, type: sniffed, orientation } = imageSize(bytes));
   } catch {
     throw new UploadError(415, 'the file is not a readable image');
   }
   if (!width || !height || !sniffed || SNIFFED[sniffed] !== ext) {
     throw new UploadError(415, 'the file content does not match its image type');
   }
+  // EXIF orientations 5-8 store the picture rotated by 90°: measure it upright.
+  if (orientation !== undefined && orientation >= 5 && orientation <= 8) [width, height] = [height, width];
 
   const id = randomUUID();
   const dir = join(getEnv().data, 'uploads');

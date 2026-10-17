@@ -57,3 +57,20 @@ export function seedRecordFile(dataDir: string, record: Record<string, unknown>)
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'record.json'), JSON.stringify(record));
 }
+
+/** Minimal JPEG: SOI + APP1 Exif (orientation) + SOF0 (size) + EOI. */
+export function jpegWithOrientation(width: number, height: number, orientation: number, name = 'phone.jpg'): File {
+  const bytes = new Uint8Array(new ArrayBuffer(59));
+  const view = new DataView(bytes.buffer);
+  bytes.set([0xff, 0xd8, 0xff, 0xe1, 0x00, 0x22], 0); // SOI, APP1 (length 34)
+  bytes.set([0x45, 0x78, 0x69, 0x66, 0x00, 0x00], 6); // "Exif\0\0"
+  bytes.set([0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08], 12); // TIFF, big-endian, IFD0 at 8
+  bytes.set([0x00, 0x01, 0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01], 20); // 1 entry: Orientation, SHORT x1
+  view.setUint16(30, orientation);
+  bytes.set([0xff, 0xc0, 0x00, 0x11, 0x08], 38); // SOF0 (length 17), 8-bit
+  view.setUint16(43, height);
+  view.setUint16(45, width);
+  bytes.set([0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01], 47);
+  bytes.set([0xff, 0xd9], 57); // EOI
+  return new File([bytes], name, { type: 'image/jpeg' });
+}

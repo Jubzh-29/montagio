@@ -11,6 +11,7 @@ import { GET as getMedia } from '@/app/media/[...path]/route';
 import {
   bigPng,
   generationRequest,
+  jpegWithOrientation,
   params,
   pngFile,
   seedRecordFile,
@@ -49,6 +50,16 @@ describe('uploads', () => {
     const wide = await (await postUpload(uploadRequest(pngFile(4000, 500)))).json();
     const tall = await (await postUpload(uploadRequest(pngFile(500, 4000)))).json();
     expect([wide.aspect, tall.aspect]).toEqual(['16:9', '9:16']);
+  });
+
+  test('a rotated phone photo (EXIF orientation 6) is measured upright', async () => {
+    const res = await postUpload(uploadRequest(jpegWithOrientation(6000, 4000, 6)));
+    expect(await res.json()).toMatchObject({ width: 4000, height: 6000, aspect: '9:16' });
+  });
+
+  test('an unrotated landscape JPEG keeps its size', async () => {
+    const res = await postUpload(uploadRequest(jpegWithOrientation(4032, 3024, 1)));
+    expect(await res.json()).toMatchObject({ width: 4032, height: 3024, aspect: '1:1' });
   });
 
   test('a PNG-typed file that is not an image is refused with 415', async () => {
