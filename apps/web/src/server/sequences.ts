@@ -3,10 +3,18 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { JobState } from '@montagio/comfy-adapter';
 import type { Aspect } from '@montagio/presets';
-import { concatClips, exportVertical, extractLastFrame, probe } from '@montagio/sequence';
+import {
+  concatClips,
+  ensureTools,
+  exportVertical,
+  extractLastFrame,
+  probe,
+  SequenceToolError,
+} from '@montagio/sequence';
 import { getEnv } from './env';
 import {
   cancelGeneration,
+  checkGenerationInput,
   createGeneration,
   GenerationError,
   getGeneration,
@@ -16,7 +24,7 @@ import {
 } from './generations';
 import { getServices } from './services';
 import { readRecord, writeAtomic } from './store';
-import { readUploadMeta, saveUploadFromFile } from './uploads';
+import { readUploadMeta, saveUploadFromFile, UploadError } from './uploads';
 
 export const MIN_SHOTS = 2;
 export const MAX_SHOTS = 3;
@@ -129,6 +137,15 @@ async function createSequenceOnce(input: CreateSequenceInput): Promise<CreateRes
   if (input.shots.some((shot) => !lib.presets.has(shot.presetId))) throw new GenerationError('unknown-preset');
   const upload = await readUploadMeta(input.imageRef);
   if (!upload) throw new GenerationError('unknown-image');
+  try {
+    await ensureTools();
+  } catch {
+    throw new GenerationError('ffmpeg-missing');
+  }
+  // Every shot must compile now: a later shot that cannot render would waste the earlier renders.
+  for (const shot of input.shots) {
+    await checkGenerationInput({ ...shot, imageRef: input.imageRef });
+  }
 
   const now = new Date().toISOString();
   const record: SequenceRecord = {
@@ -201,11 +218,19 @@ export function advanceSequence(id: string): Promise<SequenceRecord | null> {
       // Chain: the next shot starts on the last frame of this one.
       const clip = mediaFileFor(generation.outputUrl);
       if (!clip) return finish(record, 'failed', 'missing-output');
-      const frame = join(sequenceDir(record.id), `shot${index}-last.png`);
-      await mkdir(sequenceDir(record.id), { recursive: true });
-      await extractLastFrame(clip, frame);
-      const upload = await saveUploadFromFile(frame);
-      await startShot(record, index + 1, upload.imageRef);
+      try {
+        const frame = join(sequenceDir(record.id), `shot${index}-last.png`);
+        await mkdir(sequenceDir(record.id), { recursive: true });
+        await extractLastFrame(clip, frame);
+        const upload = await saveUploadFromFile(frame);
+        await startShot(record, index + 1, upload.imageRef);
+      } catch (error) {
+        // Errors that a retry cannot fix end the sequence; anything else is retried on the next poll.
+        const code = permanentErrorCode(error);
+        if (!code) throw error;
+        console.error(`[montagio] sequence ${record.id}: chaining shot ${index + 1} failed`, error);
+        return finish(record, 'failed', code);
+      }
       record.progress = ((index + 1) / record.shots.length) * 0.9;
       await saveSequence(record);
       return record;
@@ -219,6 +244,14 @@ export function advanceSequence(id: string): Promise<SequenceRecord | null> {
   });
 }
 
+/** Stable error code for failures a retry cannot fix, or null for transient ones. */
+function permanentErrorCode(error: unknown): string | null {
+  if (error instanceof GenerationError) return error.code;
+  if (error instanceof SequenceToolError) return error.code === 'tool-missing' ? 'ffmpeg-missing' : 'ffmpeg-failed';
+  if (error instanceof UploadError) return 'frame-unreadable';
+  return null;
+}
+
 async function finish(record: SequenceRecord, state: 'failed' | 'canceled', error?: string): Promise<SequenceRecord> {
   record.state = state;
   if (error) record.error = error;
@@ -230,14 +263,15 @@ async function finish(record: SequenceRecord, state: 'failed' | 'canceled', erro
 function ensureAssembly(id: string): void {
   if (assemblies.has(id)) return;
   const job = assemble(id)
-    .catch((error: unknown) =>
-      withLock(id, async () => {
+    .catch((error: unknown) => {
+      // The client gets a stable code; the details (paths, stderr) stay in the server log.
+      console.error(`[montagio] sequence ${id}: montage failed`, error);
+      const code = error instanceof SequenceToolError && error.code === 'tool-missing' ? 'ffmpeg-missing' : 'assembly-failed';
+      return withLock(id, async () => {
         const record = await readSequence(id);
-        if (record && record.state === 'assembling') {
-          await finish(record, 'failed', `assembly-failed: ${(error as Error).message}`);
-        }
-      }),
-    )
+        if (record && record.state === 'assembling') await finish(record, 'failed', code);
+      });
+    })
     .finally(() => assemblies.delete(id));
   assemblies.set(id, job);
 }

@@ -1,1 +1,1 @@
-export { concatClips, exportVertical, extractLastFrame, probe, SequenceToolError } from './ffmpeg';
+export { concatClips, ensureTools, exportVertical, extractLastFrame, probe, SequenceToolError } from './ffmpeg';

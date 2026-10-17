@@ -2,6 +2,13 @@ import { execFile } from 'node:child_process';
 
 export class SequenceToolError extends Error {
   override name = 'SequenceToolError';
+  /** "tool-missing": the binary cannot be found; "tool-failed": it ran and failed. */
+  constructor(
+    message: string,
+    readonly code: 'tool-missing' | 'tool-failed' = 'tool-failed',
+  ) {
+    super(message);
+  }
 }
 
 type Tool = { bin: string; envVar: 'MONTAGIO_FFMPEG' | 'MONTAGIO_FFPROBE' };
@@ -16,7 +23,7 @@ function run(tool: Tool, args: string[]): Promise<string> {
       if (!error) return resolve(stdout);
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return reject(
-          new SequenceToolError(`"${tool.bin}" was not found: install FFmpeg or set ${tool.envVar} to its full path`),
+          new SequenceToolError(`"${tool.bin}" was not found: install FFmpeg or set ${tool.envVar} to its full path`, 'tool-missing'),
         );
       }
       const tail = String(stderr).trim().split('\n').slice(-3).join(' | ');
@@ -96,4 +103,18 @@ export async function exportVertical(input: string, out: string): Promise<void> 
     '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an',
     out,
   ]);
+}
+
+const checkedTools = new Map<string, Promise<void>>();
+
+/** Fail fast (and once per binary pair) when FFmpeg or ffprobe is not installed. */
+export function ensureTools(): Promise<void> {
+  const key = `${ffmpeg().bin}|${ffprobe().bin}`;
+  let check = checkedTools.get(key);
+  if (!check) {
+    check = Promise.all([run(ffmpeg(), ['-version']), run(ffprobe(), ['-version'])]).then(() => undefined);
+    check.catch(() => checkedTools.delete(key));
+    checkedTools.set(key, check);
+  }
+  return check;
 }

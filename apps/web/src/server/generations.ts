@@ -16,7 +16,12 @@ import { readUploadMeta } from './uploads';
 export const IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
 const TERMINAL = new Set(['succeeded', 'failed', 'canceled']);
 
-export type GenerationErrorCode = 'unknown-preset' | 'unknown-image' | 'model-incompatible' | 'invalid-shots';
+export type GenerationErrorCode =
+  | 'unknown-preset'
+  | 'unknown-image'
+  | 'model-incompatible'
+  | 'invalid-shots'
+  | 'ffmpeg-missing';
 
 export class GenerationError extends Error {
   constructor(readonly code: GenerationErrorCode) {
@@ -49,15 +54,9 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Cr
   return creation;
 }
 
-async function createGenerationOnce(input: CreateGenerationInput): Promise<CreateResult> {
-  const previous = await lookupKey(input.idempotencyKey);
-  if (previous && Date.now() - Date.parse(previous.createdAt) < IDEMPOTENCY_WINDOW_MS) {
-    const record = await readRecord(previous.id);
-    if (record) return { record, created: false };
-  }
-
-  const { library, backend } = getServices();
-  const lib = await library;
+/** Look everything up and compile the workflow; throws GenerationError on any invalid input. */
+async function resolveJob(input: Omit<CreateGenerationInput, 'idempotencyKey'>, seed: number) {
+  const lib = await getServices().library;
   const preset = lib.presets.get(input.presetId);
   if (!preset) throw new GenerationError('unknown-preset');
   const upload = await readUploadMeta(input.imageRef);
@@ -65,20 +64,35 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
   const model = lib.models.get(input.modelId ?? preset.models.preferred);
   const template = model ? lib.templates.get(model.workflow) : undefined;
   if (!model || !template) throw new GenerationError('model-incompatible');
-
-  const seed = input.seed ?? randomInt(0, 2 ** 32);
-  let compiled;
   try {
-    compiled = compileJob(preset, model, template, {
+    const compiled = compileJob(preset, model, template, {
       imageRef: input.imageRef,
       userPrompt: input.userPrompt,
       seed,
       aspect: upload.aspect,
     });
+    return { preset, model, upload, compiled };
   } catch (error) {
     if (error instanceof CompileError) throw new GenerationError('model-incompatible');
     throw error;
   }
+}
+
+/** Dry run: would this generation be accepted? Nothing is rendered or stored. */
+export async function checkGenerationInput(input: Omit<CreateGenerationInput, 'idempotencyKey'>): Promise<void> {
+  await resolveJob(input, 0);
+}
+
+async function createGenerationOnce(input: CreateGenerationInput): Promise<CreateResult> {
+  const previous = await lookupKey(input.idempotencyKey);
+  if (previous && Date.now() - Date.parse(previous.createdAt) < IDEMPOTENCY_WINDOW_MS) {
+    const record = await readRecord(previous.id);
+    if (record) return { record, created: false };
+  }
+
+  const { backend } = getServices();
+  const seed = input.seed ?? randomInt(0, 2 ** 32);
+  const { preset, model, upload, compiled } = await resolveJob(input, seed);
 
   const id = randomUUID();
   await saveWorkflow(id, compiled.workflow);

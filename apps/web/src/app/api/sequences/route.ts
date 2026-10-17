@@ -32,7 +32,10 @@ export async function POST(request: Request) {
     });
     return Response.json(record, { status: created ? 201 : 200 });
   } catch (error) {
-    if (error instanceof GenerationError) return Response.json({ error: error.code }, { status: 400 });
+    if (error instanceof GenerationError) {
+      // A missing FFmpeg is the server's problem, not the request's.
+      return Response.json({ error: error.code }, { status: error.code === 'ffmpeg-missing' ? 503 : 400 });
+    }
     throw error;
   }
 }

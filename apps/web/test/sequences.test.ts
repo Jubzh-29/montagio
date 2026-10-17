@@ -62,6 +62,28 @@ describe('validation', () => {
     expect(existsSync(join(dataDir(), 'generations'))).toBe(false);
   });
 
+  test('an incompatible model in a later shot is refused before any render', async () => {
+    const imageRef = await uploadedImageRef();
+    const shots = [{ presetId: 'crash-push' }, { presetId: 'pan-left', modelId: 'z-image-turbo' }];
+    const res = await postSequence(sequenceRequest({ imageRef, shots }, 'bad-model'));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'model-incompatible' });
+    expect(existsSync(join(dataDir(), 'generations'))).toBe(false);
+  });
+
+  test('a missing FFmpeg is refused before any render', async () => {
+    process.env.MONTAGIO_FFMPEG = 'ffmpeg-not-installed';
+    try {
+      const imageRef = await uploadedImageRef();
+      const res = await postSequence(sequenceRequest({ imageRef, shots: threeShots }, 'no-ffmpeg'));
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: 'ffmpeg-missing' });
+      expect(existsSync(join(dataDir(), 'generations'))).toBe(false);
+    } finally {
+      delete process.env.MONTAGIO_FFMPEG;
+    }
+  });
+
   test('an unknown image -> 400 unknown-image', async () => {
     const res = await postSequence(sequenceRequest({ imageRef: 'uploads/missing.png', shots: threeShots }, 'no-image'));
     expect(await res.json()).toEqual({ error: 'unknown-image' });
@@ -143,6 +165,50 @@ describe('resilience', () => {
     });
     expect(await getSeq('lost-seq')).toMatchObject({ state: 'failed', error: 'lost' });
   });
+
+  test('FFmpeg disappearing while chaining fails the sequence with a stable code', async () => {
+    process.env.MONTAGIO_DEMO_DURATION_MS = '0';
+    const imageRef = await uploadedImageRef();
+    const { id } = await (await postSequence(sequenceRequest({ imageRef, shots: threeShots }, 'ffmpeg-gone'))).json();
+    process.env.MONTAGIO_FFMPEG = 'ffmpeg-removed-meanwhile';
+    try {
+      expect(await getSeq(id)).toMatchObject({ state: 'failed', error: 'ffmpeg-missing' });
+      expect(await getSeq(id)).toMatchObject({ state: 'failed', error: 'ffmpeg-missing' });
+    } finally {
+      delete process.env.MONTAGIO_FFMPEG;
+    }
+  });
+
+  test('a montage failure stores a stable code, never server paths', async () => {
+    seedRecordFile(dataDir(), {
+      id: 'gmissing',
+      presetId: 'crash-push',
+      modelId: 'wan22-i2v-a14b-fun-camera',
+      imageRef: 'uploads/x.png',
+      seed: 1,
+      aspect: '16:9',
+      state: 'succeeded',
+      progress: 1,
+      backendKind: 'demo',
+      backendJobId: 'demo-gmissing',
+      outputUrl: '/media/data/generations/gmissing/missing.mp4',
+      idempotencyKey: 'gmissing',
+      createdAt: now,
+      updatedAt: now,
+    });
+    seedSequence({
+      ...base,
+      id: 'broken-montage',
+      state: 'assembling',
+      currentShot: 1,
+      shots: [
+        { presetId: 'crash-push', generationId: 'gmissing', state: 'succeeded' },
+        { presetId: 'crash-push', generationId: 'gmissing', state: 'succeeded' },
+      ],
+    });
+    const done = await pollUntil('broken-montage', ['succeeded', 'failed']);
+    expect(done).toMatchObject({ state: 'failed', error: 'assembly-failed' });
+  }, 60_000);
 
   test('an interrupted montage resumes on the next GET', async () => {
     for (const id of ['g1', 'g2']) {
