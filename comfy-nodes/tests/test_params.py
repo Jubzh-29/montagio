@@ -7,8 +7,10 @@ of the app's compileJob for every preset of the monorepo. One check matters most
 node sends to WanCameraEmbedding for each pose is one of the 9 `camera_pose` values of that node.
 
 The node does not apply the limits of a model (spec section 4: the app trims the duration and
-picks the fps a model can render, the pack leaves that to the workflow), so these tests run
-presets that stay within those of the fun-camera model.
+picks the fps a model can render, the pack leaves that to the workflow), so the requests that
+compare duration, fps and frames give compileJob a copy of the model with its limits out of the
+way (wide_limits in tests/ts_bridge.ts). Then any preset the schema accepts must agree with the
+app: the same numbers, or the same refusal (two moves for the camera node, LoRAs).
 """
 import dataclasses
 
@@ -34,6 +36,8 @@ from tests.conftest import ts_compile
 from tests.parity_cases import (
     ASPECT_CHOICES,
     BASE,
+    BEYOND_PRESETS,
+    DRIVEN_PRESETS,
     FUN_CAMERA,
     LORA_BLOCK,
     MINIMAL,
@@ -46,6 +50,8 @@ from tests.parity_cases import (
     WAN_5B,
     compile_request,
     edit,
+    fun_camera_request,
+    prompt_mode_request,
 )
 
 CRASH = parse_preset(BASE, "crash-push.yaml")
@@ -250,15 +256,66 @@ def assert_same_as_compile_job(p, expected, *, camera=True):
         assert (p.camera_pose, p.speed) == (expected["cameraPose"], expected["cameraSpeed"])
 
 
-@pytest.mark.parametrize("name,text", MONOREPO_PRESETS, ids=[name for name, _ in MONOREPO_PRESETS])
+def assert_parametric_parity(ts, name, text, *, aspect="16:9", resolution=None, prompt=None):
+    """The node in parametric mode against compileJob for the camera model, limits out of the way.
+
+    Whatever the preset holds, the pack and the app agree: the same numbers, or the same refusal.
+    """
+    preset = parse_preset(text, name)
+    expected = ts_compile(ts, fun_camera_request(text, aspect, resolution, prompt))
+    arguments = {"aspect": aspect, "resolution": resolution, "prompt": prompt or ""}
+    if preset["loras"]:
+        # the app refuses the job and the pack does too, in the same words
+        with pytest.raises(ParamsError) as caught:
+            compute_params(preset, **arguments)
+        assert str(caught.value) == expected["error"]
+        return
+    assert "error" not in expected, expected.get("error")
+    assert expected["cameraMode"] == "parametric"
+    if len(preset["camera"]["poses"]) > 1:
+        # the app joins the two moves for the camera node, which only takes one: the pack refuses and names the same pair
+        with pytest.raises(ParamsError) as caught:
+            compute_params(preset, **arguments)
+        assert f"({expected['cameraPose']});" in str(caught.value)
+        return
+    assert_same_as_compile_job(compute_params(preset, **arguments), expected)
+
+
+def assert_prompt_mode_parity(ts, name, text, *, prompt=None):
+    """The node in prompt mode against compileJob for the model without camera control.
+
+    The prompt is what this mode changes (its camera is Static and 1.0, the app's are null), and the numbers
+    are compared above, with the camera model.
+    """
+    preset = parse_preset(text, name)
+    expected = ts_compile(ts, prompt_mode_request(text, "1:1", prompt))
+    arguments = {"aspect": "1:1", "prompt": prompt or "", "camera_mode": "prompt"}
+    if preset["loras"]:
+        with pytest.raises(ParamsError) as caught:
+            compute_params(preset, **arguments)
+        assert str(caught.value) == expected["error"]
+        return
+    assert "error" not in expected, expected.get("error")
+    assert expected["cameraMode"] == "prompt" and expected["cameraPose"] is None
+    p = compute_params(preset, **arguments)
+    assert p.prompt == expected["prompt"]
+    assert (p.camera_pose, p.speed) == ("Static", 1.0)
+
+
+def test_in_memory_presets_cover_what_the_monorepo_may_never_hold():
+    presets = [parse_preset(text, title) for title, text in BEYOND_PRESETS]
+    assert any(preset["defaults"]["duration_s"] > 5 for preset in presets)
+    assert any(preset["defaults"]["fps"] == 24 for preset in presets)
+    assert any(len(preset["camera"]["poses"]) > 1 for preset in presets)
+    assert any(preset["loras"] for preset in presets)
+
+
+@pytest.mark.parametrize("name,text", DRIVEN_PRESETS, ids=[name for name, _ in DRIVEN_PRESETS])
 @pytest.mark.parametrize("aspect", ASPECT_CHOICES)
 @pytest.mark.parametrize("resolution", RESOLUTION_CHOICES)
 def test_compile_parity_fun_camera(ts, name, text, aspect, resolution):
     # compileJob(preset, wan22-i2v-a14b-fun-camera, template, {imageRef: "x.png", seed: 1, aspect, resolution, userPrompt: "a cat"}).params
-    expected = ts_compile(ts, compile_request(text, FUN_CAMERA, aspect, resolution, "a cat"))
-    assert expected["cameraMode"] == "parametric"
-    # a preset above the limits of the model (more than 5 s, 24 fps) would differ here by design, see the docstring
-    assert_same_as_compile_job(compute_params(parse_preset(text, name), aspect=aspect, resolution=resolution, prompt="a cat"), expected)
+    assert_parametric_parity(ts, name, text, aspect=aspect, resolution=resolution, prompt="a cat")
 
 
 def test_monorepo_presets_were_found(ts):  # `ts` skips this test without the monorepo
@@ -268,37 +325,29 @@ def test_monorepo_presets_were_found(ts):  # `ts` skips this test without the mo
 
 @pytest.mark.parametrize("title,text", PRESET_VARIANTS, ids=[title for title, _ in PRESET_VARIANTS])
 def test_compile_parity_variants(ts, title, text):
-    expected = ts_compile(ts, compile_request(text, FUN_CAMERA, user_prompt=USER_PROMPT))
-    assert expected["cameraMode"] == "parametric"
-    assert_same_as_compile_job(compute_params(parse_preset(text, title), aspect="16:9", prompt=USER_PROMPT), expected)
+    assert_parametric_parity(ts, title, text, prompt=USER_PROMPT)
 
 
 @pytest.mark.parametrize("title,prompt", USER_PROMPTS, ids=[title for title, _ in USER_PROMPTS])
 @pytest.mark.parametrize("text", [BASE, MINIMAL], ids=["crash-push", "minimal"])
 def test_compile_parity_user_prompts(ts, title, prompt, text):
-    preset = parse_preset(text, "preset.yaml")
-    expected = ts_compile(ts, compile_request(text, FUN_CAMERA, user_prompt=prompt))
-    assert_same_as_compile_job(compute_params(preset, aspect="16:9", prompt=prompt), expected)
-    # and in prompt mode: the prompt only (the 5B model renders at another fps)
+    assert_parametric_parity(ts, "preset.yaml", text, prompt=prompt)
+    # and in prompt mode: the prompt only
     expected = ts_compile(ts, compile_request(text, WAN_5B, user_prompt=prompt))
+    preset = parse_preset(text, "preset.yaml")
     assert compute_params(preset, aspect="16:9", prompt=prompt, camera_mode="prompt").prompt == expected["prompt"]
 
 
 def test_compile_parity_without_user_prompt(ts):
-    preset = parse_preset(BASE, "crash-push.yaml")
-    assert_same_as_compile_job(compute_params(preset, aspect="16:9"), ts_compile(ts, compile_request(BASE, FUN_CAMERA)))
+    assert_parametric_parity(ts, "crash-push.yaml", BASE)
     expected = ts_compile(ts, compile_request(BASE, WAN_5B))
+    preset = parse_preset(BASE, "crash-push.yaml")
     assert compute_params(preset, aspect="16:9", camera_mode="prompt").prompt == expected["prompt"]
 
 
-@pytest.mark.parametrize("name,text", MONOREPO_PRESETS + PRESET_VARIANTS, ids=[name for name, _ in MONOREPO_PRESETS + PRESET_VARIANTS])
+@pytest.mark.parametrize("name,text", DRIVEN_PRESETS + PRESET_VARIANTS, ids=[name for name, _ in DRIVEN_PRESETS + PRESET_VARIANTS])
 def test_compile_parity_prompt_mode_5b(ts, name, text):
-    # wan22-ti2v-5b has no camera node; it renders at 24 fps, the pack at the fps of the preset: only the prompt is compared
-    expected = ts_compile(ts, compile_request(text, WAN_5B, "1:1", user_prompt=USER_PROMPT))
-    assert expected["cameraMode"] == "prompt" and expected["cameraPose"] is None
-    p = compute_params(parse_preset(text, name), aspect="1:1", prompt=USER_PROMPT, camera_mode="prompt")
-    assert p.prompt == expected["prompt"]
-    assert (p.camera_pose, p.speed) == ("Static", 1.0)
+    assert_prompt_mode_parity(ts, name, text, prompt=USER_PROMPT)
 
 
 @pytest.mark.parametrize("pair", POSE_PAIRS, ids=[f"{a}+{b}" for a, b in POSE_PAIRS])

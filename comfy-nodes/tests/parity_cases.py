@@ -225,8 +225,11 @@ CASES: list[tuple[str, str]] = (
 # The bridge runs the app's compileJob on each request of COMPILE, and test_params.py compares
 # what comes out with what the pack computes. The requests are built here and the tests build
 # the same ones again: conftest.ts_compile finds the answer by equality and fails on a request
-# that is not listed. The pack does not apply the model limits (spec section 4), so the presets
-# run against the fun-camera model stay within them: at most 5 s, at 16 fps.
+# that is not listed. The pack does not apply the model limits (spec section 4) whereas the app
+# trims a job to its model (an 8 s preset becomes 5 s, 24 fps becomes 16): the requests that
+# compare duration and fps are made with wide_limits, which gives the real compileJob a copy of
+# the model with the limits out of the way. Then every preset the schema accepts must give the
+# same numbers in the pack and in the app, whatever presets/ holds now or later.
 
 FUN_CAMERA = "wan22-i2v-a14b-fun-camera"  # has a camera node: the pack's parametric mode
 WAN_5B = "wan22-ti2v-5b"  # no camera control: the pack's prompt mode (and it renders at 24 fps)
@@ -277,35 +280,57 @@ USER_PROMPTS = [
 LORA_BLOCK = "loras:\n  - { file: style.safetensors, strength: 0.8 }\n"
 
 
-def compile_request(preset_yaml, model, aspect="16:9", resolution=None, user_prompt=None):
+# (title, yaml text): presets the schema accepts that no file of presets/ is today, but one could be
+# tomorrow: beyond the limits of the models, with two moves, with LoRAs. Written in memory, never added to presets/.
+BEYOND_PRESETS = [
+    ("in memory: 8 s", edit("duration_s: 5", "duration_s: 8")),
+    ("in memory: 24 fps", edit("fps: 16", "fps: 24")),
+    ("in memory: 10 s at 24 fps, 720p", edit("duration_s: 5", "duration_s: 10").replace("fps: 16", "fps: 24").replace("resolution: 480p", "resolution: 720p")),
+    ("in memory: two moves", edit("poses: [zoom_in]", "poses: [pan_up, zoom_in]")),
+    ("in memory: LoRAs", BASE + LORA_BLOCK),
+    ("in memory: two moves and LoRAs", edit("poses: [zoom_in]", "poses: [pan_up, zoom_in]") + LORA_BLOCK),
+]
+# what test_compile_parity_fun_camera and test_compile_parity_prompt_mode_5b run on
+DRIVEN_PRESETS = MONOREPO_PRESETS + BEYOND_PRESETS
+
+
+def compile_request(preset_yaml, model, aspect="16:9", resolution=None, user_prompt=None, wide_limits=False):
     """One request for the bridge; a resolution or a prompt left out is an input left unset."""
     request = {"preset_yaml": preset_yaml, "model": model, "aspect": aspect}
     if resolution is not None:
         request["resolution"] = resolution
     if user_prompt is not None:
         request["userPrompt"] = user_prompt
+    if wide_limits:
+        request["wide_limits"] = True
     return request
 
 
+def fun_camera_request(preset_yaml, aspect="16:9", resolution=None, user_prompt=None):
+    """The camera model, its limits out of the way, for the tests that compare duration, fps and frames."""
+    return compile_request(preset_yaml, FUN_CAMERA, aspect, resolution, user_prompt, wide_limits=True)
+
+
+def prompt_mode_request(preset_yaml, aspect="1:1", user_prompt=None):
+    """The model without camera control (the pack's prompt mode), its limits out of the way."""
+    return compile_request(preset_yaml, WAN_5B, aspect, None, user_prompt, wide_limits=True)
+
+
 COMPILE: list[dict] = (
-    # test_compile_parity_fun_camera: every preset of the monorepo, every aspect, every resolution
+    # test_compile_parity_fun_camera: every preset of the monorepo and the in-memory ones, every aspect, every resolution
     [
-        compile_request(text, FUN_CAMERA, aspect, resolution, "a cat")
-        for _, text in MONOREPO_PRESETS
+        fun_camera_request(text, aspect, resolution, "a cat")
+        for _, text in DRIVEN_PRESETS
         for aspect in ASPECT_CHOICES
         for resolution in RESOLUTION_CHOICES
     ]
-    # test_compile_parity_variants and test_compile_parity_prompt_mode_5b
-    + [compile_request(text, FUN_CAMERA, user_prompt=USER_PROMPT) for _, text in PRESET_VARIANTS]
-    + [compile_request(text, WAN_5B, "1:1", user_prompt=USER_PROMPT) for _, text in MONOREPO_PRESETS + PRESET_VARIANTS]
-    # test_compile_parity_user_prompts
-    + [
-        compile_request(text, model, user_prompt=prompt)
-        for _, prompt in USER_PROMPTS
-        for text in (BASE, MINIMAL)
-        for model in (FUN_CAMERA, WAN_5B)
-    ]
-    + [compile_request(BASE, FUN_CAMERA), compile_request(BASE, WAN_5B)]
+    # test_compile_parity_prompt_mode_5b and test_compile_parity_variants
+    + [prompt_mode_request(text, user_prompt=USER_PROMPT) for _, text in DRIVEN_PRESETS + PRESET_VARIANTS]
+    + [fun_camera_request(text, user_prompt=USER_PROMPT) for _, text in PRESET_VARIANTS]
+    # test_compile_parity_user_prompts and test_compile_parity_without_user_prompt
+    + [fun_camera_request(text, user_prompt=prompt) for _, prompt in USER_PROMPTS for text in (BASE, MINIMAL)]
+    + [compile_request(text, WAN_5B, user_prompt=prompt) for _, prompt in USER_PROMPTS for text in (BASE, MINIMAL)]
+    + [fun_camera_request(BASE), compile_request(BASE, WAN_5B)]
     # test_two_poses_parity
     + [
         compile_request(edit("poses: [zoom_in]", f"poses: [{a}, {b}]"), model, user_prompt=USER_PROMPT)

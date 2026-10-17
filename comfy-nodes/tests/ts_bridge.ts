@@ -4,6 +4,7 @@
 // Response on stdout (JSON only) : { constants, cases: [{ name, ok, preset?, error? }], compile: [params | { error }] }
 // compile[i] answers compile[i] of the request: the params of the app's compileJob (workflow template of the
 // model taken from the library under `root`, start image "x.png", seed 1), or { error } for a CompileError.
+// With wide_limits the same compileJob gets a copy of the model whose limits are out of the way (see WIDE_LIMITS).
 // Run from the monorepo root through tsx, see tests/bridge.py.
 import {
   CAMERA_POSE_PROMPTS,
@@ -29,6 +30,7 @@ type CompileReq = {
   aspect: Aspect;
   resolution?: Resolution; // left out: the preset's own
   userPrompt?: string;
+  wide_limits?: boolean; // run the model with WIDE_LIMITS instead of the limits of the registry
 };
 
 type Request = {
@@ -40,6 +42,10 @@ type Request = {
 const ASPECTS: Aspect[] = ['16:9', '9:16', '1:1'];
 const RESOLUTIONS: Resolution[] = ['480p', '720p'];
 const FPS = [16, 24];
+type Model = NonNullable<ReturnType<Library['models']['get']>>;
+// Everything a preset can ask for (the schema allows 2 to 10 s, 16 or 24 fps, both resolutions). The node pack does
+// not trim a job to a model, so its parity with compileJob is checked with the model's limits out of the way.
+const WIDE_LIMITS: Model['limits'] = { resolutions: ['480p', '720p'], fps: [16, 24], max_duration_s: 10 };
 // widths x heights around the thresholds of pickAspect (ratio 1.4 and 0.71)
 const IMAGE_SIZES: [number, number][] = [
   [1920, 1080], [1080, 1920], [1000, 1000], [4000, 3000], [3000, 4000], [1400, 1000], [1399, 1000],
@@ -80,10 +86,11 @@ function parseCase({ name, yaml }: { name: string; yaml: string }) {
 function compileCase(library: Library, req: CompileReq): CompiledParams | { error: string } {
   // a bad request is a bug of the test: it crashes the bridge, only the compiler's refusals are answers
   const preset = parsePreset(req.preset_yaml, 'compile request');
-  const model = library.models.get(req.model);
-  if (!model) throw new Error(`compile request: unknown model "${req.model}"`);
-  const template = library.templates.get(model.workflow);
+  const entry = library.models.get(req.model);
+  if (!entry) throw new Error(`compile request: unknown model "${req.model}"`);
+  const template = library.templates.get(entry.workflow);
   if (!template) throw new Error(`compile request: no workflow template for model "${req.model}"`);
+  const model: Model = req.wide_limits ? { ...entry, limits: WIDE_LIMITS } : entry;
   try {
     const inputs = { imageRef: 'x.png', seed: 1, aspect: req.aspect, resolution: req.resolution, userPrompt: req.userPrompt };
     return compileJob(preset, model, template, inputs).params;
