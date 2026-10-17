@@ -1,0 +1,532 @@
+/* Layout: the monitor gets the room, the panel holds the shot setup. */
+.studio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: var(--space-5);
+  align-items: start;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  position: sticky;
+  top: 72px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.panelSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.sectionTitle {
+  padding: 0;
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+/* Monitor: a viewfinder, crop marks in the corners. */
+.monitor {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  transition: border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+}
+
+.monitor::after {
+  content: '';
+  position: absolute;
+  inset: var(--space-4);
+  pointer-events: none;
+  --mark: oklch(0.96 0 0 / 0.28);
+  background:
+    linear-gradient(var(--mark), var(--mark)) top left / 18px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top left / 1px 18px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top right / 18px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top right / 1px 18px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom left / 18px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom left / 1px 18px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom right / 18px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom right / 1px 18px no-repeat;
+}
+
+.monitor[data-dragging='true'] {
+  border-color: var(--rec);
+  background: var(--surface-2);
+}
+
+.monitorMedia {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: oklch(0.07 0 0);
+  transition: opacity var(--dur) var(--ease-out), filter var(--dur) var(--ease-out);
+}
+
+.monitorMedia[data-dimmed='true'] {
+  opacity: 0.45;
+  filter: saturate(0.6);
+}
+
+.monitorEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.monitorEmptyTitle {
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+
+.monitorEmptyHint {
+  margin-bottom: var(--space-3);
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+}
+
+.replace {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-5);
+  z-index: 1;
+}
+
+.renderOverlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: linear-gradient(to top, oklch(0.07 0 0 / 0.9), oklch(0.07 0 0 / 0));
+}
+
+.renderStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-s);
+}
+
+.renderStatus button {
+  margin-left: auto;
+}
+
+.recDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rec);
+  animation: tally 1.2s var(--ease-out) infinite alternate;
+}
+
+@keyframes tally {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
+
+.progress {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: oklch(0.96 0 0 / 0.16);
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  background: var(--rec);
+  transform-origin: left;
+  transition: transform 600ms var(--ease-out);
+}
+
+.monitorNotice {
+  position: absolute;
+  inset: auto var(--space-5) var(--space-5) var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font-size: var(--text-s);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Presets */
+.presetGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.preset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+}
+
+.preset:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.preset[aria-pressed='true'] {
+  border-color: var(--rec);
+  background: var(--rec-soft);
+}
+
+.presetMedia {
+  position: relative;
+  display: block;
+}
+
+.presetPreview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-s);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease-out);
+}
+
+.presetPreview[data-ready='true'] {
+  opacity: 1;
+}
+
+.presetText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 var(--space-1) var(--space-1);
+}
+
+.presetName {
+  font-weight: 600;
+  font-size: var(--text-m);
+}
+
+.presetDescription {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+/* Viewfinder glyph: the scene drifts the way the camera moves. */
+.glyph {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
+}
+
+.glyphScene {
+  position: absolute;
+  inset: -20%;
+  background-image:
+    linear-gradient(oklch(0.96 0 0 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.96 0 0 / 0.06) 1px, transparent 1px);
+  background-size: 12% 18%;
+  animation: drift var(--move-duration) var(--ease-out) infinite alternate;
+  animation-play-state: paused;
+}
+
+.preset:hover .glyphScene,
+.preset[aria-pressed='true'] .glyphScene {
+  animation-play-state: running;
+}
+
+@keyframes drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(var(--tx), var(--ty)) scale(var(--scale));
+  }
+}
+
+.glyphHorizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 60%;
+  height: 1px;
+  background: var(--line-strong);
+}
+
+.glyphSubject {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--ink-faint);
+}
+
+.preset[aria-pressed='true'] .glyphSubject {
+  background: var(--ink);
+}
+
+.glyphFrame {
+  position: absolute;
+  inset: 14%;
+  --mark: oklch(0.96 0 0 / 0.4);
+  background:
+    linear-gradient(var(--mark), var(--mark)) top left / 8px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top left / 1px 8px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top right / 8px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top right / 1px 8px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom left / 8px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom left / 1px 8px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom right / 8px 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom right / 1px 8px no-repeat;
+}
+
+/* Models */
+.models {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.model {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+}
+
+.model:hover {
+  border-color: var(--line-strong);
+}
+
+.model[data-selected='true'] {
+  border-color: var(--rec);
+  background: var(--rec-soft);
+}
+
+.model:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.modelTier {
+  font-weight: 600;
+}
+
+.modelName {
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modelMeta {
+  display: flex;
+  gap: var(--space-2);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.license {
+  color: var(--ok);
+}
+
+/* Prompt and generate */
+.prompt {
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  resize: vertical;
+  transition: border-color var(--dur) var(--ease-out);
+}
+
+.prompt::placeholder {
+  color: var(--ink-faint);
+}
+
+.prompt:hover {
+  border-color: var(--line-strong);
+}
+
+.generateBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hint {
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+}
+
+.note {
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+/* Buttons: one vocabulary across the app. */
+.buttonPrimary,
+.buttonSecondary,
+.buttonGhost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-m);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+}
+
+.buttonPrimary {
+  min-height: 48px;
+  padding: 0 var(--space-5);
+  border: 0;
+  background: var(--rec);
+  color: oklch(1 0 0);
+  font-size: var(--text-m);
+}
+
+.buttonPrimary:hover:not(:disabled) {
+  background: var(--rec-hover);
+}
+
+.buttonPrimary:disabled {
+  background: var(--surface-2);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+.buttonSecondary {
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-s);
+}
+
+.buttonSecondary:hover {
+  background: var(--surface-2);
+  border-color: var(--ink-faint);
+}
+
+.buttonGhost {
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid oklch(0.96 0 0 / 0.25);
+  background: oklch(0.07 0 0 / 0.55);
+  color: var(--ink);
+  font-size: var(--text-s);
+}
+
+.buttonGhost:hover:not(:disabled) {
+  border-color: oklch(0.96 0 0 / 0.5);
+}
+
+.buttonGhost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 960px) {
+  .studio {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-4);
+    gap: var(--space-5);
+  }
+  .stage {
+    position: static;
+  }
+}
+
+@media (max-width: 420px) {
+  .monitorEmpty {
+    padding: var(--space-4);
+  }
+}
+
+.emptyActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.buttonLink {
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.buttonLink:hover {
+  color: var(--ink);
+}

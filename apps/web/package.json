@@ -8,20 +8,22 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run --globals",
-    "typecheck": "next typegen && tsc --noEmit -p tsconfig.json"
+    "typecheck": "next typegen && tsc --noEmit -p tsconfig.json",
+    "e2e": "playwright test"
   },
   "dependencies": {
+    "@montagio/check-open-stack": "*",
+    "@montagio/comfy-adapter": "*",
+    "@montagio/presets": "*",
+    "@montagio/registry": "*",
+    "image-size": "^2",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "@montagio/presets": "*",
-    "@montagio/registry": "*",
-    "@montagio/comfy-adapter": "*",
-    "@montagio/check-open-stack": "*",
-    "image-size": "^2",
     "yaml": "^2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",

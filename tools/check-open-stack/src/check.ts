@@ -1,5 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LibraryError, loadLibrary, type Library } from '@montagio/presets';
 import { ALLOWED_WEIGHT_LICENSES, parseLock, type LockEntry } from '@montagio/registry';
@@ -64,7 +64,7 @@ async function sourceDirs(root: string): Promise<string[]> {
  * this package directory and must be passed explicitly when the code is bundled.
  */
 export async function checkOpenStack(root: string, opts: { configDir?: string } = {}): Promise<OpenStackReport> {
-  const configDir = opts.configDir ?? fileURLToPath(new URL('..', import.meta.url));
+  const configDir = opts.configDir ?? join(dirname(fileURLToPath(import.meta.url)), '..');
   const violations: Violation[] = [];
   const allowedLicenses: readonly string[] = ALLOWED_WEIGHT_LICENSES;
 

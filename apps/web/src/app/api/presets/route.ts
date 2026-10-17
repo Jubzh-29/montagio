@@ -9,6 +9,7 @@ export async function GET() {
       description: preset.description,
       previewUrl: `/media/presets/${preset.preview}`,
       poses: preset.camera.poses,
+      speed: preset.camera.speed,
       defaultModel: preset.models.preferred,
     })),
   );

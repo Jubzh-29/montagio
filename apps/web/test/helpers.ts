@@ -7,7 +7,7 @@ import { resetServicesForTests } from '@/server/services';
 export const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
 /** Fresh data directory and fresh in-memory services for every test. */
-export function useTempData(): () => string {
+export function setupTempData(): () => string {
   let dir = '';
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'montagio-web-'));

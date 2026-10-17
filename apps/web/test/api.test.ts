@@ -15,10 +15,10 @@ import {
   pngFile,
   seedRecordFile,
   uploadRequest,
-  useTempData,
+  setupTempData,
 } from './helpers';
 
-const dataDir = useTempData();
+const dataDir = setupTempData();
 
 async function uploadedImageRef(): Promise<string> {
   const res = await postUpload(uploadRequest(pngFile(1920, 1080)));
