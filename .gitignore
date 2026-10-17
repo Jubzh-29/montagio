@@ -7,3 +7,4 @@ test-results/
 playwright-report/
 *.log
 .DS_Store
+apps/web/public/open-stack-report.json

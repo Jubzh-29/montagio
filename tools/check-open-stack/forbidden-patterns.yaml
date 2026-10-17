@@ -1,0 +1,18 @@
+# Regular expressions that must never appear in Montagio source code: closed
+# generation APIs and the Comfy Router. Scanned in apps/, packages/*/src and
+# tools/*/src (.ts, .tsx, .js, .mjs, .cjs).
+schema: montagio/forbidden-patterns@0.1
+patterns:
+  - { pattern: 'api\.openai\.com', reason: closed OpenAI API }
+  - { pattern: 'generativelanguage\.googleapis\.com', reason: closed Google Gemini API }
+  - { pattern: 'aiplatform\.googleapis\.com', reason: closed Google Vertex AI API }
+  - { pattern: 'api\.klingai\.com', reason: closed Kling API }
+  - { pattern: 'api\.minimax', reason: closed MiniMax API }
+  - { pattern: 'fal\.run', reason: closed fal.ai queue API }
+  - { pattern: 'api\.replicate\.com', reason: closed Replicate API }
+  - { pattern: 'api\.bfl\.ai', reason: closed Black Forest Labs API }
+  - { pattern: 'api\.higgsfield\.ai', reason: closed generation platform API }
+  - { pattern: 'api\.runwayml\.com', reason: closed Runway API }
+  - { pattern: 'api\.lumalabs\.ai', reason: closed Luma API }
+  - { pattern: 'ComfyRouter', reason: Comfy Router (proprietary model routing) }
+  - { pattern: '\.router\.', reason: Comfy SDK router namespace }

@@ -1,0 +1,23 @@
+schema: montagio/lock@0.1
+weights:
+  - id: wan22-fun-camera-high
+    file: wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors
+    url: https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera
+    license: Apache-2.0
+    source: https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera
+  - id: wan22-fun-camera-low
+    file: wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors
+    url: https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera
+    license: Apache-2.0
+    source: https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera
+  - id: umt5-xxl-fp8
+    file: umt5_xxl_fp8_e4m3fn_scaled.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged
+    license: Apache-2.0
+    source: https://huggingface.co/google/umt5-xxl
+  - id: wan21-vae
+    file: wan_2.1_vae.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged
+    sha256: 2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P

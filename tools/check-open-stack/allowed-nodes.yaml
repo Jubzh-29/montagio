@@ -1,0 +1,20 @@
+# Every node class a Montagio workflow may use, with where it comes from and under
+# which license. A workflow node absent from this list fails `check-open-stack`:
+# unknown nodes (partner nodes included) are refused by default.
+schema: montagio/allowed-nodes@0.1
+nodes:
+  - { class_type: LoadImage, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: CLIPLoader, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: CLIPTextEncode, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: VAELoader, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: UNETLoader, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: VAEDecode, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: KSampler, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: KSamplerAdvanced, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: EmptySD3LatentImage, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SaveImage, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: CreateVideo, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SaveVideo, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: WanCameraEmbedding, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: WanCameraImageToVideo, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: Wan22ImageToVideoLatent, source: comfyui-core, license: GPL-3.0 }
