@@ -1,7 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import { access } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
-import { BackendError, type BackendErrorCode } from '@montagio/comfy-adapter';
+import { isBackendError, type BackendErrorCode } from '@montagio/comfy-adapter';
 import { compileJob, CompileError, validatePreset, type Preset } from '@montagio/presets';
 import { ensureTools, tagClip } from '@montagio/sequence';
 import { getEnv } from './env';
@@ -128,7 +128,8 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
   // Every delivered clip is tagged by FFmpeg: without it, refuse before a second of GPU is spent.
   try {
     await ensureTools();
-  } catch {
+  } catch (error) {
+    console.error('[montagio] FFmpeg is required before a render:', error instanceof Error ? error.message : error);
     throw new GenerationError('ffmpeg-missing');
   }
 
@@ -182,7 +183,7 @@ export function failureResponse(error: unknown): Response | null {
     // A missing FFmpeg is the server's problem, not the request's.
     return Response.json({ error: error.code }, { status: error.code === 'ffmpeg-missing' ? 503 : 400 });
   }
-  if (error instanceof BackendError) return Response.json({ error: error.code }, { status: BACKEND_STATUS[error.code] });
+  if (isBackendError(error)) return Response.json({ error: error.code }, { status: BACKEND_STATUS[error.code] });
   return null;
 }
 
@@ -215,7 +216,16 @@ export async function getGeneration(id: string): Promise<GenerationRecord | null
   const record = await readRecord(id);
   if (!record || TERMINAL.has(record.state)) return record;
 
-  const job = await getServices().backend.get(record.backendJobId);
+  let job;
+  try {
+    job = await getServices().backend.get(record.backendJobId);
+  } catch (error) {
+    // The proxy or the pod is out of reach for now; the render may well go on. Keep the
+    // last known state so the Studio keeps polling instead of giving up on a paid render.
+    if (!isBackendError(error) || !error.retryable) throw error;
+    console.warn(`[montagio] generation ${id}: backend out of reach, still waiting (${error.message})`);
+    return record;
+  }
   const updated: GenerationRecord = {
     ...record,
     state: job.state,

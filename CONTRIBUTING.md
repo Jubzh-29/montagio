@@ -20,6 +20,8 @@ This adds a `Signed-off-by: Your Name <you@example.com>` line. There is no CLA: 
 
 ## Development
 
+You need Node.js 22 or later and FFmpeg (with ffprobe) on your `PATH`, or `MONTAGIO_FFMPEG` / `MONTAGIO_FFPROBE` set to their full paths: the app tags every clip and assembles sequences with it, and refuses to render without it.
+
 ```bash
 npm install
 npm run typecheck

@@ -12,7 +12,7 @@ import { POST as postUpload } from '@/app/api/uploads/route';
 import { GET as getWorkflow } from '@/app/api/workflows/[id]/route';
 import { GET as getMedia } from '@/app/media/[...path]/route';
 import { galleryOrder, presetPreviewUrl } from '@/server/gallery';
-import { mediaFileFor } from '@/server/generations';
+import { failureResponse, mediaFileFor } from '@/server/generations';
 import { resetServicesForTests } from '@/server/services';
 import { loadLibrary } from '@montagio/presets';
 import { readTags } from '@montagio/sequence';
@@ -150,17 +150,31 @@ describe('generations', () => {
     expect(await readTags(mediaFileFor(rec.outputUrl)!)).toMatchObject({ comment: 'AI-generated' });
   }, 30_000);
 
-  test('a missing FFmpeg is refused before any render', async () => {
+  test('a missing FFmpeg is refused before any render, and the server log says why', async () => {
     process.env.MONTAGIO_FFMPEG = 'ffmpeg-does-not-exist';
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
       const imageRef = await uploadedImageRef();
       const res = await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'noff'));
       expect(res.status).toBe(503);
       expect(await res.json()).toEqual({ error: 'ffmpeg-missing' });
       expect(existsSync(join(dataDir(), 'generations'))).toBe(false);
+      expect(logged.mock.calls.flat().map(String).join(' ')).toMatch(/MONTAGIO_FFMPEG/);
     } finally {
+      logged.mockRestore();
       delete process.env.MONTAGIO_FFMPEG;
     }
+  });
+
+  test('a backend error from another copy of the adapter still gets its status', async () => {
+    const foreign = Object.assign(new Error('x'), {
+      name: 'BackendError',
+      code: 'workflow-rejected',
+      retryable: false,
+      [Symbol.for('montagio.BackendError')]: true,
+    });
+    const res = failureResponse(foreign);
+    expect([res?.status, await res?.json()]).toEqual([422, { error: 'workflow-rejected' }]);
   });
 
   test('a clip FFmpeg cannot read is delivered untagged instead of failing', async () => {

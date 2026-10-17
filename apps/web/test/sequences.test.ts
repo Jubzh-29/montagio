@@ -73,13 +73,16 @@ describe('validation', () => {
 
   test('a missing FFmpeg is refused before any render', async () => {
     process.env.MONTAGIO_FFMPEG = 'ffmpeg-not-installed';
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
       const imageRef = await uploadedImageRef();
       const res = await postSequence(sequenceRequest({ imageRef, shots: threeShots }, 'no-ffmpeg'));
       expect(res.status).toBe(503);
       expect(await res.json()).toEqual({ error: 'ffmpeg-missing' });
       expect(existsSync(join(dataDir(), 'generations'))).toBe(false);
+      expect(logged.mock.calls.flat().map(String).join(' ')).toMatch(/MONTAGIO_FFMPEG/);
     } finally {
+      logged.mockRestore();
       delete process.env.MONTAGIO_FFMPEG;
     }
   });

@@ -26,9 +26,15 @@ test('remix: edit the speed, check, generate', async ({ page }) => {
 
 test('remix: a typo is listed with its field', async ({ page }) => {
   const editor = await openRemix(page);
+  // The live region is in the accessibility tree before anything is announced in it.
+  const status = page.locator('#remix-status[aria-live=polite]');
+  await expect(status).toBeAttached();
+  await expect(status).not.toHaveCSS('display', 'none');
   await editor.fill((await editor.inputValue()).replace('speed: 1.5', 'sped: 1.5'));
   await page.getByRole('button', { name: 'Check preset', exact: true }).click();
   await expect(page.getByText(/camera.*sped/)).toBeVisible(FIRST_COMPILE);
+  await expect(editor).toHaveAttribute('aria-invalid', 'true');
+  await expect(editor).toHaveAttribute('aria-describedby', 'remix-status');
 });
 
 test('remix: download the edited YAML', async ({ page }) => {

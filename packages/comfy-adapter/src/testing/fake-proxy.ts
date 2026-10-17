@@ -32,6 +32,8 @@ export type FakeProxy = {
   setJob(id: string, patch: Partial<FakeJobState>): void;
   rejectNextSubmit(status: number, code: string): void;
   nextJobId(id: string): void;
+  /** The next request (whose path starts with `pathPrefix`, if given) answers `status` to the same path on `origin`. */
+  redirectNext(status: number, origin: string, pathPrefix?: string): void;
   close(): Promise<void>;
 };
 
@@ -71,6 +73,7 @@ export async function startFakeProxy(opts: { autoRun?: { clip: string }; port?: 
   const clip = opts.autoRun ? readFileSync(opts.autoRun.clip) : null;
   let rejection: { status: number; code: string } | null = null;
   let forcedId: string | null = null;
+  let redirect: { status: number; origin: string; pathPrefix: string } | null = null;
   let base = '';
 
   const assetJson = (id: string, asset: FakeAsset, createdNew: boolean) => ({
@@ -141,6 +144,13 @@ export async function startFakeProxy(opts: { autoRun?: { clip: string }; port?: 
     requests.push({ method, path, headers });
     const body = await readBody(req);
     let match: RegExpExecArray | null;
+
+    if (redirect && path.startsWith(redirect.pathPrefix)) {
+      const { status, origin } = redirect;
+      redirect = null;
+      res.writeHead(status, { location: `${origin}${req.url ?? '/'}`, 'content-length': 0 }).end();
+      return;
+    }
 
     if (method === 'GET' && path === '/api/v2/health') return send(res, 200, { status: 'ok' });
 
@@ -236,6 +246,9 @@ export async function startFakeProxy(opts: { autoRun?: { clip: string }; port?: 
     },
     nextJobId(id) {
       forcedId = id;
+    },
+    redirectNext(status, origin, pathPrefix = '') {
+      redirect = { status, origin, pathPrefix };
     },
     close() {
       server.closeAllConnections();

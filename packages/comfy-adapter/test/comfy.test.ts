@@ -4,7 +4,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BackendError, ComfyBackend, type SubmitJob } from '../src/index';
+import { BackendError, ComfyBackend, isBackendError, type SubmitJob } from '../src/index';
 import { startFakeProxy, type FakeJobState, type FakeProxy } from '../src/testing/fake-proxy';
 
 const sample = fileURLToPath(new URL('../../../demo-assets/images/sample-16x9.png', import.meta.url));
@@ -269,4 +269,54 @@ test('the fake proxy runs a job to a clip on its own (autoRun)', async () => {
   for (let i = 0; i < 5 && states.at(-1) !== 'succeeded'; i++) states.push((await b.get(id)).state);
   expect(states).toEqual(['running', 'succeeded']);
   expect(readFileSync(join(outputsDir, `${id}.mp4`)).equals(readFileSync(clip))).toBe(true);
+});
+
+test('a redirect to another origin is refused before any request goes there', async () => {
+  const other = await startFakeProxy();
+  try {
+    fake.redirectNext(307, other.url);
+    const error = await backend().submit(job()).catch((e: unknown) => e);
+    expect(error).toMatchObject({ code: 'backend-unavailable' });
+    expect(other.requests).toEqual([]);
+  } finally {
+    await other.close();
+  }
+});
+
+test('a redirect within the proxy origin is followed, body included', async () => {
+  fake.redirectNext(307, fake.url, '/api/v2/jobs');
+  const { backendJobId } = await backend().submit(job());
+  expect(fake.jobs.get(backendJobId)!.workflow['2']!.class_type).toBe('SaveVideo');
+  expect(fake.requests.filter((r) => r.method === 'POST' && r.path === '/api/v2/jobs')).toHaveLength(2);
+});
+
+test('a succeeded job whose video is gone from the proxy is failed/no-output', async () => {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(job());
+  fake.setJob(id, {
+    status: 'succeeded',
+    outputs: [{ node_id: '2', name: 'Montagio_00001.mp4', type: 'video', content_type: 'video/mp4', assetId: 'gone' }],
+  });
+  expect(await b.get(id)).toMatchObject({ state: 'failed', error: 'no-output' });
+  expect(readdirSync(outputsDir)).toEqual([]);
+});
+
+test('a status outside the contract is failed/unexpected-status, not polled forever', async () => {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(job());
+  fake.setJob(id, { status: 'paused' });
+  expect(await b.get(id)).toMatchObject({ state: 'failed', error: 'unexpected-status' });
+});
+
+test('a BackendError is recognised across copies of the adapter (separate route bundles)', () => {
+  const foreign = Object.assign(new Error('x'), {
+    name: 'BackendError',
+    code: 'workflow-rejected',
+    retryable: false,
+    [Symbol.for('montagio.BackendError')]: true,
+  });
+  expect(isBackendError(foreign)).toBe(true);
+  expect(isBackendError(new BackendError('backend-error', false))).toBe(true);
+  expect(isBackendError(new Error('backend-error'))).toBe(false);
+  expect(isBackendError({ code: 'workflow-rejected' })).toBe(false);
 });

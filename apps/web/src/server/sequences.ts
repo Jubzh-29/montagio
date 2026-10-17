@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { BackendError, type JobState } from '@montagio/comfy-adapter';
+import { isBackendError, type JobState } from '@montagio/comfy-adapter';
 import type { Aspect } from '@montagio/presets';
 import {
   concatClips,
@@ -139,7 +139,8 @@ async function createSequenceOnce(input: CreateSequenceInput): Promise<CreateRes
   if (!upload) throw new GenerationError('unknown-image');
   try {
     await ensureTools();
-  } catch {
+  } catch (error) {
+    console.error('[montagio] FFmpeg is required before a sequence:', error instanceof Error ? error.message : error);
     throw new GenerationError('ffmpeg-missing');
   }
   // Every shot must compile now: a later shot that cannot render would waste the earlier renders.
@@ -226,6 +227,11 @@ export function advanceSequence(id: string): Promise<SequenceRecord | null> {
         await startShot(record, index + 1, upload.imageRef);
       } catch (error) {
         // Errors that a retry cannot fix end the sequence; anything else is retried on the next poll.
+        // The backend out of reach: the next poll chains again.
+        if (isBackendError(error) && error.retryable) {
+          console.warn(`[montagio] sequence ${record.id}: backend out of reach while chaining shot ${index + 1}, still waiting`);
+          return record;
+        }
         const code = permanentErrorCode(error);
         if (!code) throw error;
         console.error(`[montagio] sequence ${record.id}: chaining shot ${index + 1} failed`, error);
@@ -247,7 +253,7 @@ export function advanceSequence(id: string): Promise<SequenceRecord | null> {
 /** Stable error code for failures a retry cannot fix, or null for transient ones. */
 function permanentErrorCode(error: unknown): string | null {
   if (error instanceof GenerationError) return error.code;
-  if (error instanceof BackendError && !error.retryable) return error.code;
+  if (isBackendError(error) && !error.retryable) return error.code;
   if (error instanceof SequenceToolError) return error.code === 'tool-missing' ? 'ffmpeg-missing' : 'ffmpeg-failed';
   if (error instanceof UploadError) return 'frame-unreadable';
   return null;

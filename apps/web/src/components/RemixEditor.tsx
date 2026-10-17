@@ -65,6 +65,8 @@ export function RemixEditor({
         autoCapitalize="off"
         autoComplete="off"
         autoCorrect="off"
+        aria-describedby="remix-status"
+        aria-invalid={check?.kind === 'problems' || check?.kind === 'too-large' ? true : undefined}
         value={text}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -86,7 +88,7 @@ export function RemixEditor({
           {t('remixClose')}
         </button>
       </div>
-      <div className={styles.remixStatus} aria-live="polite">
+      <div id="remix-status" className={styles.remixStatus} aria-live="polite">
         {check?.kind === 'valid' && <p className={styles.remixValid}>{t('remixValid', { name: check.name })}</p>}
         {check?.kind === 'problems' && (
           <>

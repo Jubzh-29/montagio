@@ -11,6 +11,7 @@ import {
   type SequenceSummary,
   type UploadResult,
 } from '@/lib/api-types';
+import { refusalMessageKey } from '@/lib/refusals';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
 import { Monitor, type GenerationState, type TrackedJob, type UploadState } from './Monitor';
@@ -38,6 +39,9 @@ type Job =
   | { status: 'error'; message: string };
 
 type Tracked = Extract<Job, { status: 'tracking' }>;
+
+/** The body of a refused request. */
+type Refusal = { error?: string; problems?: string[] };
 
 /** A preset being remixed: the library text it started from and the edited text. */
 type Remix = { baseId: string; baseName: string; original: string; text: string; check?: RemixCheck };
@@ -256,7 +260,7 @@ export function Studio() {
    * `onRefused` may take over a refused request (a remix the server finds invalid):
    * it returns true when it showed the reason itself.
    */
-  const submit = async (kind: Tracked['kind'], body: unknown, onRefused?: (res: Response) => Promise<boolean>) => {
+  const submit = async (kind: Tracked['kind'], body: unknown, onRefused?: (status: number, refusal: Refusal | null) => boolean) => {
     submitting.current = true;
     setJob({ status: 'submitting' });
     try {
@@ -266,8 +270,9 @@ export function Studio() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const shown = onRefused ? await onRefused(res).catch(() => false) : false;
-        setJob(shown ? { status: 'idle' } : { status: 'error', message: t('errorGeneric') });
+        const refusal = (await res.json().catch(() => null)) as Refusal | null;
+        if (onRefused?.(res.status, refusal)) setJob({ status: 'idle' });
+        else setJob({ status: 'error', message: t(refusalMessageKey(refusal?.error)) });
         return;
       }
       setJob({ status: 'tracking', kind, record: await res.json() } as Tracked);
@@ -283,13 +288,12 @@ export function Studio() {
     const userPrompt = prompt.trim() || undefined;
     if (remix) {
       const { text } = remix;
-      void submit('generation', { presetYaml: text, modelId, imageRef: upload.imageRef, userPrompt }, async (res) => {
-        if (res.status === 413) {
+      void submit('generation', { presetYaml: text, modelId, imageRef: upload.imageRef, userPrompt }, (status, refusal) => {
+        if (status === 413) {
           setRemixCheck(text, { kind: 'too-large' });
           return true;
         }
-        const refusal = res.status === 400 ? ((await res.json()) as { error?: string; problems?: string[] }) : null;
-        if (refusal?.error !== 'invalid-preset') return false;
+        if (status !== 400 || refusal?.error !== 'invalid-preset') return false;
         setRemixCheck(text, { kind: 'problems', problems: refusal.problems ?? [] });
         remixTextRef.current?.focus();
         return true;

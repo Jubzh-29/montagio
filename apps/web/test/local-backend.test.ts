@@ -13,10 +13,11 @@ import { generationRequest, params, pngFile, repoRoot, setupTempData, uploadRequ
 
 // MONTAGIO_BACKEND=local against a fake comfy-api-proxy that renders the demo clip.
 const dataDir = setupTempData();
+const clip = join(repoRoot, 'demo-assets', 'clips', '_default.mp4');
 let fake: FakeProxy;
 
 beforeEach(async () => {
-  fake = await startFakeProxy({ autoRun: { clip: join(repoRoot, 'demo-assets', 'clips', '_default.mp4') } });
+  fake = await startFakeProxy({ autoRun: { clip } });
   process.env.MONTAGIO_BACKEND = 'local';
   process.env.COMFY_BASE_URL = fake.url;
   resetServicesForTests();
@@ -140,3 +141,44 @@ test('a later shot ComfyUI rejects fails the sequence with a stable code', async
     logged.mockRestore();
   }
 }, 60_000);
+
+/** The proxy comes back on the same port with the jobs it had (a restart of the proxy process, not of the pod). */
+async function restartProxy(down: FakeProxy): Promise<FakeProxy> {
+  const back = await startFakeProxy({ port: Number(new URL(down.url).port), autoRun: { clip } });
+  for (const [id, job] of down.jobs) back.jobs.set(id, job);
+  for (const [id, asset] of down.assets) back.assets.set(id, asset);
+  return back;
+}
+
+test('a proxy that drops while rendering keeps the generation alive, and it finishes once the proxy is back', async () => {
+  const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  try {
+    const imageRef = await uploadedImageRef();
+    const { id } = await (await postGeneration({ presetId: 'crash-push', imageRef }, 'l8')).json();
+    const down = fake;
+    await down.close();
+    const res = await getGeneration(new Request(`http://localhost/api/generations/${id}`), params({ id }));
+    expect([res.status, (await res.json()).state]).toEqual([200, 'queued']);
+    fake = await restartProxy(down);
+    expect(await pollUntilDone(id)).toMatchObject({ state: 'succeeded', outputUrl: `/media/data/generations/${id}/clip.mp4` });
+  } finally {
+    warned.mockRestore();
+  }
+}, 30_000);
+
+test('a proxy that drops while a sequence renders keeps the sequence running', async () => {
+  const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  try {
+    const imageRef = await uploadedImageRef();
+    const res = await postSequence(sequenceRequest({ imageRef, shots: [{ presetId: 'crash-push' }, { presetId: 'pan-left' }] }, 'l9'));
+    const { id } = await res.json();
+    const down = fake;
+    await down.close();
+    const polled = await getSequence(new Request(`http://localhost/api/sequences/${id}`), params({ id }));
+    expect([polled.status, (await polled.json()).state]).toEqual([200, 'running']);
+    fake = await restartProxy(down);
+    expect(await pollSequence(id)).toMatchObject({ state: 'succeeded' });
+  } finally {
+    warned.mockRestore();
+  }
+}, 90_000);

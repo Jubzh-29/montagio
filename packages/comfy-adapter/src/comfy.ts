@@ -122,11 +122,15 @@ export class ComfyBackend implements GenerationBackend {
         try {
           return { id, state: 'succeeded', progress: 1, outputPath: await this.download(id, video) };
         } catch (error) {
+          // The proxy no longer has the clip: waiting will not bring it back.
+          if (error instanceof NotFound) return { id, state: 'failed', progress: 1, error: 'no-output' };
           throw new BackendError('backend-unavailable', true, describe(error));
         }
       }
       default:
-        throw new BackendError('backend-unavailable', true, `unknown job status ${JSON.stringify(job.status)}`);
+        // Polling would wait forever on a status this version does not know.
+        console.error(`[montagio] job ${id}: the proxy reports an unknown status ${JSON.stringify(job.status)}`);
+        return { id, state: 'failed', progress, error: 'unexpected-status' };
     }
   }
 
