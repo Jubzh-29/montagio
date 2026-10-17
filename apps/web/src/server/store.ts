@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash, randomBytes } from 'node:crypto';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { JobState } from '@montagio/comfy-adapter';
 import type { ApiWorkflow, Aspect } from '@montagio/presets';
@@ -29,10 +29,26 @@ const generationsDir = () => join(getEnv().data, 'generations');
 const keyFile = (key: string) =>
   join(generationsDir(), '_keys', `${createHash('sha256').update(key).digest('hex')}.json`);
 
+/** Write to a temporary file, then rename: readers never see a half-written record. */
+async function writeAtomic(path: string, content: string): Promise<void> {
+  const tmp = `${path}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
+  await writeFile(tmp, content);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rename(tmp, path);
+      return;
+    } catch (error) {
+      // Windows can briefly refuse the replace while another request reads the file.
+      if ((error as NodeJS.ErrnoException).code !== 'EPERM' || attempt >= 4) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)));
+    }
+  }
+}
+
 export async function saveRecord(record: GenerationRecord): Promise<void> {
   const dir = join(generationsDir(), record.id);
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, 'record.json'), JSON.stringify(record, null, 2));
+  await writeAtomic(join(dir, 'record.json'), JSON.stringify(record, null, 2));
 }
 
 export async function readRecord(id: string): Promise<GenerationRecord | null> {

@@ -16,6 +16,7 @@ import { PresetGallery } from './PresetGallery';
 import styles from './studio.module.css';
 
 const POLL_MS = 1000;
+const MAX_POLL_FAILURES = 4;
 
 export function Studio() {
   const { t } = useI18n();
@@ -27,6 +28,8 @@ export function Studio() {
   const [upload, setUpload] = useState<UploadState>({ status: 'idle' });
   const [generation, setGeneration] = useState<GenerationState>({ status: 'idle' });
   const submitting = useRef(false);
+  const pollFailures = useRef(0);
+  const [pollRetry, setPollRetry] = useState(0);
   const localUrlRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
@@ -53,19 +56,37 @@ export function Studio() {
   const busy =
     generation.status === 'submitting' || (record !== undefined && !TERMINAL_STATES.has(record.state));
 
-  // Poll the current generation until it reaches a terminal state.
+  // Poll the current generation until it reaches a terminal state. A 404 means
+  // the server lost it (data wiped, restart); 5xx and network errors are
+  // retried with a growing delay, then surfaced as an error.
   useEffect(() => {
     if (!record || TERMINAL_STATES.has(record.state)) return;
+    const delay = POLL_MS * (pollFailures.current + 1);
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/generations/${record.id}`);
-        if (res.ok) setGeneration({ status: 'tracking', record: (await res.json()) as GenerationRecord });
+        if (res.status === 404) {
+          pollFailures.current = 0;
+          setGeneration({ status: 'tracking', record: { ...record, state: 'failed', error: 'lost' } });
+          return;
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        pollFailures.current = 0;
+        setGeneration({ status: 'tracking', record: (await res.json()) as GenerationRecord });
       } catch {
-        setGeneration({ status: 'tracking', record: { ...record } });
+        pollFailures.current += 1;
+        if (pollFailures.current >= MAX_POLL_FAILURES) {
+          pollFailures.current = 0;
+          setGeneration({ status: 'error', message: t('errorGeneric') });
+        } else {
+          setPollRetry((n) => n + 1);
+        }
       }
-    }, POLL_MS);
+    }, delay);
     return () => clearTimeout(timer);
-  }, [record]);
+    // t only changes with the language and is read when the error is shown.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [record, pollRetry]);
 
   const onFile = useCallback(
     async (file: File) => {
@@ -122,8 +143,13 @@ export function Studio() {
 
   const cancel = async () => {
     if (!record) return;
-    const res = await fetch(`/api/generations/${record.id}/cancel`, { method: 'POST' });
-    if (res.ok) setGeneration({ status: 'tracking', record: (await res.json()) as GenerationRecord });
+    try {
+      const res = await fetch(`/api/generations/${record.id}/cancel`, { method: 'POST' });
+      if (res.status === 404) setGeneration({ status: 'tracking', record: { ...record, state: 'failed', error: 'lost' } });
+      else if (res.ok) setGeneration({ status: 'tracking', record: (await res.json()) as GenerationRecord });
+    } catch {
+      // the next poll reports the real state
+    }
   };
 
   const selectedModel = models.find((model) => model.id === modelId);

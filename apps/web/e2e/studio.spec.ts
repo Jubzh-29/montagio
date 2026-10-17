@@ -58,3 +58,26 @@ test('a sample photo lets a visitor try without their own image', async ({ page 
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
 });
+
+test('a generation the server no longer knows ends as lost instead of freezing', async ({ page }) => {
+  await page.goto('/');
+  await page.setInputFiles('input[type=file]', sampleImage);
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.getByRole('progressbar')).toBeVisible();
+  await page.route(/\/api\/generations\/[^/]+$/, (route) =>
+    route.request().method() === 'GET' ? route.fulfill({ status: 404, json: { error: 'not-found' } }) : route.continue(),
+  );
+  await expect(page.getByRole('alert').filter({ hasText: 'lost' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: /^Generate/ })).toBeEnabled();
+});
+
+test('repeated server errors while polling end in an error state', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto('/');
+  await page.setInputFiles('input[type=file]', sampleImage);
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.getByRole('progressbar')).toBeVisible();
+  await page.route(/\/api\/generations\/[^/]+$/, (route) => route.fulfill({ status: 502, body: 'Bad Gateway' }));
+  await expect(page.getByRole('alert').filter({ hasText: 'Something went wrong' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: /^Generate/ })).toBeEnabled();
+});
