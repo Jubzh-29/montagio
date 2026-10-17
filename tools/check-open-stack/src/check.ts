@@ -18,7 +18,6 @@ export type OpenStackReport = {
   violations: Violation[];
 };
 
-const TOOL_DIR = fileURLToPath(new URL('..', import.meta.url));
 const SOURCE_EXTENSIONS = /\.(ts|tsx|js|mjs|cjs)$/;
 const SKIPPED_DIRS = new Set(['node_modules', '.next', 'dist', 'test-results', 'playwright-report']);
 
@@ -60,7 +59,12 @@ async function sourceDirs(root: string): Promise<string[]> {
   return dirs;
 }
 
-export async function checkOpenStack(root: string): Promise<OpenStackReport> {
+/**
+ * `configDir` holds allowed-nodes.yaml and forbidden-patterns.yaml; it defaults to
+ * this package directory and must be passed explicitly when the code is bundled.
+ */
+export async function checkOpenStack(root: string, opts: { configDir?: string } = {}): Promise<OpenStackReport> {
+  const configDir = opts.configDir ?? fileURLToPath(new URL('..', import.meta.url));
   const violations: Violation[] = [];
   const allowedLicenses: readonly string[] = ALLOWED_WEIGHT_LICENSES;
 
@@ -93,7 +97,7 @@ export async function checkOpenStack(root: string): Promise<OpenStackReport> {
   }
 
   // Workflow nodes: allow-list only, so partner nodes and unknown nodes are refused.
-  const allowed = await readYaml<{ nodes: { class_type: string }[] }>(join(TOOL_DIR, 'allowed-nodes.yaml'));
+  const allowed = await readYaml<{ nodes: { class_type: string }[] }>(join(configDir, 'allowed-nodes.yaml'));
   const allowedNodes = new Set(allowed.nodes.map((node) => node.class_type));
   for (const path of await listFiles(join(root, 'workflows'))) {
     if (!path.endsWith('.json')) continue;
@@ -111,7 +115,7 @@ export async function checkOpenStack(root: string): Promise<OpenStackReport> {
 
   // Source code: no closed API host, no Comfy Router.
   const forbidden = await readYaml<{ patterns: { pattern: string; reason: string }[] }>(
-    join(TOOL_DIR, 'forbidden-patterns.yaml'),
+    join(configDir, 'forbidden-patterns.yaml'),
   );
   const patterns = forbidden.patterns.map(({ pattern, reason }) => ({ regex: new RegExp(pattern), reason }));
   for (const dir of await sourceDirs(root)) {

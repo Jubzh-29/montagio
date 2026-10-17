@@ -1,0 +1,209 @@
+import { POST as postGenerations } from '@/app/api/generations/route';
+import { GET as getGeneration } from '@/app/api/generations/[id]/route';
+import { POST as cancelGeneration } from '@/app/api/generations/[id]/cancel/route';
+import { GET as getModels } from '@/app/api/models/route';
+import { GET as getOpenStack } from '@/app/api/open-stack/route';
+import { GET as getPresets } from '@/app/api/presets/route';
+import { GET as getPresetYaml } from '@/app/api/presets/[id]/yaml/route';
+import { POST as postUpload } from '@/app/api/uploads/route';
+import { GET as getWorkflow } from '@/app/api/workflows/[id]/route';
+import { GET as getMedia } from '@/app/media/[...path]/route';
+import {
+  bigPng,
+  generationRequest,
+  params,
+  pngFile,
+  seedRecordFile,
+  uploadRequest,
+  useTempData,
+} from './helpers';
+
+const dataDir = useTempData();
+
+async function uploadedImageRef(): Promise<string> {
+  const res = await postUpload(uploadRequest(pngFile(1920, 1080)));
+  return ((await res.json()) as { imageRef: string }).imageRef;
+}
+
+describe('uploads', () => {
+  test('11 MB is refused with 413', async () => {
+    expect((await postUpload(uploadRequest(bigPng(11 * 1024 * 1024)))).status).toBe(413);
+  });
+
+  test('text/plain is refused with 415', async () => {
+    expect((await postUpload(uploadRequest(new File(['x'], 'a.txt', { type: 'text/plain' })))).status).toBe(415);
+  });
+
+  test('accented name with spaces is stored under a generated name', async () => {
+    const res = await postUpload(uploadRequest(pngFile(1920, 1080, 'été photo.png')));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      imageRef: expect.stringMatching(/^uploads\/[0-9a-f-]{36}\.png$/),
+      width: 1920,
+      height: 1080,
+      aspect: '16:9',
+    });
+  });
+
+  test('a panorama maps to 16:9 and a tall strip to 9:16', async () => {
+    const wide = await (await postUpload(uploadRequest(pngFile(4000, 500)))).json();
+    const tall = await (await postUpload(uploadRequest(pngFile(500, 4000)))).json();
+    expect([wide.aspect, tall.aspect]).toEqual(['16:9', '9:16']);
+  });
+
+  test('a PNG-typed file that is not an image is refused with 415', async () => {
+    expect((await postUpload(uploadRequest(new File(['not a png'], 'x.png', { type: 'image/png' })))).status).toBe(415);
+  });
+});
+
+describe('generations', () => {
+  test('missing Idempotency-Key -> 400', async () => {
+    const res = await postGenerations(generationRequest({ presetId: 'crash-push', imageRef: 'uploads/x.png' }, null));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'missing-idempotency-key' });
+  });
+
+  test('unknown preset -> 400 unknown-preset', async () => {
+    const imageRef = await uploadedImageRef();
+    const res = await postGenerations(generationRequest({ presetId: 'nope', imageRef }, 'k1'));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'unknown-preset' });
+  });
+
+  test('unknown image -> 400 unknown-image', async () => {
+    const res = await postGenerations(generationRequest({ presetId: 'crash-push', imageRef: 'uploads/missing.png' }, 'k2'));
+    expect(await res.json()).toEqual({ error: 'unknown-image' });
+  });
+
+  test('image model for a video preset -> 400 model-incompatible', async () => {
+    const imageRef = await uploadedImageRef();
+    const res = await postGenerations(generationRequest({ presetId: 'crash-push', modelId: 'z-image-turbo', imageRef }, 'k3'));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'model-incompatible' });
+  });
+
+  test('valid request -> 201 with a queued record using the preferred model', async () => {
+    const imageRef = await uploadedImageRef();
+    const res = await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'k4'));
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({
+      presetId: 'crash-push',
+      modelId: 'wan22-i2v-a14b-fun-camera',
+      aspect: '16:9',
+      state: 'queued',
+      backendKind: 'demo',
+    });
+  });
+
+  test('same key twice -> same id (201 then 200)', async () => {
+    const imageRef = await uploadedImageRef();
+    const a = await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'dup'));
+    const b = await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'dup'));
+    expect([a.status, b.status]).toEqual([201, 200]);
+    expect((await b.json()).id).toBe((await a.json()).id);
+  });
+
+  test('GET reflects backend progress, then 404 for an unknown id', async () => {
+    const imageRef = await uploadedImageRef();
+    const { id } = await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'k5'))).json();
+    const res = await getGeneration(new Request(`http://localhost/api/generations/${id}`), params({ id }));
+    expect(await res.json()).toMatchObject({ id, state: 'running' });
+    const missing = await getGeneration(new Request('http://localhost/api/generations/x'), params({ id: 'x' }));
+    expect(missing.status).toBe(404);
+  });
+
+  test('a finished demo job exposes a /media/ output url', async () => {
+    process.env.MONTAGIO_DEMO_DURATION_MS = '0';
+    const imageRef = await uploadedImageRef();
+    const { id } = await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'k6'))).json();
+    const rec = await (await getGeneration(new Request('http://localhost/x'), params({ id }))).json();
+    expect(rec).toMatchObject({ state: 'succeeded', progress: 1, outputUrl: '/media/demo-assets/clips/crash-push.mp4' });
+  });
+
+  test('cancel moves a running job to canceled', async () => {
+    const imageRef = await uploadedImageRef();
+    const { id } = await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'k7'))).json();
+    const res = await cancelGeneration(new Request('http://localhost/x', { method: 'POST' }), params({ id }));
+    expect(await res.json()).toMatchObject({ id, state: 'canceled' });
+  });
+
+  test('a generation lost by the backend becomes failed/lost', async () => {
+    seedRecordFile(dataDir(), {
+      id: 'lost-1',
+      presetId: 'crash-push',
+      modelId: 'wan22-i2v-a14b-fun-camera',
+      imageRef: 'uploads/x.png',
+      seed: 1,
+      aspect: '16:9',
+      state: 'running',
+      progress: 0.4,
+      backendKind: 'demo',
+      backendJobId: 'demo-000000000000',
+      idempotencyKey: 'old',
+      createdAt: '2026-10-17T00:00:00.000Z',
+      updatedAt: '2026-10-17T00:00:00.000Z',
+    });
+    const res = await getGeneration(new Request('http://localhost/x'), params({ id: 'lost-1' }));
+    expect(await res.json()).toMatchObject({ state: 'failed', error: 'lost' });
+  });
+});
+
+describe('downloads and catalog', () => {
+  test('workflow download contains the compiled camera pose', async () => {
+    const imageRef = await uploadedImageRef();
+    const { id } = await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'wf'))).json();
+    const res = await getWorkflow(new Request('http://localhost/x'), params({ id }));
+    expect(res.headers.get('content-disposition')).toMatch(/attachment; filename="montagio-crash-push-.+\.json"/);
+    expect(JSON.stringify(await res.json())).toContain('Zoom In');
+  });
+
+  test('presets list exposes ids, names and poses', async () => {
+    const list = await (await getPresets()).json();
+    expect(list).toContainEqual(
+      expect.objectContaining({ id: 'crash-push', name: 'Crash Push', poses: ['zoom_in'], defaultModel: 'wan22-i2v-a14b-fun-camera' }),
+    );
+  });
+
+  test('preset YAML downloads as an attachment', async () => {
+    const res = await getPresetYaml(new Request('http://localhost/x'), params({ id: 'crash-push' }));
+    expect(res.headers.get('content-disposition')).toContain('montagio-preset-crash-push.yaml');
+    expect(await res.text()).toContain('id: crash-push');
+    expect((await getPresetYaml(new Request('http://localhost/x'), params({ id: '../package' }))).status).toBe(404);
+  });
+
+  test('models list exposes licenses', async () => {
+    const list = await (await getModels()).json();
+    expect(list.map((m: { license: string }) => m.license)).toEqual(['Apache-2.0', 'Apache-2.0', 'Apache-2.0']);
+  });
+
+  test('open-stack report is ok for the repository', async () => {
+    expect(await (await getOpenStack()).json()).toMatchObject({ ok: true });
+  });
+});
+
+describe('media', () => {
+  const media = (path: string[], headers: Record<string, string> = {}) =>
+    getMedia(new Request('http://localhost/media/x', { headers }), params({ path }));
+
+  test('serves a demo clip with its content type', async () => {
+    const res = await media(['demo-assets', 'clips', 'crash-push.mp4']);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('video/mp4');
+  });
+
+  test('supports byte ranges for video players', async () => {
+    const res = await media(['demo-assets', 'clips', 'crash-push.mp4'], { range: 'bytes=0-99' });
+    expect(res.status).toBe(206);
+    expect(res.headers.get('content-range')).toMatch(/^bytes 0-99\/\d+$/);
+    expect((await res.arrayBuffer()).byteLength).toBe(100);
+  });
+
+  test('path traversal is refused', async () => {
+    expect((await media(['..', '..', 'package.json'])).status).toBe(400);
+    expect((await media(['data', '..', '..', 'package.json'])).status).toBe(400);
+  });
+
+  test('only data/ and demo-assets/ are served', async () => {
+    expect((await media(['presets', 'crash-push.yaml'])).status).toBe(400);
+  });
+});

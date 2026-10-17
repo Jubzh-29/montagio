@@ -1,0 +1,62 @@
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { pickAspect, type Aspect } from '@montagio/presets';
+import { imageSize } from 'image-size';
+import { getEnv } from './env';
+
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+const EXTENSIONS: Record<string, 'png' | 'jpg' | 'webp'> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+};
+const SNIFFED: Record<string, string> = { png: 'png', jpg: 'jpg', webp: 'webp' };
+
+export type UploadMeta = { imageRef: string; width: number; height: number; aspect: Aspect };
+
+export class UploadError extends Error {
+  constructor(
+    readonly status: 400 | 413 | 415,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+export async function saveUpload(file: File): Promise<UploadMeta> {
+  const ext = EXTENSIONS[file.type];
+  if (!ext) throw new UploadError(415, 'only PNG, JPEG and WebP images are accepted');
+  if (file.size > MAX_UPLOAD_BYTES) throw new UploadError(413, 'images are limited to 10 MB');
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let width: number | undefined;
+  let height: number | undefined;
+  let sniffed: string | undefined;
+  try {
+    ({ width, height, type: sniffed } = imageSize(bytes));
+  } catch {
+    throw new UploadError(415, 'the file is not a readable image');
+  }
+  if (!width || !height || !sniffed || SNIFFED[sniffed] !== ext) {
+    throw new UploadError(415, 'the file content does not match its image type');
+  }
+
+  const id = randomUUID();
+  const dir = join(getEnv().data, 'uploads');
+  await mkdir(dir, { recursive: true });
+  const meta: UploadMeta = { imageRef: `uploads/${id}.${ext}`, width, height, aspect: pickAspect(width, height) };
+  await writeFile(join(dir, `${id}.${ext}`), bytes);
+  await writeFile(join(dir, `${id}.json`), JSON.stringify(meta));
+  return meta;
+}
+
+export async function readUploadMeta(imageRef: string): Promise<UploadMeta | null> {
+  const match = /^uploads\/([0-9a-f-]{36})\.(png|jpg|webp)$/.exec(imageRef);
+  if (!match) return null;
+  try {
+    return JSON.parse(await readFile(join(getEnv().data, 'uploads', `${match[1]}.json`), 'utf8')) as UploadMeta;
+  } catch {
+    return null;
+  }
+}
