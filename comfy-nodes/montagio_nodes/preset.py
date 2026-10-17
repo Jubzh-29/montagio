@@ -8,8 +8,9 @@ the same values and the same defaults, and a bad preset is reported as
 
 The parser is PyYAML, so a few rare corners of YAML text are still PyYAML's: tabs used
 as separators, control characters, NEL/LS/PS line breaks and a "%YAML 1.1" directive
-are not read like the npm library reads them, and PyYAML does not insist that the
-continuation lines of a quoted scalar or a flow collection are indented.
+are not read like the npm library reads them, a bare "!" tag written right before a
+"," "]" or "}" of a flow collection is taken for part of the tag, and PyYAML does not
+insist that the continuation lines of a quoted scalar or a flow collection are indented.
 """
 import math
 import re
@@ -63,6 +64,10 @@ _CORE_SCALARS = (
 )
 
 
+def _join_surrogates(text):
+    return text.encode("utf-16-le", "surrogatepass").decode("utf-16-le", "surrogatepass")
+
+
 def _core_scalar_constructor(regexp, convert):
     def construct(loader, node):
         text = loader.construct_scalar(node)
@@ -81,17 +86,57 @@ def _construct_unresolved(loader, node):
     return loader.construct_scalar(node)
 
 
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+
+
+class _Symbol:
+    """What the npm library makes of a value tagged !!merge: a JavaScript symbol, which no field accepts."""
+
+
+def _construct_merge_tagged(loader, node):
+    return _Symbol() if isinstance(node, yaml.ScalarNode) else _construct_unresolved(loader, node)
+
+
 class _CoreLoader(yaml.SafeLoader):
-    """SafeLoader without PyYAML's YAML 1.1 extras (yes/no, dates, sexagesimals, "<<" merge)."""
+    """SafeLoader without PyYAML's YAML 1.1 extras (yes/no, dates, sexagesimals, implicit "<<" merge).
+
+    Only a key that is explicitly tagged !!merge merges its mapping(s) into the parent, exactly
+    as in the npm library (PyYAML's own flatten_mapping does that).
+    """
 
     yaml_implicit_resolvers = {}
 
+    def compose_node(self, parent, index):
+        # an anchor may be defined again, an alias meaning the nearest definition before it (PyYAML refuses)
+        if not self.check_event(yaml.AliasEvent):
+            self.anchors.pop(self.peek_event().anchor, None)
+        return super().compose_node(parent, index)
+
+    def compose_scalar_node(self, anchor):
+        # a bare "!" tag means "a string" (YAML 1.2), whereas PyYAML still resolves the text by its look
+        if self.peek_event().tag == "!":
+            self.peek_event().tag = "tag:yaml.org,2002:str"
+        return super().compose_scalar_node(anchor)
+
     def flatten_mapping(self, node):
-        """Never merge: "<<" is a plain key."""
+        # several merge keys: the npm library lets the first one win, PyYAML the last one
+        merges = [pair for pair in node.value if pair[0].tag == _MERGE_TAG]
+        node.value = merges[::-1] + [pair for pair in node.value if pair[0].tag != _MERGE_TAG]
+        super().flatten_mapping(node)
+
+    def construct_scalar(self, node):
+        # JavaScript strings are UTF-16: the two halves of a pair written as two escapes
+        # ("\ud83d\ude00") make one character there, not two lone surrogates
+        return _join_surrogates(super().construct_scalar(node))
 
     def construct_mapping(self, node, deep=False):
         seen = set()
         for key_node, _ in node.value if isinstance(node, yaml.MappingNode) else ():
+            if key_node.tag == _MERGE_TAG:  # never a duplicate: the npm library makes a new symbol of each
+                if not isinstance(key_node, yaml.ScalarNode):
+                    problem = "a merge key must be a scalar"
+                    raise yaml.constructor.ConstructorError(None, None, problem, key_node.start_mark)
+                continue
             key = self.construct_object(key_node, deep=True)
             try:
                 duplicate = key in seen
@@ -110,6 +155,7 @@ def _install_core_schema(loader):
         regexp = re.compile(rf"(?:{pattern})\Z")
         loader.add_implicit_resolver(tag, regexp, first)
         loader.add_constructor(tag, _core_scalar_constructor(regexp, convert))
+    loader.add_constructor(_MERGE_TAG, _construct_merge_tagged)
     loader.add_constructor(None, _construct_unresolved)
 
 
@@ -128,6 +174,8 @@ def load_yaml(text, source):
     """Parse one YAML document with the same scalar rules as the npm `yaml` library."""
     loader = None
     try:
+        if not text.endswith(("\n", "\r")):
+            text += "\n"  # the npm library reads a missing last line break as present (a block scalar then ends with one)
         loader = _CoreLoader(text)  # already rejects characters YAML does not allow
         return loader.get_single_data()
     except Exception as error:  # PyYAML's rarer tags (!!timestamp...) can fail with plain Python errors
@@ -152,6 +200,8 @@ def _type_name(value):
         return "null"
     if isinstance(value, bool):
         return "boolean"
+    if isinstance(value, _Symbol):
+        return "symbol"
     if isinstance(value, float) and math.isnan(value):
         return "NaN"
     if isinstance(value, float) and math.isinf(value):
@@ -162,8 +212,8 @@ def _type_name(value):
 
 
 def _length(text):
-    """Length as zod counts it: in code points, a UTF-16 surrogate pair counting once."""
-    return len(text.encode("utf-16-le", "surrogatepass").decode("utf-16-le", "surrogatepass"))
+    """Length as zod counts it: in code points (the surrogate pairs were joined when the text was read)."""
+    return len(text)
 
 
 def _string(min_len=0, max_len=None, pattern=None, hint=""):

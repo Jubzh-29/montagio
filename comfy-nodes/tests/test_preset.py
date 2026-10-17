@@ -7,25 +7,11 @@ every default it applies, must come out identically here.
 """
 import math
 import re
-from pathlib import Path
 
 import pytest
 
 from montagio_nodes.preset import PresetError, load_yaml, parse_preset
-
-BASE = (Path(__file__).parent / "fixtures" / "crash-push.yaml").read_text(encoding="utf-8")
-
-
-def edit(a, b):
-    if a not in BASE:
-        raise AssertionError(f'fixture does not contain "{a}"')
-    return BASE.replace(a, b, 1)
-
-
-MODELS_BLOCK = "models:\n"
-LORA_OK = "{file: a.safetensors, strength: 1}"
-DEFAULTS_BLOCK = "defaults:\n  duration_s: 5\n  resolution: 480p\n  fps: 16\n"
-DESCRIPTION = "description: Fast push toward the subject, ending tight."
+from tests.parity_cases import ACCEPTED, BASE, MINIMAL, MODELS_BLOCK, NO_DEFAULTS_NO_SPEED, REJECTED, SURROGATE_PAIR, edit
 
 
 def test_parses_crash_push_with_defaults():
@@ -36,27 +22,12 @@ def test_parses_crash_push_with_defaults():
 
 
 def test_missing_optional_blocks_get_defaults():  # no defaults block, no speed
-    p = parse_preset(re.sub(r"defaults:\n(  .*\n)+", "", BASE).replace("  speed: 1.5\n", ""), "m.yaml")
+    p = parse_preset(NO_DEFAULTS_NO_SPEED, "m.yaml")
     assert p["defaults"] == {"duration_s": 5, "resolution": "480p", "fps": 16} and p["camera"]["speed"] == 1
 
 
 def test_every_optional_field_gets_its_default():
-    minimal = "\n".join(
-        [
-            "schema: montagio/preset@0.1",
-            "id: minimal",
-            "name: Minimal",
-            "preview: previews/minimal.webm",
-            "license: MIT",
-            "author: me",
-            "capability: i2v-camera",
-            "camera:",
-            "  poses: [static]",
-            "models:",
-            "  preferred: some-model",
-        ]
-    )
-    assert parse_preset(minimal, "minimal.yaml") == {
+    assert parse_preset(MINIMAL, "minimal.yaml") == {
         "schema": "montagio/preset@0.1",
         "id": "minimal",
         "name": "Minimal",
@@ -82,89 +53,11 @@ def test_unknown_key_names_file_and_path():
         parse_preset(edit("speed: 1.5", "sped: 1.5"), "crash-push.yaml")
 
 
-# (replace, with, start of the message after the file name)
-REJECTED = [
-    # the 7 refusals of schema.test.ts
-    ("id: crash-push", "id: Crash Push", "id"),
-    ("poses: [zoom_in]", "poses: [static, zoom_in]", "camera.poses"),
-    ("poses: [zoom_in]", "poses: [zoom_in, zoom_in]", "camera.poses"),
-    ("poses: [zoom_in]", "poses: [zoom_in, pan_left, pan_up]", "camera.poses"),
-    ("license: CC-BY-4.0", "license: CC-BY-NC-4.0", "license"),
-    ("duration_s: 5", "duration_s: 11", "defaults.duration_s"),
-    ("duration_s: 5", "duration_s: 1", "defaults.duration_s"),
-    # numbers: a boolean is never a number, nothing non finite, integers stay integers
-    ("speed: 1.5", "speed: true", "camera.speed"),
-    ("speed: 1.5", "speed: 0.05", "camera.speed"),
-    ("speed: 1.5", "speed: 3.5", "camera.speed"),
-    ("speed: 1.5", "speed: .inf", "camera.speed"),
-    ("speed: 1.5", "speed: .nan", "camera.speed"),
-    ("duration_s: 5", "duration_s: 5.5", "defaults.duration_s"),
-    ("duration_s: 5", "duration_s: true", "defaults.duration_s"),
-    ("duration_s: 5", "duration_s: 0755", "defaults.duration_s"),
-    ("duration_s: 5", "duration_s: 1" + "0" * 400, "defaults.duration_s"),
-    ("duration_s: 5", "duration_s: " + "9" * 5000, "invalid YAML"),
-    ("fps: 16", "fps: 30", "defaults.fps"),
-    ("fps: 16", "fps: true", "defaults.fps"),
-    ("resolution: 480p", "resolution: 1080p", "defaults.resolution"),
-    # strings and patterns (fullmatch: a trailing newline is not accepted)
-    ("id: crash-push", r'id: "crash-push\n"', "id"),
-    ("name: Crash Push", "name: ''", "name"),
-    ("name: Crash Push", "name: 123", "name"),
-    ("name: Crash Push", "name: " + "😀" * 41, "name"),
-    ("preview: previews/crash-push.mp4", "preview: previews/crash-push.mov", "preview"),
-    ("poses: [zoom_in]", "poses: []", "camera.poses"),
-    ("capability: i2v-camera", "capability: t2v", "capability"),
-    ("schema: montagio/preset@0.1", "schema: montagio/preset@0.2", "schema"),
-    # keys: unknown ones, duplicates, and "<<" is a plain key (no merge)
-    ("capability: i2v-camera", "capability: i2v-camera\nextra: 1", "(root).extra"),
-    ("license: CC-BY-4.0", "license: CC-BY-4.0\nlicense: MIT", "invalid YAML"),
-    ("prompt:\n", "prompt:\n  <<: {suffix: x}\n", "prompt.<<"),
-    # a key that is present but null is refused, the default only applies when it is absent
-    (DEFAULTS_BLOCK, "defaults:\n", "defaults"),
-    (DESCRIPTION, "description:", "description"),
-    ("fallback: wan22-ti2v-5b", "fallback:", "models.fallback"),
-    # loras
-    (MODELS_BLOCK, "loras: [{file: a.safetensors, strength: 3}]\n" + MODELS_BLOCK, "loras.0.strength"),
-    (MODELS_BLOCK, "loras: [{file: a.ckpt, strength: 1}]\n" + MODELS_BLOCK, "loras.0.file"),
-    (MODELS_BLOCK, "loras: [{file: a.safetensors, strength: 1, x: 1}]\n" + MODELS_BLOCK, "loras.0.x"),
-    (MODELS_BLOCK, "loras: [" + ", ".join([LORA_OK] * 4) + "]\n" + MODELS_BLOCK, "loras"),
-    (MODELS_BLOCK, "loras: " + LORA_OK + "\n" + MODELS_BLOCK, "loras"),
-]
-
-
 @pytest.mark.parametrize("a,b,where", REJECTED)
 def test_rejects(a, b, where):
     with pytest.raises(PresetError) as caught:
         parse_preset(edit(a, b), "crash-push.yaml")
     assert str(caught.value).startswith(f"crash-push.yaml: {where}")
-
-
-# (replace, with, path into the parsed preset, expected value)
-ACCEPTED = [
-    # the 3 acceptances of schema.test.ts
-    ("duration_s: 5", "duration_s: 2", ("defaults", "duration_s"), 2),
-    ("duration_s: 5", "duration_s: 10", ("defaults", "duration_s"), 10),
-    ("poses: [zoom_in]", "poses: [pan_up, zoom_in]", ("camera", "poses"), ["pan_up", "zoom_in"]),
-    # a whole number written as a float or with leading zeros is an int
-    ("duration_s: 5", "duration_s: 5.0", ("defaults", "duration_s"), 5),
-    ("duration_s: 5", "duration_s: 1e1", ("defaults", "duration_s"), 10),
-    ("duration_s: 5", "duration_s: 0010", ("defaults", "duration_s"), 10),
-    ("fps: 16", "fps: 24.0", ("defaults", "fps"), 24),
-    ("speed: 1.5", "speed: 0.1", ("camera", "speed"), 0.1),
-    ("speed: 1.5", "speed: 3", ("camera", "speed"), 3),
-    ("poses: [zoom_in]", "poses: [static]", ("camera", "poses"), ["static"]),
-    ("resolution: 480p", "resolution: 720p", ("defaults", "resolution"), "720p"),
-    # lengths count code points, like the zod version the app runs (an emoji is 1, not 2)
-    ("name: Crash Push", "name: " + "😀" * 20, ("name",), "😀" * 20),
-    ("name: Crash Push", "name: " + "😀" * 21, ("name",), "😀" * 21),
-    ("name: Crash Push", "name: " + "😀" * 40, ("name",), "😀" * 40),
-    (MODELS_BLOCK, "loras: [" + LORA_OK + "]\n" + MODELS_BLOCK, ("loras",), [{"file": "a.safetensors", "strength": 1}]),
-    (MODELS_BLOCK, "loras: [" + ", ".join([LORA_OK] * 3) + "]\n" + MODELS_BLOCK, ("loras", 2, "strength"), 1),
-    # YAML 1.2: strings the app keeps as strings, whereas PyYAML alone would turn them into bool/date/int
-    ("name: Crash Push", "name: yes", ("name",), "yes"),
-    ("author: montagio-community", "author: 2026-10-17", ("author",), "2026-10-17"),
-    (DESCRIPTION, "description: 1:30", ("description",), "1:30"),
-]
 
 
 @pytest.mark.parametrize("a,b,path,expected", ACCEPTED)
@@ -177,11 +70,9 @@ def test_accepts(a, b, path, expected):
 
 @pytest.mark.parametrize("escapes,ok", [(40, True), (41, False)])
 def test_surrogate_pair_escapes_count_as_one_code_point(escapes, ok):
-    backslash = chr(92)  # a surrogate pair written as two YAML escapes spells one emoji
-    emoji = backslash + "ud83d" + backslash + "ude00"
-    text = edit("name: Crash Push", 'name: "' + emoji * escapes + '"')
+    text = edit("name: Crash Push", 'name: "' + SURROGATE_PAIR * escapes + '"')
     if ok:
-        parse_preset(text, "s.yaml")
+        assert parse_preset(text, "s.yaml")["name"] == "😀" * escapes
     else:
         with pytest.raises(PresetError, match="name"):
             parse_preset(text, "s.yaml")
@@ -254,8 +145,55 @@ def test_merge_key_is_a_plain_key():
     assert load_yaml("b: &x {c: 1}\na:\n  <<: *x", "t") == {"b": {"c": 1}, "a": {"<<": {"c": 1}}}
 
 
-def test_explicit_merge_tag_is_not_a_merge_either():
-    assert load_yaml("b: &x {c: 1}\na:\n  !!merge <<: *x", "t") == {"b": {"c": 1}, "a": {"<<": {"c": 1}}}
+def test_explicit_merge_tag_merges_like_the_npm_yaml_library():
+    # only the explicit tag merges (the npm library resolves "<<" to a merge key by tag, never by its text)
+    assert load_yaml("b: &x {c: 1}\na:\n  !!merge <<: *x", "t") == {"b": {"c": 1}, "a": {"c": 1}}
+    assert load_yaml("a:\n  !!merge foo: {c: 1}", "t") == {"a": {"c": 1}}
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("a:\n  !!merge <<: {c: 1}\n  c: 2", {"c": 2}),  # a key of the mapping itself beats the merged one,
+        ("a:\n  c: 2\n  !!merge <<: {c: 1}", {"c": 2}),  # wherever it is written
+        ("a:\n  !!merge <<: [{c: 1}, {c: 2, d: 3}]", {"c": 1, "d": 3}),  # the earlier mapping wins
+        ("a:\n  !!merge <<: {!!merge <<: {z: 1}, c: 1}", {"z": 1, "c": 1}),
+        ("a:\n  !!merge <<: {c: 1}\n  !!merge <<: {d: 2}", {"c": 1, "d": 2}),  # not a duplicate key
+        ("a:\n  !!merge <<: {c: 1}\n  !!merge <<: {c: 2}", {"c": 1}),  # the first merge key wins
+    ],
+)
+def test_explicit_merge_details(text, expected):
+    assert load_yaml(text, "t") == {"a": expected}
+
+
+@pytest.mark.parametrize("text,expected", [("k: |\n  a\n  b", "a\nb\n"), (">\n  a\n  b", "a b\n"), ("k: |-\n  a", "a")])
+def test_a_missing_last_line_break_counts_as_present(text, expected):  # so a block scalar at the end of the file
+    value = load_yaml(text, "t")
+    assert (value["k"] if isinstance(value, dict) else value) == expected
+
+
+def test_a_bare_exclamation_mark_tag_makes_a_string():
+    assert load_yaml("a: !\nb: ! 5\nc: ! true\nd: ! ~\ne: ! x", "t") == {"a": "", "b": "5", "c": "true", "d": "~", "e": "x"}
+
+
+def test_an_anchor_can_be_defined_again():  # an alias means the nearest definition before it
+    assert load_yaml("a: &x 1\nb: *x\nc: &x 2\nd: *x", "t") == {"a": 1, "b": 1, "c": 2, "d": 2}
+
+
+@pytest.mark.parametrize("text", ["a:\n  !!merge <<: 5", "a:\n  !!merge <<: [1]", "a:\n  !!merge <<:", "? !!merge [a]\n: {c: 1}"])
+def test_explicit_merge_of_something_else_than_mappings_is_refused(text):
+    with pytest.raises(PresetError, match=r"^t: invalid YAML"):
+        load_yaml(text, "t")
+
+
+def test_a_value_tagged_merge_is_not_a_string():  # the npm library makes a JavaScript symbol of it
+    with pytest.raises(PresetError, match=r"name: Invalid input: expected string, received symbol"):
+        parse_preset(edit("name: Crash Push", "name: !!merge x"), "s.yaml")
+
+
+def test_escaped_surrogate_halves_join_into_one_character():
+    assert load_yaml('a: "' + SURROGATE_PAIR + '"', "t") == {"a": "😀"}
+    assert load_yaml('a: "' + SURROGATE_PAIR[:6] + '"', "t")["a"] == chr(0xD83D)  # a lone half stays what it is
 
 
 def test_invalid_yaml_names_file():
@@ -265,7 +203,7 @@ def test_invalid_yaml_names_file():
 
 def test_invalid_yaml_message_is_one_line_with_position():
     with pytest.raises(PresetError) as caught:
-        parse_preset("id: [unclosed", "broken.yaml")
+        parse_preset("id: a: b", "broken.yaml")  # (the end of a file is on the line after its last line break)
     message = str(caught.value)
     assert message.startswith("broken.yaml: invalid YAML (") and "line 1" in message and "\n" not in message
 
