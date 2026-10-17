@@ -91,7 +91,7 @@ Commandes utiles : `bash infra/runpod/bootstrap.sh status`, puis `stop` et `star
 
 - [ ] Nodes Montagio (≈ 2 min) : installer `comfy-nodes` dans `custom_nodes/montagio`, redémarrer ComfyUI, puis lancer `comfy-nodes/scripts/smoke_comfyui.py` sur le ComfyUI du pod. Le script enchaîne les sorties de `MontagioPresetFromYAML` dans `WanCameraEmbedding` (sans GPU ni poids) et doit se terminer par `node 5 shows text: 33` et le code de sortie 0 :
   ```bash
-  ln -s /workspace/montagio/comfy-nodes /workspace/ComfyUI/custom_nodes/montagio
+  ln -sfn /workspace/montagio/comfy-nodes /workspace/ComfyUI/custom_nodes/montagio
   bash infra/runpod/bootstrap.sh stop
   bash infra/runpod/bootstrap.sh start --expose-ui
   python3 comfy-nodes/scripts/smoke_comfyui.py http://127.0.0.1:8188; echo "code $?"

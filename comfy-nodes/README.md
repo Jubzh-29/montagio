@@ -97,6 +97,8 @@ When two folders hold a file with the same name, the first folder wins. A user f
 
 Files in sub-folders are listed with their relative path, such as `mine/slow-push.yaml`. Folders whose name starts with a dot, such as `.git` and `.github` in a cloned repository, are skipped. A name that leads outside the preset folders, or into a dot folder, is refused.
 
+Links (symbolic links, junctions) inside a preset folder that point outside it are not followed: the presets they lead to are not listed. To use presets kept elsewhere, add their folder with `extra_model_paths.yaml`, or link the whole `montagio_presets` folder.
+
 A new file shows up in the menu when the frontend refreshes the node definitions, with no restart. An edit to a preset file is picked up on the next run when the `preset` menu of the Load node is used directly.
 
 ## Differences with the Montagio app
