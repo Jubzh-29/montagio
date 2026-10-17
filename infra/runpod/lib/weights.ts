@@ -1,0 +1,233 @@
+import { spawnSync } from 'node:child_process';
+import { createHash, type Hash } from 'node:crypto';
+import { createReadStream, createWriteStream, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdir, rename, rm, stat, truncate, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { Readable, Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
+import type { ApiWorkflow } from '@montagio/presets';
+import { isMap, isScalar, isSeq, parseDocument } from 'yaml';
+
+const HF = 'https://huggingface.co';
+
+export function parseHfUrl(url: string): { repo: string; revision: string | null; path: string | null } {
+  const parsed = new URL(url);
+  if (parsed.origin !== HF) throw new Error(`${url} is not a huggingface.co URL`);
+  const parts = parsed.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+  if (parts.length < 2) throw new Error(`${url} names no huggingface repository`);
+  const repo = `${parts[0]}/${parts[1]}`;
+  if ((parts[2] === 'resolve' || parts[2] === 'blob') && parts.length >= 5) {
+    return { repo, revision: parts[3]!, path: parts.slice(4).join('/') };
+  }
+  return { repo, revision: null, path: null };
+}
+
+export function resolveUrl(repo: string, path: string, revision = 'main'): string {
+  return `${HF}/${repo}/resolve/${revision}/${path.split('/').map(encodeURIComponent).join('/')}`;
+}
+
+/** Loader inputs that name a weight file, and the ComfyUI models/ folder they read from. */
+const LOADER_FOLDERS: Record<string, Record<string, string>> = {
+  UNETLoader: { unet_name: 'diffusion_models' },
+  CLIPLoader: { clip_name: 'text_encoders' },
+  DualCLIPLoader: { clip_name1: 'text_encoders', clip_name2: 'text_encoders' },
+  VAELoader: { vae_name: 'vae' },
+  CheckpointLoaderSimple: { ckpt_name: 'checkpoints' },
+  LoraLoader: { lora_name: 'loras' },
+  LoraLoaderModelOnly: { lora_name: 'loras' },
+  CLIPVisionLoader: { clip_name: 'clip_vision' },
+};
+
+const COMFY_FOLDERS = new Set(['checkpoints', 'diffusion_models', 'text_encoders', 'vae', 'loras', 'clip_vision', 'controlnet', 'upscale_models']);
+
+export function weightFolders(workflows: ApiWorkflow[]): Map<string, string> {
+  const folders = new Map<string, string>();
+  for (const workflow of workflows) {
+    for (const node of Object.values(workflow)) {
+      for (const [field, folder] of Object.entries(LOADER_FOLDERS[node.class_type] ?? {})) {
+        const file = node.inputs[field];
+        if (typeof file === 'string') folders.set(file, folder);
+      }
+    }
+  }
+  return folders;
+}
+
+/** Folder from the workflow loaders first, else from the repository layout (Comfy-Org's split_files/<folder>/). */
+export function folderFor(file: string, repoPath: string, folders: Map<string, string>): string | null {
+  const fromLoader = folders.get(file);
+  if (fromLoader) return fromLoader;
+  const parent = repoPath.split('/').at(-2);
+  return parent && COMFY_FOLDERS.has(parent) ? parent : null;
+}
+
+export type RepoFile = { path: string; size: number; sha256: string | null };
+export type RepoListing = { repo: string; gated: boolean; revision: string | null; license: string | null; files: RepoFile[] };
+export type RepoInfo = Omit<RepoListing, 'files'>;
+
+async function getJson<T>(url: string, headers: Record<string, string>): Promise<{ body: T; link: string | null }> {
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`GET ${url} → HTTP ${res.status}`);
+  return { body: (await res.json()) as T, link: res.headers.get('link') };
+}
+
+/** Model card metadata of a repository: gating, current revision, declared license. */
+export async function repoInfo(repo: string, headers: Record<string, string> = {}): Promise<RepoInfo> {
+  const { body } = await getJson<{ gated?: boolean | string; sha?: string; cardData?: { license?: string } }>(`${HF}/api/models/${repo}`, headers);
+  return { repo, gated: body.gated !== undefined && body.gated !== false, revision: body.sha ?? null, license: body.cardData?.license ?? null };
+}
+
+/** Every file of a repository at main, with the sha256 Hugging Face stores for LFS files. */
+export async function listRepo(repo: string, headers: Record<string, string> = {}): Promise<RepoListing> {
+  const info = await repoInfo(repo, headers);
+  const files: RepoFile[] = [];
+  let next: string | null = `${HF}/api/models/${repo}/tree/main?recursive=true`;
+  while (next) {
+    const { body, link }: { body: { type: string; path: string; size: number; lfs?: { oid?: string } }[]; link: string | null } =
+      await getJson(next, headers);
+    for (const entry of body) {
+      if (entry.type !== 'file') continue;
+      const oid = entry.lfs?.oid;
+      files.push({ path: entry.path, size: entry.size, sha256: oid && /^[a-f0-9]{64}$/.test(oid) ? oid : null });
+    }
+    next = /<([^>]+)>;\s*rel="next"/.exec(link ?? '')?.[1] ?? null;
+  }
+  return { ...info, files };
+}
+
+export type Candidate =
+  | ({ ok: true; skipped: string[] } & RepoFile & RepoInfo)
+  | { ok: false; reason: string };
+
+/** The first usable repository that holds exactly one file with that name. */
+export function pickCandidate(file: string, listings: RepoListing[], opts: { allowGated?: boolean } = {}): Candidate {
+  const skipped: string[] = [];
+  for (const listing of listings) {
+    const matches = listing.files.filter((entry) => entry.path.split('/').at(-1) === file);
+    if (matches.length === 0) {
+      skipped.push(`${listing.repo}: not found`);
+    } else if (matches.length > 1) {
+      skipped.push(`${listing.repo}: ${matches.length} files named ${file} (${matches.map((m) => m.path).join(', ')})`);
+    } else if (listing.gated && !opts.allowGated) {
+      skipped.push(`${listing.repo}: gated (set HF_TOKEN to use it)`);
+    } else {
+      const { files: _files, ...info } = listing;
+      return { ok: true, skipped, ...info, ...matches[0]! };
+    }
+  }
+  return { ok: false, reason: `${file} not found in a usable repository: ${skipped.join('; ')}` };
+}
+
+/**
+ * The lock with `url` and `sha256` set on the given entries. Comments, key
+ * order and every other field (licenses included) are kept as they are.
+ */
+export function proposeLock(lockText: string, updates: Map<string, { url: string; sha256: string }>): string {
+  const doc = parseDocument(lockText);
+  const weights = doc.get('weights');
+  if (!isSeq(weights)) throw new Error('models.lock.yaml has no weights list');
+  for (const item of weights.items) {
+    if (!isMap(item)) continue;
+    const update = updates.get(String(item.get('id')));
+    if (!update) continue;
+    item.set('url', update.url);
+    if (item.has('sha256')) {
+      item.set('sha256', update.sha256);
+    } else {
+      const urlIndex = item.items.findIndex((pair) => isScalar(pair.key) && pair.key.value === 'url');
+      item.items.splice(urlIndex + 1, 0, doc.createPair('sha256', update.sha256));
+    }
+  }
+  return doc.toString({ lineWidth: 0 });
+}
+
+/** A git-style patch of registry/models.lock.yaml, applicable with `git apply` at the repository root. */
+export function lockPatch(oldText: string, newText: string): string {
+  const dir = mkdtempSync(join(tmpdir(), 'montagio-lock-'));
+  try {
+    // a/ and b/ trees + --no-prefix give the usual "a/registry/… b/registry/…" headers.
+    for (const [side, text] of [['a', oldText], ['b', newText]] as const) {
+      mkdirSync(join(dir, side, 'registry'), { recursive: true });
+      writeFileSync(join(dir, side, 'registry', 'models.lock.yaml'), text);
+    }
+    const diff = spawnSync(
+      'git',
+      ['diff', '--no-index', '--no-color', '--no-prefix', '--', 'a/registry/models.lock.yaml', 'b/registry/models.lock.yaml'],
+      { cwd: dir, encoding: 'utf8' },
+    );
+    if (diff.status === 0) return '';
+    if (diff.status !== 1) throw new Error(`git diff failed: ${diff.stderr || diff.error?.message}`);
+    return diff.stdout;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+export async function sha256File(path: string): Promise<string> {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
+  return hash.digest('hex');
+}
+
+/**
+ * Stream a file to `<dest>.part` while hashing it, resume a previous partial
+ * download with a Range request, then move it into place. A sha256 that does
+ * not match `expectedSha256` deletes the partial file and throws.
+ */
+export async function downloadFile(
+  url: string,
+  dest: string,
+  opts: { expectedSha256?: string | null; headers?: Record<string, string>; onProgress?: (bytes: number, total: number | null) => void } = {},
+): Promise<{ sha256: string; bytes: number; resumedFrom: number }> {
+  const part = `${dest}.part`;
+  await mkdir(dirname(dest), { recursive: true });
+  let hash: Hash = createHash('sha256');
+  let offset = 0;
+  try {
+    offset = (await stat(part)).size;
+  } catch {
+    offset = 0;
+  }
+  if (offset > 0) for await (const chunk of createReadStream(part)) hash.update(chunk as Buffer);
+
+  const res = await fetch(url, { headers: { ...opts.headers, ...(offset > 0 ? { range: `bytes=${offset}-` } : {}) } });
+  if (offset > 0 && res.status === 200) {
+    // The server ignored the range: start again from zero.
+    await truncate(part, 0);
+    offset = 0;
+    hash = createHash('sha256');
+  } else if (offset > 0 && res.status !== 206) {
+    throw new Error(`GET ${url} (resume at ${offset}) → HTTP ${res.status}`);
+  }
+  if (!res.ok || !res.body) throw new Error(`GET ${url} → HTTP ${res.status}`);
+  const length = Number(res.headers.get('content-length'));
+  const total = Number.isFinite(length) && length > 0 ? offset + length : null;
+
+  const resumedFrom = offset;
+  let bytes = offset;
+  const hashing = new Transform({
+    transform(chunk: Buffer, _encoding, done) {
+      hash.update(chunk);
+      bytes += chunk.length;
+      opts.onProgress?.(bytes, total);
+      done(null, chunk);
+    },
+  });
+  await pipeline(Readable.fromWeb(res.body as unknown as NodeReadableStream), hashing, createWriteStream(part, { flags: offset > 0 ? 'a' : 'w' }));
+
+  const sha256 = hash.digest('hex');
+  if (total !== null && bytes !== total) throw new Error(`${url}: got ${bytes} bytes, expected ${total} (partial file kept for resume)`);
+  if (opts.expectedSha256 && sha256 !== opts.expectedSha256) {
+    await rm(part, { force: true });
+    throw new Error(`sha256 mismatch for ${dest}: got ${sha256}, expected ${opts.expectedSha256}`);
+  }
+  await rename(part, dest);
+  return { sha256, bytes, resumedFrom };
+}
+
+export async function writeText(path: string, text: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, text);
+}

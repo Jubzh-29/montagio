@@ -8,3 +8,6 @@ playwright-report/
 *.log
 .DS_Store
 apps/web/public/open-stack-report.json
+
+# GPU session results (infra/runpod): clips, reports, lock patch
+s1-results/

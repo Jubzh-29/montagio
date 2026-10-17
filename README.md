@@ -18,6 +18,7 @@ Montagio is an open-source studio for cinematic camera moves: drop a photo, pick
 |---|---|
 | App and server (`apps/`, root) | AGPL-3.0-only |
 | Libraries (`packages/*`, `tools/*`) | Apache-2.0 |
+| GPU session tooling (`infra/*`) | Apache-2.0 |
 | Preset library (`presets/`) | CC-BY-4.0 |
 
 Model weights keep their own licenses (Apache-2.0 or MIT for everything the official distribution references) and are downloaded from their official repositories, never bundled.
