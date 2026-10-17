@@ -43,7 +43,8 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
       io.err(`montagio: ${arg}: no *.yaml or *.yml file in this folder`);
       return 2;
     }
-    files.push(...found);
+    // The same file named twice (or a file inside a folder also given) is validated once.
+    for (const file of found) if (!files.some((known) => known.path === file.path)) files.push(file);
   }
 
   let library;
@@ -58,14 +59,22 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   }
 
   let failed = false;
+  // loadLibrary refuses a folder where two files share a preset id: so does the check.
+  const ids = new Map<string, string>();
   for (const file of files) {
     const result = validatePreset(await readFile(file.path, 'utf8'), file.shown, library);
+    const problems = result.ok ? [] : result.problems;
     if (result.ok) {
+      const other = ids.get(result.preset.id);
+      if (other) problems.push(`id: duplicate preset id "${result.preset.id}" (also in ${other})`);
+      else ids.set(result.preset.id, file.shown);
+    }
+    if (problems.length === 0) {
       io.out(`✓ ${file.shown}`);
     } else {
       failed = true;
       io.out(`✗ ${file.shown}`);
-      for (const problem of result.problems) io.out(`  - ${problem}`);
+      for (const problem of problems) io.out(`  - ${problem}`);
     }
   }
   return failed ? 1 : 0;

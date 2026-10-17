@@ -83,3 +83,18 @@ test('the npm script entry runs when the repository is reached through a junctio
   expect(res.status, res.stderr).toBe(1);
   expect(res.stdout).toContain(`✗ ${bad}`);
 }, 60_000);
+
+test('two files with the same preset id fail, as the app library would', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'montagio-cli-dup-'));
+  const first = join(dir, 'crash-push.yaml');
+  const second = join(dir, 'my-push.yaml');
+  writeFileSync(first, readFileSync(good, 'utf8'));
+  writeFileSync(second, readFileSync(good, 'utf8').replace('name: Crash Push', 'name: My Push'));
+  expect(await runCli(['preset', 'validate', dir], io)).toBe(1);
+  expect(lines).toEqual([`✓ ${first}`, `✗ ${second}`, `  - id: duplicate preset id "crash-push" (also in ${first})`]);
+});
+
+test('a file named twice is validated once', async () => {
+  expect(await runCli(['preset', 'validate', good, good], io)).toBe(0);
+  expect(lines).toEqual([`✓ ${good}`]);
+});
