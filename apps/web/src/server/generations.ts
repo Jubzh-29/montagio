@@ -2,7 +2,7 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { access } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { BackendError, type BackendErrorCode } from '@montagio/comfy-adapter';
-import { compileJob, CompileError } from '@montagio/presets';
+import { compileJob, CompileError, validatePreset, type Preset } from '@montagio/presets';
 import { ensureTools, tagClip } from '@montagio/sequence';
 import { getEnv } from './env';
 import { getServices } from './services';
@@ -10,6 +10,7 @@ import {
   lookupKey,
   readRecord,
   rememberKey,
+  savePresetText,
   saveRecord,
   saveWorkflow,
   type GenerationRecord,
@@ -17,6 +18,10 @@ import {
 import { readUploadMeta } from './uploads';
 
 export const IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
+/** A remixed preset is a small text file: 16 KiB of UTF-8 at most. */
+export const MAX_PRESET_YAML_BYTES = 16 * 1024;
+/** Request bodies that may carry a preset: room for its JSON escaping, nothing near a pasted megabyte. */
+export const MAX_REQUEST_BYTES = 128 * 1024;
 const TERMINAL = new Set(['succeeded', 'failed', 'canceled']);
 
 export type GenerationErrorCode =
@@ -24,16 +29,34 @@ export type GenerationErrorCode =
   | 'unknown-image'
   | 'model-incompatible'
   | 'invalid-shots'
-  | 'ffmpeg-missing';
+  | 'ffmpeg-missing'
+  | 'invalid-preset'
+  | 'preset-too-large';
 
 export class GenerationError extends Error {
-  constructor(readonly code: GenerationErrorCode) {
+  constructor(
+    readonly code: GenerationErrorCode,
+    /** For "invalid-preset": one line per problem, as `montagio preset validate` prints them. */
+    readonly problems?: string[],
+  ) {
     super(code);
   }
 }
 
+/** Validate a preset pasted in the remix editor, on `modelId` if given, else on its own models. */
+export async function checkPresetText(text: string, modelId?: string): Promise<Preset> {
+  if (Buffer.byteLength(text, 'utf8') > MAX_PRESET_YAML_BYTES) throw new GenerationError('preset-too-large');
+  const lib = await getServices().library;
+  const result = validatePreset(text, 'remix.yaml', lib, modelId ? { modelId } : undefined);
+  if (!result.ok) throw new GenerationError('invalid-preset', result.problems);
+  return result.preset;
+}
+
 export type CreateGenerationInput = {
-  presetId: string;
+  /** A preset of the library, or… */
+  presetId?: string;
+  /** …the text of a remixed preset, which replaces presetId. */
+  presetYaml?: string;
   modelId?: string;
   imageRef: string;
   userPrompt?: string;
@@ -65,7 +88,8 @@ export async function createGeneration(input: CreateGenerationInput): Promise<Cr
 /** Look everything up and compile the workflow; throws GenerationError on any invalid input. */
 async function resolveJob(input: Omit<CreateGenerationInput, 'idempotencyKey'>, seed: number) {
   const lib = await getServices().library;
-  const preset = lib.presets.get(input.presetId);
+  const preset =
+    input.presetYaml !== undefined ? await checkPresetText(input.presetYaml, input.modelId) : lib.presets.get(input.presetId ?? '');
   if (!preset) throw new GenerationError('unknown-preset');
   const upload = await readUploadMeta(input.imageRef);
   if (!upload) throw new GenerationError('unknown-image');
@@ -110,6 +134,7 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
 
   const id = randomUUID();
   await saveWorkflow(id, compiled.workflow);
+  if (input.presetYaml !== undefined) await savePresetText(id, input.presetYaml);
   // The start image travels as a file: the backend uploads it and binds it to the loader node.
   const imageBinding = model.bindings.image;
   const { backendJobId } = await backend.submit({
@@ -127,6 +152,7 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
     modelId: model.id,
     imageRef: input.imageRef,
     ...(input.userPrompt ? { userPrompt: input.userPrompt } : {}),
+    ...(input.presetYaml !== undefined ? { remix: true as const } : {}),
     seed,
     aspect: upload.aspect,
     state: 'queued',
@@ -151,6 +177,8 @@ const BACKEND_STATUS: Record<BackendErrorCode, number> = {
 /** The HTTP answer for a known failure of a create route, or null for an unexpected error. */
 export function failureResponse(error: unknown): Response | null {
   if (error instanceof GenerationError) {
+    if (error.code === 'invalid-preset') return Response.json({ error: error.code, problems: error.problems ?? [] }, { status: 400 });
+    if (error.code === 'preset-too-large') return Response.json({ error: error.code }, { status: 413 });
     // A missing FFmpeg is the server's problem, not the request's.
     return Response.json({ error: error.code }, { status: error.code === 'ffmpeg-missing' ? 503 : 400 });
   }
