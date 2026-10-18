@@ -1,6 +1,6 @@
 import type { ShowcaseData } from '@montagio/showcase/data';
 import { createShowcaseRouter, type ShowcaseRouter } from './router';
-import { MontageError, type Montage } from './types';
+import type { Montage } from './types';
 import { showcaseUrl } from './urls';
 
 /**
@@ -31,12 +31,4 @@ async function loadData(): Promise<ShowcaseData> {
   return (await res.json()) as ShowcaseData;
 }
 
-/** Until the montage lands, a film fails cleanly instead of hanging. */
-const noMontage: Montage = {
-  preload: () => undefined,
-  assemble: async () => {
-    throw new MontageError('ffmpeg-unavailable');
-  },
-};
-
-export const showcaseFetch = createShowcaseFetch(loadData, async () => noMontage);
+export const showcaseFetch = createShowcaseFetch(loadData, async () => (await import('./montage')).browserMontage());
