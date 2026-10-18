@@ -7,6 +7,18 @@ export type CameraPose = (typeof CAMERA_POSES)[number];
 export const CAMERA_COMBINES = ['together', 'then'] as const;
 export type CameraCombine = (typeof CAMERA_COMBINES)[number];
 
+/** Moves whose camera vectors are exact opposites: together, they cancel out to a still camera. */
+const OPPOSITE_POSES: Partial<Record<CameraPose, CameraPose>> = {
+  zoom_in: 'zoom_out',
+  zoom_out: 'zoom_in',
+  pan_left: 'pan_right',
+  pan_right: 'pan_left',
+  pan_up: 'pan_down',
+  pan_down: 'pan_up',
+  roll_ccw: 'roll_cw',
+  roll_cw: 'roll_ccw',
+};
+
 const kebabId = z.string().max(48).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'must be kebab-case (a-z, 0-9, -)');
 
 const CameraSchema = z
@@ -23,6 +35,10 @@ const CameraSchema = z
     // "static" at the same time as a move adds nothing; before or after one, it is a hold
     if (camera.poses.includes('static') && camera.poses.length > 1 && camera.combine !== 'then') {
       ctx.addIssue({ code: 'custom', path: ['poses'], message: '"static" can only be combined with another pose when combine is "then"' });
+    }
+    const [a, b] = camera.poses;
+    if (b && OPPOSITE_POSES[a!] === b && camera.combine !== 'then') {
+      ctx.addIssue({ code: 'custom', path: ['poses'], message: `"${a}" and "${b}" cancel out when combine is "together"; use combine: "then"` });
     }
   });
 

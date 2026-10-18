@@ -44,6 +44,11 @@ REJECTED = [
     ("poses: [zoom_in]", "poses: [zoom_in, static]\n  combine: together", "camera.poses"),
     ("poses: [zoom_in]", "poses: [zoom_in, pan_up]\n  combine: true", "camera.combine"),
     ("poses: [zoom_in]", "poses: [zoom_in, pan_up]\n  combine: Then", "camera.combine"),
+    # opposite moves cancel out together: they need then
+    ("poses: [zoom_in]", "poses: [zoom_in, zoom_out]", "camera.poses"),
+    ("poses: [zoom_in]", "poses: [pan_right, pan_left]\n  combine: together", "camera.poses"),
+    ("poses: [zoom_in]", "poses: [pan_down, pan_up]", "camera.poses"),
+    ("poses: [zoom_in]", "poses: [roll_ccw, roll_cw]", "camera.poses"),
     # numbers: a boolean is never a number, nothing non finite, integers stay integers
     ("speed: 1.5", "speed: true", "camera.speed"),
     ("speed: 1.5", "speed: 0.05", "camera.speed"),
@@ -130,7 +135,8 @@ ACCEPTED = [
     ("license: CC-BY-4.0", "license: Apache-2.0", ("license",), "Apache-2.0"),
     ("license: CC-BY-4.0", "license: MIT", ("license",), "MIT"),
     ("fps: 16", "fps: 24", ("defaults", "fps"), 24),
-    ("poses: [zoom_in]", "poses: [pan_left, pan_right]", ("camera", "poses"), ["pan_left", "pan_right"]),
+    ("poses: [zoom_in]", "poses: [pan_left, pan_right]\n  combine: then", ("camera", "poses"), ["pan_left", "pan_right"]),
+    ("poses: [zoom_in]", "poses: [pan_left, pan_up]", ("camera", "poses"), ["pan_left", "pan_up"]),
     ("poses: [zoom_in]", "poses: [pan_down, zoom_out]", ("camera", "poses"), ["pan_down", "zoom_out"]),
     (MODELS_BLOCK, "loras: [{file: a.safetensors, strength: 0}]\n" + MODELS_BLOCK, ("loras", 0, "strength"), 0),
     (MODELS_BLOCK, "loras: [{file: a.safetensors, strength: 2}]\n" + MODELS_BLOCK, ("loras", 0, "strength"), 2),
@@ -310,8 +316,11 @@ ASPECT_CHOICES = ("16:9", "9:16", "1:1")
 RESOLUTION_CHOICES = ("480p", "720p")
 USER_PROMPT = "a cat on a sofa"
 
-# every ordered pair of distinct moves the schema accepts together (such a pair never holds "static")
-POSE_PAIRS = [(a, b) for a in CAMERA_POSES for b in CAMERA_POSES if a != b and "static" not in (a, b)]
+# moves whose vectors are exact opposites in WanCameraEmbedding: together they cancel out
+OPPOSITES = {("zoom_in", "zoom_out"), ("pan_left", "pan_right"), ("pan_up", "pan_down"), ("roll_ccw", "roll_cw")}
+OPPOSITES |= {(b, a) for a, b in OPPOSITES}
+# every ordered pair of distinct moves the schema accepts together (never "static", never two opposites)
+POSE_PAIRS = [(a, b) for a in CAMERA_POSES for b in CAMERA_POSES if a != b and "static" not in (a, b) and (a, b) not in OPPOSITES]
 # every ordered pair of distinct moves the schema accepts one after the other ("static" included)
 THEN_PAIRS = [(a, b) for a in CAMERA_POSES for b in CAMERA_POSES if a != b]
 

@@ -27,6 +27,9 @@ import yaml
 
 CAMERA_POSES = ("static", "pan_left", "pan_right", "pan_up", "pan_down", "zoom_in", "zoom_out", "roll_ccw", "roll_cw")
 CAMERA_COMBINES = ("together", "then")  # how two moves combine: at once, or one after the other
+# moves whose camera vectors are exact opposites: together, they cancel out to a still camera
+_OPPOSITE_POSES = {"zoom_in": "zoom_out", "pan_left": "pan_right", "pan_up": "pan_down", "roll_ccw": "roll_cw"}
+_OPPOSITE_POSES.update({b: a for a, b in list(_OPPOSITE_POSES.items())})
 LICENSES = ("CC-BY-4.0", "CC0-1.0", "Apache-2.0", "MIT")
 RESOLUTIONS = ("480p", "720p")
 FPS_VALUES = (16, 24)
@@ -481,6 +484,8 @@ def _camera(value, path, issues):
         # "static" at the same time as a move adds nothing; before or after one, it is a hold
         if "static" in poses and len(poses) > 1 and combine is not None and combine != "then":
             issues.append((path + ("poses",), '"static" can only be combined with another pose when combine is "then"'))
+        if len(poses) == 2 and _OPPOSITE_POSES.get(poses[0]) == poses[1] and combine is not None and combine != "then":
+            issues.append((path + ("poses",), f'"{poses[0]}" and "{poses[1]}" cancel out when combine is "together"; use combine: "then"'))
     return {"poses": poses, "speed": speed, "combine": combine}
 
 
