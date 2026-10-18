@@ -6,7 +6,8 @@ the path of WanCameraEmbedding, and execute lays its rows out for process_pose_p
 tests below compare camera.py with an independent, frame-by-frame rewrite of that formula in plain
 Python (math, no numpy). The heavy test at the end runs the real core node next to ours, in the
 Python of a ComfyUI install, and wants the same tensor; it is skipped unless MONTAGIO_COMFYUI_DIR
-names a ComfyUI v0.41.0 checkout with a virtual environment (.venv) that has torch.
+names a ComfyUI v0.41.0 checkout, whose Python (with torch) is MONTAGIO_COMFYUI_PYTHON or a .venv
+inside the checkout.
 """
 import json
 import math
@@ -317,10 +318,14 @@ print(json.dumps(result))
 
 
 def comfyui_python():
+    """MONTAGIO_COMFYUI_PYTHON (the pod's /workspace/venvs/comfyui/bin/python), else a .venv inside the checkout."""
+    explicit = os.environ.get("MONTAGIO_COMFYUI_PYTHON")
+    if explicit:
+        return explicit
     for candidate in (Path(COMFYUI_DIR) / ".venv" / "Scripts" / "python.exe", Path(COMFYUI_DIR) / ".venv" / "bin" / "python"):
         if candidate.exists():
             return str(candidate)
-    pytest.fail(f"MONTAGIO_COMFYUI_DIR={COMFYUI_DIR} has no .venv with a Python", pytrace=False)
+    pytest.fail(f"MONTAGIO_COMFYUI_DIR={COMFYUI_DIR} has no .venv with a Python: set MONTAGIO_COMFYUI_PYTHON", pytrace=False)
 
 
 @pytest.fixture(scope="module")
