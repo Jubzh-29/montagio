@@ -1,0 +1,22 @@
+{
+  "name": "@montagio/showcase",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./data": "./src/data.ts"
+  },
+  "scripts": {
+    "test": "vitest run --globals",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@montagio/presets": "*",
+    "@montagio/registry": "*",
+    "@montagio/sequence": "*",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  }
+}
