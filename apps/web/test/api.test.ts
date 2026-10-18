@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { POST as postGenerations } from '@/app/api/generations/route';
@@ -15,7 +15,7 @@ import { galleryOrder, presetPreviewUrl } from '@/server/gallery';
 import { failureResponse, mediaFileFor } from '@/server/generations';
 import { resetServicesForTests } from '@/server/services';
 import { loadLibrary } from '@montagio/presets';
-import { readTags } from '@montagio/sequence';
+import { readTags, tagClip } from '@montagio/sequence';
 import {
   bigPng,
   generationRequest,
@@ -27,12 +27,27 @@ import {
   setupTempData,
 } from './helpers';
 
+// The real tagClip, watched: the tests count how many times a clip gets tagged.
+vi.mock('@montagio/sequence', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@montagio/sequence')>();
+  return { ...actual, tagClip: vi.fn(actual.tagClip) };
+});
+
 const dataDir = setupTempData();
 
 async function uploadedImageRef(): Promise<string> {
   const res = await postUpload(uploadRequest(pngFile(1920, 1080)));
   return ((await res.json()) as { imageRef: string }).imageRef;
 }
+
+/** A generation whose demo render is already finished, not polled yet. */
+async function finishedGeneration(key: string): Promise<string> {
+  process.env.MONTAGIO_DEMO_DURATION_MS = '0';
+  const imageRef = await uploadedImageRef();
+  return ((await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, key))).json()) as { id: string }).id;
+}
+
+const poll = async (id: string) => (await getGeneration(new Request('http://localhost/x'), params({ id }))).json();
 
 describe('uploads', () => {
   test('11 MB is refused with 413', async () => {
@@ -148,6 +163,25 @@ describe('generations', () => {
     const rec = await (await getGeneration(new Request('http://localhost/x'), params({ id }))).json();
     expect(rec).toMatchObject({ state: 'succeeded', progress: 1, outputUrl: `/media/data/generations/${id}/clip.mp4` });
     expect(await readTags(mediaFileFor(rec.outputUrl)!)).toMatchObject({ comment: 'AI-generated' });
+  }, 30_000);
+
+  test('a clip.mp4 already on disk (tagged before a restart) is delivered as is', async () => {
+    const id = await finishedGeneration('reuse');
+    const clip = join(dataDir(), 'generations', id, 'clip.mp4');
+    writeFileSync(clip, 'tagged before the restart');
+    vi.mocked(tagClip).mockClear();
+    expect(await poll(id)).toMatchObject({ state: 'succeeded', outputUrl: `/media/data/generations/${id}/clip.mp4` });
+    expect(readFileSync(clip, 'utf8')).toBe('tagged before the restart');
+    expect(tagClip).not.toHaveBeenCalled();
+  });
+
+  test('concurrent polls of a finished render tag its clip once', async () => {
+    const id = await finishedGeneration('concurrent');
+    vi.mocked(tagClip).mockClear();
+    const records = await Promise.all([poll(id), poll(id), poll(id)]);
+    expect(records.map((rec) => rec.outputUrl)).toEqual(Array(3).fill(`/media/data/generations/${id}/clip.mp4`));
+    expect(tagClip).toHaveBeenCalledTimes(1);
+    expect(await readTags(join(dataDir(), 'generations', id, 'clip.mp4'))).toMatchObject({ comment: 'AI-generated' });
   }, 30_000);
 
   test('a missing FFmpeg is refused before any render, and the server log says why', async () => {
