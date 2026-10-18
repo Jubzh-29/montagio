@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,7 +6,7 @@ import { resetServicesForTests } from '@/server/services';
 
 export const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-/** Fresh data directory and fresh in-memory services for every test. */
+/** Fresh data directory and fresh in-memory services for every test; the directory goes once the test is over. */
 export function setupTempData(): () => string {
   let dir = '';
   beforeEach(() => {
@@ -17,6 +17,8 @@ export function setupTempData(): () => string {
     process.env.MONTAGIO_DEMO_DURATION_MS = '60000';
     resetServicesForTests();
   });
+  // Retries: on Windows a clip FFmpeg just closed can stay locked for a moment.
+  afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
   return () => dir;
 }
 
