@@ -1,10 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { GET as getGenerationPreset } from '@/app/api/generations/[id]/preset/route';
 import { POST as postGenerations } from '@/app/api/generations/route';
 import { POST as postValidateRoute } from '@/app/api/presets/validate/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
 import { GET as getWorkflow } from '@/app/api/workflows/[id]/route';
+import { loadLibrary } from '@montagio/presets';
 import { generationRequest, params, pngFile, repoRoot, setupTempData, uploadRequest } from './helpers';
 
 const dataDir = setupTempData();
@@ -98,7 +100,8 @@ describe('remixed generations', () => {
     const rec = await res.json();
     expect([res.status, rec.presetId, rec.remix]).toEqual([201, 'crash-push', true]);
     const workflow = await (await getWorkflow(new Request('http://localhost/x'), params({ id: rec.id }))).json();
-    expect(JSON.stringify(workflow)).toContain('0.8');
+    const speed = (await loadLibrary(repoRoot)).models.get(rec.modelId)!.bindings.camera_speed!;
+    expect(workflow[speed.node].inputs[speed.field]).toBe(0.8);
     expect(await readFile(join(dataDir(), 'generations', rec.id, 'preset.yaml'), 'utf8')).toBe(text);
   });
 
@@ -129,6 +132,25 @@ describe('remixed generations', () => {
     const res = await postGenerations(generationRequest({ presetYaml: yaml + '#'.repeat(16 * 1024), imageRef }, 'rx5'));
     expect([res.status, await res.json()]).toEqual([413, { error: 'preset-too-large' }]);
     expect(existsSync(join(dataDir(), 'generations'))).toBe(false);
+  });
+
+  test('a remixed generation serves its own preset text, as it was sent', async () => {
+    const imageRef = await uploadedImageRef();
+    const text = yaml.replace('speed: 1.5', 'speed: 0.8').replace('name: Crash Push', 'name: Crash Push (é)');
+    const { id } = await (await postGenerations(generationRequest({ presetYaml: text, imageRef }, 'rx7'))).json();
+    const res = await getGenerationPreset(new Request('http://localhost/x'), params({ id }));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/yaml; charset=utf-8');
+    expect(await res.text()).toBe(text);
+  });
+
+  test('a library generation, an unknown id or a path has no preset text of its own -> 404', async () => {
+    const imageRef = await uploadedImageRef();
+    const { id } = await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'rx8'))).json();
+    for (const missing of [id, 'no-such-generation', '..', '../../presets/crash-push']) {
+      const res = await getGenerationPreset(new Request('http://localhost/x'), params({ id: missing }));
+      expect([missing, res.status, await res.json()]).toEqual([missing, 404, { error: 'not-found' }]);
+    }
   });
 
   test('neither presetId nor presetYaml -> 400 invalid-request', async () => {

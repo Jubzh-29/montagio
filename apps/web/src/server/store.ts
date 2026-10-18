@@ -75,6 +75,16 @@ export async function savePresetText(id: string, text: string): Promise<void> {
   await writeFile(join(dir, 'preset.yaml'), text);
 }
 
+/** The text savePresetText kept, or null: a library generation has none of its own. */
+export async function readPresetText(id: string): Promise<string | null> {
+  if (!SAFE_ID.test(id)) return null;
+  try {
+    return await readFile(join(generationsDir(), id, 'preset.yaml'), 'utf8');
+  } catch {
+    return null;
+  }
+}
+
 export async function readWorkflow(id: string): Promise<ApiWorkflow | null> {
   if (!SAFE_ID.test(id)) return null;
   try {

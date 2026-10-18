@@ -12,6 +12,7 @@ import {
   type UploadResult,
 } from '@/lib/api-types';
 import { refusalMessageKey } from '@/lib/refusals';
+import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
 import { Monitor, type GenerationState, type TrackedJob, type UploadState } from './Monitor';
@@ -43,8 +44,18 @@ type Tracked = Extract<Job, { status: 'tracking' }>;
 /** The body of a refused request. */
 type Refusal = { error?: string; problems?: string[] };
 
-/** A preset being remixed: the library text it started from and the edited text. */
-type Remix = { baseId: string; baseName: string; original: string; text: string; check?: RemixCheck };
+/** A preset being remixed: the text it was opened with and the edited text. */
+type Remix = {
+  baseId: string;
+  baseName: string;
+  original: string;
+  text: string;
+  /** The generation whose preset this editor holds: the remix it was opened from, or the last one it rendered. */
+  generationId?: string;
+  check?: RemixCheck;
+  /** The model a server answer was for; absent for an answer that depends on none. */
+  checkModel?: string | null;
+};
 
 const SEQUENCE_STATE: Record<SequenceSummary['state'], JobState> = {
   running: 'running',
@@ -110,11 +121,12 @@ export function Studio() {
   }, []);
 
   // The editor takes the gallery's place: move the focus with it, and back on close.
+  // remixFocus is set just before the setRemix that opens, refills or closes the editor.
   useEffect(() => {
     if (remixFocus.current === 'editor') remixTextRef.current?.focus();
     if (remixFocus.current === 'toggle') remixToggleRef.current?.focus();
     remixFocus.current = null;
-  }, [remix?.baseId]);
+  }, [remix]);
 
   const tracked = job.status === 'tracking' ? job : undefined;
   const view = tracked ? trackedJob(tracked) : undefined;
@@ -208,25 +220,32 @@ export function Studio() {
       ? ready && presetId !== null
       : ready && shots.length >= 2;
 
-  /** Show a check result, unless the text changed while it was on its way. */
-  const setRemixCheck = (text: string, check: RemixCheck | undefined) =>
-    setRemix((current) => (current && current.text === text ? { ...current, check } : current));
+  /** Show the server's answer on `text` for `model`, unless the text changed while it was on its way. */
+  const setRemixCheck = (text: string, model: string | null, check: RemixCheck) =>
+    setRemix((current) => (current && current.text === text ? { ...current, check, checkModel: model } : current));
 
-  const openRemix = async (id: string) => {
-    if (remix?.baseId === id) {
-      remixTextRef.current?.focus();
-      return;
-    }
+  /** Open the editor on a preset: the library file, or the text a past remix (`generationId`) was rendered from. */
+  const openRemix = async (id: string, source = `/api/presets/${encodeURIComponent(id)}/yaml`, generationId?: string) => {
     const baseName = presets.find((preset) => preset.id === id)?.name ?? id;
-    remixFocus.current = 'editor';
+    let next: Remix;
     try {
-      const res = await fetch(`/api/presets/${encodeURIComponent(id)}/yaml`);
+      const res = await fetch(source);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
-      setRemix({ baseId: id, baseName, original: text, text });
+      next = { baseId: id, baseName, original: text, text, generationId };
     } catch {
-      setRemix({ baseId: id, baseName, original: '', text: '', check: { kind: 'error' } });
+      next = { baseId: id, baseName, original: '', text: '', generationId, check: { kind: 'error' } };
     }
+    remixFocus.current = 'editor';
+    setRemix(next);
+  };
+
+  /** The result's "Remix preset": back to the editor if it holds this generation's preset, else open it there. */
+  const remixResult = async (record: GenerationRecord) => {
+    const action = resultRemixAction(remix, record);
+    if (action === 'focus') return remixTextRef.current?.focus();
+    if (action === 'confirm' && !window.confirm(t('remixReplace', { name: remix?.baseName ?? '' }))) return;
+    await openRemix(record.presetId, presetTextUrl(record), record.remix ? record.id : undefined);
   };
 
   const closeRemix = () => {
@@ -237,22 +256,24 @@ export function Studio() {
   const checkRemix = async () => {
     if (!remix) return;
     const { text } = remix;
-    setRemixCheck(text, { kind: 'checking' });
+    // The dry compile runs on this model: its answer is shown only while this model stays chosen.
+    const model = modelId;
+    setRemixCheck(text, model, { kind: 'checking' });
     try {
       const res = await fetch('/api/presets/validate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ yaml: text, modelId }),
+        body: JSON.stringify({ yaml: text, modelId: model }),
       });
       if (res.ok) {
-        setRemixCheck(text, { kind: 'valid', name: ((await res.json()) as { preset: { name: string } }).preset.name });
+        setRemixCheck(text, model, { kind: 'valid', name: ((await res.json()) as { preset: { name: string } }).preset.name });
       } else if (res.status === 422) {
-        setRemixCheck(text, { kind: 'problems', problems: ((await res.json()) as { problems: string[] }).problems });
+        setRemixCheck(text, model, { kind: 'problems', problems: ((await res.json()) as { problems: string[] }).problems });
       } else {
-        setRemixCheck(text, { kind: res.status === 413 ? 'too-large' : 'error' });
+        setRemixCheck(text, model, { kind: res.status === 413 ? 'too-large' : 'error' });
       }
     } catch {
-      setRemixCheck(text, { kind: 'error' });
+      setRemixCheck(text, model, { kind: 'error' });
     }
   };
 
@@ -260,7 +281,11 @@ export function Studio() {
    * `onRefused` may take over a refused request (a remix the server finds invalid):
    * it returns true when it showed the reason itself.
    */
-  const submit = async (kind: Tracked['kind'], body: unknown, onRefused?: (status: number, refusal: Refusal | null) => boolean) => {
+  const submit = async (
+    kind: Tracked['kind'],
+    body: unknown,
+    onRefused?: (status: number, refusal: Refusal | null) => boolean,
+  ): Promise<Tracked['record'] | undefined> => {
     submitting.current = true;
     setJob({ status: 'submitting' });
     try {
@@ -275,7 +300,9 @@ export function Studio() {
         else setJob({ status: 'error', message: t(refusalMessageKey(refusal?.error)) });
         return;
       }
-      setJob({ status: 'tracking', kind, record: await res.json() } as Tracked);
+      const record = (await res.json()) as Tracked['record'];
+      setJob({ status: 'tracking', kind, record } as Tracked);
+      return record;
     } catch {
       setJob({ status: 'error', message: t('errorGeneric') });
     } finally {
@@ -287,16 +314,21 @@ export function Studio() {
     if (submitting.current || !canGenerate || upload.status !== 'ready') return;
     const userPrompt = prompt.trim() || undefined;
     if (remix) {
-      const { text } = remix;
-      void submit('generation', { presetYaml: text, modelId, imageRef: upload.imageRef, userPrompt }, (status, refusal) => {
+      const { text, baseId } = remix;
+      const model = modelId;
+      void submit('generation', { presetYaml: text, modelId: model, imageRef: upload.imageRef, userPrompt }, (status, refusal) => {
         if (status === 413) {
-          setRemixCheck(text, { kind: 'too-large' });
-          return true;
+          setRemixCheck(text, model, { kind: 'too-large' });
+        } else if (status === 400 && refusal?.error === 'invalid-preset') {
+          setRemixCheck(text, model, { kind: 'problems', problems: refusal.problems ?? [] });
+        } else {
+          return false;
         }
-        if (status !== 400 || refusal?.error !== 'invalid-preset') return false;
-        setRemixCheck(text, { kind: 'problems', problems: refusal.problems ?? [] });
         remixTextRef.current?.focus();
         return true;
+      }).then((record) => {
+        // This editor now holds that generation's remix: the result's "Remix preset" leads back here.
+        if (record) setRemix((current) => (current?.baseId === baseId ? { ...current, generationId: record.id } : current));
       });
     } else if (mode === 'single') {
       void submit('generation', { presetId, modelId, imageRef: upload.imageRef, userPrompt });
@@ -367,7 +399,7 @@ export function Studio() {
               <button
                 type="button"
                 className={styles.buttonSecondary}
-                onClick={() => (tracked.record.remix && remix ? remixTextRef.current?.focus() : openRemix(tracked.record.presetId))}
+                onClick={() => void remixResult(tracked.record)}
               >
                 {t('remix')}
               </button>
@@ -410,7 +442,7 @@ export function Studio() {
               baseName={remix.baseName}
               text={remix.text}
               original={remix.original}
-              check={remix.check}
+              check={remix.checkModel === undefined || remix.checkModel === modelId ? remix.check : undefined}
               textareaRef={remixTextRef}
               onChange={(text) => setRemix((current) => current && { ...current, text, check: undefined })}
               onCheck={checkRemix}

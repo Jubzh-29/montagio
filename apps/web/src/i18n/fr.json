@@ -38,6 +38,7 @@
   "remixDownload": "Télécharger le YAML",
   "remixReset": "Réinitialiser",
   "remixClose": "Retour aux presets",
+  "remixReplace": "Remplacer vos modifications non enregistrées de {name} ?",
   "generateRemix": "Générer le remix (~{s} s)",
   "localNote": "Tourne sur votre GPU ou sur un GPU que vous louez. Rien ne quitte votre machine.",
   "openStackTitle": "Pile ouverte",
