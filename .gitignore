@@ -11,3 +11,8 @@ apps/web/public/open-stack-report.json
 
 # GPU session results (infra/runpod): clips, reports, lock patch
 s1-results/
+
+# Showcase build output (apps/web: npm run showcase:build)
+apps/web/out/
+apps/web/public/showcase/
+apps/web/public/ffmpeg/

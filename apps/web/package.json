@@ -13,16 +13,18 @@
     "e2e:local": "playwright test -c playwright.local.config.ts"
   },
   "dependencies": {
+    "@ffmpeg/core": "0.12.10",
+    "@ffmpeg/ffmpeg": "0.12.15",
     "@montagio/check-open-stack": "*",
     "@montagio/comfy-adapter": "*",
     "@montagio/presets": "*",
     "@montagio/registry": "*",
+    "@montagio/sequence": "*",
     "image-size": "^2",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "yaml": "^2",
-    "@montagio/sequence": "*"
+    "yaml": "^2"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
