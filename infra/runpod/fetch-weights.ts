@@ -36,6 +36,7 @@ import { parseLock, type LockEntry } from '@montagio/registry';
 import {
   downloadFile,
   folderFor,
+  gib,
   listRepo,
   lockDrift,
   lockFromHf,
@@ -111,9 +112,6 @@ type Plan = {
 };
 
 type Outcome = Plan & { status: 'downloaded' | 'present' | 'planned' | 'failed'; sha256: string | null; seconds: number | null; error: string | null };
-
-const GB = 1024 ** 3;
-const gb = (bytes: number) => `${(bytes / GB).toFixed(2)} GB`;
 
 function licenseCheck(plan: Plan): string {
   if (plan.extra) return `card says ${plan.license_mirror_card ?? '?'}: read the license before any use`;
@@ -259,9 +257,9 @@ async function main(): Promise<number> {
   }
 
   const total = plans.reduce((sum, plan) => sum + plan.size, 0);
-  console.log(`${plans.length} file(s), ${gb(total)} → ${modelsDir}\n`);
+  console.log(`${plans.length} file(s), ${gib(total)} → ${modelsDir}\n`);
   for (const plan of plans) {
-    console.log(`${plan.id.padEnd(24)} ${gb(plan.size).padStart(9)}  ${plan.folder}/${plan.file}`);
+    console.log(`${plan.id.padEnd(24)} ${gib(plan.size).padStart(10)}  ${plan.folder}/${plan.file}`);
     console.log(`${''.padEnd(24)} ${plan.url}`);
     console.log(`${''.padEnd(24)} license: ${licenseCheck(plan)}${plan.notes.length ? `; ${plan.notes.join('; ')}` : ''}`);
   }
@@ -346,7 +344,7 @@ async function fetchOne(plan: Plan, headers: Record<string, string>): Promise<Ou
               if (performance.now() - lastPrint < 15_000) return;
               lastPrint = performance.now();
               const rate = bytes / 1024 ** 2 / ((performance.now() - started) / 1000);
-              console.log(`… ${plan.file}: ${gb(bytes)}${total ? ` / ${gb(total)}` : ''} (${rate.toFixed(0)} MB/s)`);
+              console.log(`… ${plan.file}: ${gib(bytes)}${total ? ` / ${gib(total)}` : ''} (${rate.toFixed(0)} MiB/s)`);
             },
           });
         } catch (error) {

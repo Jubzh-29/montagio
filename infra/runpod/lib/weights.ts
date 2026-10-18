@@ -12,6 +12,11 @@ import { isMap, isScalar, isSeq, parseDocument } from 'yaml';
 
 const HF = 'https://huggingface.co';
 
+/** A size for the console, in GiB (1024³ bytes): the lock's 69.7 GB are 64.91 GiB. */
+export function gib(bytes: number): string {
+  return `${(bytes / 1024 ** 3).toFixed(2)} GiB`;
+}
+
 export function parseHfUrl(url: string): { repo: string; revision: string | null; path: string | null } {
   const parsed = new URL(url);
   if (parsed.origin !== HF) throw new Error(`${url} is not a huggingface.co URL`);
