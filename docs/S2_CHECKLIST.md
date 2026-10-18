@@ -96,7 +96,7 @@ source /workspace/montagio.env
 python3 comfy-nodes/scripts/smoke_comfyui.py http://127.0.0.1:8188; echo "code $?"
 curl -s http://127.0.0.1:8188/object_info/MontagioCameraEmbedding | head -c 200; echo
 ```
-Le script de fumée doit finir par `node 5 shows text: 33` et `code 0`. La commande `curl` doit renvoyer la définition du node, pas `{}`.
+Le script de fumée doit afficher `node 5 shows text: 33` (le `WanCameraEmbedding` du cœur), puis `node 8 shows text: 33` (Montagio Camera Embedding, nourri par un preset à deux mouvements en `camera_mode` `combined`), et finir par `code 0`. La commande `curl` doit renvoyer la définition du node, pas `{}`.
 
 Test lourd du node, contre le vrai `WanCameraEmbedding` du pod, en quelques secondes :
 ```bash

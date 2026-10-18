@@ -43,8 +43,11 @@ FAKES_DIR = Path(__file__).resolve().parent / "fakes"
 CRASH_PUSH = (BUNDLED_DIR / "crash-push.yaml").read_text(encoding="utf-8")
 SPDX = "# SPDX-License-Identifier: GPL-3.0-only"
 
-OUTPUT_NAMES = ["camera_pose", "speed", "width", "height", "length", "fps", "prompt", "negative", "duration_s", "resolution", "info"]
-OUTPUT_TYPES = ["COMBO", "FLOAT", "INT", "INT", "INT", "FLOAT", "STRING", "STRING", "INT", "STRING", "STRING"]
+OUTPUT_NAMES = [
+    "camera_pose", "speed", "width", "height", "length", "fps", "prompt", "negative", "duration_s", "resolution", "info",
+    "camera_pose_2", "combine",  # added last, so that the links of a graph saved before keep their indexes
+]
+OUTPUT_TYPES = ["COMBO", "FLOAT", "INT", "INT", "INT", "FLOAT", "STRING", "STRING", "INT", "STRING", "STRING", "COMBO", "COMBO"]
 # after the input each node has of its own: (id, io_type, optional)
 COMMON_INPUTS = [
     ("prompt", "STRING", True),
@@ -58,6 +61,14 @@ NODES = [
     pytest.param(MontagioPresetFromYAML, "MontagioPresetFromYAML", "Montagio Preset from YAML", ("yaml", "STRING", False), id="yaml"),
 ]
 CHOICES = {"aspect": "16:9", "resolution": "preset", "camera_mode": "parametric"}
+# the bundled presets that combine two moves: (camera_pose, camera_pose_2, combine) in combined mode
+TWO_MOVE_PRESETS = {
+    "breathing.yaml": ("Zoom In", "Zoom Out", "then"),
+    "drift-left-push.yaml": ("Pan Left", "Zoom In", "together"),
+    "pull-back-tilt-up.yaml": ("Zoom Out", "Pan Up", "together"),
+    "push-and-settle.yaml": ("Zoom In", "Static", "then"),
+    "rise-and-push.yaml": ("Pan Up", "Zoom In", "together"),
+}
 
 
 class FakeImage:
@@ -123,7 +134,7 @@ def test_common_input_choices(node, node_id, display_name, own):
     assert (prompt.multiline, prompt.default) == (True, "")
     assert (aspect.options, aspect.default) == (["auto", "16:9", "9:16", "1:1"], "auto")
     assert (resolution.options, resolution.default) == (["preset", "480p", "720p"], "preset")
-    assert (camera_mode.options, camera_mode.default) == (["parametric", "prompt"], "parametric")
+    assert (camera_mode.options, camera_mode.default) == (["parametric", "prompt", "combined"], "parametric")
 
 
 def test_load_menu_lists_bundled_and_user_presets(fake_models_dir):
@@ -207,8 +218,10 @@ def test_execute_gives_every_output_in_order():
         "a cat, dynamic camera push-in, cinematic, sharp focus on subject",
         "blurry, distorted, warped faces, extra limbs, flicker, low quality",
         5, "480p", "Crash Push (crash-push) — by montagio-community — CC-BY-4.0",
+        "Static", "together",
     )
     assert [type(value) for value in out.args[:6]] == [str, float, int, int, int, float]  # what the linked nodes take
+    assert [type(value) for value in out.args[11:]] == [str, str]
 
 
 @pytest.mark.parametrize(
@@ -266,12 +279,41 @@ def test_a_bad_choice_is_a_params_error(choices, message):
         run_yaml(**choices)
 
 
-def test_a_preset_that_needs_two_camera_moves_is_a_params_error_until_the_mode_is_prompt():
+def test_a_preset_that_needs_two_camera_moves_is_a_params_error_until_the_mode_is_combined_or_prompt():
     two_moves = CRASH_PUSH.replace("poses: [zoom_in]", "poses: [zoom_in, pan_left]")
     assert two_moves != CRASH_PUSH
-    with pytest.raises(ParamsError, match="combines 2 camera moves"):
+    with pytest.raises(ParamsError, match='combines 2 camera moves.*camera_mode "combined"'):
         run_yaml(two_moves)
+    out = run_yaml(two_moves, camera_mode="combined")
+    assert (out.args[0], out.args[1], out.args[11], out.args[12]) == ("Zoom In", 1.5, "Pan Left", "together")
     assert run_yaml(two_moves, camera_mode="prompt").args[0] == "Static"
+
+
+def test_bundled_presets_with_two_moves_run_in_combined_mode_only():
+    bundled = sorted(path.name for path in BUNDLED_DIR.glob("*.yaml"))
+    assert set(TWO_MOVE_PRESETS) < set(bundled)
+    for name in bundled:
+        out = run_load(name, camera_mode="combined")
+        moves = (out.args[0], out.args[11], out.args[12])
+        if name in TWO_MOVE_PRESETS:
+            assert moves == TWO_MOVE_PRESETS[name], name
+            with pytest.raises(ParamsError, match='combines 2 camera moves.*camera_mode "combined"'):
+                run_load(name)  # parametric mode feeds the core WanCameraEmbedding, which would drop one
+        else:
+            assert moves[1:] == ("Static", "together"), name
+            assert run_load(name).args == out.args  # a one-move preset runs the same in both modes
+
+
+def test_combined_outputs_are_what_montagio_camera_embedding_takes():
+    """In combined mode the outputs link into Montagio Camera Embedding: same names, values among its options."""
+    embedding = {item.id: item for item in MontagioCameraEmbedding.define_schema().inputs}
+    linked = ["camera_pose", "speed", "width", "height", "length", "camera_pose_2", "combine"]
+    assert set(linked) <= set(embedding) and set(linked) <= set(OUTPUT_NAMES)
+    assert {item_id for item_id, item in embedding.items() if not item.optional} <= set(linked)  # nothing left unset
+    for name in sorted(path.name for path in BUNDLED_DIR.glob("*.yaml")):
+        out = dict(zip(OUTPUT_NAMES, run_load(name, camera_mode="combined").args))
+        for combo in ("camera_pose", "camera_pose_2", "combine"):
+            assert out[combo] in embedding[combo].options, (name, combo)
 
 
 def test_from_yaml_default_runs_and_bad_yaml_names_the_input():

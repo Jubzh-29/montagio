@@ -4,7 +4,9 @@
 It checks that the pack is loaded, then runs a prompt in which the outputs of MontagioPresetFromYAML
 feed the core WanCameraEmbedding node: camera_pose is a COMBO output linked into a COMBO input, and
 the nine pose strings must be exactly ComfyUI's, otherwise WanCameraEmbedding raises a KeyError.
-WanCameraEmbedding only builds a tensor, so no GPU and no model file are needed.
+A second branch does the same in camera_mode "combined" with a preset of two moves, whose
+camera_pose_2 and combine outputs feed Montagio Camera Embedding. Both camera nodes only build a
+tensor, so no GPU and no model file are needed.
 
     python comfy-nodes/scripts/smoke_comfyui.py [URL]      # URL defaults to http://127.0.0.1:8199
 
@@ -48,14 +50,42 @@ models:
   fallback: wan22-ti2v-5b
 """
 
+# breathing (zoom in, then zoom out), at speed 1.0 and 2 seconds long: two moves, one after the other
+YAML_TWO_MOVES = """\
+schema: montagio/preset@0.1
+id: breathing
+name: Breathing
+description: A barely visible push in and out that keeps a still shot alive.
+preview: previews/breathing.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-camera
+camera:
+  poses: [zoom_in, zoom_out]
+  combine: then
+  speed: 1.0
+prompt:
+  suffix: "barely perceptible breathing camera, gentle micro push in and out, calm and steady"
+  negative: "blurry, distorted, warped faces, extra limbs, flicker, low quality"
+defaults:
+  duration_s: 2
+  resolution: 480p
+  fps: 16
+models:
+  preferred: wan22-i2v-a14b-fun-camera
+  fallback: wan22-ti2v-5b
+"""
+
 
 def build_prompt():
     """The prompt, in ComfyUI's API format ({node id: {"class_type", "inputs"}}); a new dict each call.
 
     Node "2" is the one under test: its outputs 0 to 4 (camera_pose, speed, width, height, length)
-    go to WanCameraEmbedding ("3"). The two PreviewAny nodes are the outputs ComfyUI needs to run
-    something: "4" shows the info of the preset-file node ("1", output 10) and "5" the length that
-    WanCameraEmbedding sends back (its output 3). PreviewAny takes a single input, called source.
+    go to WanCameraEmbedding ("3"). Node "6" is the same node in combined mode: those outputs and
+    camera_pose_2 and combine (11 and 12) go to Montagio Camera Embedding ("7"). The PreviewAny
+    nodes are the outputs ComfyUI needs to run something: "4" shows the info of the preset-file
+    node ("1", output 10), "5" and "8" the length that each camera node sends back (its output 3).
+    PreviewAny takes a single input, called source.
     """
     common = {"aspect": "16:9", "resolution": "preset", "camera_mode": "parametric"}
     return {
@@ -73,6 +103,20 @@ def build_prompt():
         },
         "4": {"class_type": "PreviewAny", "inputs": {"source": ["1", 10]}},
         "5": {"class_type": "PreviewAny", "inputs": {"source": ["3", 3]}},
+        "6": {"class_type": "MontagioPresetFromYAML", "inputs": {"yaml": YAML_TWO_MOVES, **common, "camera_mode": "combined"}},
+        "7": {
+            "class_type": "MontagioCameraEmbedding",
+            "inputs": {
+                "camera_pose": ["6", 0],
+                "camera_pose_2": ["6", 11],
+                "combine": ["6", 12],
+                "speed": ["6", 1],
+                "width": ["6", 2],
+                "height": ["6", 3],
+                "length": ["6", 4],
+            },
+        },
+        "8": {"class_type": "PreviewAny", "inputs": {"source": ["7", 3]}},
     }
 
 

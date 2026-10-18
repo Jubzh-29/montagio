@@ -1,6 +1,6 @@
 # Montagio nodes for ComfyUI
 
-Two nodes that read a Montagio camera preset (a YAML file) and output the values ComfyUI's own nodes take: camera move and speed, size, frame count, fps, prompt and negative prompt. The same preset file drives a clip in the Montagio app and in a ComfyUI graph. A third node, Montagio Camera Embedding, gives the Wan 2.2 Fun Camera models two camera moves at once or one after the other.
+Two nodes that read a Montagio camera preset (a YAML file) and output the values ComfyUI's own nodes take: camera move and speed, size, frame count, fps, prompt and negative prompt. The same preset file drives a clip in the Montagio app and in a ComfyUI graph. A third node, Montagio Camera Embedding, gives the Wan 2.2 Fun Camera models two camera moves at once or one after the other; in `camera_mode` `combined`, the preset nodes feed it both moves of a preset.
 
 The nodes use the V3 node API, so they need ComfyUI 0.41.0 or newer.
 
@@ -19,7 +19,7 @@ No example workflow ships with the pack yet.
 | Load Montagio Preset | `MontagioLoadPreset` | the `preset` menu, which lists the `.yaml` and `.yml` files of the [preset folders](#preset-folders) |
 | Montagio Preset from YAML | `MontagioPresetFromYAML` | the `yaml` text field: paste a preset, for example one remixed in the Montagio app (it starts with the text of Crash Push) |
 
-Both nodes have the same other inputs and the same 11 outputs. A third node, [Montagio Camera Embedding](#montagio-camera-embedding), combines two camera moves.
+Both nodes have the same other inputs and the same 13 outputs. A third node, [Montagio Camera Embedding](#montagio-camera-embedding), combines two camera moves.
 
 ### Inputs
 
@@ -31,7 +31,7 @@ Both nodes have the same other inputs and the same 11 outputs. A third node, [Mo
 | `aspect` | COMBO: `auto`, `16:9`, `9:16`, `1:1` | `auto` | `auto` picks the aspect from `image` (16:9 wide, 9:16 tall, 1:1 near square), or 16:9 when no image is connected |
 | `image` | IMAGE, optional | none | only read to pick the aspect; the node has no image output |
 | `resolution` | COMBO: `preset`, `480p`, `720p` | `preset` | `preset` keeps the resolution written in the file |
-| `camera_mode` | COMBO: `parametric`, `prompt` | `parametric` | see [Differences with the Montagio app](#differences-with-the-montagio-app) |
+| `camera_mode` | COMBO: `parametric`, `prompt`, `combined` | `parametric` | `parametric`: one move, for the core `WanCameraEmbedding`; a preset with two moves is refused. `combined`: up to two moves, for [Montagio Camera Embedding](#montagio-camera-embedding). `prompt`: the moves in words, for a model without camera control. See [Wiring](#wiring) and [Differences with the Montagio app](#differences-with-the-montagio-app) |
 
 ### Outputs
 
@@ -39,7 +39,7 @@ In this order:
 
 | Output | Type | Value |
 |---|---|---|
-| `camera_pose` | COMBO | `parametric`: the move, spelled as `WanCameraEmbedding` spells it (for example `Zoom In`). `prompt`: `Static` |
+| `camera_pose` | COMBO | `parametric` and `combined`: the (first) move, spelled as `WanCameraEmbedding` spells it (for example `Zoom In`). `prompt`: `Static` |
 | `speed` | FLOAT | `camera.speed` of the preset. `prompt`: 1.0 |
 | `width` | INT | from `aspect` and `resolution`, see the sizes below |
 | `height` | INT | same |
@@ -50,6 +50,10 @@ In this order:
 | `duration_s` | INT | `defaults.duration_s` of the preset |
 | `resolution` | STRING | `480p` or `720p` |
 | `info` | STRING | name, id, author and license, for example `Crash Push (crash-push) — by montagio-community — CC-BY-4.0` |
+| `camera_pose_2` | COMBO | `combined`, for a preset with two moves: the second move (for example `Zoom Out`). Otherwise `Static` |
+| `combine` | COMBO | `combined`, for a preset with two moves: `together` or `then`, as the preset says. Otherwise `together` |
+
+`camera_pose_2` and `combine` come last, after `info`, so a graph saved with the first 11 outputs keeps its links. `Static` and `together` mean "no second move": with them, Montagio Camera Embedding computes what `WanCameraEmbedding` computes. A preset with one move gives them in every mode, even when it says `combine: then`.
 
 Sizes, width x height: 480p is 832x480 (16:9), 480x832 (9:16) or 640x640 (1:1); 720p is 1280x720, 720x1280 or 960x960.
 
@@ -59,12 +63,15 @@ The node reads a preset with the same rules as the app, apart from a few rare YA
 
 | Output | Goes to |
 |---|---|
-| `camera_pose`, `speed`, `width`, `height`, `length` | the inputs of the same names on the core `WanCameraEmbedding` node |
+| `camera_pose`, `speed`, `width`, `height`, `length` | `parametric` mode: the inputs of the same names on the core `WanCameraEmbedding` node |
+| `camera_pose`, `camera_pose_2`, `combine`, `speed`, `width`, `height`, `length` | `combined` mode: the inputs of the same names on [Montagio Camera Embedding](#montagio-camera-embedding) |
 | `prompt` | the `text` of the `CLIPTextEncode` node for the positive prompt |
 | `negative` | the `text` of the `CLIPTextEncode` node for the negative prompt |
 | `fps` | the `fps` of the `CreateVideo` node |
 
-`camera_pose` is a COMBO output, so it links straight into the `camera_pose` combo of `WanCameraEmbedding`. Connect your start image to the rest of the workflow as usual; the `image` input of the Montagio node is only there to pick the aspect.
+`camera_pose`, `camera_pose_2` and `combine` are COMBO outputs, so they link straight into the combos of the same names. Connect your start image to the rest of the workflow as usual; the `image` input of the Montagio node is only there to pick the aspect.
+
+To run every preset, those with two moves included, set `camera_mode` to `combined` and use Montagio Camera Embedding in place of `WanCameraEmbedding`: its other links (`camera_embedding` to `WanCameraImageToVideo`, and `width`, `height`, `length`) stay the same. Do not set `combined` on a graph that keeps the core `WanCameraEmbedding`: it has no second move, so it would run the first one alone, without an error. In `parametric` mode the node refuses a preset with two moves for that reason.
 
 `duration_s`, `resolution` and `info` are for your own use, for example to name the saved file or to keep the credit with the clip.
 
@@ -83,14 +90,16 @@ With `camera_pose_2` set to `Static` and `combine` set to `together`, it compute
 
 The node builds the camera path itself, and the Plücker embedding comes from ComfyUI's own `process_pose_params` (`comfy_extras/nodes_camera_trajectory.py`). It is written against ComfyUI v0.41.0. numpy, which it uses, comes with ComfyUI.
 
+The preset nodes of this pack feed it in `camera_mode` `combined` (see [Wiring](#wiring)): `camera_pose_2` and `combine` come from the preset, or are `Static` and `together` for a preset with one move.
+
 The Montagio app sends this node only for presets that combine two moves. A preset with one move uses the core node, so it runs on a ComfyUI that does not have this pack.
 
 ## App Mode
 
 App Mode needs ComfyUI frontend 1.41.13 or newer (ComfyUI v0.41.0 ships 1.55.17).
 
-1. Wire the graph as above, with the `Load Montagio Preset` node feeding the camera, the text encoders and `CreateVideo`.
-2. Open the App Builder. As app inputs, pick the `preset` widget of the Load node, plus the start image and the `prompt` widget of the Load node if you want them.
+1. Wire the graph as above, with the `Load Montagio Preset` node feeding the camera, the text encoders and `CreateVideo`. For a menu where every preset works, the five with two moves included, set `camera_mode` to `combined` and feed Montagio Camera Embedding (its `camera_pose_2` and `combine` linked too). With the core `WanCameraEmbedding` and `parametric`, a preset with two moves picked in the app stops the run with an error that says so.
+2. Open the App Builder. As app inputs, pick the `preset` widget of the Load node, plus the start image and the `prompt` widget of the Load node if you want them. Leave `camera_mode` out: it goes with the wiring.
 3. As output, pick the save node.
 
 Widgets that are fed by a link are hidden in the app panel. This is intended: the person who runs the app sees the preset menu, the image and the prompt, and nothing else.
@@ -123,13 +132,13 @@ A new file shows up in the menu when the frontend refreshes the node definitions
 The node accepts the presets the app accepts, and its values are the app's own (tests compare both with the app's code), with these exceptions:
 
 - **Model limits are not applied.** The app trims a job to what its model can render, such as the allowed fps and the maximum duration. The node does not know which model follows, so it outputs the preset's values as they are.
-- **A preset with two camera moves is refused in `parametric` mode.** `WanCameraEmbedding` takes one move, and the preset nodes have one `camera_pose` output. The error says so and suggests `camera_mode` `prompt`, or [Montagio Camera Embedding](#montagio-camera-embedding) with the second move set by hand.
-- **`prompt` mode gives a neutral camera.** For models without camera control, such as Wan 2.2 5B, `camera_pose` is `Static` and `speed` is 1.0, and the moves go into the `prompt` output as words. The node cannot see the graph, so it does not know whether `camera_pose` is linked: in this mode, do not link `camera_pose` if you want a driven camera.
+- **A preset with two camera moves is refused in `parametric` mode.** This mode feeds the core `WanCameraEmbedding`, which takes one move: the second one would be lost without a word. The error says so and suggests `camera_mode` `combined` with [Montagio Camera Embedding](#montagio-camera-embedding), or `camera_mode` `prompt`. The app has no such mode: it picks the camera node itself.
+- **`prompt` mode gives a neutral camera.** For models without camera control, such as Wan 2.2 5B, `camera_pose` is `Static`, `speed` is 1.0, `camera_pose_2` is `Static` and `combine` is `together`, and the moves go into the `prompt` output as words. The node cannot see the graph, so it does not know whether `camera_pose` is linked: in this mode, do not link `camera_pose` if you want a driven camera.
 - **Presets with LoRAs are refused**, as in the app. A clip that dropped the LoRA would not be what the preset promises.
 - **A few rare YAML spellings with tabs.** A tab works as a separator, as in the app: after a colon, before a comment, at the end of a line, inside a value, or on a blank line. A tab used as indentation is refused, as in the app. Two spellings still differ: a tab right after a tag (`!!str<TAB>text`) or inside a `%YAML` directive line is refused by the node but accepted by the app, and a quoted text that goes on over lines indented with a tab alone is accepted by the node but refused by the app. Indent with spaces and a file reads the same in both. The other rare corners are listed at the top of `montagio_nodes/preset.py`.
-- **Combined moves in the app.** For a preset with two moves, the app's compiler (`packages/presets/src/compile.ts`) turns the camera node of its workflow into Montagio Camera Embedding and fills `camera_pose_2` and `combine` (`together` by default, `then` when the preset says `combine: then`). The preset nodes of this pack have a single `camera_pose` output, so they cannot feed that node's second move yet.
+- **Combined moves in the app.** For a preset with two moves, the app's compiler (`packages/presets/src/compile.ts`) turns the camera node of its workflow into Montagio Camera Embedding and fills `camera_pose_2` and `combine` (`together` by default, `then` when the preset says `combine: then`). `combined` mode outputs the same values, for you to link into that node. For a preset with one move, the app keeps the core node and sends no second move; `combined` mode gives `Static` and `together`, the same path on Montagio Camera Embedding.
 - **Presets may say how two moves combine.** `camera.combine` is `together` (the default) or `then`. `static` can be one of two moves only with `then`: before a move it waits, after one it holds. Two opposite moves (`zoom_in` and `zoom_out`, `pan_left` and `pan_right`, `pan_up` and `pan_down`, `roll_ccw` and `roll_cw`) also need `then`: together they would cancel out to a still camera. In `prompt` mode the two moves are joined with ", then " instead of ", ".
-- **Bundled presets with two moves.** Rise & Push, Drift Left Push, Pull Back & Tilt Up, Push & Settle and Breathing combine two moves, so the preset nodes refuse them in `parametric` mode (see above): use `camera_mode` `prompt`, or Montagio Camera Embedding with the two moves set by hand. The other seven bundled presets have one move.
+- **Bundled presets with two moves.** Rise & Push, Drift Left Push, Pull Back & Tilt Up, Push & Settle and Breathing combine two moves. Run them with `camera_mode` `combined` and Montagio Camera Embedding (see [Wiring](#wiring)), or with `prompt` for a model without camera control. `parametric` mode refuses them (see above). The other seven bundled presets have one move and give the same outputs in `parametric` and `combined`.
 
 ## Development
 

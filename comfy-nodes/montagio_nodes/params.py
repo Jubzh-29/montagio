@@ -37,7 +37,9 @@ POSE_PROMPTS = {
 
 ASPECTS = ("16:9", "9:16", "1:1")
 AUTO = "auto"  # "pick the aspect from the start image"
-CAMERA_MODES = ("parametric", "prompt")
+# parametric: one move, for the core WanCameraEmbedding; prompt: the moves in words, for a model without
+# camera control; combined: up to two moves, for Montagio Camera Embedding. The first is the default.
+CAMERA_MODES = ("parametric", "prompt", "combined")
 
 # resolution -> aspect -> (width, height), as in dimensions.ts
 DIMENSIONS = {
@@ -75,6 +77,9 @@ class NodeParams:
     duration_s: int
     resolution: str
     info: str
+    # last, so that the links of a graph saved with the 11 outputs above keep their indexes
+    camera_pose_2: str
+    combine: str
 
 
 def frame_count(duration_s, fps):
@@ -124,18 +129,23 @@ def compute_params(preset, *, aspect, resolution=None, prompt="", camera_mode="p
     poses = preset["camera"]["poses"]
     one_after_the_other = preset["camera"]["combine"] == "then"
     parts = [_trim(prompt), _trim(preset["prompt"]["suffix"])]
+    # no second move: on Montagio Camera Embedding, Static together is the core node's path (as the app's
+    # compiler, which leaves both out for one move, whatever combine the preset says)
+    camera_pose_2, combine = POSE_VALUES["static"], "together"
     if camera_mode == "prompt":
         camera_pose, speed = "Static", 1.0  # the camera is only in the words of the prompt
         parts.append((", then " if one_after_the_other else ", ").join(POSE_PROMPTS[pose] for pose in poses))
     else:
         values = [POSE_VALUES[pose] for pose in poses]
         if len(values) > 1:
-            # the app sends both moves to Montagio Camera Embedding; these nodes have one camera_pose output
-            raise ParamsError(
-                f"preset {preset['id']} combines {len(values)} camera moves "
-                f"({(', then ' if one_after_the_other else ' + ').join(values)}); WanCameraEmbedding takes one move. "
-                'Use camera_mode "prompt", or the Montagio Camera Embedding node with the second move set by hand.'
-            )
+            if camera_mode == "parametric":
+                # camera_pose goes to the core WanCameraEmbedding, which would drop the second move without a word
+                raise ParamsError(
+                    f"preset {preset['id']} combines {len(values)} camera moves "
+                    f"({(', then ' if one_after_the_other else ' + ').join(values)}); WanCameraEmbedding takes one move. "
+                    'Use camera_mode "combined" with the Montagio Camera Embedding node, or camera_mode "prompt".'
+                )
+            camera_pose_2, combine = values[1], preset["camera"]["combine"]
         camera_pose, speed = values[0], float(preset["camera"]["speed"])
 
     width, height = DIMENSIONS[resolution][aspect]
@@ -151,4 +161,6 @@ def compute_params(preset, *, aspect, resolution=None, prompt="", camera_mode="p
         duration_s=defaults["duration_s"],
         resolution=resolution,
         info=f"{preset['name']} ({preset['id']}) — by {preset['author']} — {preset['license']}",
+        camera_pose_2=camera_pose_2,
+        combine=combine,
     )
