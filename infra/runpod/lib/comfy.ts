@@ -35,15 +35,46 @@ function isLink(value: unknown): value is [string, number] {
   return Array.isArray(value) && value.length === 2 && typeof value[0] === 'string' && typeof value[1] === 'number';
 }
 
-/** Options of a combo input as /object_info describes it, or null for any other input. */
+/** A V3 io.DynamicCombo: each option has a key and inputs of its own, written "<input>.<nested>" in a workflow. */
+const DYNAMIC_COMBO = 'COMFY_DYNAMICCOMBO_V3';
+type DynamicOption = { key: string | number; inputs?: { required?: InputSpecs; optional?: InputSpecs } };
+
+function dynamicOptions(spec: unknown): DynamicOption[] | null {
+  if (!Array.isArray(spec) || spec[0] !== DYNAMIC_COMBO) return null;
+  const options = (spec[1] as { options?: unknown } | undefined)?.options;
+  return Array.isArray(options) ? (options as DynamicOption[]) : null;
+}
+
+/** Options of a combo input (a dynamic combo included) as /object_info describes it, or null for any other input. */
 export function comboOptions(spec: unknown): (string | number)[] | null {
   if (!Array.isArray(spec)) return null;
   const [type, config] = spec as [unknown, unknown];
   if (Array.isArray(type)) return type as (string | number)[];
+  const dynamic = dynamicOptions(spec);
+  if (dynamic) return dynamic.map((option) => option.key);
   if (type === 'COMBO' && config && typeof config === 'object' && Array.isArray((config as { options?: unknown }).options)) {
     return (config as { options: (string | number)[] }).options;
   }
   return null;
+}
+
+/**
+ * The spec of an input, "format.codec" included: the part after a dot is an
+ * input of the option the dynamic combo before it has selected in this node.
+ * undefined: no such input; null: the dynamic combo holds no valid option, which
+ * its own check reports.
+ */
+function specFor(declared: InputSpecs, inputs: Record<string, unknown>, field: string): unknown {
+  const parts = field.split('.');
+  let specs: InputSpecs = declared;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const options = dynamicOptions(specs[parts[i]!]);
+    if (!options) return undefined;
+    const selected = options.find((option) => option.key === inputs[parts.slice(0, i + 1).join('.')]);
+    if (!selected) return null;
+    specs = { ...selected.inputs?.optional, ...selected.inputs?.required };
+  }
+  return specs[parts.at(-1)!];
 }
 
 /**
@@ -69,7 +100,9 @@ export function checkWorkflow(workflow: ApiWorkflow, info: ObjectInfo, opts: { s
       if (!(field in node.inputs)) problems.push(`node ${id} (${node.class_type}): missing required input "${field}"`);
     }
     for (const [field, value] of Object.entries(node.inputs)) {
-      if (!(field in declared)) {
+      const fieldSpec = specFor(declared, node.inputs, field);
+      if (fieldSpec === null) continue;
+      if (fieldSpec === undefined) {
         problems.push(`node ${id} (${node.class_type}): unknown input "${field}"`);
         continue;
       }
@@ -82,7 +115,7 @@ export function checkWorkflow(workflow: ApiWorkflow, info: ObjectInfo, opts: { s
         } else if (outputs && index >= outputs.length) {
           problems.push(`node ${id} (${node.class_type}).${field} links to output ${index} of node ${from} (${source.class_type}), which has ${outputs.length} output(s)`);
         } else if (outputs) {
-          const expected = inputType(declared[field]);
+          const expected = inputType(fieldSpec);
           if (expected && !typesMatch(expected, outputs[index]!)) {
             problems.push(`node ${id} (${node.class_type}).${field} expects ${expected}, output ${index} of node ${from} is ${outputs[index]}`);
           }
@@ -90,7 +123,7 @@ export function checkWorkflow(workflow: ApiWorkflow, info: ObjectInfo, opts: { s
         continue;
       }
       if (Array.isArray(value) || skip.has(`${id}.${field}`)) continue;
-      const options = comboOptions(spec.input?.required?.[field] ?? spec.input?.optional?.[field]);
+      const options = comboOptions(fieldSpec);
       if (options && (typeof value === 'string' || typeof value === 'number') && !options.includes(value)) {
         const shown = options.slice(0, 12).join(', ') + (options.length > 12 ? `, … (${options.length} values)` : '');
         problems.push(`node ${id} (${node.class_type}).${field} = ${JSON.stringify(value)} is not one of: ${shown || '(none)'}`);

@@ -173,6 +173,67 @@ describe('checkWorkflow: input names, required inputs and links', () => {
   });
 });
 
+describe('checkWorkflow: dynamic combos (SaveVideo format and codec)', () => {
+  // the shape ComfyUI v0.41.0 gives in /object_info for io.DynamicCombo inputs
+  const codec = (keys: string[]) => ['COMFY_DYNAMICCOMBO_V3', { options: keys.map((key) => ({ key, inputs: { required: {} } })) }];
+  const info = {
+    LoadImage: { input: { required: { image: [['start.png'], {}] } }, output: ['IMAGE', 'MASK'] },
+    CreateVideo: { input: { required: { images: ['IMAGE', {}], fps: ['FLOAT', {}] } }, output: ['VIDEO'] },
+    SaveVideo: {
+      input: {
+        required: {
+          video: ['VIDEO', {}],
+          filename_prefix: ['STRING', {}],
+          format: [
+            'COMFY_DYNAMICCOMBO_V3',
+            {
+              options: [
+                { key: 'auto', inputs: { required: { codec: codec(['auto', 'h264', 'av1']) } } },
+                { key: 'mp4', inputs: { required: { codec: codec(['auto', 'h264', 'av1']) } } },
+                { key: 'webm', inputs: { required: { codec: codec(['auto', 'av1']) } } },
+              ],
+            },
+          ],
+        },
+        optional: { codec: codec(['auto', 'h264', 'av1']) },
+      },
+      output: ['VIDEO'],
+    },
+  };
+  const workflow = (save: Record<string, unknown>) => ({
+    '1': { class_type: 'LoadImage', inputs: { image: 'start.png' } },
+    '2': { class_type: 'CreateVideo', inputs: { images: ['1', 0], fps: 16 } },
+    '3': { class_type: 'SaveVideo', inputs: { video: ['2', 0], filename_prefix: 'montagio/clip', ...save } },
+  });
+
+  test('reads the options of a dynamic combo', () => {
+    expect(comboOptions(info.SaveVideo.input.required.format)).toEqual(['auto', 'mp4', 'webm']);
+  });
+
+  test('a dynamic combo and the input nested under its option are accepted', () => {
+    expect(checkWorkflow(workflow({ format: 'mp4', 'format.codec': 'h264' }), info)).toEqual([]);
+    expect(checkWorkflow(workflow({ format: 'mp4', codec: 'h264' }), info)).toEqual([]);
+  });
+
+  test('an option a dynamic combo does not have is reported', () => {
+    expect(checkWorkflow(workflow({ format: 'mov', 'format.codec': 'h264' }), info)).toEqual([
+      'node 3 (SaveVideo).format = "mov" is not one of: auto, mp4, webm',
+    ]);
+  });
+
+  test('a nested value the selected option does not offer is reported', () => {
+    expect(checkWorkflow(workflow({ format: 'webm', 'format.codec': 'h264' }), info)).toEqual([
+      'node 3 (SaveVideo).format.codec = "h264" is not one of: auto, av1',
+    ]);
+  });
+
+  test('a nested input the selected option does not declare is unknown', () => {
+    expect(checkWorkflow(workflow({ format: 'mp4', 'format.colour': 'red' }), info)).toEqual([
+      'node 3 (SaveVideo): unknown input "format.colour"',
+    ]);
+  });
+});
+
 test('parseNvidiaSmiLine reads used and total MiB', () => {
   expect(parseNvidiaSmiLine('20480, 24564')).toEqual({ usedMiB: 20480, totalMiB: 24564 });
   expect(parseNvidiaSmiLine('garbage')).toBeNull();
