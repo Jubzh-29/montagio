@@ -40,8 +40,9 @@ export function parseNvidiaSmiCsv(text: string): Gpu[] {
   return gpus;
 }
 
+/** "CUDA Version: 13.0" (R5xx drivers) or "CUDA UMD Version: 13.4" (R6xx). */
 export function parseCudaBanner(text: string): [number, number] | null {
-  const match = /CUDA Version:\s*(\d+)\.(\d+)/.exec(text);
+  const match = /CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)/.exec(text);
   return match ? [Number(match[1]), Number(match[2])] : null;
 }
 

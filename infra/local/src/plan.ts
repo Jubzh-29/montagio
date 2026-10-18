@@ -114,7 +114,7 @@ export function buildPlan(input: PlanInput): Step[] {
     id: 'npm-ci',
     title: "install the app's npm dependencies",
     run: npmStale,
-    why: !input.repo.nodeModules ? 'node_modules is missing' : npmStale ? 'package-lock.json changed' : 'up to date',
+    why: !input.repo.nodeModules ? 'node_modules is missing' : !state.stamps.npm ? 'first install' : npmStale ? 'package-lock.json changed' : 'up to date',
     detail: [`npm ci --no-audit --no-fund (in ${input.repoRoot})`],
   });
 
@@ -214,7 +214,7 @@ export function buildPlan(input: PlanInput): Step[] {
     id: 'app-build',
     title: 'build the app (next build)',
     run: buildStale,
-    why: build === null ? 'not a git checkout: always rebuilt' : buildStale ? 'the code or its dependencies changed' : 'up to date',
+    why: build === null ? 'not a git checkout: always rebuilt' : !state.stamps.build ? 'not built yet' : buildStale ? 'the code or its dependencies changed' : 'up to date',
     detail: [`next build (in ${path.join(input.repoRoot, 'apps', 'web')})`],
   });
 

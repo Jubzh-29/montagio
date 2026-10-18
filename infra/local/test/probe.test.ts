@@ -18,6 +18,10 @@ test('parseCudaBanner reads the highest CUDA version the driver supports', () =>
   expect(parseCudaBanner('NVIDIA-SMI has failed')).toBeNull();
 });
 
+test('parseCudaBanner reads the R6xx banner, which says "CUDA UMD Version"', () => {
+  expect(parseCudaBanner('| NVIDIA-SMI 616.92                 KMD Version: 616.92        CUDA UMD Version: 13.4     |')).toEqual([13, 4]);
+});
+
 test('parsePythonVersion reads a version and refuses the Microsoft Store stub', () => {
   expect(parsePythonVersion('Python 3.12.10\n')).toEqual([3, 12, 10]);
   expect(parsePythonVersion('Python was not found; run without arguments to install from the Microsoft Store, or disable this shortcut')).toBeNull();

@@ -71,6 +71,12 @@ test('a fresh machine runs every install step, in order', () => {
   expect(running(steps)).toEqual(['npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights', 'open-stack', 'app-build', 'save-state', 'start']);
 });
 
+test('a first install says so, not that something changed', () => {
+  const steps = buildPlan(fresh({ repo: { head: 'abc123', lockHash: 'h1', nodeModules: true } }));
+  expect(step(steps, 'npm-ci').why).toBe('first install');
+  expect(step(steps, 'app-build').why).toBe('not built yet');
+});
+
 test('a fully installed machine skips every install step', () => {
   expect(running(buildPlan(installed()))).toEqual(['open-stack', 'save-state', 'start']);
   expect(running(buildPlan(installed({ start: false })))).toEqual(['open-stack', 'save-state']);
