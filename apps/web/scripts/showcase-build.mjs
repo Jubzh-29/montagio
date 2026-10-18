@@ -1,0 +1,83 @@
+// Build the static showcase (the free demo link) into apps/web/out:
+//
+//   node scripts/showcase-build.mjs [--release] [--base-path /montagio]
+//
+// 1. check-open-stack writes the report the Open Stack page reads;
+// 2. `showcase prepare` writes public/showcase (clips, placeholders, 9:16 cuts,
+//    workflows, data.json) — strict in a release;
+// 3. ffmpeg.wasm is copied to public/ffmpeg (served from the showcase's own origin);
+// 4. `next build` exports the pages (MONTAGIO_SHOWCASE_EXPORT=1);
+// 5. the Hugging Face Space card is copied to out/README.md.
+//
+// A release needs MONTAGIO_REPO_URL, the public repository (source link, AGPL-3.0 §13).
+import { execFileSync } from 'node:child_process';
+import { copyFileSync, cpSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+
+const web = fileURLToPath(new URL('..', import.meta.url));
+const root = join(web, '..', '..');
+const require = createRequire(import.meta.url);
+
+const { values } = parseArgs({ options: { release: { type: 'boolean', default: false }, 'base-path': { type: 'string' } } });
+const basePath = values['base-path'] ?? '';
+if (basePath && !/^\/[A-Za-z0-9._~-]+(\/[A-Za-z0-9._~-]+)*$/.test(basePath)) {
+  console.error(`--base-path must look like /montagio (a leading slash, no trailing slash), got "${basePath}"`);
+  process.exit(2);
+}
+const repoUrl = process.env.MONTAGIO_REPO_URL?.trim() ?? '';
+if (values.release && !repoUrl) {
+  console.error('a release build needs MONTAGIO_REPO_URL, the public repository URL (the showcase links to its source code)');
+  process.exit(2);
+}
+
+const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const run = (command, args, opts = {}) => {
+  console.log(`\n> ${command} ${args.join(' ')}`);
+  execFileSync(command, args, { stdio: 'inherit', shell: process.platform === 'win32', ...opts });
+};
+
+run(npm, ['run', 'check:open-stack'], { cwd: root });
+run(npm, ['run', 'showcase', '--', 'prepare', ...(values.release ? ['--strict'] : []), ...(repoUrl ? ['--repo-url', repoUrl] : [])], { cwd: root });
+
+// ffmpeg.wasm never goes through the bundler (Turbopack cannot resolve its worker URL):
+// the page imports these files at run time from /ffmpeg/.
+const ffmpegOut = join(web, 'public', 'ffmpeg');
+rmSync(ffmpegOut, { recursive: true, force: true });
+mkdirSync(ffmpegOut, { recursive: true });
+const ffmpegPkg = dirname(require.resolve('@ffmpeg/ffmpeg/package.json'));
+const corePkg = dirname(require.resolve('@ffmpeg/core/package.json'));
+cpSync(join(ffmpegPkg, 'dist', 'esm'), join(ffmpegOut, 'esm'), { recursive: true, filter: (path) => !path.endsWith('.d.ts') && !path.endsWith('.d.mts') });
+for (const file of ['ffmpeg-core.js', 'ffmpeg-core.wasm']) copyFileSync(join(corePkg, 'dist', 'esm', file), join(ffmpegOut, file));
+writeFileSync(
+  join(ffmpegOut, 'LICENSES.txt'),
+  [
+    'ffmpeg.wasm, served unmodified from the npm packages below.',
+    '@ffmpeg/ffmpeg 0.12.15 (esm/): MIT, https://github.com/ffmpegwasm/ffmpeg.wasm',
+    '@ffmpeg/core 0.12.10 (ffmpeg-core.js, ffmpeg-core.wasm): GPL-2.0-or-later, FFmpeg and libx264 compiled to WebAssembly;',
+    'source: https://github.com/ffmpegwasm/ffmpeg.wasm (tag v0.12.10) and https://ffmpeg.org',
+    '',
+  ].join('\n'),
+);
+
+rmSync(join(web, 'out'), { recursive: true, force: true });
+run(npx, ['next', 'build'], {
+  cwd: web,
+  env: {
+    ...process.env,
+    MONTAGIO_SHOWCASE_EXPORT: '1',
+    NEXT_PUBLIC_MONTAGIO_MODE: 'showcase',
+    NEXT_PUBLIC_MONTAGIO_BASE_PATH: basePath,
+    NEXT_TELEMETRY_DISABLED: '1',
+  },
+});
+
+copyFileSync(join(web, 'showcase-space', 'README.md'), join(web, 'out', 'README.md'));
+// GitHub Pages runs Jekyll unless told not to, and Jekyll drops the _next/ folder.
+if (basePath) writeFileSync(join(web, 'out', '.nojekyll'), '');
+
+const size = (path) => (statSync(path).isDirectory() ? readdirSync(path).reduce((sum, name) => sum + size(join(path, name)), 0) : statSync(path).size);
+console.log(`\nshowcase: apps/web/out is ready (${(size(join(web, 'out')) / 1024 / 1024).toFixed(1)} MB)${basePath ? ` for ${basePath}/` : ''}`);

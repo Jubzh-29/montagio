@@ -206,6 +206,22 @@ export async function normalizeClip(
   ]);
 }
 
+/**
+ * A light copy of a clip for a looping gallery tile: `width` pixels wide and a
+ * high CRF, so a dozen tiles cost the visitor a megabyte or two, not twenty.
+ */
+export async function previewClip(input: string, out: string, opts: { width: number; tags: VideoTags }): Promise<void> {
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    '-i', input,
+    '-map', '0:v:0',
+    '-vf', `scale=${opts.width}:-2,setsar=1,format=yuv420p`,
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart',
+    ...metadataArgs(opts.tags),
+    '-f', 'mp4', partial,
+  ]);
+}
+
 /** zoompan expressions (z, x, y) in terms of `on`, the output frame number. */
 export type ZoompanExpr = { z: string; x: string; y: string };
 

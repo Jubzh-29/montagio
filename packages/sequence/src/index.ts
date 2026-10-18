@@ -8,6 +8,7 @@ export {
   extractLastFrame,
   normalizeClip,
   placeholderClip,
+  previewClip,
   probe,
   readTags,
   SequenceToolError,

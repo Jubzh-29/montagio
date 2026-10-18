@@ -4,12 +4,14 @@
  *
  *   npm run showcase -- verify [--strict]
  *   npm run showcase -- ingest <smoke results folder> --sample <id> [--pick <preset>=<run> ...]
+ *   npm run showcase -- prepare [--strict] [--out <dir>] [--repo-url <url>]
  *
  * Exit code: 0 when everything is fine, 1 on an error, 2 on a usage error.
  */
 import { isAbsolute, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { IngestError, ingestSmoke } from './ingest';
+import { PrepareError, prepareShowcase } from './prepare';
 import { verifyShowcase } from './verify';
 
 export type CliIo = { root: string; cwd?: string; out(line: string): void; err(line: string): void };
@@ -18,6 +20,7 @@ const USAGE = [
   'Usage:',
   '  showcase verify [--strict]',
   '  showcase ingest <smoke results folder> --sample <id> [--pick <preset>=<run> ...]',
+  '  showcase prepare [--strict] [--out <dir>] [--repo-url <url>]',
 ].join('\n');
 
 const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -27,8 +30,9 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   try {
     if (command === 'verify') return await verify(rest, io);
     if (command === 'ingest') return await ingest(rest, io);
+    if (command === 'prepare') return await prepare(rest, io);
   } catch (error) {
-    if (error instanceof IngestError) {
+    if (error instanceof IngestError || error instanceof PrepareError) {
       for (const problem of error.problems) io.err(`error: ${problem}`);
       return 1;
     }
@@ -79,5 +83,22 @@ async function ingest(args: string[], io: CliIo): Promise<number> {
   for (const file of result.added) io.out(`added: ${file}`);
   for (const file of result.replaced) io.out(`replaced: ${file}`);
   io.out(`showcase: ${count(result.added.length + result.replaced.length, 'clip')} ingested for ${values.sample}; run "showcase verify" next`);
+  return 0;
+}
+
+async function prepare(args: string[], io: CliIo): Promise<number> {
+  const { values } = parseArgs({
+    args,
+    options: { strict: { type: 'boolean', default: false }, out: { type: 'string' }, 'repo-url': { type: 'string' } },
+  });
+  const outDir = values.out ? (isAbsolute(values.out) ? values.out : resolve(io.cwd ?? process.cwd(), values.out)) : undefined;
+  const started = Date.now();
+  const data = await prepareShowcase(io.root, { outDir, strict: values.strict, repoUrl: values['repo-url'] || null });
+  const placeholders = data.clips.filter((clip) => clip.placeholder).length;
+  io.out(
+    `showcase: ${count(data.clips.length, 'clip')} (${data.clips.length - placeholders} rendered, ${count(placeholders, 'placeholder')}), ` +
+      `${count(data.samples.length, 'sample')}, prepared in ${Math.round((Date.now() - started) / 1000)} s`,
+  );
+  if (!data.repoUrl) io.out('showcase: no --repo-url: the page shows "source link added at release"');
   return 0;
 }

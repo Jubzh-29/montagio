@@ -12,6 +12,7 @@ import {
   normalizeClip,
   placeholderClip,
   PLACEHOLDER_METADATA,
+  previewClip,
   probe,
   readTags,
   SequenceToolError,
@@ -179,4 +180,13 @@ test('decodeCheck rejects a truncated clip', async () => {
 
 test('probe names the codec and the pixel format', async () => {
   expect(await probe(clipA)).toMatchObject({ codec: 'h264', pixFmt: 'yuv420p' });
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('previewClip writes a small looping copy at the asked width with the tags', async () => {
+  const out = join(dir, 'preview.mp4');
+  await previewClip(clipA, out, { width: 320, tags: PLACEHOLDER_METADATA });
+  const p = await probe(out);
+  expect(p).toMatchObject({ width: 320, height: 184, codec: 'h264', pixFmt: 'yuv420p' });
+  expect(p.duration_s).toBeCloseTo(2, 1);
+  expect(await readTags(out)).toMatchObject(PLACEHOLDER_METADATA);
 }, FFMPEG_TEST_TIMEOUT_MS);

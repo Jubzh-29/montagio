@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@montagio/check-open-stack": "*",
     "@montagio/presets": "*",
     "@montagio/registry": "*",
     "@montagio/sequence": "*",
