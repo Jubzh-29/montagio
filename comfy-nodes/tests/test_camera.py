@@ -258,6 +258,30 @@ def test_a_length_that_is_not_4n_plus_1_is_refused_before_any_work(fake_core):
 
 
 
+OBJECT_INFO = PACK_DIR.parent / "infra" / "runpod" / "test" / "fixtures" / "object_info-v0.41.0.json"
+
+
+def test_the_object_info_fixture_of_the_app_describes_this_node():
+    # the app checks its compiled workflows against that fixture (infra/runpod/test/workflows.test.ts):
+    # change the node, then take the fixture again from a ComfyUI that loads the pack
+    if not OBJECT_INFO.exists():
+        pytest.skip("the object_info fixture is part of the monorepo")
+    fixture = json.loads(OBJECT_INFO.read_text(encoding="utf-8"))["MontagioCameraEmbedding"]
+    schema = MontagioCameraEmbedding.GET_SCHEMA()
+    split = {"required": [i.id for i in schema.inputs if not i.optional], "optional": [i.id for i in schema.inputs if i.optional]}
+    assert fixture["input_order"] == split
+    for item in schema.inputs:
+        spec = fixture["input"]["optional" if item.optional else "required"][item.id]
+        assert spec[0] == item.io_type, item.id
+        assert spec[1].get("default") == item.default, item.id
+        if item.io_type == "COMBO":
+            assert spec[1]["options"] == item.options, item.id
+        else:
+            assert (spec[1].get("min"), spec[1].get("max"), spec[1].get("step")) == (item.min, item.max, item.step), item.id
+    assert fixture["output"] == [o.io_type for o in schema.outputs]
+    assert fixture["output_name"] == [o.display_name for o in schema.outputs]
+
+
 # --- against the real core node, in a ComfyUI install ------------------------------------------
 
 COMFYUI_DIR = os.environ.get("MONTAGIO_COMFYUI_DIR")
