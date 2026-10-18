@@ -40,3 +40,4 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: apps/web
       - run: npm run e2e -w @montagio/web
+      - run: npm run e2e:local -w @montagio/web

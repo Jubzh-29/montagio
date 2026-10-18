@@ -30,6 +30,7 @@ export type GenerationRecord = {
   progress: number;
   outputUrl?: string;
   error?: string;
+  remix?: boolean;
 };
 
 export type OpenStackReport = {

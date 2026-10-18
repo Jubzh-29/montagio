@@ -1,1 +1,11 @@
-export { concatClips, ensureTools, exportVertical, extractLastFrame, probe, SequenceToolError } from './ffmpeg';
+export {
+  AI_METADATA,
+  concatClips,
+  ensureTools,
+  exportVertical,
+  extractLastFrame,
+  probe,
+  readTags,
+  SequenceToolError,
+  tagClip,
+} from './ffmpeg';

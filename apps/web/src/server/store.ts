@@ -19,6 +19,8 @@ export type GenerationRecord = {
   backendJobId: string;
   outputUrl?: string;
   error?: string;
+  /** Rendered from a preset edited in the remix editor (its text is in preset.yaml). */
+  remix?: true;
   idempotencyKey: string;
   createdAt: string;
   updatedAt: string;
@@ -64,6 +66,23 @@ export async function saveWorkflow(id: string, workflow: ApiWorkflow): Promise<v
   const dir = join(generationsDir(), id);
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, 'workflow.api.json'), JSON.stringify(workflow, null, 2));
+}
+
+/** The remixed preset exactly as the user sent it, next to the workflow it compiled to. */
+export async function savePresetText(id: string, text: string): Promise<void> {
+  const dir = join(generationsDir(), id);
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, 'preset.yaml'), text);
+}
+
+/** The text savePresetText kept, or null: a library generation has none of its own. */
+export async function readPresetText(id: string): Promise<string | null> {
+  if (!SAFE_ID.test(id)) return null;
+  try {
+    return await readFile(join(generationsDir(), id, 'preset.yaml'), 'utf8');
+  } catch {
+    return null;
+  }
 }
 
 export async function readWorkflow(id: string): Promise<ApiWorkflow | null> {

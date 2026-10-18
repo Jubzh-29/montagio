@@ -6,12 +6,16 @@ const PORT = 3100;
 
 // Every run starts with a cold Turbopack dev cache, as in CI: a cache warmed on
 // another commit makes pages reload in a loop after a branch switch or merge.
-const RESET_DEV_CACHE = `node -e "require('node:fs').rmSync('.next/dev/cache/turbopack', { recursive: true, force: true, maxRetries: 5 })"`;
+export const RESET_DEV_CACHE = `node -e "require('node:fs').rmSync('.next/dev/cache/turbopack', { recursive: true, force: true, maxRetries: 5 })"`;
 
 export default defineConfig({
   testDir: './e2e',
+  // Compiles every route once the server is up, so no test pays a cold compile.
+  globalSetup: './e2e/warm-up.ts',
   timeout: 60_000,
   fullyParallel: false,
+  // One worker: parallel spec files starved each other of CPU on a loaded dev machine (5 s waits missed), and it keeps the PC cooler.
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   use: { baseURL: `http://localhost:${PORT}`, trace: 'retain-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],

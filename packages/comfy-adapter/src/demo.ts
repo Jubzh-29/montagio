@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ApiWorkflow } from '@montagio/presets';
-import type { BackendJob, GenerationBackend } from './backend';
+import { IDEMPOTENCY_WINDOW_MS, type BackendJob, type GenerationBackend, type SubmitJob } from './backend';
 
 type DemoJob = { presetId: string; startedAt: number; canceledAt?: number };
 
@@ -14,17 +13,27 @@ type DemoJob = { presetId: string; startedAt: number; canceledAt?: number };
 export class DemoBackend implements GenerationBackend {
   readonly kind = 'demo' as const;
   private readonly jobs = new Map<string, DemoJob>();
+  /** Job started by each idempotency key, kept for the idempotency window and no longer. */
+  private readonly submissions = new Map<string, { at: number; backendJobId: string }>();
   private readonly now: () => number;
 
   constructor(private readonly opts: { clipsDir: string; durationMs: number; now?: () => number }) {
     this.now = opts.now ?? Date.now;
   }
 
-  async submit(job: { workflow: ApiWorkflow; presetId: string; idempotencyKey: string }): Promise<{ backendJobId: string }> {
-    const backendJobId = `demo-${createHash('sha256').update(job.idempotencyKey).digest('hex').slice(0, 12)}`;
-    if (!this.jobs.has(backendJobId)) {
-      this.jobs.set(backendJobId, { presetId: job.presetId, startedAt: this.now() });
+  /** `files` is ignored: the demo renders nothing. */
+  async submit(job: SubmitJob): Promise<{ backendJobId: string }> {
+    const now = this.now();
+    // Past the window the web layer treats a reused key as a new request: so does the backend.
+    for (const [key, entry] of this.submissions) {
+      if (now - entry.at >= IDEMPOTENCY_WINDOW_MS) this.submissions.delete(key);
     }
+    const known = this.submissions.get(job.idempotencyKey);
+    if (known) return { backendJobId: known.backendJobId };
+    // The start time is part of the id: a key reused after the window does not reopen its old job.
+    const backendJobId = `demo-${createHash('sha256').update(`${job.idempotencyKey}@${now}`).digest('hex').slice(0, 12)}`;
+    this.jobs.set(backendJobId, { presetId: job.presetId, startedAt: now });
+    this.submissions.set(job.idempotencyKey, { at: now, backendJobId });
     return { backendJobId };
   }
 
