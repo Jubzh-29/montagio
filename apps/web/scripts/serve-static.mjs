@@ -3,12 +3,13 @@
 // folder, byte ranges (video seeking needs them), the export's 404.html, and an
 // optional path prefix (a GitHub Pages project site lives under /<repo>/).
 //
-//   node scripts/serve-static.mjs <dir> <port> [--prefix /montagio]
+//   node scripts/serve-static.mjs <dir> <port> [--prefix montagio]
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { normalizeBasePath } from './build-options.mjs';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -100,11 +101,12 @@ export function createStaticServer(dir, { prefix = '' } = {}) {
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const [dir, port, ...rest] = process.argv.slice(2);
   if (!dir || !port) {
-    console.error('usage: node scripts/serve-static.mjs <dir> <port> [--prefix /x]');
+    console.error('usage: node scripts/serve-static.mjs <dir> <port> [--prefix montagio]');
     process.exit(2);
   }
   const at = rest.indexOf('--prefix');
-  const prefix = at === -1 ? '' : (rest[at + 1] ?? '').replace(/\/+$/, '');
+  // "montagio" or "/montagio" (Git Bash rewrites an argument that starts with "/").
+  const prefix = normalizeBasePath(at === -1 ? '' : rest[at + 1]);
   createStaticServer(dir, { prefix }).listen(Number(port), () => {
     console.log(`serving ${resolve(dir)} on http://localhost:${port}${prefix}/`);
   });

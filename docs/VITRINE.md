@@ -128,10 +128,10 @@ Si le Space est indisponible, le même dossier peut être servi par GitHub Pages
 1. Construire avec le préfixe :
 
    ```bash
-   MONTAGIO_REPO_URL=https://github.com/<compte>/montagio npm run showcase:build -w @montagio/web -- --release --base-path /montagio
+   MONTAGIO_REPO_URL=https://github.com/<compte>/montagio npm run showcase:build -w @montagio/web -- --release --base-path montagio
    ```
 
-   Le script écrit aussi `out/.nojekyll`. Sans ce fichier, GitHub Pages ignore le dossier `_next/`.
+   Le préfixe s'écrit sans barre initiale (`montagio`) : sous Git Bash, `/montagio` serait converti en chemin Windows. Le script écrit aussi `out/.nojekyll`. Sans ce fichier, GitHub Pages ignore le dossier `_next/`.
 2. Publier le contenu de `apps/web/out/` sur la branche `gh-pages` du dépôt (ou par l'action « Deploy to GitHub Pages »), puis activer Pages dans les réglages du dépôt. Comme sur Hugging Face, c'est vous qui publiez.
 3. Refaire les vérifications de la partie 4 sur `https://<compte>.github.io/montagio/`.
 

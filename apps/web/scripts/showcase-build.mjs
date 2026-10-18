@@ -1,6 +1,6 @@
 // Build the static showcase (the free demo link) into apps/web/out:
 //
-//   node scripts/showcase-build.mjs [--release] [--base-path /montagio]
+//   node scripts/showcase-build.mjs [--release] [--base-path montagio]
 //
 // 1. check-open-stack writes the report the Open Stack page reads;
 // 2. `showcase prepare` writes public/showcase (clips, placeholders, 9:16 cuts,
@@ -16,6 +16,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { normalizeBasePath } from './build-options.mjs';
 import { flattenSegmentPrefetches } from './export-fixes.mjs';
 
 const web = fileURLToPath(new URL('..', import.meta.url));
@@ -23,9 +24,11 @@ const root = join(web, '..', '..');
 const require = createRequire(import.meta.url);
 
 const { values } = parseArgs({ options: { release: { type: 'boolean', default: false }, 'base-path': { type: 'string' } } });
-const basePath = values['base-path'] ?? '';
-if (basePath && !/^\/[A-Za-z0-9._~-]+(\/[A-Za-z0-9._~-]+)*$/.test(basePath)) {
-  console.error(`--base-path must look like /montagio (a leading slash, no trailing slash), got "${basePath}"`);
+let basePath;
+try {
+  basePath = normalizeBasePath(values['base-path']);
+} catch (error) {
+  console.error(error.message);
   process.exit(2);
 }
 const repoUrl = process.env.MONTAGIO_REPO_URL?.trim() ?? '';
