@@ -139,6 +139,7 @@ export async function ingestSmoke(
       sample: sample.id,
       seed: record.seed,
       sha256: await sha256File(out),
+      image_sha256: sampleSha,
       workflow_sha256: workflowSha256(showcaseWorkflow(library, manifest, preset, sample, record.seed)),
       rendered_at: record.at.slice(0, 10),
     });

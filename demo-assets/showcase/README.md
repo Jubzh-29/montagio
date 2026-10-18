@@ -28,5 +28,6 @@ ffmpeg -f lavfi -i "mandelbrot=size=960x1664:start_x=-1.25066:start_y=0.02012:st
 
 1. Generate the three photos with Z-Image-Turbo (Apache-2.0; SFW, no real person), save them under the same names (or new ids), and update `title`, `credit` (model, seed, prompt) and `status: final`.
 2. For each photo: `npm run smoke -w @montagio/infra-runpod -- --preset all --image demo-assets/showcase/samples/<id>.jpg --out s3-results/<id>`.
-3. `npm run showcase -- ingest s3-results/<id> --sample <id>` (add `--pick <preset>=<run>` when a preset was rendered more than once).
-4. `npm run showcase -- verify --strict`, then rebuild the showcase.
+3. On the pod, archive `s3-results/` and the photos; download the archive and check that it opens before stopping the pod (`s3-results/` is git-ignored).
+4. On the PC, same commit: `npm run showcase -- ingest s3-results/<id> --sample <id>` (add `--pick <preset>=<run>` when a preset was rendered more than once).
+5. `npm run showcase -- verify --strict`, then rebuild the showcase.

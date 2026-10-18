@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { normalizeBasePath } from './build-options.mjs';
 import { flattenSegmentPrefetches } from './export-fixes.mjs';
+import { ffmpegLicenses } from './ffmpeg-licenses.mjs';
 
 const web = fileURLToPath(new URL('..', import.meta.url));
 const root = join(web, '..', '..');
@@ -64,16 +65,7 @@ const ffmpegPkg = packageDir('@ffmpeg/ffmpeg');
 const corePkg = packageDir('@ffmpeg/core');
 cpSync(join(ffmpegPkg, 'dist', 'esm'), join(ffmpegOut, 'esm'), { recursive: true, filter: (path) => !path.endsWith('.d.ts') && !path.endsWith('.d.mts') });
 for (const file of ['ffmpeg-core.js', 'ffmpeg-core.wasm']) copyFileSync(join(corePkg, 'dist', 'esm', file), join(ffmpegOut, file));
-writeFileSync(
-  join(ffmpegOut, 'LICENSES.txt'),
-  [
-    'ffmpeg.wasm, served unmodified from the npm packages below.',
-    '@ffmpeg/ffmpeg 0.12.15 (esm/): MIT, https://github.com/ffmpegwasm/ffmpeg.wasm',
-    '@ffmpeg/core 0.12.10 (ffmpeg-core.js, ffmpeg-core.wasm): GPL-2.0-or-later, FFmpeg and libx264 compiled to WebAssembly;',
-    'source: https://github.com/ffmpegwasm/ffmpeg.wasm (tag v0.12.10) and https://ffmpeg.org',
-    '',
-  ].join('\n'),
-);
+writeFileSync(join(ffmpegOut, 'LICENSES.txt'), ffmpegLicenses(readFileSync(join(root, 'comfy-nodes', 'LICENSE'), 'utf8')));
 
 rmSync(join(web, 'out'), { recursive: true, force: true });
 run(npx, ['next', 'build'], {

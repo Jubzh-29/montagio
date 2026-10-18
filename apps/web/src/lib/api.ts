@@ -10,3 +10,9 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   if (!IS_SHOWCASE) return fetch(path, init);
   return import('@/showcase/client').then(({ showcaseFetch }) => showcaseFetch(path, init));
 }
+
+/** The JSON of a successful answer; an error answer (4xx, 5xx) throws instead of passing its body off as data. */
+export async function jsonOrThrow<T>(res: Response): Promise<T> {
+  if (!res.ok) throw new Error(`${res.url || 'request'}: HTTP ${res.status}`);
+  return (await res.json()) as T;
+}

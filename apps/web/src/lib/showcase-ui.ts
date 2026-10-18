@@ -10,3 +10,8 @@ export function primaryLabelKey(mode: 'single' | 'sequence', remix: boolean, sho
   if (showcase) return mode === 'single' ? 'showcaseShowClip' : 'showcaseAssembleFilm';
   return mode === 'single' ? 'generate' : 'generateFilm';
 }
+
+/** The showcase's note under the sample photos: one more sentence while some clips are placeholders. */
+export function showcaseNoteKeys(placeholders: boolean): MessageKey[] {
+  return placeholders ? ['showcaseNote', 'showcasePlaceholderNote'] : ['showcaseNote'];
+}

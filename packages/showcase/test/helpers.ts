@@ -75,7 +75,7 @@ export async function addRenderedClip(
   const text = readFileSync(manifestPath, 'utf8').replace('clips: []\n', 'clips:\n');
   writeFileSync(
     manifestPath,
-    `${text}  - { preset: ${preset}, sample: landscape-a, seed: ${seed}, sha256: ${sha256Of(file)}, workflow_sha256: ${workflowSha256(workflow)}, rendered_at: 2026-10-24 }\n`,
+    `${text}  - { preset: ${preset}, sample: landscape-a, seed: ${seed}, sha256: ${sha256Of(file)}, image_sha256: ${sha256Of(showcasePath(root, 'samples', 'landscape-a.jpg'))}, workflow_sha256: ${workflowSha256(workflow)}, rendered_at: 2026-10-24 }\n`,
   );
   return file;
 }

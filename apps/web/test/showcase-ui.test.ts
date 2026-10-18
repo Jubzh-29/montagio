@@ -1,4 +1,4 @@
-import { primaryLabelKey } from '@/lib/showcase-ui';
+import { primaryLabelKey, showcaseNoteKeys } from '@/lib/showcase-ui';
 
 test('the primary label is Show clip in the showcase, Generate film in a local sequence', () => {
   expect(primaryLabelKey('single', false, true)).toBe('showcaseShowClip');
@@ -10,4 +10,9 @@ test('the primary label is Show clip in the showcase, Generate film in a local s
 
 test('the showcase has no primary button for a remix: it explains instead', () => {
   expect(primaryLabelKey('single', true, true)).toBeNull();
+});
+
+test('the showcase note says so when some clips are still placeholders', () => {
+  expect(showcaseNoteKeys(false)).toEqual(['showcaseNote']);
+  expect(showcaseNoteKeys(true)).toEqual(['showcaseNote', 'showcasePlaceholderNote']);
 });

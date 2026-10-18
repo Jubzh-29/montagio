@@ -1,4 +1,5 @@
-import { appendFileSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { appendFileSync, mkdtempSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AI_METADATA, normalizeClip, PLACEHOLDER_METADATA } from '@montagio/sequence';
@@ -104,4 +105,28 @@ test('verify prints the errors and exits 1', async () => {
   expect(code).toBe(1);
   expect(out).toContainEqual('error: clips/stray.mp4: no manifest entry');
   expect(out.at(-1)).toMatch(/^showcase: 0 rendered, 2 placeholders, 1 error/);
+}, FFMPEG_TIMEOUT_MS);
+
+test('rendered clips of a sample that do not share their H.264 headers are an error', async () => {
+  await addRenderedClip(root, rawA, 'crash-push');
+  const odd = await addRenderedClip(root, rawB, 'pan-left', { seed: 9 });
+  // Re-encode the second one with another colour description, keep the manifest's sha256 true.
+  const listed = sha256Of(odd);
+  execFileSync('ffmpeg', [
+    '-loglevel', 'error', '-y', '-i', rawB, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
+    '-colorspace', 'bt470bg', '-metadata', 'comment=AI-generated', '-f', 'mp4', `${odd}.tmp`,
+  ]);
+  renameSync(`${odd}.tmp`, odd);
+  const manifestPath = showcasePath(root, 'manifest.yaml');
+  writeFileSync(manifestPath, readFileSync(manifestPath, 'utf8').replace(listed, sha256Of(odd)));
+  const report = await verifyShowcase(root, { strict: false });
+  expect(report.errors).toContainEqual(expect.stringMatching(/^landscape-a: its rendered clips do not share their H\.264 headers \(clips\/pan-left--landscape-a\.mp4 differs\)/));
+}, FFMPEG_TIMEOUT_MS);
+
+test('a clip rendered from another photo than the sample is an error', async () => {
+  await addRenderedClip(root, rawA, 'crash-push');
+  // The photo is regenerated after the clip was rendered and ingested.
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'mandelbrot=size=1664x960', '-frames:v', '1', showcasePath(root, 'samples', 'landscape-a.jpg')]);
+  const report = await verifyShowcase(root, { strict: false });
+  expect(report.errors).toContainEqual(expect.stringMatching(/^crash-push × landscape-a: rendered from another photo than samples\/landscape-a\.jpg/));
 }, FFMPEG_TIMEOUT_MS);

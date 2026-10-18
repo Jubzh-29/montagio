@@ -146,13 +146,13 @@ const VERTICAL_X264 = [
 export async function exportVertical(
   input: string,
   out: string,
-  opts: { encoder?: readonly string[]; tags?: VideoTags } = {},
+  opts: { encoder?: readonly string[]; colour?: string; tags?: VideoTags } = {},
 ): Promise<void> {
   const filter = [
     '[0:v]split[bg][fg]',
     '[bg]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=20:2[blurred]',
     '[fg]scale=720:-2[front]',
-    '[blurred][front]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[out]',
+    `[blurred][front]overlay=(W-w)/2:(H-h)/2,setsar=1,${opts.colour ?? 'format=yuv420p'}[out]`,
   ].join(';');
   await run(ffmpeg(), [
     '-loglevel', 'error', '-y',
@@ -174,8 +174,15 @@ export async function exportVertical(
 export const SHOWCASE_X264: readonly string[] = [
   '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'veryfast', '-crf', '18',
   '-bf', '0', '-g', '16', '-keyint_min', '16', '-sc_threshold', '0',
-  '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart',
+  '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
+  '-an', '-movflags', '+faststart',
 ];
+
+/**
+ * The colour stage of every showcase encode: limited-range BT.709 4:2:0. A JPEG photo
+ * decodes to full range: without this, a placeholder's headers differ from a render's.
+ */
+export const SHOWCASE_COLOUR = 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p';
 
 /** Run FFmpeg into `<out>.part`, then rename: `out` is never half-written. */
 async function writeAtomically(out: string, args: (partial: string) => string[]): Promise<void> {
@@ -199,7 +206,7 @@ export async function normalizeClip(
     '-loglevel', 'error', '-y',
     '-i', input,
     '-map', '0:v:0',
-    '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},format=yuv420p`,
+    '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},${SHOWCASE_COLOUR}`,
     ...SHOWCASE_X264,
     ...metadataArgs(opts.tags),
     '-f', 'mp4', partial,
@@ -240,7 +247,7 @@ export async function placeholderClip(
     `crop=${2 * w}:${2 * h}`,
     `zoompan=z='${motion.z}':x='${motion.x}':y='${motion.y}':d=1:s=${w}x${h}:fps=${fps}`,
     'setsar=1',
-    'format=yuv420p',
+    SHOWCASE_COLOUR,
   ].join(',');
   await writeAtomically(out, (partial) => [
     '-loglevel', 'error', '-y',
@@ -272,6 +279,19 @@ export async function concatCopy(clips: string[], out: string, tags: VideoTags):
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+/**
+ * A fingerprint of a clip's H.264 headers (SPS/PPS, colour description included).
+ * Clips joined with `-c copy` play with the first clip's headers: they must all match.
+ */
+export async function headerHash(media: string): Promise<string> {
+  const out = await run(ffprobe(), [
+    '-v', 'error', '-show_data_hash', 'SHA256', '-select_streams', 'v:0', '-show_entries', 'stream=extradata_hash', '-of', 'csv=p=0', media,
+  ]);
+  const hash = out.trim();
+  if (!hash) throw new SequenceToolError(`no video headers in ${media}`);
+  return hash;
 }
 
 /** Decode a whole file and fail on the first error FFmpeg reports (a truncated or mismatched stream). */

@@ -18,7 +18,7 @@ const twoSamples = (clips: string) =>
     'manifest.yaml',
   );
 const entry = (preset: string, sample: string) =>
-  `  - { preset: ${preset}, sample: ${sample}, seed: 7, sha256: ${SHA}, workflow_sha256: ${SHA}, rendered_at: 2026-10-24 }\n`;
+  `  - { preset: ${preset}, sample: ${sample}, seed: 7, sha256: ${SHA}, image_sha256: ${SHA}, workflow_sha256: ${SHA}, rendered_at: 2026-10-24 }\n`;
 
 test('plans every preset for every sample, rendered or not', () => {
   const manifest = twoSamples(entry('crash-push', 'landscape-b'));

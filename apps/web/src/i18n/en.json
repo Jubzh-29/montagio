@@ -90,5 +90,6 @@
   "showcaseSource": "Source code (AGPL-3.0)",
   "showcaseSourcePending": "Source link added at release",
   "showcaseRunLocally": "Run it yourself",
-  "showcasePlaceholderBadge": "placeholder"
+  "showcasePlaceholderBadge": "placeholder",
+  "showcasePlaceholderNote": "Some clips are still placeholders: FFmpeg simulates their camera move until the GPU session renders them."
 }

@@ -68,11 +68,14 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
   }
 
   function presetSummaries(): PresetSummary[] {
+    const firstSample = data.samples[0]?.id;
     return galleryOrder(data.presets).map((preset) => ({
       id: preset.id,
       name: preset.name,
       description: preset.description,
       previewUrl: showcaseUrl(preset.preview),
+      // The preview is the preset's clip on the first sample: it is a placeholder when that clip is.
+      previewPlaceholder: clips.get(`${preset.id}|${firstSample}`)?.placeholder ?? true,
       poses: preset.poses,
       speed: preset.speed,
       defaultModel: preset.defaultModel,

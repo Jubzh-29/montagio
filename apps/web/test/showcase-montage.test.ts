@@ -140,3 +140,37 @@ test('a clip that cannot be fetched fails the film', async () => {
   expect((error as MontageError).code).toBe('ffmpeg-failed');
   expect(fake.files.size).toBe(0);
 });
+
+test('a load that never settles fails as ffmpeg-unavailable after the timeout, and the next film loads again', async () => {
+  // ffmpeg.wasm only listens to its worker's messages: a worker that fails to start never answers.
+  const fake = fakeFFmpeg();
+  const signals: AbortSignal[] = [];
+  let attempts = 0;
+  const montage = createMontage({
+    load: (signal) => {
+      signals.push(signal);
+      attempts += 1;
+      return attempts === 1 ? new Promise<FFmpegLike>(() => undefined) : Promise.resolve(fake.ffmpeg);
+    },
+    fetchBytes,
+    loadTimeoutMs: 20,
+  });
+  const error = await montage.assemble(job, new AbortController().signal, () => undefined).catch((e: unknown) => e);
+  expect((error as MontageError).code).toBe('ffmpeg-unavailable');
+  expect(signals[0]!.aborted).toBe(true);
+  await expect(montage.assemble(job, new AbortController().signal, () => undefined)).resolves.toBeDefined();
+  expect(attempts).toBe(2);
+});
+
+test('an instance that loads after its timeout is terminated', async () => {
+  const late = fakeFFmpeg();
+  const montage = createMontage({
+    load: () => new Promise<FFmpegLike>((resolve) => setTimeout(() => resolve(late.ffmpeg), 60)),
+    fetchBytes,
+    loadTimeoutMs: 20,
+  });
+  const error = await montage.assemble(job, new AbortController().signal, () => undefined).catch((e: unknown) => e);
+  expect((error as MontageError).code).toBe('ffmpeg-unavailable');
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  expect(late.terminated()).toBe(1);
+});

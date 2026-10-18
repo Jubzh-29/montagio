@@ -137,3 +137,26 @@ test('the open stack page loads directly', async ({ page }) => {
   await expect(page.getByRole('button', { name: /^Show clip/ })).toBeVisible();
   expect(problems()).toEqual([]);
 });
+
+test('a missing data.json shows the generic error, not a blank page', async ({ page }) => {
+  await page.route('**/showcase/data.json', (route) => route.fulfill({ status: 404, body: 'not found' }));
+  await page.goto('/');
+  await expect(page.getByRole('alert').filter({ hasText: 'Something went wrong' })).toBeVisible();
+  await page.goto('/open-stack/');
+  await expect(page.getByRole('heading', { name: 'Open stack' })).toBeVisible();
+});
+
+test('when FFmpeg cannot load, the film says so and single clips still play', async ({ page }) => {
+  await page.route('**/ffmpeg/ffmpeg-core.js', (route) => route.fulfill({ status: 404, body: 'not found' }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Sequence', exact: true }).click();
+  await page.getByRole('button', { name: /Placeholder landscape A/ }).click();
+  for (const name of ['Crash Push', 'Pan Left']) await page.getByRole('button', { name }).click();
+  await page.getByRole('button', { name: /^Assemble film/ }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'FFmpeg could not start in this browser' })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await page.getByRole('button', { name: 'Single shot', exact: true }).click();
+  await page.getByRole('button', { name: 'Crash Push' }).click();
+  await page.getByRole('button', { name: /^Show clip/ }).click();
+  await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /crash-push--landscape-a\.mp4$/);
+});

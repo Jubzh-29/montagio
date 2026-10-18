@@ -11,6 +11,8 @@ apps/web/public/open-stack-report.json
 
 # GPU session results (infra/runpod): clips, reports, lock patch
 s1-results/
+# GPU session S3 results (smoke.ts --out s3-results/<sample>), ingested into demo-assets/showcase
+s3-results/
 
 # Showcase build output (apps/web: npm run showcase:build)
 apps/web/out/

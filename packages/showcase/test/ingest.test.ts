@@ -83,6 +83,7 @@ test('ingests the succeeded runs of the sample and writes the manifest entries',
     sample: 'landscape-a',
     seed: 42,
     sha256: sha256Of(file),
+    image_sha256: sha256Of(showcasePath(root, 'samples', 'landscape-a.jpg')),
     workflow_sha256: workflowSha256(workflow),
     rendered_at: '2026-10-24',
   });

@@ -9,6 +9,7 @@ import {
   decodeCheck,
   exportVertical,
   extractLastFrame,
+  headerHash,
   normalizeClip,
   placeholderClip,
   PLACEHOLDER_METADATA,
@@ -16,6 +17,7 @@ import {
   probe,
   readTags,
   SequenceToolError,
+  SHOWCASE_COLOUR,
   SHOWCASE_X264,
   tagClip,
 } from '../src/index';
@@ -148,7 +150,7 @@ test('placeholderClip writes the asked frames and the placeholder tags', async (
 
 test('exportVertical takes the showcase encoder and tags', async () => {
   const out = join(dir, 'vertical-showcase.mp4');
-  await exportVertical(clipA, out, { encoder: SHOWCASE_X264, tags: PLACEHOLDER_METADATA });
+  await exportVertical(clipA, out, { encoder: SHOWCASE_X264, colour: SHOWCASE_COLOUR, tags: PLACEHOLDER_METADATA });
   expect(await probe(out)).toMatchObject({ width: 720, height: 1280, fps: 16 });
   expect(await readTags(out)).toMatchObject(PLACEHOLDER_METADATA);
 }, FFMPEG_TEST_TIMEOUT_MS);
@@ -189,4 +191,22 @@ test('previewClip writes a small looping copy at the asked width with the tags',
   expect(p).toMatchObject({ width: 320, height: 184, codec: 'h264', pixFmt: 'yuv420p' });
   expect(p.duration_s).toBeCloseTo(2, 1);
   expect(await readTags(out)).toMatchObject(PLACEHOLDER_METADATA);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('a placeholder made from a JPEG and a normalized render share their H.264 headers', async () => {
+  // A JPEG decodes to full-range YUV; a render is limited range. Joined with -c copy, the
+  // film keeps the first clip's headers: every showcase clip must carry the same ones.
+  const jpeg = join(dir, 'sample.jpg');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1664x960', '-frames:v', '1', jpeg]);
+  const placeholder = join(dir, 'headers-placeholder.mp4');
+  const normalized = join(dir, 'headers-normalized.mp4');
+  await placeholderClip(jpeg, placeholder, { width: 832, height: 480, fps: 16, frames: 17, motion: ZOOM_IN, tags: PLACEHOLDER_METADATA });
+  await normalizeClip(clipA, normalized, { width: 832, height: 480, fps: 16, tags: AI_METADATA });
+  expect(await headerHash(placeholder)).toBe(await headerHash(normalized));
+  const vertical = join(dir, 'headers-vertical.mp4');
+  const verticalOfRender = join(dir, 'headers-vertical-render.mp4');
+  await exportVertical(placeholder, vertical, { encoder: SHOWCASE_X264, colour: SHOWCASE_COLOUR, tags: PLACEHOLDER_METADATA });
+  await exportVertical(normalized, verticalOfRender, { encoder: SHOWCASE_X264, colour: SHOWCASE_COLOUR, tags: AI_METADATA });
+  expect(await headerHash(vertical)).toBe(await headerHash(verticalOfRender));
+  expect(await probe(placeholder)).toMatchObject({ pixFmt: 'yuv420p' });
 }, FFMPEG_TEST_TIMEOUT_MS);

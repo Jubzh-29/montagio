@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AI_METADATA, PLACEHOLDER_METADATA, probe, readTags } from '@montagio/sequence';
@@ -129,4 +130,19 @@ test('writes a light gallery preview per preset from the first sample clip', asy
   expect(await probe(preview)).toMatchObject({ width: 320, height: 184, codec: 'h264' });
   expect(statSync(preview).size).toBeLessThan(statSync(join(out, 'clips', 'crash-push--landscape-a.mp4')).size / 3);
   expect(await readTags(preview)).toMatchObject(PLACEHOLDER_METADATA);
+}, PREPARE_TIMEOUT_MS);
+
+test('refuses a rendered clip whose H.264 headers differ from the other clips of its sample', async () => {
+  // Decodes fine and joins without error, but tagged BT.601: joined with -c copy behind
+  // the placeholders, it would play with their colour description.
+  const odd = join(raws, 'odd.mp4');
+  execFileSync('ffmpeg', [
+    '-loglevel', 'error', '-y', '-i', rawA, '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
+    '-colorspace', 'bt470bg', '-color_range', 'tv', '-metadata', 'comment=AI-generated', odd,
+  ]);
+  const file = await addRenderedClip(root, rawA, 'crash-push');
+  copyFileSync(odd, file);
+  const manifestPath = join(root, 'demo-assets', 'showcase', 'manifest.yaml');
+  writeFileSync(manifestPath, readFileSync(manifestPath, 'utf8').replace(/sha256: [0-9a-f]{64},/, `sha256: ${sha256Of(file)},`));
+  await expect(prepareShowcase(root, { outDir: out, strict: false, repoUrl: null })).rejects.toThrow(/do not share their H\.264 headers/);
 }, PREPARE_TIMEOUT_MS);

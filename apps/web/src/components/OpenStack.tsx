@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useI18n } from '@/i18n';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, jsonOrThrow } from '@/lib/api';
 import type { OpenStackReport } from '@/lib/api-types';
 import { Header } from './Header';
 import { ShowcaseFooter } from './ShowcaseFooter';
@@ -15,7 +15,7 @@ export function OpenStack() {
 
   useEffect(() => {
     apiFetch('/api/open-stack')
-      .then((res) => res.json() as Promise<OpenStackReport>)
+      .then((res) => jsonOrThrow<OpenStackReport>(res))
       .then(setReport)
       .catch(() => setReport(null));
   }, []);

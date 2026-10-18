@@ -13,6 +13,9 @@ export type FFmpegLike = {
   terminate(): void;
 };
 
+/** Long enough for 31 MB on a slow connection (about 2 Mbit/s), short enough not to hang a juror. */
+const LOAD_TIMEOUT_MS = 120_000;
+
 /** Rejects with MontageError('canceled') as soon as `signal` aborts. */
 function unlessAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -28,24 +31,45 @@ function unlessAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
  * is loaded once and kept; every virtual file a film needed is deleted once
  * its blobs are out; a canceled montage terminates FFmpeg, and the next one
  * loads a fresh instance.
+ *
+ * ffmpeg.wasm only listens to its worker's messages: a worker that cannot start
+ * (blocked, missing, a browser without module workers) never answers. A load that
+ * has not finished after `loadTimeoutMs` fails as ffmpeg-unavailable, and an
+ * instance that turns up later is terminated.
  */
-export function createMontage(deps: { load: () => Promise<FFmpegLike>; fetchBytes: (url: string) => Promise<Uint8Array> }): Montage {
+export function createMontage(deps: {
+  load: (signal: AbortSignal) => Promise<FFmpegLike>;
+  fetchBytes: (url: string) => Promise<Uint8Array>;
+  loadTimeoutMs?: number;
+}): Montage {
+  const timeoutMs = deps.loadTimeoutMs ?? LOAD_TIMEOUT_MS;
   let instance: Promise<FFmpegLike> | null = null;
   let loaded = false;
 
   const loadOnce = (): Promise<FFmpegLike> => {
     if (!instance) {
-      const attempt: Promise<FFmpegLike> = deps.load().then(
-        (ffmpeg) => {
-          if (instance === attempt) loaded = true;
-          return ffmpeg;
-        },
-        (error: unknown) => {
-          console.error('[montagio] FFmpeg could not be loaded', error);
-          if (instance === attempt) instance = null;
-          throw new MontageError('ffmpeg-unavailable');
-        },
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const loading = deps.load(controller.signal);
+      // Too late: nobody waits for this instance any more.
+      loading.then((ffmpeg) => controller.signal.aborted && ffmpeg.terminate(), () => undefined);
+      const timedOut = new Promise<never>((_, reject) =>
+        controller.signal.addEventListener('abort', () => reject(new Error(`FFmpeg did not load in ${timeoutMs} ms`)), { once: true }),
       );
+      const attempt: Promise<FFmpegLike> = Promise.race([loading, timedOut])
+        .finally(() => clearTimeout(timer))
+        .then(
+          (ffmpeg) => {
+            if (instance === attempt) loaded = true;
+            return ffmpeg;
+          },
+          (error: unknown) => {
+            console.error('[montagio] FFmpeg could not be loaded', error);
+            controller.abort();
+            if (instance === attempt) instance = null;
+            throw new MontageError('ffmpeg-unavailable');
+          },
+        );
       instance = attempt;
     }
     return instance;
@@ -114,14 +138,23 @@ export function createMontage(deps: { load: () => Promise<FFmpegLike>; fetchByte
 export function browserMontage(): Montage {
   const absolute = (path: string) => new URL(path, window.location.href).href;
   return createMontage({
-    load: async () => {
+    load: async (signal) => {
       const { FFmpeg } = (await import(/* webpackIgnore: true */ absolute(ffmpegUrl('esm/index.js')))) as { FFmpeg: typeof FFmpegClass };
       const ffmpeg = new FFmpeg();
-      await ffmpeg.load({
-        coreURL: absolute(ffmpegUrl('ffmpeg-core.js')),
-        wasmURL: absolute(ffmpegUrl('ffmpeg-core.wasm')),
-        classWorkerURL: absolute(ffmpegUrl('esm/worker.js')),
-      });
+      try {
+        await ffmpeg.load(
+          {
+            coreURL: absolute(ffmpegUrl('ffmpeg-core.js')),
+            wasmURL: absolute(ffmpegUrl('ffmpeg-core.wasm')),
+            classWorkerURL: absolute(ffmpegUrl('esm/worker.js')),
+          },
+          { signal },
+        );
+      } catch (error) {
+        // Do not leave a worker running for an instance nobody will use.
+        ffmpeg.terminate();
+        throw error;
+      }
       return ffmpeg;
     },
     fetchBytes: async (url) => {

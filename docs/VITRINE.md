@@ -156,7 +156,14 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
    ```
 
    Pour goûter plusieurs seeds, ajouter `--runs 2` : la seed augmente de 1 à chaque run. `smoke.jsonl` note désormais la photo de départ (`image`, `image_sha256`).
-3. **L'intégration**, sur le même commit que le rendu :
+3. **Rapatrier avant d'éteindre le pod** : les rendus sont payés, il ne faut pas les perdre. Sur le pod, archiver les résultats **et** les photos :
+
+   ```bash
+   tar czf /workspace/s3-results-$(date +%Y%m%d-%H%M).tgz s3-results demo-assets/showcase/samples
+   ```
+
+   Télécharger l'archive comme celle de la S2 (`docs/S2_CHECKLIST.md`, partie 7), et vérifier qu'elle s'ouvre sur le PC **avant** d'éteindre le pod. Sur le PC, l'extraire à la racine du dépôt : `s3-results/` est ignoré par git, et les photos reprennent leur place sous `demo-assets/showcase/samples/`.
+4. **L'intégration, sur le PC**, sur le même commit que celui du pod (le dépôt et FFmpeg y sont) :
 
    ```bash
    npm run showcase -- ingest s3-results/landscape-a --sample landscape-a
@@ -165,10 +172,10 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
    `ingest` :
    - garde les rendus réussis, faits sur le bon modèle, à partir de la bonne photo et avec la caméra du preset ;
    - les réencode dans l'encodage commun de la vitrine, avec la mention « AI-generated » ;
-   - écrit leurs entrées dans le manifeste : seed, sha256, empreinte du workflow, date.
+   - écrit leurs entrées dans le manifeste : seed, sha256, empreintes de la photo et du workflow, date.
 
    S'il y a plusieurs runs pour un preset, choisir avec `--pick crash-push=2` (une option `--pick` par preset).
-4. **Le contrôle** :
+5. **Le contrôle** :
 
    ```bash
    npm run showcase -- verify --strict
@@ -179,13 +186,15 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
    - les dimensions, la durée et le codec ;
    - la mention « AI-generated » ;
    - que chaque workflow n'a pas changé depuis son rendu ;
-   - qu'on peut concaténer sans réencoder les clips d'une même photo.
-5. **Versionner** `demo-assets/showcase/` (manifeste, photos, clips : environ 40 à 70 Mo). Puis reconstruire en `--release` (partie 2) et déposer de nouveau (partie 3).
+   - que chaque clip vient de la photo actuelle (`image_sha256`) ;
+   - qu'on peut concaténer sans réencoder les clips d'une même photo, et qu'ils partagent les mêmes en-têtes H.264.
+6. **Versionner** `demo-assets/showcase/` (manifeste, photos, clips : environ 40 à 70 Mo), jamais `s3-results/`. Puis reconstruire en `--release` (partie 2) et déposer de nouveau (partie 3).
 
 À savoir :
 - **Aperçus de la galerie** : chaque tuile joue son preset sur la première photo. La S3 peut donc se passer des aperçus séparés de `presets/previews/`.
 - **Retouche d'un preset après la S3** : corriger un nom ou une description ne change pas le workflow, donc ne casse rien. Toucher à la caméra, au prompt ou à la durée est détecté par `verify --strict` : il faut alors refaire le rendu de ce preset, ou garder l'ancienne version.
-- **S3 incomplète** : les couples manquants restent provisoires et signalés comme tels. `verify --strict` refuse alors la publication. C'est à vous de décider de publier quand même (sans `--release`) ou non.
+- **Photo refaite après un rendu** : `verify` le voit (`image_sha256`) et refuse les clips faits à partir de l'ancienne photo.
+- **S3 incomplète** : les couples manquants restent provisoires et signalés comme tels (légende sous le clip, badge sur la tuile, phrase dans la note). `verify --strict` refuse alors la publication. C'est à vous de décider de publier quand même (sans `--release`) ou non.
 
 ## 7. Ce que la vitrine collecte : rien
 

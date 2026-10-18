@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { dimensionsFor, frameCount, LibraryError, loadLibrary, pickAspect, type Library } from '@montagio/presets';
-import { AI_METADATA, concatCopy, decodeCheck, probe, readTags } from '@montagio/sequence';
+import { AI_METADATA, concatCopy, decodeCheck, headerHash, probe, readTags } from '@montagio/sequence';
 import { imageSize } from 'image-size';
 import { loadManifest, ManifestError, SHOWCASE_DIR, type Manifest } from './manifest';
 import { planClips, strayClips, type PlannedClip } from './plan';
@@ -41,9 +41,12 @@ export async function verifyShowcase(root: string, opts: { strict: boolean }): P
   const modelKnown = library.models.has(manifest.model);
   if (!modelKnown) errors.push(`model: "${manifest.model}" is not in the registry`);
 
+  const photoSha = new Map<string, string>();
   for (const sample of manifest.samples) {
     try {
-      const { width, height } = imageSize(await readFile(join(dir, sample.file)));
+      const bytes = await readFile(join(dir, sample.file));
+      photoSha.set(sample.id, createHash('sha256').update(bytes).digest('hex'));
+      const { width, height } = imageSize(bytes);
       if (!width || !height) throw new Error('no size');
       const aspect = pickAspect(width, height);
       if (aspect !== sample.aspect) errors.push(`${sample.file}: the photo is ${aspect}, the manifest says ${sample.aspect}`);
@@ -67,6 +70,10 @@ export async function verifyShowcase(root: string, opts: { strict: boolean }): P
     }
     listed.add(item.file);
     errors.push(...(await checkRenderedClip(dir, item)));
+    const photo = photoSha.get(item.sample.id);
+    if (photo && photo !== item.rendered.image_sha256) {
+      errors.push(`${item.preset.id} × ${item.sample.id}: rendered from another photo than ${item.sample.file} (image_sha256 differs); render it again from this photo`);
+    }
     if (modelKnown) {
       const workflow = showcaseWorkflow(library, manifest, item.preset, item.sample, item.rendered.seed);
       if (workflowSha256(workflow) !== item.rendered.workflow_sha256) {
@@ -87,6 +94,12 @@ export async function verifyShowcase(root: string, opts: { strict: boolean }): P
   for (const sample of manifest.samples) {
     const clips = planned.filter((item) => item.sample.id === sample.id && item.rendered).map((item) => join(dir, item.file));
     if (clips.length < 2 || errors.length > 0) continue;
+    const headers = await Promise.all(clips.map((clip) => headerHash(clip)));
+    const odd = clips.findIndex((_, index) => headers[index] !== headers[0]);
+    if (odd !== -1) {
+      errors.push(`${sample.id}: its rendered clips do not share their H.264 headers (${relative(dir, clips[odd]!).split(sep).join('/')} differs); re-ingest it`);
+      continue;
+    }
     const scratch = await mkdtemp(join(tmpdir(), 'montagio-verify-'));
     try {
       const film = join(scratch, 'film.mp4');

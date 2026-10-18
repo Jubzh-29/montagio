@@ -4,7 +4,7 @@ import { INITIAL_MANIFEST } from './fixtures';
 
 const SHA = 'a'.repeat(64);
 const clip = (preset: string, sample: string) =>
-  `  - { preset: ${preset}, sample: ${sample}, seed: 42, sha256: ${SHA}, workflow_sha256: ${SHA}, rendered_at: 2026-10-24 }\n`;
+  `  - { preset: ${preset}, sample: ${sample}, seed: 42, sha256: ${SHA}, image_sha256: ${SHA}, workflow_sha256: ${SHA}, rendered_at: 2026-10-24 }\n`;
 
 function problemsOf(text: string): string[] {
   try {
@@ -31,7 +31,7 @@ test('parses the initial manifest', () => {
 test('reads a rendered clip entry', () => {
   const manifest = parseManifest(INITIAL_MANIFEST.replace('clips: []\n', `clips:\n${clip('crash-push', 'landscape-a')}`), 'm.yaml');
   expect(manifest.clips).toEqual([
-    { preset: 'crash-push', sample: 'landscape-a', seed: 42, sha256: SHA, workflow_sha256: SHA, rendered_at: '2026-10-24' },
+    { preset: 'crash-push', sample: 'landscape-a', seed: 42, sha256: SHA, image_sha256: SHA, workflow_sha256: SHA, rendered_at: '2026-10-24' },
   ]);
 });
 

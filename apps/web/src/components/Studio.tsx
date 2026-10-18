@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
-import { apiFetch, IS_SHOWCASE } from '@/lib/api';
+import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import {
   TERMINAL_STATES,
   type GenerationRecord,
@@ -15,7 +15,7 @@ import {
 } from '@/lib/api-types';
 import { refusalMessageKey } from '@/lib/refusals';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
-import { primaryLabelKey } from '@/lib/showcase-ui';
+import { primaryLabelKey, showcaseNoteKeys } from '@/lib/showcase-ui';
 import { useShowcase } from '@/lib/use-showcase';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
@@ -109,8 +109,8 @@ export function Studio() {
 
   useEffect(() => {
     Promise.all([
-      apiFetch('/api/presets').then((res) => res.json() as Promise<PresetSummary[]>),
-      apiFetch('/api/models').then((res) => res.json() as Promise<ModelSummary[]>),
+      apiFetch('/api/presets').then((res) => jsonOrThrow<PresetSummary[]>(res)),
+      apiFetch('/api/models').then((res) => jsonOrThrow<ModelSummary[]>(res)),
     ])
       .then(([presetList, modelList]) => {
         setPresets(presetList);
@@ -410,7 +410,11 @@ export function Studio() {
                 ? {
                     samples: showcase?.samples ?? [],
                     selectedId: selectedSample,
-                    note: showcase ? t('showcaseNote', { model: showcase.model.name, license: showcase.model.license }) : '',
+                    note: showcase
+                      ? showcaseNoteKeys(showcase.placeholders)
+                          .map((key) => t(key, { model: showcase.model.name, license: showcase.model.license }))
+                          .join(' ')
+                      : '',
                     onPick: pickSample,
                     onOtherSample: () => {
                       if (busyRef.current) return;

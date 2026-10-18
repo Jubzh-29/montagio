@@ -9,9 +9,11 @@ import {
   concatCopy,
   decodeCheck,
   exportVertical,
+  headerHash,
   PLACEHOLDER_METADATA,
   placeholderClip,
   previewClip,
+  SHOWCASE_COLOUR,
   SHOWCASE_X264,
 } from '@montagio/sequence';
 import type { ShowcaseData } from './data';
@@ -26,7 +28,7 @@ const PREVIEW_WIDTH = 320;
 const previewFile = (preset: string) => `previews/${preset}.mp4`;
 
 /** Bumped when the way prepare encodes changes: every cached file is then made again. */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_FILE = '.prepare-cache.json';
 
 export class PrepareError extends Error {
@@ -116,8 +118,8 @@ export async function prepareShowcase(
   for (const item of planned) {
     const clipPrint = await ensureClip(item, showcaseDir, sampleSha.get(item.sample.id)!, ensure);
     const tags = item.rendered ? AI_METADATA : PLACEHOLDER_METADATA;
-    await ensure(item.vertical, hash('vertical', clipPrint, SHOWCASE_X264, tags), (path) =>
-      exportVertical(join(outDir, item.file), path, { encoder: SHOWCASE_X264, tags }),
+    await ensure(item.vertical, hash('vertical', clipPrint, SHOWCASE_X264, SHOWCASE_COLOUR, tags), (path) =>
+      exportVertical(join(outDir, item.file), path, { encoder: SHOWCASE_X264, colour: SHOWCASE_COLOUR, tags }),
     );
     // The gallery tile of a preset loops its clip on the first sample.
     if (item.sample.id === manifest.samples[0]!.id) {
@@ -220,6 +222,10 @@ async function ensureClip(
 }
 
 async function checkJoin(files: string[], label: string): Promise<void> {
+  // A -c copy join plays every clip with the first one's headers (colour description included).
+  const headers = await Promise.all(files.map((file) => headerHash(file)));
+  const odd = files.find((_, index) => headers[index] !== headers[0]);
+  if (odd) throw new PrepareError([`${label}: the clips do not share their H.264 headers (${odd} differs from ${files[0]}); re-encode it with "showcase ingest"`]);
   const scratch = await mkdtemp(join(tmpdir(), 'montagio-prepare-'));
   try {
     const film = join(scratch, 'film.mp4');

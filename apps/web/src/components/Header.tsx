@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useI18n, type Lang } from '@/i18n';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, jsonOrThrow } from '@/lib/api';
 import type { OpenStackReport } from '@/lib/api-types';
 import styles from './header.module.css';
 
@@ -14,7 +14,7 @@ function OpenStackBadge() {
   useEffect(() => {
     let alive = true;
     apiFetch('/api/open-stack')
-      .then((res) => res.json() as Promise<OpenStackReport>)
+      .then((res) => jsonOrThrow<OpenStackReport>(res))
       .then((report) => alive && setOk(report.ok))
       .catch(() => alive && setOk(false));
     return () => {

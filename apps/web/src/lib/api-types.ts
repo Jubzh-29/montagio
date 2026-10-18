@@ -4,6 +4,8 @@ export type PresetSummary = {
   description: string;
   /** Absent while the preset has no preview file yet. */
   previewUrl?: string;
+  /** Showcase: the preview loops a placeholder clip (camera move simulated by FFmpeg). */
+  previewPlaceholder?: boolean;
   poses: string[];
   speed: number;
   defaultModel: string;

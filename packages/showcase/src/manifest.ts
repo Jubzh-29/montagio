@@ -32,6 +32,8 @@ const ClipSchema = z
     sample: kebabId,
     seed: z.number().int().min(0).max(2 ** 32 - 1),
     sha256,
+    /** The sample photo the clip was rendered from: a photo replaced afterwards is caught. */
+    image_sha256: sha256,
     workflow_sha256: sha256,
     rendered_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be a date, YYYY-MM-DD'),
   })
