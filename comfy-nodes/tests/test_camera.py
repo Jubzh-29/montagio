@@ -290,6 +290,8 @@ AGAINST_CORE = r"""
 import importlib.util, json, sys
 comfy_dir, pack_dir = sys.argv[1:3]
 sys.path.insert(0, comfy_dir)
+from comfy.cli_args import args
+args.cpu = True  # imported as a library ComfyUI parses no flags: never ask for CUDA here
 import torch
 from comfy_extras import nodes_camera_trajectory as core
 
@@ -305,6 +307,11 @@ for pose in json.loads(sys.argv[3]):
     theirs = core.WanCameraEmbedding.execute(camera_pose=pose, **args)
     ours = MontagioCameraEmbedding.execute(camera_pose=pose, camera_pose_2="Static", combine="together", **args)
     result["equal"][pose] = bool(torch.equal(theirs.args[0], ours.args[0])) and theirs.args[1:] == ours.args[1:]
+    result["shape"] = list(theirs.args[0].shape)
+result["combined"] = {}
+for combine in ("together", "then"):
+    out = MontagioCameraEmbedding.execute(camera_pose="Pan Up", camera_pose_2="Zoom In", combine=combine, width=64, height=48, length=9, speed=1.7)
+    result["combined"][combine] = {"shape": list(out.args[0].shape), "finite": bool(torch.isfinite(out.args[0]).all())}
 print(json.dumps(result))
 """
 
@@ -330,6 +337,12 @@ def against_core():
 
 def test_matches_wan_camera_embedding_for_every_single_pose(against_core):
     assert against_core["equal"] == {pose: True for pose in WAN_CAMERA_POSES}
+
+
+def test_two_moves_give_an_embedding_of_the_shape_the_core_gives(against_core):
+    # [batch, 24 channels, (length + 3) // 4 frame groups, height, width]
+    assert against_core["shape"] == [1, 24, 3, 48, 64]
+    assert against_core["combined"] == {mode: {"shape": [1, 24, 3, 48, 64], "finite": True} for mode in ("together", "then")}
 
 
 def test_camera_dict_of_the_core_is_the_test_constant(against_core):
