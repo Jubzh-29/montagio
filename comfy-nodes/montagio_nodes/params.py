@@ -18,6 +18,8 @@ POSE_VALUES = {
     "pan_down": "Pan Down",
     "zoom_in": "Zoom In",
     "zoom_out": "Zoom Out",
+    "roll_ccw": "Anti Clockwise (ACW)",
+    "roll_cw": "ClockWise (CW)",
 }
 
 # CAMERA_POSE_PROMPTS of compile.ts: the same moves in words, for a model without camera control
@@ -29,6 +31,8 @@ POSE_PROMPTS = {
     "pan_down": "the camera tilts down",
     "zoom_in": "the camera pushes in toward the subject",
     "zoom_out": "the camera pulls back from the subject",
+    "roll_ccw": "the camera rolls counterclockwise",
+    "roll_cw": "the camera rolls clockwise",
 }
 
 ASPECTS = ("16:9", "9:16", "1:1")
@@ -118,16 +122,19 @@ def compute_params(preset, *, aspect, resolution=None, prompt="", camera_mode="p
         raise ParamsError(f"preset {preset['id']} uses LoRAs, which are not supported yet")
 
     poses = preset["camera"]["poses"]
+    one_after_the_other = preset["camera"]["combine"] == "then"
     parts = [_trim(prompt), _trim(preset["prompt"]["suffix"])]
     if camera_mode == "prompt":
         camera_pose, speed = "Static", 1.0  # the camera is only in the words of the prompt
-        parts.append(", ".join(POSE_PROMPTS[pose] for pose in poses))
+        parts.append((", then " if one_after_the_other else ", ").join(POSE_PROMPTS[pose] for pose in poses))
     else:
         values = [POSE_VALUES[pose] for pose in poses]
         if len(values) > 1:
+            # the app sends both moves to Montagio Camera Embedding; these nodes have one camera_pose output
             raise ParamsError(
-                f"preset {preset['id']} combines {len(values)} camera moves ({' + '.join(values)}); "
-                'WanCameraEmbedding takes one move. Use camera_mode "prompt", or a combined-move node (planned).'
+                f"preset {preset['id']} combines {len(values)} camera moves "
+                f"({(', then ' if one_after_the_other else ' + ').join(values)}); WanCameraEmbedding takes one move. "
+                'Use camera_mode "prompt", or the Montagio Camera Embedding node with the second move set by hand.'
             )
         camera_pose, speed = values[0], float(preset["camera"]["speed"])
 

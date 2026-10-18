@@ -120,11 +120,14 @@ export function pickCandidate(file: string, listings: RepoListing[], opts: { all
   return { ok: false, reason: `${file} not found in a usable repository: ${skipped.join('; ')}` };
 }
 
+export type LockUpdate = { url: string; sha256: string; size?: number };
+
 /**
- * The lock with `url` and `sha256` set on the given entries. Comments, key
- * order and every other field (licenses included) are kept as they are.
+ * The lock with `url`, `sha256` and, when given, `size` set on the given
+ * entries (`sha256` right after `url`, `size` right after `sha256`).
+ * Comments, key order and every other field (licenses included) are kept.
  */
-export function proposeLock(lockText: string, updates: Map<string, { url: string; sha256: string }>): string {
+export function proposeLock(lockText: string, updates: Map<string, LockUpdate>): string {
   const doc = parseDocument(lockText);
   const weights = doc.get('weights');
   if (!isSeq(weights)) throw new Error('models.lock.yaml has no weights list');
@@ -132,15 +135,47 @@ export function proposeLock(lockText: string, updates: Map<string, { url: string
     if (!isMap(item)) continue;
     const update = updates.get(String(item.get('id')));
     if (!update) continue;
+    const setAfter = (key: string, value: string | number, after: string) => {
+      if (item.has(key)) return item.set(key, value);
+      const index = item.items.findIndex((pair) => isScalar(pair.key) && pair.key.value === after);
+      item.items.splice(index + 1, 0, doc.createPair(key, value));
+    };
     item.set('url', update.url);
-    if (item.has('sha256')) {
-      item.set('sha256', update.sha256);
-    } else {
-      const urlIndex = item.items.findIndex((pair) => isScalar(pair.key) && pair.key.value === 'url');
-      item.items.splice(urlIndex + 1, 0, doc.createPair('sha256', update.sha256));
-    }
+    setAfter('sha256', update.sha256, 'url');
+    if (update.size !== undefined) setAfter('size', update.size, 'sha256');
   }
   return doc.toString({ lineWidth: 0 });
+}
+
+/**
+ * Lock updates straight from Hugging Face's metadata (exact URL, size, and
+ * the sha256 of the LFS object), without downloading anything. A file
+ * Hugging Face publishes no sha256 for is reported and left out; `--extra`
+ * files never enter the lock.
+ */
+export function lockFromHf(
+  plans: { id: string; url: string; size: number; hf_sha256: string | null; extra: boolean }[],
+): { updates: Map<string, Required<LockUpdate>>; problems: string[] } {
+  const updates = new Map<string, Required<LockUpdate>>();
+  const problems: string[] = [];
+  for (const plan of plans) {
+    if (plan.extra) continue;
+    if (!plan.hf_sha256) {
+      problems.push(`${plan.id}: Hugging Face publishes no sha256 for ${plan.url}; download it to hash it`);
+      continue;
+    }
+    updates.set(plan.id, { url: plan.url, sha256: plan.hf_sha256, size: plan.size });
+  }
+  return { updates, problems };
+}
+
+/** Why the file Hugging Face serves is not the one the lock pins, or null when it is (or the lock pins nothing). */
+export function lockDrift(lock: { sha256?: string; size?: number }, remote: { sha256: string | null; size: number }): string | null {
+  const problems: string[] = [];
+  if (lock.sha256 && remote.sha256 === null) problems.push(`lock pins sha256 ${lock.sha256}, Hugging Face publishes no sha256`);
+  else if (lock.sha256 && remote.sha256 !== lock.sha256) problems.push(`lock pins sha256 ${lock.sha256}, Hugging Face serves ${remote.sha256}`);
+  if (lock.size !== undefined && remote.size !== lock.size) problems.push(`lock pins ${lock.size} bytes, Hugging Face serves ${remote.size}`);
+  return problems.length > 0 ? `the file changed upstream: ${problems.join('; ')}` : null;
 }
 
 /** A git-style patch of registry/models.lock.yaml, applicable with `git apply` at the repository root. */

@@ -77,7 +77,7 @@ def test_prompt_nodes():
 def test_prompt_yaml_is_crash_push_for_two_seconds():
     preset = parse_preset(smoke.build_prompt()["2"]["inputs"]["yaml"], "smoke prompt")
     assert preset["id"] == "crash-push"
-    assert preset["camera"] == {"poses": ["zoom_in"], "speed": 1.5}
+    assert preset["camera"] == {"poses": ["zoom_in"], "speed": 1.5, "combine": "together"}
     assert preset["defaults"]["duration_s"] == 2
     assert frame_count(2, preset["defaults"]["fps"]) == 33  # what the run should show for the length
 

@@ -31,6 +31,16 @@ test('an i2v-only model does not need camera bindings', () => {
   expect(parseModel(i2v, 'i2v.yaml').capabilities).toEqual(['i2v']);
 });
 
+test('a t2i model needs no negative binding', () => {
+  // Z-Image-Turbo runs at cfg 1 with ConditioningZeroOut as its negative: there is no negative prompt to bind
+  const t2i = replaceOnce(
+    replaceOnce(replaceOnce(model, 'kind: video', 'kind: image'), 'capabilities: [i2v-camera]', 'capabilities: [t2i]'),
+    /  negative: .*\n/,
+    '',
+  );
+  expect(parseModel(t2i, 't2i.yaml').bindings.negative).toBeUndefined();
+});
+
 test('non-permissive model license is refused', () => {
   expect(() => parseModel(replaceOnce(model, 'license: Apache-2.0', 'license: LTX-2 Community'), 'm.yaml'))
     .toThrow(RegistryError);
@@ -54,6 +64,17 @@ test('lock: url outside huggingface.co is refused', () => {
 test('lock: duplicate ids are refused', () => {
   const dup = replaceOnce(lock, '- id: wan22-fun-camera-low', '- id: wan22-fun-camera-high');
   expect(() => parseLock(dup, 'l.yaml')).toThrow(/duplicate.*wan22-fun-camera-high/);
+});
+
+test('a lock entry may give its size in bytes', () => {
+  const sized = replaceOnce(lock, /(sha256: [a-f0-9]+\n)/, '$1    size: 15301408048\n');
+  expect(parseLock(sized, 'l.yaml')[3]?.size).toBe(15301408048);
+});
+
+test.each(['0', '-1', '1.5'])('a size of %s is refused', (size) => {
+  const sized = replaceOnce(lock, /(sha256: [a-f0-9]+\n)/, `$1    size: ${size}\n`);
+  // a refusal of the value, not of an unknown key
+  expect(() => parseLock(sized, 'l.yaml')).toThrow(/weights\.3\.size: (?!Unrecognized)/);
 });
 
 test('lock: malformed sha256 is refused', () => {

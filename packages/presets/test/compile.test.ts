@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { parseModel, type ModelEntry } from '@montagio/registry';
 import {
+  CAMERA_POSE_VALUES,
+  COMBINED_CAMERA_NODE,
   compileJob,
   CompileError,
   dimensionsFor,
@@ -62,10 +64,73 @@ test('parametric compile writes bindings and keeps the template intact', () => {
   expect(template).toEqual(before);
 });
 
-test('two poses are joined for the camera node', () => {
-  const combo = parsePreset(read('crash-push.yaml').replace('poses: [zoom_in]', 'poses: [pan_up, zoom_in]'), 'combo.yaml');
-  const { workflow } = compileJob(combo, funCamera, template, { imageRef: 'u.png', seed: 1, aspect: '16:9' });
-  expect(workflow['12']?.inputs.camera_pose).toBe('Pan Up + Zoom In');
+const withPoses = (poses: string, combine?: string) =>
+  parsePreset(
+    read('crash-push.yaml').replace('poses: [zoom_in]', `poses: ${poses}${combine ? `\n  combine: ${combine}` : ''}`),
+    'combo.yaml',
+  );
+
+test('a single pose keeps the core camera node', () => {
+  const { workflow, params } = compileJob(preset, funCamera, template, { imageRef: 'u.png', seed: 1, aspect: '16:9' });
+  expect(workflow['12']?.class_type).toBe('WanCameraEmbedding');
+  expect(Object.keys(workflow['12']!.inputs)).not.toContain('camera_pose_2');
+  expect(Object.keys(workflow['12']!.inputs)).not.toContain('combine');
+  expect(params).toMatchObject({ cameraPose: 'Zoom In', cameraPose2: null, cameraCombine: null });
+});
+
+test('two poses swap the camera node for Montagio Camera Embedding', () => {
+  const before = structuredClone(template);
+  const { workflow, params } = compileJob(withPoses('[pan_up, zoom_in]'), funCamera, template, { imageRef: 'u.png', seed: 1, aspect: '16:9' });
+  expect(COMBINED_CAMERA_NODE).toBe('MontagioCameraEmbedding');
+  expect(workflow['12']).toEqual({
+    class_type: 'MontagioCameraEmbedding',
+    inputs: { ...template['12']!.inputs, camera_pose: 'Pan Up', camera_pose_2: 'Zoom In', combine: 'together', speed: 1.5, width: 832, height: 480, length: 81 },
+  });
+  expect(params).toMatchObject({ cameraPose: 'Pan Up', cameraPose2: 'Zoom In', cameraCombine: 'together', cameraSpeed: 1.5 });
+  expect(template).toEqual(before);
+});
+
+test('then is passed to the node', () => {
+  const { workflow, params } = compileJob(withPoses('[zoom_in, static]', 'then'), funCamera, template, { imageRef: 'u.png', seed: 1, aspect: '16:9' });
+  expect(workflow['12']?.inputs).toMatchObject({ camera_pose: 'Zoom In', camera_pose_2: 'Static', combine: 'then' });
+  expect(params.cameraCombine).toBe('then');
+});
+
+test('a combined move on a bound node that is not a camera node is refused', () => {
+  const t = structuredClone(template);
+  t['12'] = { class_type: 'PrimitiveString', inputs: { camera_pose: 'Static', speed: 1, width: 832, height: 480, length: 81 } };
+  expect(() => compileJob(withPoses('[pan_up, zoom_in]'), funCamera, t, { imageRef: 'u.png', seed: 1, aspect: '16:9' })).toThrow(
+    /combines 2 camera moves.*node 12 is PrimitiveString, not a camera node/,
+  );
+});
+
+test('prompt mode chains the words with then', () => {
+  const { params } = compileJob(withPoses('[zoom_in, static]', 'then'), wan5b, template5b, { imageRef: 'u.png', seed: 1, aspect: '16:9' });
+  expect(params.prompt).toBe(
+    'dynamic camera push-in, cinematic, sharp focus on subject, the camera pushes in toward the subject, then static locked-off camera',
+  );
+  expect(params).toMatchObject({ cameraMode: 'prompt', cameraPose: null, cameraPose2: null, cameraCombine: null });
+});
+
+test.each([
+  ['roll_ccw', 'Anti Clockwise (ACW)', 'the camera rolls counterclockwise'],
+  ['roll_cw', 'ClockWise (CW)', 'the camera rolls clockwise'],
+])('the roll %s reaches the camera node as "%s" and the prompt as "%s"', (pose, value, words) => {
+  const roll = withPoses(`[${pose}]`);
+  expect(compileJob(roll, funCamera, template, { imageRef: 'u.png', seed: 1, aspect: '16:9' }).workflow['12']?.inputs.camera_pose).toBe(value);
+  expect(compileJob(roll, wan5b, template5b, { imageRef: 'u.png', seed: 1, aspect: '16:9' }).params.prompt.endsWith(words)).toBe(true);
+});
+
+test('every camera_pose of WanCameraEmbedding is reachable from a preset', () => {
+  // ComfyUI v0.41.0, comfy_extras/nodes_camera_trajectory.py
+  expect(Object.values(CAMERA_POSE_VALUES).sort()).toEqual(
+    ['Static', 'Pan Up', 'Pan Down', 'Pan Left', 'Pan Right', 'Zoom In', 'Zoom Out', 'Anti Clockwise (ACW)', 'ClockWise (CW)'].sort(),
+  );
+});
+
+test('prompt mode joins moves that happen together with a comma', () => {
+  const { params } = compileJob(withPoses('[pan_up, zoom_in]'), wan5b, template5b, { imageRef: 'u.png', seed: 1, aspect: '16:9' });
+  expect(params.prompt.endsWith('the camera tilts up, the camera pushes in toward the subject')).toBe(true);
 });
 
 test('prompt mode for a model without camera control', () => {

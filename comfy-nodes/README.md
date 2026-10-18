@@ -1,6 +1,6 @@
 # Montagio nodes for ComfyUI
 
-Two nodes that read a Montagio camera preset (a YAML file) and output the values ComfyUI's own nodes take: camera move and speed, size, frame count, fps, prompt and negative prompt. The same preset file drives a clip in the Montagio app and in a ComfyUI graph.
+Two nodes that read a Montagio camera preset (a YAML file) and output the values ComfyUI's own nodes take: camera move and speed, size, frame count, fps, prompt and negative prompt. The same preset file drives a clip in the Montagio app and in a ComfyUI graph. A third node, Montagio Camera Embedding, gives the Wan 2.2 Fun Camera models two camera moves at once or one after the other.
 
 The nodes use the V3 node API, so they need ComfyUI 0.41.0 or newer.
 
@@ -19,7 +19,7 @@ No example workflow ships with the pack yet.
 | Load Montagio Preset | `MontagioLoadPreset` | the `preset` menu, which lists the `.yaml` and `.yml` files of the [preset folders](#preset-folders) |
 | Montagio Preset from YAML | `MontagioPresetFromYAML` | the `yaml` text field: paste a preset, for example one remixed in the Montagio app (it starts with the text of Crash Push) |
 
-Both nodes have the same other inputs and the same 11 outputs.
+Both nodes have the same other inputs and the same 11 outputs. A third node, [Montagio Camera Embedding](#montagio-camera-embedding), combines two camera moves.
 
 ### Inputs
 
@@ -68,6 +68,23 @@ The node reads a preset with the same rules as the app, apart from a few rare YA
 
 `duration_s`, `resolution` and `info` are for your own use, for example to name the saved file or to keep the credit with the clip.
 
+## Montagio Camera Embedding
+
+`MontagioCameraEmbedding` is the core `WanCameraEmbedding` node with a second move. It takes the same inputs, with the same names and bounds, plus two more:
+
+| Input | Type | Default | Meaning |
+|---|---|---|---|
+| `camera_pose_2` | COMBO, the 9 poses of `WanCameraEmbedding` | `Static` | the second move |
+| `combine` | COMBO: `together`, `then` | `together` | `together`: both moves at once, over the whole clip (their vectors add up). `then`: the first move over the first half of the clip, then the second one from where the first ended |
+
+Its outputs are the core node's: `camera_embedding`, `width`, `height`, `length`. It therefore takes the place of `WanCameraEmbedding` in a Wan 2.2 Fun Camera workflow without any link changing: its `camera_embedding` goes to `camera_conditions` of `WanCameraImageToVideo`, and `width`, `height` and `length` go to the inputs of the same names.
+
+With `camera_pose_2` set to `Static` and `combine` set to `together`, it computes exactly what `WanCameraEmbedding` computes (a test compares both tensors on a ComfyUI install). `then` with `Static` second gives a move that stops halfway; `Zoom In` then `Zoom Out` breathes in and out. `length` must be of the form 4n+1 (1, 5, …, 81), as the core node assumes; any other length is refused with a message.
+
+The node builds the camera path itself, and the Plücker embedding comes from ComfyUI's own `process_pose_params` (`comfy_extras/nodes_camera_trajectory.py`). It is written against ComfyUI v0.41.0. numpy, which it uses, comes with ComfyUI.
+
+The Montagio app sends this node only for presets that combine two moves. A preset with one move uses the core node, so it runs on a ComfyUI that does not have this pack.
+
 ## App Mode
 
 App Mode needs ComfyUI frontend 1.41.13 or newer (ComfyUI v0.41.0 ships 1.55.17).
@@ -106,11 +123,13 @@ A new file shows up in the menu when the frontend refreshes the node definitions
 The node accepts the presets the app accepts, and its values are the app's own (tests compare both with the app's code), with these exceptions:
 
 - **Model limits are not applied.** The app trims a job to what its model can render, such as the allowed fps and the maximum duration. The node does not know which model follows, so it outputs the preset's values as they are.
-- **A preset with two camera moves is refused in `parametric` mode.** `WanCameraEmbedding` takes one move. The error says so and suggests `camera_mode` `prompt`. A node for combined moves is planned.
+- **A preset with two camera moves is refused in `parametric` mode.** `WanCameraEmbedding` takes one move, and the preset nodes have one `camera_pose` output. The error says so and suggests `camera_mode` `prompt`, or [Montagio Camera Embedding](#montagio-camera-embedding) with the second move set by hand.
 - **`prompt` mode gives a neutral camera.** For models without camera control, such as Wan 2.2 5B, `camera_pose` is `Static` and `speed` is 1.0, and the moves go into the `prompt` output as words. The node cannot see the graph, so it does not know whether `camera_pose` is linked: in this mode, do not link `camera_pose` if you want a driven camera.
 - **Presets with LoRAs are refused**, as in the app. A clip that dropped the LoRA would not be what the preset promises.
 - **A few rare YAML spellings with tabs.** A tab works as a separator, as in the app: after a colon, before a comment, at the end of a line, inside a value, or on a blank line. A tab used as indentation is refused, as in the app. Two spellings still differ: a tab right after a tag (`!!str<TAB>text`) or inside a `%YAML` directive line is refused by the node but accepted by the app, and a quoted text that goes on over lines indented with a tab alone is accepted by the node but refused by the app. Indent with spaces and a file reads the same in both. The other rare corners are listed at the top of `montagio_nodes/preset.py`.
-- **Known gap on the app side.** The app's compiler (`packages/presets/src/compile.ts`) currently joins two moves as `Pan Up + Zoom In`, a value `WanCameraEmbedding` would reject. It is tracked separately and the node does not copy it.
+- **Combined moves in the app.** For a preset with two moves, the app's compiler (`packages/presets/src/compile.ts`) turns the camera node of its workflow into Montagio Camera Embedding and fills `camera_pose_2` and `combine` (`together` by default, `then` when the preset says `combine: then`). The preset nodes of this pack have a single `camera_pose` output, so they cannot feed that node's second move yet.
+- **Presets may say how two moves combine.** `camera.combine` is `together` (the default) or `then`. `static` can be one of two moves only with `then`: before a move it waits, after one it holds. Two opposite moves (`zoom_in` and `zoom_out`, `pan_left` and `pan_right`, `pan_up` and `pan_down`, `roll_ccw` and `roll_cw`) also need `then`: together they would cancel out to a still camera. In `prompt` mode the two moves are joined with ", then " instead of ", ".
+- **Bundled presets with two moves.** Rise & Push, Drift Left Push, Pull Back & Tilt Up, Push & Settle and Breathing combine two moves, so the preset nodes refuse them in `parametric` mode (see above): use `camera_mode` `prompt`, or Montagio Camera Embedding with the two moves set by hand. The other seven bundled presets have one move.
 
 ## Development
 
@@ -123,6 +142,8 @@ npm run test:nodes                                  # python -m pytest comfy-nod
 ```
 
 The tests do not need ComfyUI or a GPU: a small fake of `comfy_api` stands in for it. The parity suite compares the Python reader and the Python outputs with the app's real `parsePreset` and `compileJob`, which it runs through a `tsx` bridge. Without the repository around the pack (a standalone checkout), these tests are skipped. `MONTAGIO_REQUIRE_TS_PARITY=1` turns a skip into a failure, which is how CI runs them.
+
+Three tests of `tests/test_camera.py` run Montagio Camera Embedding beside the core `WanCameraEmbedding` in a real ComfyUI v0.41.0 and want the same tensor. They are skipped unless `MONTAGIO_COMFYUI_DIR` names a ComfyUI checkout; its Python (with torch, a CPU build is enough) is `MONTAGIO_COMFYUI_PYTHON` or a `.venv` inside the checkout. Example on a GPU pod: `MONTAGIO_COMFYUI_DIR=/workspace/ComfyUI MONTAGIO_COMFYUI_PYTHON=/workspace/venvs/comfyui/bin/python npm run test:nodes`.
 
 `presets/` holds copies of the repository's `presets/*.yaml` and `presets/*.yml`, because the Registry publishes only this folder. Refresh them with `python comfy-nodes/scripts/sync_presets.py` (add `--check` to only list the differences). A test fails when the copies differ from the originals.
 

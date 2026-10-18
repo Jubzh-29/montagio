@@ -16,7 +16,7 @@ from tests.parity_cases import ACCEPTED, BASE, MINIMAL, MODELS_BLOCK, NO_DEFAULT
 
 def test_parses_crash_push_with_defaults():
     p = parse_preset(BASE, "crash-push.yaml")
-    assert p["camera"] == {"poses": ["zoom_in"], "speed": 1.5}
+    assert p["camera"] == {"poses": ["zoom_in"], "speed": 1.5, "combine": "together"}
     assert p["defaults"] == {"duration_s": 5, "resolution": "480p", "fps": 16}
     assert p["loras"] == [] and "fallback" in p["models"]
 
@@ -36,7 +36,7 @@ def test_every_optional_field_gets_its_default():
         "license": "MIT",
         "author": "me",
         "capability": "i2v-camera",
-        "camera": {"poses": ["static"], "speed": 1},
+        "camera": {"poses": ["static"], "speed": 1, "combine": "together"},
         "prompt": {"suffix": "", "negative": ""},
         "defaults": {"duration_s": 5, "resolution": "480p", "fps": 16},
         "models": {"preferred": "some-model"},

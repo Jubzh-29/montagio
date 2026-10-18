@@ -1,0 +1,87 @@
+/**
+ * The workflows of the repository and every preset compiled with them, checked offline
+ * against what ComfyUI v0.41.0 declares.
+ *
+ * fixtures/object_info-v0.41.0.json is the /object_info of a real ComfyUI v0.41.0 (commit
+ * 98cc0bf8, started with --cpu --disable-partner-nodes and the Montagio node pack, on
+ * 2026-10-18), cut down to the classes of workflows/*.api.json plus WanCameraEmbedding and
+ * MontagioCameraEmbedding, tooltips removed. The weight lists of the loaders are the files of
+ * registry/models.lock.yaml; LoadImage lists start.png. When a workflow gains a class, take
+ * that class from the /object_info of the GPU session, not from memory.
+ */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { compileJob, loadLibrary, type Aspect, type Library } from '@montagio/presets';
+import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
+
+const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const info = JSON.parse(readFileSync(new URL('./fixtures/object_info-v0.41.0.json', import.meta.url), 'utf8')) as ObjectInfo;
+const ASPECTS: Aspect[] = ['16:9', '9:16', '1:1'];
+
+let library: Library;
+beforeAll(async () => {
+  library = await loadLibrary(repoRoot);
+});
+
+test('every model template is accepted by ComfyUI v0.41.0 (object_info fixture)', () => {
+  for (const model of library.models.values()) {
+    expect({ model: model.id, problems: checkWorkflow(library.templates.get(model.workflow)!, info) }).toEqual({ model: model.id, problems: [] });
+  }
+});
+
+test('every binding names an input its node declares', () => {
+  for (const model of library.models.values()) {
+    const workflow = library.templates.get(model.workflow)!;
+    for (const [key, binding] of Object.entries(model.bindings)) {
+      const node = workflow[binding.node];
+      const spec = node && info[node.class_type]?.input;
+      const declared = { ...spec?.required, ...spec?.optional };
+      expect({ model: model.id, key, node: binding.node, class: node?.class_type, declared: binding.field in declared }).toEqual({
+        model: model.id,
+        key,
+        node: binding.node,
+        class: node?.class_type,
+        declared: true,
+      });
+    }
+  }
+});
+
+test('every preset compiles on its preferred and fallback models into a workflow ComfyUI v0.41.0 accepts', () => {
+  let compiled = 0;
+  for (const preset of library.presets.values()) {
+    for (const id of [preset.models.preferred, preset.models.fallback].filter((id): id is string => Boolean(id))) {
+      const model = library.models.get(id)!;
+      for (const aspect of ASPECTS) {
+        for (const resolution of model.limits.resolutions) {
+          const { workflow } = compileJob(preset, model, library.templates.get(model.workflow)!, { imageRef: 'start.png', seed: 7, aspect, resolution });
+          const problems = checkWorkflow(workflow, info);
+          expect({ preset: preset.id, model: id, aspect, resolution, problems }).toEqual({ preset: preset.id, model: id, aspect, resolution, problems: [] });
+          compiled++;
+        }
+      }
+    }
+  }
+  expect(compiled).toBeGreaterThanOrEqual(12 * 2 * 3);
+});
+
+test('a combined preset needs Montagio Camera Embedding, which a stock ComfyUI does not have', () => {
+  const preset = library.presets.get('rise-and-push')!;
+  const model = library.models.get(preset.models.preferred)!;
+  const { workflow } = compileJob(preset, model, library.templates.get(model.workflow)!, { imageRef: 'start.png', seed: 7, aspect: '16:9' });
+  const { MontagioCameraEmbedding: _pack, ...stock } = info;
+  expect(checkWorkflow(workflow, stock)).toEqual([expect.stringMatching(/class MontagioCameraEmbedding is not installed/)]);
+});
+
+test('the shipped workflows load no LoRA', () => {
+  for (const [path, workflow] of library.templates) {
+    expect({ path, loras: Object.values(workflow).filter((node) => /lora/i.test(node.class_type)) }).toEqual({ path, loras: [] });
+  }
+});
+
+test('every class of the fixture comes from the core of ComfyUI or from the Montagio pack', () => {
+  for (const [name, spec] of Object.entries(info)) {
+    const origin = name === 'MontagioCameraEmbedding' ? 'custom_nodes.montagio' : /^(nodes|comfy_extras\.[a-z0-9_]+)$/;
+    expect({ name, module: spec.python_module }).toEqual({ name, module: expect.stringMatching(origin) });
+  }
+});

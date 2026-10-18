@@ -16,6 +16,7 @@ wins on a name clash), any folder that extra_model_paths.yaml adds under the nam
 "montagio_presets", and the presets shipped with the pack (last).
 """
 import hashlib
+import importlib
 import logging
 import os
 from dataclasses import astuple
@@ -23,9 +24,11 @@ from dataclasses import astuple
 import folder_paths
 from comfy_api.latest import ComfyExtension, io
 
+from .camera import COMBINE_MODES, camera_rows, check_length, trajectory
 from .catalog import BUNDLED_DIR, list_presets, resolve_preset
 from .params import ASPECTS, AUTO, CAMERA_MODES, DIMENSIONS, ParamsError, compute_params, resolve_aspect
 from .preset import PresetError, parse_preset
+from .wan import WAN_CAMERA_POSES
 
 FOLDER_KEY = "montagio_presets"  # the name of the preset folders in folder_paths
 CATEGORY = "Montagio"
@@ -166,9 +169,83 @@ class MontagioPresetFromYAML(io.ComfyNode):
         return _node_output(parsed, aspect=aspect, resolution=resolution, camera_mode=camera_mode, prompt=prompt, image=image)
 
 
+CORE_CAMERA_MODULE = "comfy_extras.nodes_camera_trajectory"  # where WanCameraEmbedding and its helpers live
+MAX_RESOLUTION = 16384  # nodes.MAX_RESOLUTION of ComfyUI v0.41.0
+
+
+def wan_layout(plucker):
+    """The embedding in the layout WanCameraImageToVideo takes.
+
+    The same steps as the end of WanCameraEmbedding.execute in ComfyUI v0.41.0
+    (comfy_extras/nodes_camera_trajectory.py, GPL-3.0): channels first, the first frame
+    repeated 4 times, then frames grouped by 4 into 24 channels.
+    """
+    import comfy.model_management  # ComfyUI's, imported when the node runs
+    import torch
+
+    video = plucker.permute([3, 0, 1, 2]).unsqueeze(0).to(device=comfy.model_management.intermediate_device())
+    video = torch.concat([torch.repeat_interleave(video[:, :, 0:1], repeats=4, dim=2), video[:, :, 1:]], dim=2).transpose(1, 2)
+    b, f, c, h, w = video.shape
+    video = video.contiguous().view(b, f // 4, 4, c, h, w).transpose(2, 3)
+    return video.contiguous().view(b, f // 4, c * 4, h, w).transpose(1, 2)
+
+
+class MontagioCameraEmbedding(io.ComfyNode):
+    """WanCameraEmbedding with a second move: both at once ("together") or one after the other ("then").
+
+    Its inputs keep the names and bounds of the core node and its outputs are the same, so it
+    replaces WanCameraEmbedding in a workflow without changing a link. The Plücker embedding is
+    computed by the core's own process_pose_params, from the path camera.py builds.
+    """
+
+    @classmethod
+    def define_schema(cls):
+        return io.Schema(
+            node_id="MontagioCameraEmbedding",
+            display_name="Montagio Camera Embedding",
+            category=CATEGORY,
+            description='Two camera moves of WanCameraEmbedding at once ("together") or one after the other ("then").',
+            inputs=[
+                io.Combo.Input("camera_pose", options=list(WAN_CAMERA_POSES), default="Static"),
+                io.Combo.Input("camera_pose_2", options=list(WAN_CAMERA_POSES), default="Static"),
+                io.Combo.Input("combine", options=list(COMBINE_MODES), default=COMBINE_MODES[0]),
+                io.Int.Input("width", default=832, min=16, max=MAX_RESOLUTION, step=16),
+                io.Int.Input("height", default=480, min=16, max=MAX_RESOLUTION, step=16),
+                io.Int.Input("length", default=81, min=1, max=MAX_RESOLUTION, step=4),
+                io.Float.Input("speed", default=1.0, min=0, max=10.0, step=0.1, optional=True),
+                io.Float.Input("fx", default=0.5, min=0, max=1, step=0.000000001, optional=True, advanced=True),
+                io.Float.Input("fy", default=0.5, min=0, max=1, step=0.000000001, optional=True, advanced=True),
+                io.Float.Input("cx", default=0.5, min=0, max=1, step=0.01, optional=True, advanced=True),
+                io.Float.Input("cy", default=0.5, min=0, max=1, step=0.01, optional=True, advanced=True),
+            ],
+            outputs=[
+                io.WanCameraEmbedding.Output(display_name="camera_embedding"),
+                io.Int.Output(display_name="width"),
+                io.Int.Output(display_name="height"),
+                io.Int.Output(display_name="length"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, camera_pose, camera_pose_2, combine, width, height, length, speed=1.0, fx=0.5, fy=0.5, cx=0.5, cy=0.5):
+        check_length(length)
+        core = importlib.import_module(CORE_CAMERA_MODULE)
+        poses = core.CAMERA_DICT
+
+        def motion(pose):
+            return poses[pose]["angle"], poses[pose]["T"]
+
+        path = trajectory(
+            motion(camera_pose), motion(camera_pose_2), combine, speed, length,
+            base_angle=poses["base_angle"], base_t=poses["base_T_norm"],
+        )
+        plucker = core.process_pose_params(camera_rows(path, fx, fy, cx, cy), width=width, height=height)
+        return io.NodeOutput(wan_layout(plucker), width, height, length)
+
+
 class MontagioExtension(ComfyExtension):
     async def get_node_list(self):
-        return [MontagioLoadPreset, MontagioPresetFromYAML]
+        return [MontagioLoadPreset, MontagioPresetFromYAML, MontagioCameraEmbedding]
 
 
 async def comfy_entrypoint() -> MontagioExtension:

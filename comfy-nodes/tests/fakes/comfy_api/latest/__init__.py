@@ -166,6 +166,15 @@ class Image(_ComfyType):
         pass
 
 
+@_comfytype("WAN_CAMERA_EMBEDDING")
+class WanCameraEmbedding(_ComfyType):
+    class Input(Input):
+        pass
+
+    class Output(Output):
+        pass
+
+
 @dataclass
 class Schema:
     node_id: str
@@ -276,4 +285,5 @@ io = SimpleNamespace(
     Int=Int,
     Float=Float,
     Image=Image,
+    WanCameraEmbedding=WanCameraEmbedding,
 )

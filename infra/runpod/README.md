@@ -1,6 +1,6 @@
 # GPU session tooling (Runpod)
 
-Scripts that turn a rented GPU pod (RTX 4090, 24 GB) into a Montagio backend: ComfyUI started with `--disable-partner-nodes`, the [comfy-api-proxy](https://github.com/Comfy-Org/comfy-api-proxy) (MIT) in front of it, the open weights of `registry/models.lock.yaml`, and a smoke test that goes through the Comfy SDK. The step-by-step session guide is [docs/S1_CHECKLIST.md](../../docs/S1_CHECKLIST.md) (in French).
+Scripts that turn a rented GPU pod (RTX 4090, 24 GB) into a Montagio backend: ComfyUI started with `--disable-partner-nodes`, the [comfy-api-proxy](https://github.com/Comfy-Org/comfy-api-proxy) (MIT) in front of it, the open weights of `registry/models.lock.yaml`, and a smoke test that goes through the Comfy SDK. The step-by-step guide of GPU session S2, the first one, is [docs/S2_CHECKLIST.md](../../docs/S2_CHECKLIST.md) (in French); session S1 became an analysis without GPU, [docs/S1_ANALYSE.md](../../docs/S1_ANALYSE.md).
 
 | File | What it does |
 |---|---|
@@ -24,3 +24,5 @@ bash infra/runpod/bootstrap.sh collect
 - Weights come only from `registry/models.lock.yaml`. Files fetched with `--extra` (evaluation of a candidate whose license is still being read) are hashed and reported but never added to the lock patch.
 
 Without a GPU, `npm run smoke -w @montagio/infra-runpod -- --dry-run` and `npm run weights -w @montagio/infra-runpod -- --dry-run` show what a session would run and download.
+
+`npm run weights -w @montagio/infra-runpod -- --lock-from-hf` writes the lock patch (exact `resolve/main/…` URL, size, and the sha256 Hugging Face stores as the LFS object id) from Hugging Face's metadata alone, without downloading a byte of weights. In every mode, a lock entry whose pinned sha256 or size no longer matches what Hugging Face serves fails before any download.

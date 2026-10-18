@@ -23,7 +23,7 @@ export type BindingKey = (typeof BINDING_KEYS)[number];
 export const REQUIRED_BINDINGS: Record<Capability, BindingKey[]> = {
   'i2v-camera': ['image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames', 'camera_pose', 'camera_speed'],
   i2v: ['image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames'],
-  t2i: ['prompt', 'negative', 'seed', 'width', 'height'],
+  t2i: ['prompt', 'seed', 'width', 'height'],
 };
 
 const kebabId = z.string().max(64).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'must be kebab-case (a-z, 0-9, -)');
@@ -76,6 +76,8 @@ export const LockEntrySchema = z
     file: z.string().min(1),
     url: z.string().startsWith('https://huggingface.co/', 'url must point to https://huggingface.co/'),
     sha256: z.string().regex(/^[a-f0-9]{64}$/, 'sha256 must be 64 lowercase hex characters').optional(),
+    /** Size of the file in bytes, as Hugging Face publishes it. */
+    size: z.number().int('size must be a whole number of bytes').positive('size must be a positive number of bytes').optional(),
     license: z.string().min(1),
     source: z.string().url(),
   })

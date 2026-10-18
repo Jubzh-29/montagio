@@ -23,7 +23,7 @@ import { parseArgs } from 'node:util';
 import { Comfy, type Job, type WorkflowGraph } from '@comfyorg/sdk';
 import { CAMERA_POSE_VALUES, compileJob, loadLibrary, pickAspect, type ApiWorkflow, type Resolution } from '@montagio/presets';
 import { imageSize } from 'image-size';
-import { assertLocalBaseUrl, checkWorkflow, comboOptions, guardFetch, VramSampler, type ObjectInfo, type VramStats } from './lib/comfy';
+import { assertLocalBaseUrl, cameraMove, checkWorkflow, comboOptions, guardFetch, VramSampler, type ObjectInfo, type VramStats } from './lib/comfy';
 
 const DEFAULT_PROXY_URL = 'http://127.0.0.1:8189';
 const DEFAULT_COMFYUI_URL = 'http://127.0.0.1:8188';
@@ -82,7 +82,7 @@ type SmokeRecord = {
   run: number;
   status: string;
   error: unknown;
-  camera: { mode: string; pose: string | null; speed: number | null };
+  camera: { mode: string; pose: string | null; pose_2: string | null; combine: string | null; speed: number | null };
   width: number;
   height: number;
   frames: number;
@@ -213,7 +213,7 @@ async function main(): Promise<number> {
         run,
         status: 'compiled',
         error: null,
-        camera: { mode: params.cameraMode, pose: params.cameraPose, speed: params.cameraSpeed },
+        camera: { mode: params.cameraMode, pose: params.cameraPose, pose_2: params.cameraPose2, combine: params.cameraCombine, speed: params.cameraSpeed },
         width: params.width,
         height: params.height,
         frames: params.frames,
@@ -232,7 +232,7 @@ async function main(): Promise<number> {
       };
       console.log(
         `\n▶ ${preset.id} on ${model.id} (run ${run}/${runs}): ${params.width}x${params.height}, ${params.frames} frames @ ${params.fps} fps, ` +
-          `camera ${params.cameraMode}${params.cameraPose ? ` "${params.cameraPose}" speed ${params.cameraSpeed}` : ''}`,
+          `camera ${params.cameraMode}${params.cameraPose ? ` "${cameraMove(params)}" speed ${params.cameraSpeed}` : ''}`,
       );
 
       if (client) {
@@ -252,7 +252,8 @@ async function main(): Promise<number> {
 
   console.log('\npreset         model                       camera                  run  status            wall s  exec s  peak VRAM MiB');
   for (const r of records) {
-    const camera = r.camera.pose ? `${r.camera.pose} x${r.camera.speed}` : r.camera.mode;
+    const move = cameraMove({ cameraPose: r.camera.pose, cameraPose2: r.camera.pose_2, cameraCombine: r.camera.combine as 'together' | 'then' | null });
+    const camera = move ? `${move} x${r.camera.speed}` : r.camera.mode;
     console.log(
       `${r.preset.padEnd(14)} ${r.model.padEnd(27)} ${camera.padEnd(23)} ${String(r.run).padEnd(4)} ${r.status.padEnd(17)} ` +
         `${String(r.wall_s ?? '-').padStart(6)}  ${String(r.exec_s ?? '-').padStart(6)}  ${String(r.vram?.peakMiB ?? '-').padStart(13)}`,

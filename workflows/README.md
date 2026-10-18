@@ -1,0 +1,57 @@
+# Workflows
+
+ComfyUI workflows in the API format, one per model of `registry/models/`. The compiler (`packages/presets/src/compile.ts`) fills the inputs named by each model's `bindings` (image, prompt, seed, size, frames, fps, camera move) and leaves everything else as it is here.
+
+They are converted from the official ComfyUI templates of [Comfy-Org/workflow_templates](https://github.com/Comfy-Org/workflow_templates), MIT License, Copyright (c) 2023-present Comfy Org (full text in [LICENSE.workflow_templates](LICENSE.workflow_templates)), at commit `59a3b48bf369c5a15f29a1308bae3e279fa15505` (2026-10-18):
+
+| Workflow | Template | Model |
+|---|---|---|
+| `wan22-fun-camera.api.json` | `templates/video_wan2_2_14B_fun_camera.json` | Wan 2.2 Fun Camera 14B (high and low noise) |
+| `wan22-ti2v-5b.api.json` | `templates/video_wan2_2_5B_ti2v.json` | Wan 2.2 TI2V 5B |
+| `z-image-turbo.api.json` | `templates/image_z_image_turbo.json` | Z-Image-Turbo |
+
+## How they were converted
+
+The node ids are the template's, so each node can be found in the template. The input names and the order of the widget values come from the `/object_info` of ComfyUI v0.41.0 (commit `98cc0bf8`):
+- the values in `widgets_values` follow the widget inputs in `input_order` (required, then optional);
+- a widget fed by a link keeps its slot, but the link wins;
+- `control_after_generate` adds one value after a seed, and `image_upload` one after an image;
+- a dynamic combo (the `format` of `SaveVideo`) is followed by the widgets of its selected option, written `format.codec`.
+
+Only active nodes are kept: notes are left out, as are bypassed nodes. The Z-Image-Turbo template wraps its nodes in a subgraph, whose widgets are proxies of the inner nodes. The workflow keeps the inner nodes with their own ids and values.
+
+Each workflow was then checked by `POST /prompt` on that ComfyUI v0.41.0, with empty model files named as in the lock. All three passed validation with no node error, and the run was interrupted before anything loaded. `infra/runpod/test/workflows.test.ts` repeats the check offline, on these files and on every preset compiled with them.
+
+## Changes from the templates
+
+All models:
+- the prompt texts are empty (the compiler writes them);
+- the seeds are 0;
+- `LoadImage` loads `start.png`, a placeholder that the app replaces with the uploaded image;
+- the size is 832×480 (the compiler writes the size of the job);
+- `SaveVideo` writes `montagio/clip` as an MP4 in H.264 (`format` `mp4`, `format.codec` `h264`; the template has `auto` for both, which also gives an MP4). `SaveImage` writes `montagio/image`.
+
+Wan 2.2 Fun Camera:
+- only the 20-step group is kept: two `KSamplerAdvanced`, 10 steps on the high-noise model then 10 on the low-noise model, cfg 3.5, euler/simple, and `ModelSamplingSD3` with shift 8 on both models;
+- the template's second group (4 steps, with the LightX2V LoRAs) is left out until GPU session S2 has checked that the camera move survives it (see `docs/S1_ANALYSE.md`). Its own note says these LoRAs lose some of the motion.
+- The template's negative prompt is the default Wan negative (Chinese text, node 99 of the template). The compiler replaces the negative with the preset's, so it is not kept here. GPU session S2 compares the two.
+
+Wan 2.2 5B:
+- the template ships `LoadImage` bypassed (text to video); here it is active and feeds `start_image` of `Wan22ImageToVideoLatent` (image to video);
+- `ModelSamplingSD3` with shift 8, `KSampler` 20 steps, cfg 5, uni_pc/simple, 24 fps. The template renders at 1280×704. `Wan22ImageToVideoLatent` asks for multiples of 32 in its widget, while the app's 720p table gives 1280×720: GPU session S2 checks 720p on this model.
+
+Z-Image-Turbo:
+- the negative is `ConditioningZeroOut` of the positive, as in the template. At cfg 1 there is no negative prompt, so the model has no `negative` binding;
+- `ModelSamplingAuraFlow` with shift 3, `KSampler` 8 steps, cfg 1, res_multistep/simple.
+
+## Combined camera moves
+
+A preset with two moves needs the Montagio Camera Embedding node (`comfy-nodes/`, GPL-3.0). The compiler switches node 108 of the Fun Camera workflow from `WanCameraEmbedding` to `MontagioCameraEmbedding` and adds `camera_pose_2` and `combine`. A preset with one move keeps the core node.
+
+## Bindings
+
+| Model | image | prompt | negative | seed | width / height / frames | fps | camera_pose / camera_speed |
+|---|---|---|---|---|---|---|---|
+| `wan22-i2v-a14b-fun-camera` | 97.image | 107.text | 99.text | 102.noise_seed | 108.width / height / length | 105.fps | 108.camera_pose / speed |
+| `wan22-ti2v-5b` | 56.image | 6.text | 7.text | 3.seed | 55.width / height / length | 57.fps | (camera in the prompt) |
+| `z-image-turbo` | | 27.text | | 3.seed | 13.width / height | | |

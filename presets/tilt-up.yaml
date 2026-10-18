@@ -1,5 +1,5 @@
 # Draft (plan 2b): provisional name and settings, tuned in GPU session S2.
-# Note: "Pan Up" / "Pan Down" of WanCameraEmbedding move the camera (translation) rather than rotate it; GPU session S1 decides how a tilt renders.
+# Note: "Pan Up" / "Pan Down" of WanCameraEmbedding move the camera (translation) rather than rotate it; GPU session S2 decides how a tilt renders (see docs/S1_ANALYSE.md).
 schema: montagio/preset@0.1
 id: tilt-up
 name: Tilt Up
