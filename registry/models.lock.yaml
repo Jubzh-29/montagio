@@ -1,50 +1,72 @@
-# Provisional lock (2026-10-17): repository-level URLs and declared licenses.
-# Exact file URLs and sha256 are filled after GPU session S1 (plan 2), once
-# every file is downloaded and its LICENSE re-read at the source.
+# Weight lock (2026-10-18): exact file URLs, sizes and sha256, read from the
+# Hugging Face API (`paths-info`, sha256 = `lfs.oid` of the LFS object) without
+# downloading anything (`npm run weights -w @montagio/infra-runpod -- --lock-from-hf`).
+# `url` is the file actually downloaded (Comfy-Org single-file repackagings);
+# `source` is the original repository, where the license was read at the
+# source: see docs/S1_ANALYSE.md. fetch-weights refuses a file whose sha256 or
+# size no longer matches this lock.
 schema: montagio/lock@0.1
 weights:
   - id: wan22-fun-camera-high
     file: wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors
-    url: https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors
+    sha256: 89a99cb5ab29e388f2e24fddac48eab4d88ca339d236c7a8d96aabacd0f525ae
+    size: 15301408048
     license: Apache-2.0
     source: https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera
   - id: wan22-fun-camera-low
     file: wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors
-    url: https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors
+    sha256: a2b7b361e3fad907958aa6ad662a3673bad5ffdce14706cffde4baabb98f9020
+    size: 15301408048
     license: Apache-2.0
     source: https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera
   - id: wan22-ti2v-5b
     file: wan2.2_ti2v_5B_fp16.safetensors
-    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_ti2v_5B_fp16.safetensors
+    sha256: 456f901338bd9eadbded3828b819109a9b68e8a525ca5cf8d0049a69fcfeca1e
+    size: 9999658848
     license: Apache-2.0
     source: https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B
   - id: umt5-xxl-fp8
     file: umt5_xxl_fp8_e4m3fn_scaled.safetensors
-    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged
+    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors
+    sha256: c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68
+    size: 6735906897
     license: Apache-2.0
     source: https://huggingface.co/google/umt5-xxl
   - id: wan21-vae
     file: wan_2.1_vae.safetensors
-    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged
+    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
+    sha256: 2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b
+    size: 253815318
     license: Apache-2.0
     source: https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P
   - id: wan22-vae
     file: wan2.2_vae.safetensors
-    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/vae/wan2.2_vae.safetensors
+    sha256: e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156
+    size: 1409400960
     license: Apache-2.0
     source: https://huggingface.co/Wan-AI/Wan2.2-TI2V-5B
   - id: z-image-turbo
     file: z_image_turbo_bf16.safetensors
-    url: https://huggingface.co/Tongyi-MAI/Z-Image-Turbo
+    url: https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors
+    sha256: 2407613050b809ffdff18a4ac99af83ea6b95443ecebdf80e064a79c825574a6
+    size: 12309866400
     license: Apache-2.0
     source: https://huggingface.co/Tongyi-MAI/Z-Image-Turbo
   - id: qwen3-4b
     file: qwen_3_4b.safetensors
-    url: https://huggingface.co/Qwen/Qwen3-4B
+    url: https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors
+    sha256: 6c671498573ac2f7a5501502ccce8d2b08ea6ca2f661c458e708f36b36edfc5a
+    size: 8044982048
     license: Apache-2.0
     source: https://huggingface.co/Qwen/Qwen3-4B
   - id: flux-ae
     file: ae.safetensors
-    url: https://huggingface.co/black-forest-labs/FLUX.1-schnell
+    url: https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors
+    sha256: afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38
+    size: 335304388
     license: Apache-2.0
     source: https://huggingface.co/black-forest-labs/FLUX.1-schnell
