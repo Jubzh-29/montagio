@@ -14,6 +14,8 @@ export default defineConfig({
   globalSetup: './e2e/warm-up.ts',
   timeout: 60_000,
   fullyParallel: false,
+  // One worker: parallel spec files starved each other of CPU on a loaded dev machine (5 s waits missed), and it keeps the PC cooler.
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   use: { baseURL: `http://localhost:${PORT}`, trace: 'retain-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
