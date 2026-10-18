@@ -8,6 +8,10 @@ The [ComfyUI node pack](comfy-nodes/README.md) loads the same preset files in a 
 
 > Status: **pre-alpha** — under active construction (October 2026).
 
+## Online showcase
+
+The demo link is a **static showcase** of the real Studio: pick a sample photo and a camera preset to play a clip pre-generated with Montagio on open weights, assemble a 2–3 shot film in your browser (FFmpeg compiled to WebAssembly), remix and check a preset, download its ComfyUI workflow. It renders nothing on a GPU, costs nothing to host and collects nothing. Build it with `npm run showcase:build -w @montagio/web`; how it is built, deployed and updated after a GPU session is in [docs/VITRINE.md](docs/VITRINE.md) (French).
+
 ## Principles
 
 - **Open weights only.** The official distribution ships only models whose weights are licensed Apache-2.0 or MIT. No closed API, no partner node, no proprietary connector — and a CI check (`check-open-stack`) proves it on every commit.
