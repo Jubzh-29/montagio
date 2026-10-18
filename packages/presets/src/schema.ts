@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CAMERA_POSES = ['static', 'pan_left', 'pan_right', 'pan_up', 'pan_down', 'zoom_in', 'zoom_out'] as const;
+export const CAMERA_POSES = ['static', 'pan_left', 'pan_right', 'pan_up', 'pan_down', 'zoom_in', 'zoom_out', 'roll_ccw', 'roll_cw'] as const;
 export type CameraPose = (typeof CAMERA_POSES)[number];
 
 /** How two moves combine: both at once over the whole clip, or the first then the second. */

@@ -18,6 +18,8 @@ POSE_VALUES = {
     "pan_down": "Pan Down",
     "zoom_in": "Zoom In",
     "zoom_out": "Zoom Out",
+    "roll_ccw": "Anti Clockwise (ACW)",
+    "roll_cw": "ClockWise (CW)",
 }
 
 # CAMERA_POSE_PROMPTS of compile.ts: the same moves in words, for a model without camera control
@@ -29,6 +31,8 @@ POSE_PROMPTS = {
     "pan_down": "the camera tilts down",
     "zoom_in": "the camera pushes in toward the subject",
     "zoom_out": "the camera pulls back from the subject",
+    "roll_ccw": "the camera rolls counterclockwise",
+    "roll_cw": "the camera rolls clockwise",
 }
 
 ASPECTS = ("16:9", "9:16", "1:1")

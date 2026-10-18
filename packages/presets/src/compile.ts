@@ -52,6 +52,8 @@ export const CAMERA_POSE_VALUES: Record<CameraPose, string> = {
   pan_down: 'Pan Down',
   zoom_in: 'Zoom In',
   zoom_out: 'Zoom Out',
+  roll_ccw: 'Anti Clockwise (ACW)',
+  roll_cw: 'ClockWise (CW)',
 };
 
 /** Degraded mode for models without parametric camera control. */
@@ -63,6 +65,8 @@ export const CAMERA_POSE_PROMPTS: Record<CameraPose, string> = {
   pan_down: 'the camera tilts down',
   zoom_in: 'the camera pushes in toward the subject',
   zoom_out: 'the camera pulls back from the subject',
+  roll_ccw: 'the camera rolls counterclockwise',
+  roll_cw: 'the camera rolls clockwise',
 };
 
 export class CompileError extends Error {

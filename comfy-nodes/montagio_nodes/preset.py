@@ -25,7 +25,7 @@ import re
 
 import yaml
 
-CAMERA_POSES = ("static", "pan_left", "pan_right", "pan_up", "pan_down", "zoom_in", "zoom_out")
+CAMERA_POSES = ("static", "pan_left", "pan_right", "pan_up", "pan_down", "zoom_in", "zoom_out", "roll_ccw", "roll_cw")
 CAMERA_COMBINES = ("together", "then")  # how two moves combine: at once, or one after the other
 LICENSES = ("CC-BY-4.0", "CC0-1.0", "Apache-2.0", "MIT")
 RESOLUTIONS = ("480p", "720p")

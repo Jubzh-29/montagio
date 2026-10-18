@@ -83,6 +83,13 @@ def test_every_app_pose_value_is_a_wan_value():
     assert set(POSE_VALUES.values()) <= set(WAN_CAMERA_POSES)
 
 
+def test_every_wan_value_is_reachable_from_a_preset():
+    # the two rolls included: roll_ccw is "Anti Clockwise (ACW)", roll_cw is "ClockWise (CW)"
+    assert sorted(POSE_VALUES.values()) == sorted(WAN_CAMERA_POSES)
+    assert (POSE_VALUES["roll_ccw"], POSE_VALUES["roll_cw"]) == ("Anti Clockwise (ACW)", "ClockWise (CW)")
+    assert (POSE_PROMPTS["roll_ccw"], POSE_PROMPTS["roll_cw"]) == ("the camera rolls counterclockwise", "the camera rolls clockwise")
+
+
 def test_every_pose_of_a_preset_reaches_the_camera_node_as_a_wan_value():
     for pose in CAMERA_POSES:
         preset = parse_preset(edit("poses: [zoom_in]", f"poses: [{pose}]"), f"{pose}.yaml")
