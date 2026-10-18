@@ -1,6 +1,6 @@
 # GPU session tooling (Runpod)
 
-Scripts that turn a rented GPU pod (RTX 4090, 24 GB) into a Montagio backend: ComfyUI started with `--disable-partner-nodes`, the [comfy-api-proxy](https://github.com/Comfy-Org/comfy-api-proxy) (MIT) in front of it, the open weights of `registry/models.lock.yaml`, and a smoke test that goes through the Comfy SDK. The step-by-step session guide is [docs/S1_CHECKLIST.md](../../docs/S1_CHECKLIST.md) (in French).
+Scripts that turn a rented GPU pod (RTX 4090, 24 GB) into a Montagio backend: ComfyUI started with `--disable-partner-nodes`, the [comfy-api-proxy](https://github.com/Comfy-Org/comfy-api-proxy) (MIT) in front of it, the open weights of `registry/models.lock.yaml`, and a smoke test that goes through the Comfy SDK. The step-by-step guide of GPU session S2, the first one, is [docs/S2_CHECKLIST.md](../../docs/S2_CHECKLIST.md) (in French); session S1 became an analysis without GPU, [docs/S1_ANALYSE.md](../../docs/S1_ANALYSE.md).
 
 | File | What it does |
 |---|---|

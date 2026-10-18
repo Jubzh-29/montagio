@@ -92,3 +92,68 @@ Lecture du code de ComfyUI v0.41.0 :
 3. **Latent.** `WanCameraImageToVideo` (`comfy_extras/nodes_wan.py`, l. 430 et 431) fabrique un latent Wan 2.1 à **16 canaux en /8**, et `WAN22_Camera` hérite de `latent_format = Wan21`. Le 5B travaille avec le VAE Wan 2.2 : **48 canaux en /16** (`Wan22ImageToVideoLatent`, l. 1439). Le `in_dim` de 100 vaut 48 (bruit) + 4 (masque) + 48 (image) : c'est la version Wan 2.2 de l'entrée à 36 canaux du 14B.
 
 **Décision :** pas de caméra paramétrique en 5B avec le cœur de ComfyUI v0.41.0. Le mode « Rapide » garde la caméra pilotée par le texte, que le compilateur gère déjà (`cameraMode: 'prompt'`). Il faudrait sinon une classe de modèle, un adaptateur et un node de latent nouveaux dans le cœur, ce qui sort du périmètre du concours. La S2 n'a **rien à tester** sur ce point. Il faudra rouvrir la question si une version de ComfyUI ajoute une classe `camera_2.2` à `in_dim` 100.
+
+## 4. Vrais workflows (Q6)
+
+Les trois `workflows/*.api.json` sont convertis depuis les templates officiels de [Comfy-Org/workflow_templates](https://github.com/Comfy-Org/workflow_templates) (MIT, commit `59a3b48b`), d'après les définitions des nodes de ComfyUI v0.41.0. La provenance, les règles de conversion et chaque écart au template sont dans [workflows/README.md](../workflows/README.md). Points clés :
+
+- **Fun Camera 14B** (`video_wan2_2_14B_fun_camera.json`) : on garde le groupe 20 étapes. Il passe par deux `KSamplerAdvanced` (10 étapes sur le modèle « high noise », puis 10 sur le « low noise »), en cfg 3,5, euler/simple, avec **`ModelSamplingSD3` shift 8** sur les deux modèles. Ce node manquait au workflow provisoire. Le second groupe du template (4 étapes, LoRA LightX2V) est laissé de côté jusqu'à la S2.
+- **5B** (`video_wan2_2_5B_ti2v.json`) : shift 8, 20 étapes, cfg 5, uni_pc. Le template livre `LoadImage` désactivé (texte vers vidéo) ; il est réactivé ici (image vers vidéo).
+- **Z-Image-Turbo** (`image_z_image_turbo.json`) : le sous-graphe est aplati. `ModelSamplingAuraFlow` shift 3, 8 étapes, cfg 1, res_multistep. Le négatif est un `ConditioningZeroOut`, donc il n'y a pas de prompt négatif. Le registre n'exige plus de binding `negative` pour `t2i`.
+- **`SaveVideo`** écrit un MP4 H.264 (`format` `mp4`, `format.codec` `h264`). Ces valeurs ont été vérifiées par un rendu sans modèle : une image de 64 × 48, encodée en vidéo d'une image.
+- **Bindings** : les identifiants de nodes sont ceux du template. Ils sont dans `registry/models/*.yaml` et dans la table du README des workflows.
+- **`allowed-nodes.yaml`** gagne quatre classes : `ModelSamplingSD3` et `ModelSamplingAuraFlow` (`comfy_extras/nodes_model_advanced.py`), `ConditioningZeroOut` (`nodes.py`), toutes trois du cœur d'après le `python_module` de `/object_info`, et `MontagioCameraEmbedding` (notre pack, GPL-3.0).
+
+## 5. Combinaisons de mouvements (Q1)
+
+- Le vrai ComfyUI v0.41.0 refuse `"Zoom In + Pan Left"` (`value_not_in_list`). Le défaut de l'ancien `compile.ts` est donc confirmé.
+- **Nouveau node `Montagio Camera Embedding`** (`comfy-nodes/`, GPL-3.0). Il reprend les entrées et les sorties de `WanCameraEmbedding` et ajoute `camera_pose_2` et `combine` :
+  - `together` additionne les vecteurs des deux poses ;
+  - `then` déroule la première pose sur la première moitié du clip, puis la seconde à partir de là.
+
+  Le node construit la trajectoire en numpy et réutilise `process_pose_params` du cœur pour le calcul de Plücker.
+- **Vérification.** Sur le ComfyUI v0.41.0 en CPU, pour les 9 poses seules, notre node rend exactement le tenseur du `WanCameraEmbedding` du cœur (`torch.equal`, en 64 × 48 sur 9 images). Les deux modes combinés donnent un tenseur de même forme, `[1, 24, 3, 48, 64]`, aux valeurs finies. Les tests légers comparent la trajectoire à une réécriture de la formule du cœur, image par image.
+- **Presets.**
+  - Le schéma gagne `camera.combine` (`together` par défaut, ou `then`). `static` n'entre dans une paire qu'avec `then`.
+  - Pour deux poses, `compile.ts` remplace le node caméra par `MontagioCameraEmbedding`. Un preset à une pose garde le node du cœur et tourne donc sur un ComfyUI sans notre pack.
+  - Rise & Push, Drift Left Push et Pull Back & Tilt Up utilisent `together`.
+  - À votre demande, Push & Settle devient `[zoom_in, static]` en `then` (avancée puis arrêt), et Breathing `[zoom_in, zoom_out]` en `then`.
+  - Les 12 presets compilés passent le contrôle hors ligne. 10 compilations ont aussi passé la validation du vrai ComfyUI.
+- **À voir en S2 :** la qualité réelle des deux modes, et la vitesse maximale exploitable. Fun-Camera n'a jamais vu ces trajectoires sommées. Le pack Montagio doit être installé sur le pod pour les presets combinés.
+
+## 6. Rotations ACW/CW (Q2)
+
+À votre demande, deux poses rejoignent le schéma, **sans nouveau preset** : `roll_ccw` (« Anti Clockwise (ACW) ») et `roll_cw` (« ClockWise (CW) »). Toutes les valeurs de `camera_pose` du node du cœur sont donc accessibles depuis un preset, et le remix les accepte. `base_angle` vaut π/3, si bien qu'à la vitesse 1 la caméra tourne de 60° sur le clip : un « Dutch angle » se situerait autour de 0,3. La S2 décidera d'un preset après avoir vu un rendu. Dans la galerie, le glyphe affiche une rotation comme une caméra fixe ; aucun preset n'en utilise.
+
+## 7. Validation sur un ComfyUI en mode CPU
+
+ComfyUI v0.41.0 a été installé dans `../comfyui-cpu-v0.41.0`, hors du dépôt :
+- commit `98cc0bf8` vérifié ;
+- torch 2.14.1+cpu ;
+- 2,1 Go sur le disque ;
+- `pydantic` ajouté (classé « non essentiel », mais importé au démarrage).
+
+Il a été lancé avec `--cpu --disable-partner-nodes` et le pack Montagio. Résultat : 650 classes, **0 node partenaire**, et les 19 classes utiles toutes présentes.
+
+Les fichiers de modèle étaient **vides**, avec les noms du lock. Chaque `POST /prompt` a été suivi aussitôt d'un `/interrupt` et d'un vidage de la file, et **rien n'a été généré**. Ont passé la validation, sans erreur de node : les 3 workflows, puis 10 presets compilés (Crash Push, Rise & Push, Push & Settle et Breathing sur Fun Camera, en 480p et 720p ; Crash Push sur le 5B en 480p et 720p).
+
+Le `/object_info` de cette installation sert de fixture (`infra/runpod/test/fixtures/object_info-v0.41.0.json`) au contrôle hors ligne `infra/runpod/test/workflows.test.ts`. Vous pouvez supprimer le dossier `comfyui-cpu-v0.41.0` ; le garder permet de rejouer le test lourd du node (`MONTAGIO_COMFYUI_DIR=<dossier> npm run test:nodes`).
+
+## 8. À vérifier sur GPU en S2
+
+Ce que ni le code ni les métadonnées ne peuvent dire :
+
+1. **Premier rendu réel** de Fun Camera en 480p avec le workflow officiel. Temps à froid et à chaud, pic de VRAM sur 24 Go (deux 14B en fp8 qui se relaient).
+2. **720p** sur Fun Camera : temps et VRAM, ou dépassement de mémoire.
+3. **5B** en 480p et en 720p. Le widget de `Wan22ImageToVideoLatent` demande des multiples de 32, or 720 n'en est pas un, et le template officiel utilise 1280 × 704. Si la qualité ou le rendu en pâtissent, la S2 doit donner au 5B ses propres dimensions en 720p.
+4. **Z-Image-Turbo** : temps et VRAM d'une image en 16:9, pour l'image de départ de « Try with a sample photo ».
+5. **Qualité des mouvements** : une note de 1 à 5 par pose et par vitesse, la vitesse maximale exploitable, et les combinés `together` et `then` (Rise & Push, Push & Settle, Breathing).
+6. **« Pan » contre « Tilt »** : les poses Pan Up et Pan Down déplacent la caméra (grue), elles ne la font pas pivoter. Faut-il renommer Tilt Up et Tilt Down (par exemple « Crane Up ») ?
+7. **Négatif par défaut de Wan** (node 99 du template) : faut-il l'ajouter au négatif des presets ? Comparer un rendu avec et sans.
+8. **LightX2V 4 étapes** : la licence est acceptée. Le mouvement de caméra est-il conservé ? Comparer sur un preset le groupe 4 étapes du template (désactivé par défaut) et le workflow en 20 étapes.
+9. **Rotations** : rendu de `roll_cw` à la vitesse 0,3, et un éventuel preset « Dutch ».
+
+## 9. Ce qui vous revient
+
+- **Q5, Comfy Cloud** (avec votre compte, sur votre PC, sans rien lancer de payant) : ouvrez les templates « Wan 2.2 Fun Camera », « Wan 2.2 5B » et « Z-Image-Turbo » sur cloud.comfy.org et vérifiez qu'aucun modèle n'est signalé manquant. Notez la version de ComfyUI (Settings → About). Les presets à une pose n'utilisent que des nodes du cœur. Les presets combinés, eux, ont besoin du pack Montagio, absent de Comfy Cloud tant qu'il n'est pas publié sur le Registry.
+- **sha256 de `ae.safetensors`** chez BFL (partie 1) : à comparer avec votre compte Hugging Face.

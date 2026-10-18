@@ -142,6 +142,8 @@ npm run test:nodes                                  # python -m pytest comfy-nod
 
 The tests do not need ComfyUI or a GPU: a small fake of `comfy_api` stands in for it. The parity suite compares the Python reader and the Python outputs with the app's real `parsePreset` and `compileJob`, which it runs through a `tsx` bridge. Without the repository around the pack (a standalone checkout), these tests are skipped. `MONTAGIO_REQUIRE_TS_PARITY=1` turns a skip into a failure, which is how CI runs them.
 
+Three tests of `tests/test_camera.py` run Montagio Camera Embedding beside the core `WanCameraEmbedding` in a real ComfyUI v0.41.0 and want the same tensor. They are skipped unless `MONTAGIO_COMFYUI_DIR` names a ComfyUI checkout; its Python (with torch, a CPU build is enough) is `MONTAGIO_COMFYUI_PYTHON` or a `.venv` inside the checkout. Example on a GPU pod: `MONTAGIO_COMFYUI_DIR=/workspace/ComfyUI MONTAGIO_COMFYUI_PYTHON=/workspace/venvs/comfyui/bin/python npm run test:nodes`.
+
 `presets/` holds copies of the repository's `presets/*.yaml` and `presets/*.yml`, because the Registry publishes only this folder. Refresh them with `python comfy-nodes/scripts/sync_presets.py` (add `--check` to only list the differences). A test fails when the copies differ from the originals.
 
 ## Publishing
