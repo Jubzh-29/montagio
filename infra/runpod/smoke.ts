@@ -23,6 +23,7 @@ import { parseArgs } from 'node:util';
 import { Comfy, type Job, type WorkflowGraph } from '@comfyorg/sdk';
 import { CAMERA_POSE_VALUES, compileJob, loadLibrary, pickAspect, type ApiWorkflow, type Resolution } from '@montagio/presets';
 import { imageSize } from 'image-size';
+import { imageFingerprint } from './lib/image';
 import { assertLocalBaseUrl, cameraMove, checkWorkflow, comboOptions, guardFetch, VramSampler, type ObjectInfo, type VramStats } from './lib/comfy';
 
 const DEFAULT_PROXY_URL = 'http://127.0.0.1:8189';
@@ -89,6 +90,9 @@ type SmokeRecord = {
   fps: number;
   duration_s: number;
   seed: number;
+  /** The start image: its file name and sha256 (the showcase ingests only clips of its exact sample photo). */
+  image: string;
+  image_sha256: string;
   wall_s: number | null;
   exec_s: number | null;
   metrics: unknown;
@@ -127,6 +131,7 @@ async function main(): Promise<number> {
   const presetIds = args.preset === 'all' ? [...library.presets.keys()] : args.preset.split(',').map((id) => id.trim());
   const { width: imageWidth, height: imageHeight } = imageSize(await readFile(imagePath));
   const aspect = pickAspect(imageWidth, imageHeight);
+  const startImage = await imageFingerprint(imagePath);
   await mkdir(join(outDir, 'workflows'), { recursive: true });
   await mkdir(join(outDir, 'clips'), { recursive: true });
 
@@ -220,6 +225,7 @@ async function main(): Promise<number> {
         fps: params.fps,
         duration_s: params.duration_s,
         seed,
+        ...startImage,
         wall_s: null,
         exec_s: null,
         metrics: null,

@@ -20,7 +20,7 @@
     "test:nodes": "python -m pytest comfy-nodes -q",
     "check:open-stack": "tsx tools/check-open-stack/src/cli.ts . --out apps/web/public/open-stack-report.json",
     "montagio": "tsx packages/presets/src/montagio.ts",
-    "showcase": "tsx packages/showcase/src/cli.ts"
+    "showcase": "tsx packages/showcase/src/showcase.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

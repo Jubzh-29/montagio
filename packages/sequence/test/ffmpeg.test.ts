@@ -176,3 +176,7 @@ test('decodeCheck rejects a truncated clip', async () => {
   await expect(decodeCheck(truncated)).rejects.toBeInstanceOf(SequenceToolError);
   await expect(decodeCheck(whole)).resolves.toBeUndefined();
 }, FFMPEG_TEST_TIMEOUT_MS);
+
+test('probe names the codec and the pixel format', async () => {
+  expect(await probe(clipA)).toMatchObject({ codec: 'h264', pixFmt: 'yuv420p' });
+}, FFMPEG_TEST_TIMEOUT_MS);

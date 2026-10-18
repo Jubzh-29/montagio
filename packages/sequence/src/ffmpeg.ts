@@ -44,23 +44,30 @@ function run(tool: Tool, args: string[], opts: { failOnStderr?: boolean } = {}):
 
 export async function probe(
   media: string,
-): Promise<{ width: number; height: number; duration_s: number; fps: number }> {
+): Promise<{ width: number; height: number; duration_s: number; fps: number; codec: string; pixFmt: string }> {
   const out = await run(ffprobe(), [
     '-v', 'error',
     '-select_streams', 'v:0',
-    '-show_entries', 'stream=width,height,r_frame_rate:format=duration',
+    '-show_entries', 'stream=width,height,r_frame_rate,codec_name,pix_fmt:format=duration',
     '-of', 'json',
     media,
   ]);
   const json = JSON.parse(out) as {
-    streams?: { width?: number; height?: number; r_frame_rate?: string }[];
+    streams?: { width?: number; height?: number; r_frame_rate?: string; codec_name?: string; pix_fmt?: string }[];
     format?: { duration?: string };
   };
   const stream = json.streams?.[0];
   if (!stream?.width || !stream.height) throw new SequenceToolError(`no video stream in ${media}`);
   const [num, den] = (stream.r_frame_rate ?? '0/1').split('/').map(Number);
   const fps = num && den ? num / den : 0;
-  return { width: stream.width, height: stream.height, duration_s: Number(json.format?.duration ?? 0), fps };
+  return {
+    width: stream.width,
+    height: stream.height,
+    duration_s: Number(json.format?.duration ?? 0),
+    fps,
+    codec: stream.codec_name ?? '',
+    pixFmt: stream.pix_fmt ?? '',
+  };
 }
 
 
