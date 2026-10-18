@@ -13,11 +13,13 @@ export function cameraMove(params: Pick<CompiledParams, 'cameraPose' | 'cameraPo
 export { assertLocalBaseUrl, guardFetch } from '@montagio/comfy-adapter';
 
 type InputSpecs = Record<string, unknown>;
+/** The type of an output: a type name or, for some legacy nodes, the option list of a combo. */
+type OutputType = string | (string | number)[];
 export type ObjectInfo = Record<
   string,
   {
     input?: { required?: InputSpecs; optional?: InputSpecs; hidden?: InputSpecs };
-    output?: string[];
+    output?: OutputType[];
     output_name?: string[];
     python_module?: string;
   }
@@ -31,11 +33,29 @@ function inputType(spec: unknown): string | null {
   return typeof type === 'string' ? type : null;
 }
 
-/** ComfyUI's rule: "*" matches anything, and a type may list several, comma-separated. */
-function typesMatch(expected: string, received: string): boolean {
-  if (expected === '*' || received === '*') return true;
+/**
+ * ComfyUI's rule (comfy_execution/validation.py): "*" matches anything, a type may list
+ * several, comma-separated, and an output typed as an option list goes into a combo.
+ */
+function typesMatch(expected: string, received: OutputType): boolean {
+  if (expected === '*') return true;
+  if (Array.isArray(received)) return expected === 'COMBO';
+  if (received === '*') return true;
   const received_ = new Set(received.split(','));
   return expected.split(',').some((type) => received_.has(type));
+}
+
+function typeLabel(type: OutputType): string {
+  return Array.isArray(type) ? `a list of ${type.length} options` : type;
+}
+
+/** min and max of an INT or FLOAT input, when /object_info gives them. */
+function bounds(spec: unknown): { min?: number; max?: number } {
+  const config = Array.isArray(spec) ? (spec[1] as { min?: unknown; max?: unknown } | undefined) : undefined;
+  return {
+    min: typeof config?.min === 'number' ? config.min : undefined,
+    max: typeof config?.max === 'number' ? config.max : undefined,
+  };
 }
 
 function isLink(value: unknown): value is [string, number] {
@@ -85,9 +105,30 @@ function specFor(declared: InputSpecs, inputs: Record<string, unknown>, field: s
 }
 
 /**
+ * The required inputs of the options the dynamic combos of a node have selected,
+ * "format.codec.encoding.crf" for instance. As in ComfyUI, a nested dynamic combo
+ * counts only when the workflow gives it: get_finalized_class_inputs leaves an
+ * absent one out of the schema, so it is never reported missing.
+ */
+function requiredUnderOptions(declared: InputSpecs, inputs: Record<string, unknown>, prefix = ''): string[] {
+  const required: string[] = [];
+  for (const [name, spec] of Object.entries(declared)) {
+    const path = prefix + name;
+    const selected = path in inputs ? dynamicOptions(spec)?.find((option) => option.key === inputs[path]) : undefined;
+    if (!selected) continue;
+    for (const [nested, nestedSpec] of Object.entries(selected.inputs?.required ?? {})) {
+      if (!dynamicOptions(nestedSpec)) required.push(`${path}.${nested}`);
+    }
+    required.push(...requiredUnderOptions({ ...selected.inputs?.optional, ...selected.inputs?.required }, inputs, `${path}.`));
+  }
+  return required;
+}
+
+/**
  * Compare a workflow with what the running ComfyUI accepts: installed node
- * classes, input names (unknown ones, missing required ones), links (to an
- * existing node, an existing output, of the expected type) and combo values
+ * classes, input names (unknown ones, missing required ones, those of the
+ * option a dynamic combo selected included), links (to an existing node, an
+ * existing output, of the expected type), min and max bounds, and combo values
  * (camera poses, weight files present on disk).
  * `skip` lists "node.field" inputs that are filled at submit time (uploaded
  * image): their combo value is not checked, their presence still is.
@@ -103,7 +144,7 @@ export function checkWorkflow(workflow: ApiWorkflow, info: ObjectInfo, opts: { s
     }
     const required = spec.input?.required ?? {};
     const declared = { ...spec.input?.optional, ...required };
-    for (const field of Object.keys(required)) {
+    for (const field of [...Object.keys(required), ...requiredUnderOptions(declared, node.inputs)]) {
       if (!(field in node.inputs)) problems.push(`node ${id} (${node.class_type}): missing required input "${field}"`);
     }
     for (const [field, value] of Object.entries(node.inputs)) {
@@ -124,12 +165,21 @@ export function checkWorkflow(workflow: ApiWorkflow, info: ObjectInfo, opts: { s
         } else if (outputs) {
           const expected = inputType(fieldSpec);
           if (expected && !typesMatch(expected, outputs[index]!)) {
-            problems.push(`node ${id} (${node.class_type}).${field} expects ${expected}, output ${index} of node ${from} is ${outputs[index]}`);
+            problems.push(`node ${id} (${node.class_type}).${field} expects ${expected}, output ${index} of node ${from} is ${typeLabel(outputs[index]!)}`);
           }
         }
         continue;
       }
       if (Array.isArray(value) || skip.has(`${id}.${field}`)) continue;
+      const { min, max } = bounds(fieldSpec);
+      if (typeof value === 'number' && min !== undefined && value < min) {
+        problems.push(`node ${id} (${node.class_type}).${field} = ${value} is below the min of ${min}`);
+        continue;
+      }
+      if (typeof value === 'number' && max !== undefined && value > max) {
+        problems.push(`node ${id} (${node.class_type}).${field} = ${value} is above the max of ${max}`);
+        continue;
+      }
       const options = comboOptions(fieldSpec);
       if (options && (typeof value === 'string' || typeof value === 'number') && !options.includes(value)) {
         const shown = options.slice(0, 12).join(', ') + (options.length > 12 ? `, … (${options.length} values)` : '');

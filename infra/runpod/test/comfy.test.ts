@@ -1,4 +1,6 @@
-import { assertLocalBaseUrl, cameraMove, checkWorkflow, comboOptions, guardFetch, parseNvidiaSmiLine } from '../lib/comfy';
+import { readFileSync } from 'node:fs';
+import type { ApiWorkflow } from '@montagio/presets';
+import { assertLocalBaseUrl, cameraMove, checkWorkflow, comboOptions, guardFetch, parseNvidiaSmiLine, type ObjectInfo } from '../lib/comfy';
 
 describe('assertLocalBaseUrl', () => {
   test('accepts the local proxy and says it is loopback', () => {
@@ -231,6 +233,57 @@ describe('checkWorkflow: dynamic combos (SaveVideo format and codec)', () => {
     expect(checkWorkflow(workflow({ format: 'mp4', 'format.colour': 'red' }), info)).toEqual([
       'node 3 (SaveVideo): unknown input "format.colour"',
     ]);
+  });
+});
+
+describe('checkWorkflow: what ComfyUI v0.41.0 validates in the inputs of an option, bounds and list outputs', () => {
+  // SaveVideo as the real /object_info gives it: format → codec → encoding, whose "re-encode" option requires crf (0 to 51 in H.264)
+  const real = JSON.parse(readFileSync(new URL('./fixtures/object_info-v0.41.0.json', import.meta.url), 'utf8')) as ObjectInfo;
+  const info: ObjectInfo = {
+    SaveVideo: real.SaveVideo!,
+    WanCameraEmbedding: real.WanCameraEmbedding!,
+    VideoSource: { input: { required: {} }, output: ['VIDEO'] },
+    // a legacy node may give the option list of a combo as the type of an output
+    PoseList: { input: { required: {} }, output: [['Static', 'Zoom In']], output_name: ['pose'] },
+    CLIPTextEncode: { input: { required: { text: ['STRING', { multiline: true }] } }, output: ['CONDITIONING'] },
+  };
+  const camera = { camera_pose: 'Zoom In', width: 832, height: 480, length: 81, speed: 1.5 };
+  const save = (inputs: Record<string, unknown>) => ({
+    '1': { class_type: 'WanCameraEmbedding', inputs: camera },
+    '2': { class_type: 'SaveVideo', inputs: { video: ['8', 0], filename_prefix: 'montagio/clip', format: 'mp4', 'format.codec': 'h264', ...inputs } },
+    '8': { class_type: 'VideoSource', inputs: {} },
+  });
+
+  test('a required input of the option a dynamic combo selected is reported when missing', () => {
+    expect(checkWorkflow(save({ 'format.codec.encoding': 're-encode' }), info)).toEqual([
+      'node 2 (SaveVideo): missing required input "format.codec.encoding.crf"',
+    ]);
+    expect(checkWorkflow(save({ 'format.codec.encoding': 're-encode', 'format.codec.encoding.crf': 18 }), info)).toEqual([]);
+  });
+
+  test('a nested dynamic combo left out of the workflow requires nothing: ComfyUI leaves it out of the schema', () => {
+    const workflow = save({});
+    delete (workflow['2'].inputs as Record<string, unknown>)['format.codec'];
+    expect(checkWorkflow(workflow, info)).toEqual([]);
+  });
+
+  test('a value below the min or above the max is reported, nested inputs included', () => {
+    const workflow = save({ 'format.codec.encoding': 're-encode', 'format.codec.encoding.crf': 60 });
+    workflow['1'].inputs = { ...camera, width: 8, speed: 12 };
+    expect(checkWorkflow(workflow, info)).toEqual([
+      'node 1 (WanCameraEmbedding).width = 8 is below the min of 16',
+      'node 1 (WanCameraEmbedding).speed = 12 is above the max of 10',
+      'node 2 (SaveVideo).format.codec.encoding.crf = 60 is above the max of 51',
+    ]);
+  });
+
+  test('an output typed as a list of options goes into a combo input, not into another type', () => {
+    const workflow: ApiWorkflow = {
+      '1': { class_type: 'WanCameraEmbedding', inputs: { ...camera, camera_pose: ['9', 0] } },
+      '3': { class_type: 'CLIPTextEncode', inputs: { text: ['9', 0] } },
+      '9': { class_type: 'PoseList', inputs: {} },
+    };
+    expect(checkWorkflow(workflow, info)).toEqual(['node 3 (CLIPTextEncode).text expects STRING, output 0 of node 9 is a list of 2 options']);
   });
 });
 

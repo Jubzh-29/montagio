@@ -90,6 +90,15 @@ test('two poses swap the camera node for Montagio Camera Embedding', () => {
   expect(template).toEqual(before);
 });
 
+test('a single pose on a template that already has Montagio Camera Embedding resets its second move', () => {
+  const t = structuredClone(template);
+  t['12'] = { class_type: COMBINED_CAMERA_NODE, inputs: { ...t['12']!.inputs, camera_pose_2: 'Pan Left', combine: 'then' } };
+  const { workflow, params } = compileJob(preset, funCamera, t, { imageRef: 'u.png', seed: 1, aspect: '16:9' });
+  expect(workflow['12']?.class_type).toBe(COMBINED_CAMERA_NODE);
+  expect(workflow['12']?.inputs).toMatchObject({ camera_pose: 'Zoom In', camera_pose_2: 'Static', combine: 'together' });
+  expect(params).toMatchObject({ cameraPose: 'Zoom In', cameraPose2: null, cameraCombine: null });
+});
+
 test('then is passed to the node', () => {
   const { workflow, params } = compileJob(withPoses('[zoom_in, static]', 'then'), funCamera, template, { imageRef: 'u.png', seed: 1, aspect: '16:9' });
   expect(workflow['12']?.inputs).toMatchObject({ camera_pose: 'Zoom In', camera_pose_2: 'Static', combine: 'then' });

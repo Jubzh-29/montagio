@@ -1,5 +1,5 @@
 /**
- * Montagio GPU smoke test (spec §9 and §10, session S1).
+ * Montagio GPU smoke test (spec §9 and §10, GPU session S2).
  *
  * Compiles presets with @montagio/presets, sends each workflow through
  * @comfyorg/sdk to a self-hosted comfy-api-proxy, downloads the clip and records

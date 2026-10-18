@@ -32,7 +32,7 @@ Tout ce qui sort de la session va dans `s1-results/`. Le nom est resté celui de
 | 0. Préparer sur le PC (la veille) | 20 min | non |
 | 1. Créer le pod | 10 min | à partir du démarrage |
 | 2. Copier le dépôt | 5 min | oui |
-| 3. Installer, lancer, ajouter le pack Montagio | 20 à 30 min | oui |
+| 3. Installer et lancer, pack Montagio compris | 20 à 30 min | oui |
 | 4. Télécharger les poids | 10 à 25 min | oui |
 | 5. Premiers rendus et mesures | 45 min | oui |
 | 6. Vérifications et réglage des presets | 2 à 3 h | oui |
@@ -77,7 +77,7 @@ cd montagio
 git log -1 --oneline
 ```
 
-## 3. Installer, lancer, ajouter le pack Montagio (≈ 20 à 30 min)
+## 3. Installer et lancer, pack Montagio compris (≈ 20 à 30 min)
 
 ```bash
 bash infra/runpod/bootstrap.sh --expose-ui
@@ -87,14 +87,12 @@ source /workspace/montagio.env
 À noter :
 - la ligne `GPU: NVIDIA GeForce RTX 4090, …` ;
 - `torch 2.14.1+cu130 …` ;
-- **`<n> node classes loaded, 0 partner node(s)`**, la preuve « aucun Partner Node » ;
+- `Montagio node pack: /workspace/ComfyUI/custom_nodes/montagio -> /workspace/montagio/comfy-nodes` ;
+- **`<n> node classes loaded, 0 partner node(s)`**, la preuve « aucun Partner Node », **sans** ligne `warning: nodes missing` à la suite ;
 - `proxy: {"status": "healthy", …}`.
 
-**Pack Montagio, obligatoire.** Les presets combinés (Rise & Push, Drift Left Push, Pull Back & Tilt Up, Push & Settle et Breathing) passent par son node `MontagioCameraEmbedding` :
+**Pack Montagio, obligatoire.** Les presets combinés (Rise & Push, Drift Left Push, Pull Back & Tilt Up, Push & Settle et Breathing) passent par son node `MontagioCameraEmbedding`. Le bootstrap relie le pack dans `custom_nodes` avant de lancer ComfyUI, puis vérifie que ce node est chargé : rien à faire à la main. Pour le contrôler :
 ```bash
-ln -sfn /workspace/montagio/comfy-nodes /workspace/ComfyUI/custom_nodes/montagio
-bash infra/runpod/bootstrap.sh stop
-bash infra/runpod/bootstrap.sh start --expose-ui
 python3 comfy-nodes/scripts/smoke_comfyui.py http://127.0.0.1:8188; echo "code $?"
 curl -s http://127.0.0.1:8188/object_info/MontagioCameraEmbedding | head -c 200; echo
 ```
@@ -216,7 +214,7 @@ Faites un rendu de `roll_cw` à 0,3 avec `--camera-pose "ClockWise (CW)" --camer
 Pod : GPU ______  driver ______  CUDA ______  prix ____ $/h  début __:__  fin __:__  coût total ____ $
 Install : durée ____ min  torch ______  ligne « partner node(s) » : ______________________
 Pack Montagio : smoke « 33 » oui / non   test lourd du node : oui / non
-Poids : ____ Go en ____ min (____ Mo/s)  tous « matches Hugging Face » : oui / non   dérive signalée : ______
+Poids : ____ Gio en ____ min (____ Mio/s)  tous « matches Hugging Face » : oui / non   dérive signalée : ______
 
 Mesures (smoke.jsonl les contient ; noter ici la qualité) :
 | modèle | preset / pose | vitesse | résolution | images | wall s (froid / chaud) | VRAM max | qualité 1-5 | artefacts |
@@ -246,7 +244,8 @@ Presets réglés : ______________________________________________
 | avertissement de repli cu128, puis erreur au démarrage | pilote limité à CUDA 12.8 | redéployer avec le filtre CUDA 13.0 |
 | `ComfyUI exited during startup` | erreur Python | lire `/workspace/logs/comfyui.log` |
 | `partner nodes are loaded` | ComfyUI lancé sans `--disable-partner-nodes` | `bootstrap.sh stop`, puis `bootstrap.sh start --expose-ui` |
-| `class MontagioCameraEmbedding is not installed` | pack Montagio absent | partie 3, puis redémarrer ComfyUI |
+| `warning: nodes missing: MontagioCameraEmbedding` ou `class MontagioCameraEmbedding is not installed` | le pack Montagio ne s'est pas chargé | chercher son erreur d'import dans `/workspace/logs/comfyui.log`, puis `bootstrap.sh stop` et `bootstrap.sh start --expose-ui` |
+| `custom_nodes/montagio is a folder, not a link` | une copie du pack occupe la place du lien | la déplacer hors de `custom_nodes`, puis relancer |
 | `the file changed upstream` | Hugging Face sert un autre fichier que le lock | s'arrêter, noter, ne pas forcer |
 | `✗ … unet_name = "…" is not one of` | poids absent ou mal rangé | relancer `npm run weights …` |
 | `CUDA out of memory` | 720p ou clip trop long sur le 14B fp8 | noter, revenir en 480p |

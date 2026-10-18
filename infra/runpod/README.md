@@ -4,7 +4,7 @@ Scripts that turn a rented GPU pod (RTX 4090, 24 GB) into a Montagio backend: Co
 
 | File | What it does |
 |---|---|
-| `bootstrap.sh` | Installs ComfyUI (pinned tag, commit verified), PyTorch, comfy-api-proxy and Node.js 22 under `/workspace`; starts ComfyUI on `:8188` and the proxy on `127.0.0.1:8189`; fails if any partner node is loaded. Subcommands: `install`, `start`, `stop`, `status`, `collect`. |
+| `bootstrap.sh` | Installs ComfyUI (pinned tag, commit verified), PyTorch, comfy-api-proxy and Node.js 22 under `/workspace`; links the Montagio node pack (`comfy-nodes`) as `custom_nodes/montagio`; starts ComfyUI on `:8188` and the proxy on `127.0.0.1:8189`; fails if any partner node is loaded, and warns if `MontagioCameraEmbedding` or a core node it needs is missing. Subcommands: `install`, `start`, `stop`, `status`, `collect`. |
 | `fetch-weights.ts` | Resolves the exact Hugging Face file of every lock entry (`resolve/main/…`), downloads it into ComfyUI's `models/` with resume, checks the sha256 Hugging Face publishes, and writes a lock patch to review. Licenses are never edited. |
 | `smoke.ts` | Compiles presets with `@montagio/presets`, submits them through `@comfyorg/sdk` to the proxy, downloads the clips, and records wall time, execution time and peak VRAM in `s1-results/smoke.jsonl`. |
 | `versions.env` | Every pinned version and checksum. |

@@ -38,7 +38,8 @@ export type CompiledParams = {
  * and `combine` (comfy-nodes, Montagio node pack). It keeps the core node's
  * inputs and outputs, so the compiler swaps the class of the bound camera node
  * and adds the two inputs. A one-move preset keeps the core node, which any
- * ComfyUI has.
+ * ComfyUI has; on a template that already has Montagio Camera Embedding, it
+ * keeps that node with "Static" together as the second move, the core's path.
  */
 export const COMBINED_CAMERA_NODE = 'MontagioCameraEmbedding';
 const CAMERA_NODES = new Set(['WanCameraEmbedding', COMBINED_CAMERA_NODE]);
@@ -167,17 +168,24 @@ export function compileJob(
     const details = [...missing].map(([node, keys]) => `${keys.join(', ')} → node ${node}`).join('; ');
     throw new CompileError(`bindings not found in the workflow template of ${model.id}: ${details}`);
   }
-  if (parametric && combined) {
+  if (parametric) {
+    // the registry requires the camera_pose binding of a camera model, and its node was found above
     const id = model.bindings.camera_pose!.node;
     const node = workflow[id]!;
-    if (!CAMERA_NODES.has(node.class_type)) {
-      throw new CompileError(
-        `preset ${preset.id} combines 2 camera moves, but node ${id} is ${node.class_type}, not a camera node (${[...CAMERA_NODES].join(' or ')})`,
-      );
+    if (combined) {
+      if (!CAMERA_NODES.has(node.class_type)) {
+        throw new CompileError(
+          `preset ${preset.id} combines 2 camera moves, but node ${id} is ${node.class_type}, not a camera node (${[...CAMERA_NODES].join(' or ')})`,
+        );
+      }
+      node.class_type = COMBINED_CAMERA_NODE;
+      node.inputs.camera_pose_2 = params.cameraPose2;
+      node.inputs.combine = params.cameraCombine;
+    } else if (node.class_type === COMBINED_CAMERA_NODE) {
+      // a template saved with Montagio Camera Embedding: one move, whatever second move it was saved with
+      node.inputs.camera_pose_2 = CAMERA_POSE_VALUES.static;
+      node.inputs.combine = 'together' satisfies CameraCombine;
     }
-    node.class_type = COMBINED_CAMERA_NODE;
-    node.inputs.camera_pose_2 = params.cameraPose2;
-    node.inputs.combine = params.cameraCombine;
   }
   return { workflow, params };
 }

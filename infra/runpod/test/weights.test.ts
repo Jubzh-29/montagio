@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import {
   downloadFile,
   folderFor,
+  gib,
   lockDrift,
   lockFromHf,
   lockPatch,
@@ -18,6 +19,12 @@ import {
   weightFolders,
   type RepoListing,
 } from '../lib/weights';
+
+test('gib counts in powers of 1024 and says so', () => {
+  expect(gib(1024 ** 3)).toBe('1.00 GiB');
+  // the 69.7 GB of the lock
+  expect(gib(69.7e9)).toBe('64.91 GiB');
+});
 
 test('parseHfUrl reads repository, revision and path', () => {
   expect(parseHfUrl('https://huggingface.co/Comfy-Org/z_image_turbo')).toEqual({ repo: 'Comfy-Org/z_image_turbo', revision: null, path: null });

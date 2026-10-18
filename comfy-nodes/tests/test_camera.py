@@ -78,6 +78,25 @@ def add(u, v):
     return [a + b for a, b in zip(u, v)]
 
 
+def core_camera_motion(angle, T, speed, n):
+    """get_camera_motion of the core, in numpy and with its operations in the same order."""
+    def compute_R_form_rad_angle(angles):
+        theta_x, theta_y, theta_z = angles
+        Rx = np.array([[1, 0, 0], [0, np.cos(theta_x), -np.sin(theta_x)], [0, np.sin(theta_x), np.cos(theta_x)]])
+        Ry = np.array([[np.cos(theta_y), 0, np.sin(theta_y)], [0, 1, 0], [-np.sin(theta_y), 0, np.cos(theta_y)]])
+        Rz = np.array([[np.cos(theta_z), -np.sin(theta_z), 0], [np.sin(theta_z), np.cos(theta_z), 0], [0, 0, 1]])
+        return np.dot(Rz, np.dot(Ry, Rx))
+
+    angle, T = np.array(angle), np.array(T)
+    RT = []
+    for i in range(n):
+        _angle = (i / n) * speed * BASE_ANGLE * angle
+        R = compute_R_form_rad_angle(_angle)
+        _T = (i / n) * speed * BASE_T * (T.reshape(3, 1))
+        RT.append(np.concatenate([R, _T], axis=1))
+    return np.stack(RT)
+
+
 # --- the path --------------------------------------------------------------------------------
 
 
@@ -89,6 +108,17 @@ def test_together_with_static_is_the_core_trajectory(pose, speed, length):
     expected = reference_motion(angle, t, speed, length)
     assert path(pose, speed=speed, length=length).shape == (length, 3, 4)
     assert np.allclose(path(pose, speed=speed, length=length), expected, rtol=0, atol=1e-12)
+
+
+@pytest.mark.parametrize("pose", WAN_CAMERA_POSES)
+@pytest.mark.parametrize("speed", [0.0, 0.1, 0.35, 0.7, 1.0, 1.3, 1.7, 2.9, 10.0])
+@pytest.mark.parametrize("length", [5, 81])
+def test_one_pose_is_the_core_path_bit_for_bit(pose, speed, length):
+    # the same products in the same order: same bits, the sign of each zero included
+    core = core_camera_motion(*CORE_POSES[pose], speed, length)
+    for ours in (path(pose, "Static", speed=speed, length=length), path("Static", pose, speed=speed, length=length)):
+        assert (ours.dtype, ours.shape) == (core.dtype, core.shape)
+        assert ours.tobytes() == core.tobytes()
 
 
 def test_together_adds_the_two_moves():
@@ -119,7 +149,7 @@ def test_then_moves_a_over_the_first_half_then_b():
         t = [2.0 * BASE_T * (w_a * a + w_b * b) for a, b in zip(a_t, b_t)]
         angle = [2.0 * BASE_ANGLE * (w_a * a + w_b * b) for a, b in zip(a_angle, b_angle)]
         assert np.allclose(then[i], reference_frame(angle, t), rtol=0, atol=1e-12), f"frame {i}"
-    # by the middle of the clip A is complete and B has not started
+    # at frame 41 of 81, just past the middle, A is complete and B has gone 1/81 of its way
     middle = then[(length + 1) // 2]
     assert middle[2][3] == pytest.approx(2.0 * BASE_T * 2.0) and middle[0][3] == pytest.approx(-2.0 * BASE_T * (2 * (41 / 81) - 1))
 

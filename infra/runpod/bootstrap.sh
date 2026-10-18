@@ -5,7 +5,8 @@
 #   - ComfyUI at a pinned tag (commit verified) in its own venv, with a pinned PyTorch;
 #   - comfy-api-proxy (MIT) at a pinned version, in its own venv;
 #   - Node.js 22 (checksum verified) and the repository's npm dependencies.
-# Then starts ComfyUI with --disable-partner-nodes on :8188 and the proxy on
+# Then links the Montagio node pack (comfy-nodes) into ComfyUI's custom_nodes,
+# starts ComfyUI with --disable-partner-nodes on :8188 and the proxy on
 # 127.0.0.1:8189, and fails if a single partner node got loaded.
 #
 # Usage, from the repository root on the pod:
@@ -170,7 +171,20 @@ EOF
 
 # --- services ---------------------------------------------------------------
 
+# The presets with two camera moves need MontagioCameraEmbedding, from the node
+# pack of this repository. Its dependencies, PyYAML and numpy, come with ComfyUI.
+link_pack() {
+  local link=$COMFY_DIR/custom_nodes/montagio
+  [ -d "$COMFY_DIR/custom_nodes" ] || die "no ComfyUI in $COMFY_DIR: run bash infra/runpod/bootstrap.sh install first"
+  if [ -e "$link" ] && [ ! -L "$link" ]; then
+    die "$link is a folder, not a link to $REPO_ROOT/comfy-nodes: move it away, then start again"
+  fi
+  ln -sfn "$REPO_ROOT/comfy-nodes" "$link"
+  log "Montagio node pack: $link -> $REPO_ROOT/comfy-nodes"
+}
+
 start_comfyui() {
+  link_pack
   if running "$RUN_DIR/comfyui.pid"; then
     log "ComfyUI already running (pid $(cat "$RUN_DIR/comfyui.pid"))"
   else
@@ -191,15 +205,18 @@ import json, sys
 info = json.load(sys.stdin)
 partner = sorted(name for name, node in info.items()
                  if node.get("api_node") or str(node.get("python_module", "")).startswith("comfy_api_nodes"))
-needed = ["WanCameraEmbedding", "WanCameraImageToVideo", "Wan22ImageToVideoLatent", "CreateVideo", "SaveVideo", "UNETLoader"]
+needed = ["WanCameraEmbedding", "WanCameraImageToVideo", "Wan22ImageToVideoLatent", "CreateVideo", "SaveVideo", "UNETLoader",
+          "MontagioCameraEmbedding"]
 missing = [name for name in needed if name not in info]
 print(f"[montagio] {len(info)} node classes loaded, {len(partner)} partner node(s)")
 if missing:
-    print("[montagio] warning: core nodes missing: " + ", ".join(missing))
+    print("[montagio] warning: nodes missing: " + ", ".join(missing))
+if "MontagioCameraEmbedding" in missing:
+    print(f"[montagio] warning: the Montagio node pack did not load: look for its import error in {sys.argv[1]}, then stop and start again")
 if partner:
     print("[montagio] error: partner nodes loaded: " + ", ".join(partner[:20]))
     sys.exit(2)
-' || die "partner nodes are loaded: ComfyUI must run with --disable-partner-nodes"
+' "$LOG_DIR/comfyui.log" || die "partner nodes are loaded: ComfyUI must run with --disable-partner-nodes"
   local version
   version=$(curl -fsS "$COMFY_URL/system_stats" | "$COMFY_VENV/bin/python" -I -c 'import json, sys; print(json.load(sys.stdin)["system"].get("comfyui_version", "?"))')
   log "ComfyUI $version answering on $COMFY_URL"
@@ -286,7 +303,7 @@ for arg in "$@"; do
   case $arg in
     --expose-ui) LISTEN=0.0.0.0 ;;
     all | install | start | stop | status | collect) command=$arg ;;
-    -h | --help) sed -n '2,18p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) sed -n '2,19p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "unknown argument: $arg (see --help)" ;;
   esac
 done
