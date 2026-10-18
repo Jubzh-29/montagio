@@ -4,6 +4,7 @@
  *
  * Run from the repository root, on the pod:
  *   npm run weights -w @montagio/infra-runpod -- --dry-run                       # resolve exact URLs, download nothing
+ *   npm run weights -w @montagio/infra-runpod -- --lock-from-hf                  # lock patch from Hugging Face metadata, download nothing
  *   npm run weights -w @montagio/infra-runpod -- --models-dir /workspace/ComfyUI/models
  *   npm run weights -w @montagio/infra-runpod -- --models-dir … --only wan21-vae,wan22-vae
  *   npm run weights -w @montagio/infra-runpod -- --models-dir … --extra loras=https://huggingface.co/<repo>/resolve/main/<file>
@@ -19,6 +20,11 @@
  * declares so a human can re-read the license at the source.
  * `--extra` files (evaluation only, e.g. an accelerator LoRA whose license is
  * still being checked) are downloaded and hashed but never added to the patch.
+ *
+ * `--lock-from-hf` writes the same patch without downloading: url, size and the
+ * sha256 Hugging Face stores for the LFS object (`lfs.oid`). A lock entry whose
+ * pinned sha256 or size no longer matches what Hugging Face serves fails before
+ * anything is downloaded, in every mode.
  */
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -31,6 +37,8 @@ import {
   downloadFile,
   folderFor,
   listRepo,
+  lockDrift,
+  lockFromHf,
   lockPatch,
   parseHfUrl,
   pickCandidate,
@@ -60,6 +68,7 @@ const { values: args } = parseArgs({
     out: { type: 'string' },
     concurrency: { type: 'string', default: '2' },
     'dry-run': { type: 'boolean', default: false },
+    'lock-from-hf': { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   },
 });
@@ -72,6 +81,7 @@ if (args.help) {
   --out DIR               results folder (default s1-results)
   --concurrency N         parallel downloads (default 2)
   --dry-run               resolve exact URLs and sizes, download nothing
+  --lock-from-hf          write the lock patch (url, size, sha256) from Hugging Face metadata, download nothing
 Environment: HF_TOKEN (optional) lets gated repositories be used.`);
   process.exit(0);
 }
@@ -110,7 +120,8 @@ function licenseCheck(plan: Plan): string {
 }
 
 async function main(): Promise<number> {
-  const dryRun = args['dry-run'];
+  const lockOnly = args['lock-from-hf'];
+  const dryRun = args['dry-run'] || lockOnly;
   if (!dryRun && !args['models-dir']) throw new Error('--models-dir is required (for example /workspace/ComfyUI/models), or pass --dry-run');
   const modelsDir = args['models-dir'] ? fromCaller(args['models-dir']) : '(dry run)';
   const outDir = fromCaller(args.out ?? join(repoRoot, 's1-results'));
@@ -161,6 +172,8 @@ async function main(): Promise<number> {
       candidate = pickCandidate(entry.file, await Promise.all(repos.map(listing)), { allowGated: Boolean(token) });
     }
     if (!candidate.ok) throw new Error(candidate.reason);
+    const drift = lockDrift({ sha256: entry.sha256, size: entry.size }, { sha256: candidate.sha256, size: candidate.size });
+    if (drift) throw new Error(`${drift} (${resolveUrl(candidate.repo, candidate.path)})`);
     const folder = folderFor(entry.file, candidate.path, folders);
     if (!folder) throw new Error(`cannot tell the ComfyUI folder of ${entry.file} (no loader names it, repository path ${candidate.path})`);
     plans.push({
@@ -245,11 +258,15 @@ async function main(): Promise<number> {
   };
   await writeText(join(outDir, 'weights-report.json'), `${JSON.stringify(report, null, 2)}\n`);
 
-  const updates = new Map(
-    outcomes
-      .filter((o) => !o.extra && (o.status === 'downloaded' || o.status === 'present') && o.sha256)
-      .map((o) => [o.id, { url: o.url, sha256: o.sha256! }]),
-  );
+  const fromHf = lockOnly ? lockFromHf(plans) : null;
+  for (const problem of fromHf?.problems ?? []) console.error(`✗ ${problem}`);
+  const updates = fromHf
+    ? fromHf.updates
+    : new Map(
+        outcomes
+          .filter((o) => !o.extra && (o.status === 'downloaded' || o.status === 'present') && o.sha256)
+          .map((o) => [o.id, { url: o.url, sha256: o.sha256!, size: o.size }]),
+      );
   if (updates.size > 0) {
     const proposed = proposeLock(lockText, updates);
     const patch = lockPatch(lockText, proposed);
@@ -261,7 +278,7 @@ async function main(): Promise<number> {
   console.log(`report: ${relative(callerDir, join(outDir, 'weights-report.json'))}`);
   const failed = outcomes.filter((o) => o.status === 'failed');
   if (failed.length > 0) console.error(`\n${failed.length} failure(s): ${failed.map((o) => o.id).join(', ')}`);
-  return failed.length > 0 ? 1 : 0;
+  return failed.length > 0 || (fromHf?.problems.length ?? 0) > 0 ? 1 : 0;
 }
 
 function emptyPlan(id: string, file: string): Plan {

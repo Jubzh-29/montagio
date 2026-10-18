@@ -56,6 +56,17 @@ test('lock: duplicate ids are refused', () => {
   expect(() => parseLock(dup, 'l.yaml')).toThrow(/duplicate.*wan22-fun-camera-high/);
 });
 
+test('a lock entry may give its size in bytes', () => {
+  const sized = replaceOnce(lock, /(sha256: [a-f0-9]+\n)/, '$1    size: 15301408048\n');
+  expect(parseLock(sized, 'l.yaml')[3]?.size).toBe(15301408048);
+});
+
+test.each(['0', '-1', '1.5'])('a size of %s is refused', (size) => {
+  const sized = replaceOnce(lock, /(sha256: [a-f0-9]+\n)/, `$1    size: ${size}\n`);
+  // a refusal of the value, not of an unknown key
+  expect(() => parseLock(sized, 'l.yaml')).toThrow(/weights\.3\.size: (?!Unrecognized)/);
+});
+
 test('lock: malformed sha256 is refused', () => {
   expect(() => parseLock(replaceOnce(lock, /sha256: [a-f0-9]+/, 'sha256: nothex'), 'l.yaml')).toThrow(/sha256/);
 });

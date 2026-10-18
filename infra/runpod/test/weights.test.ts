@@ -8,6 +8,8 @@ import { join } from 'node:path';
 import {
   downloadFile,
   folderFor,
+  lockDrift,
+  lockFromHf,
   lockPatch,
   parseHfUrl,
   pickCandidate,
@@ -105,6 +107,75 @@ test('proposeLock sets url and sha256, keeps comments, order and licenses', () =
   );
   // untouched entry stays identical
   expect(text).toContain('  - id: other\n    file: other.safetensors\n    url: https://huggingface.co/o/r\n    license: Apache-2.0');
+});
+
+test('proposeLock writes size right after sha256', () => {
+  const sha = 'c'.repeat(64);
+  const text = proposeLock(LOCK, new Map([['vae', { url: 'https://huggingface.co/o/r/resolve/main/vae.safetensors', sha256: sha, size: 253815318 }]]));
+  expect(text).toContain(
+    `    url: https://huggingface.co/o/r/resolve/main/vae.safetensors\n    sha256: ${sha}\n    size: 253815318\n    license: Apache-2.0`,
+  );
+  expect(text).toContain('  - id: other\n    file: other.safetensors\n    url: https://huggingface.co/o/r\n    license: Apache-2.0');
+});
+
+test('proposeLock replaces an existing size', () => {
+  const sha = 'd'.repeat(64);
+  const update = (size: number) => new Map([['vae', { url: 'https://huggingface.co/o/r/resolve/main/vae.safetensors', sha256: sha, size }]]);
+  const text = proposeLock(proposeLock(LOCK, update(1)), update(2));
+  expect(text).toContain(`    sha256: ${sha}\n    size: 2\n    license: Apache-2.0`);
+  expect(text).not.toContain('size: 1');
+});
+
+describe('lockFromHf', () => {
+  const plan = (id: string, hf_sha256: string | null, extra = false) => ({
+    id,
+    url: `https://huggingface.co/o/r/resolve/main/${id}.safetensors`,
+    size: 1000,
+    hf_sha256,
+    extra,
+  });
+
+  test('turns every resolved file into url, sha256 and size', () => {
+    const { updates, problems } = lockFromHf([plan('vae', 'e'.repeat(64)), plan('other', 'f'.repeat(64))]);
+    expect(problems).toEqual([]);
+    expect(updates.get('vae')).toEqual({ url: 'https://huggingface.co/o/r/resolve/main/vae.safetensors', sha256: 'e'.repeat(64), size: 1000 });
+    expect([...updates.keys()]).toEqual(['vae', 'other']);
+  });
+
+  test('reports a file Hugging Face publishes no sha256 for and leaves it out', () => {
+    const { updates, problems } = lockFromHf([plan('vae', null), plan('other', 'f'.repeat(64))]);
+    expect([...updates.keys()]).toEqual(['other']);
+    expect(problems).toEqual([expect.stringMatching(/^vae: .*no sha256/)]);
+  });
+
+  test('ignores --extra files', () => {
+    const { updates, problems } = lockFromHf([plan('extra:lora.safetensors', 'a'.repeat(64), true)]);
+    expect(updates.size).toBe(0);
+    expect(problems).toEqual([]);
+  });
+});
+
+describe('lockDrift', () => {
+  const sha = 'a'.repeat(64);
+
+  test('is null when the lock pins nothing or the same file', () => {
+    expect(lockDrift({}, { sha256: sha, size: 10 })).toBeNull();
+    expect(lockDrift({ sha256: sha, size: 10 }, { sha256: sha, size: 10 })).toBeNull();
+  });
+
+  test('names the sha256 the lock pins and the one Hugging Face serves', () => {
+    const message = lockDrift({ sha256: sha }, { sha256: 'b'.repeat(64), size: 10 });
+    expect(message).toContain(`lock pins sha256 ${sha}`);
+    expect(message).toContain(`Hugging Face serves ${'b'.repeat(64)}`);
+  });
+
+  test('names a size change', () => {
+    expect(lockDrift({ sha256: sha, size: 10 }, { sha256: sha, size: 11 })).toMatch(/lock pins 10 bytes, Hugging Face serves 11/);
+  });
+
+  test('a pinned sha256 that Hugging Face no longer publishes is drift', () => {
+    expect(lockDrift({ sha256: sha }, { sha256: null, size: 10 })).toMatch(/publishes no sha256/);
+  });
 });
 
 test('lockPatch produces a patch that git apply accepts on the repository file', () => {

@@ -24,3 +24,5 @@ bash infra/runpod/bootstrap.sh collect
 - Weights come only from `registry/models.lock.yaml`. Files fetched with `--extra` (evaluation of a candidate whose license is still being read) are hashed and reported but never added to the lock patch.
 
 Without a GPU, `npm run smoke -w @montagio/infra-runpod -- --dry-run` and `npm run weights -w @montagio/infra-runpod -- --dry-run` show what a session would run and download.
+
+`npm run weights -w @montagio/infra-runpod -- --lock-from-hf` writes the lock patch (exact `resolve/main/…` URL, size, and the sha256 Hugging Face stores as the LFS object id) from Hugging Face's metadata alone, without downloading a byte of weights. In every mode, a lock entry whose pinned sha256 or size no longer matches what Hugging Face serves fails before any download.

@@ -76,6 +76,8 @@ export const LockEntrySchema = z
     file: z.string().min(1),
     url: z.string().startsWith('https://huggingface.co/', 'url must point to https://huggingface.co/'),
     sha256: z.string().regex(/^[a-f0-9]{64}$/, 'sha256 must be 64 lowercase hex characters').optional(),
+    /** Size of the file in bytes, as Hugging Face publishes it. */
+    size: z.number().int('size must be a whole number of bytes').positive('size must be a positive number of bytes').optional(),
     license: z.string().min(1),
     source: z.string().url(),
   })
