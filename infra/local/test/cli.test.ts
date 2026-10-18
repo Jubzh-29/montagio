@@ -33,6 +33,25 @@ test('--proxy-url needs --app-only and an http(s) URL', () => {
   expect(parseArgs(['install', '--app-only', '--proxy-url', 'http://127.0.0.1:9189']).options).toMatchObject({ appOnly: true, proxyUrl: 'http://127.0.0.1:9189' });
 });
 
+test('status, start and stop work on a folder where nothing is installed', async () => {
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'montagio cli '));
+  const out: string[] = [];
+  const log = vi.spyOn(console, 'log').mockImplementation((line: string) => void out.push(line));
+  try {
+    expect(await main(['status', '--dir', dir])).toBe(0);
+    expect(out.join('\n')).toContain('mode: not installed');
+    expect(await main(['stop', '--dir', dir])).toBe(0);
+    expect(await main(['start', '--dir', dir, '--no-browser'])).toBe(1);
+    expect(out.join('\n')).toContain('not installed');
+  } finally {
+    log.mockRestore();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('help prints the usage and exits 0, a bad argument exits 2', async () => {
   const out: string[] = [];
   const log = vi.spyOn(console, 'log').mockImplementation((line: string) => void out.push(line));

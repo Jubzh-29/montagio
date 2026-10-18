@@ -13,8 +13,10 @@ import { parseArgs as parseNodeArgs } from 'node:util';
 import type { Ports } from './checks.ts';
 import { capture, stream } from './exec.ts';
 import { install } from './install.ts';
-import { defaultInstallDir, osOf } from './platform.ts';
+import { defaultInstallDir, layout, osOf } from './platform.ts';
 import { probe } from './probe.ts';
+import { runningPorts, startAll, status, stopAll, type ServiceContext } from './services.ts';
+import { readState } from './state.ts';
 
 export const USAGE = `Usage: ./montagio.sh <command> [options]           (Linux)
        powershell -ExecutionPolicy Bypass -File .\\montagio.ps1 <command> [options]   (Windows)
@@ -149,35 +151,42 @@ export async function main(argv: string[]): Promise<number> {
   const os = osOf(process.platform);
   const dir = resolve(options.dir ?? defaultInstallDir(os ?? 'linux', process.env, homedir()));
   const log = (line: string) => console.log(line);
+  const L = layout(dir, os ?? 'linux');
+  // Read the state at each call: install writes it (save-state) right before it starts the services.
+  const services = (): ServiceContext => ({ os: os ?? 'linux', layout: L, repoRoot, state: readState(L.statePath), capture, log });
 
-  if (command === 'install') {
-    return install(
-      repoRoot,
-      {
-        dir,
-        mode: options.appOnly ? 'app-only' : 'full',
-        ignoreVram: options.ignoreVram,
-        ports: options.ports,
-        proxyUrl: options.proxyUrl,
-        dryRun: options.dryRun,
-        start: options.start,
-        browser: options.browser,
-      },
-      {
-        capture,
-        stream,
-        log,
-        ask: process.stdin.isTTY && process.stdout.isTTY ? askYesNo : null,
-        probe,
-        // Wired to the services in the next step of the plan.
-        runningPorts: async () => [],
-        stopAll: async () => undefined,
-        startAll: async () => 0,
-      },
-    );
+  if (command === 'start') return startAll(services(), { browser: options.browser });
+  if (command === 'stop') {
+    await stopAll(services());
+    return 0;
   }
-  console.error(`error: "${command}" is not available yet`);
-  return 1;
+  if (command === 'status') {
+    log(await status(services()));
+    return 0;
+  }
+  return install(
+    repoRoot,
+    {
+      dir,
+      mode: options.appOnly ? 'app-only' : 'full',
+      ignoreVram: options.ignoreVram,
+      ports: options.ports,
+      proxyUrl: options.proxyUrl,
+      dryRun: options.dryRun,
+      start: options.start,
+      browser: options.browser,
+    },
+    {
+      capture,
+      stream,
+      log,
+      ask: process.stdin.isTTY && process.stdout.isTTY ? askYesNo : null,
+      probe,
+      runningPorts: () => runningPorts(services()),
+      stopAll: () => stopAll(services()),
+      startAll: (opts) => startAll(services(), opts),
+    },
+  );
 }
 
 const entry = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : '';
