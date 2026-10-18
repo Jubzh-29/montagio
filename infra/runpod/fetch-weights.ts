@@ -51,6 +51,7 @@ import {
   type RepoInfo,
   type RepoListing,
 } from './lib/weights';
+import { readSafetensorsHeader, summarizeHeader } from './lib/safetensors';
 
 /** Comfy-Org single-file repackagings, tried after the entry's own repository. */
 const MIRRORS = ['Comfy-Org/Wan_2.2_ComfyUI_Repackaged', 'Comfy-Org/Wan_2.1_ComfyUI_repackaged', 'Comfy-Org/z_image_turbo'];
@@ -69,6 +70,7 @@ const { values: args } = parseArgs({
     concurrency: { type: 'string', default: '2' },
     'dry-run': { type: 'boolean', default: false },
     'lock-from-hf': { type: 'boolean', default: false },
+    inspect: { type: 'string', multiple: true, default: [] },
     help: { type: 'boolean', default: false },
   },
 });
@@ -82,6 +84,8 @@ if (args.help) {
   --concurrency N         parallel downloads (default 2)
   --dry-run               resolve exact URLs and sizes, download nothing
   --lock-from-hf          write the lock patch (url, size, sha256) from Hugging Face metadata, download nothing
+  --inspect URL           read only the header of a .safetensors file (two Range requests) and write it to
+                          <out>/inspect-<file>.json (repeatable); nothing else runs
 Environment: HF_TOKEN (optional) lets gated repositories be used.`);
   process.exit(0);
 }
@@ -119,7 +123,31 @@ function licenseCheck(plan: Plan): string {
   return lock === card ? 'card matches the lock (still re-read the license text)' : `MISMATCH: lock ${plan.license_lock}, source card ${plan.license_source_card}`;
 }
 
+async function inspect(urls: string[], outDir: string, headers: Record<string, string>): Promise<number> {
+  let failures = 0;
+  for (const url of urls) {
+    // <repo>__<file> for a Hugging Face URL (…/<owner>/<repo>/resolve/<rev>/<path>), else the file name
+    const parts = new URL(url).pathname.split('/').filter(Boolean);
+    const name = parts[2] === 'resolve' ? `${parts[1]}__${parts.at(-1)}` : parts.at(-1)!;
+    try {
+      // Only huggingface.co gets the token: fetch drops Authorization on the cross-origin CDN redirect.
+      const header = await readSafetensorsHeader(url, { headers: new URL(url).origin === 'https://huggingface.co' ? headers : {} });
+      const out = join(outDir, `inspect-${name}.json`);
+      await writeText(out, `${JSON.stringify({ url, at: new Date().toISOString(), ...header }, null, 2)}\n`);
+      console.log(`${url}\n  ${summarizeHeader(header).join('\n  ')}\n  header: ${relative(callerDir, out)}`);
+    } catch (error) {
+      failures++;
+      console.error(`✗ ${url}: ${(error as Error).message}`);
+    }
+  }
+  return failures > 0 ? 1 : 0;
+}
+
 async function main(): Promise<number> {
+  if (args.inspect.length > 0) {
+    const token = process.env.HF_TOKEN?.trim();
+    return inspect(args.inspect, fromCaller(args.out ?? join(repoRoot, 's1-results')), token ? { authorization: `Bearer ${token}` } : {});
+  }
   const lockOnly = args['lock-from-hf'];
   const dryRun = args['dry-run'] || lockOnly;
   if (!dryRun && !args['models-dir']) throw new Error('--models-dir is required (for example /workspace/ComfyUI/models), or pass --dry-run');
