@@ -21,6 +21,7 @@
     "@montagio/presets": "*",
     "@montagio/registry": "*",
     "@montagio/sequence": "*",
+    "@montagio/showcase": "*",
     "image-size": "^2",
     "next": "16.4.2",
     "react": "19.3.0",

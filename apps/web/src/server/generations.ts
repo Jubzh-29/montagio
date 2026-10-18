@@ -4,6 +4,7 @@ import { join, relative, sep } from 'node:path';
 import { IDEMPOTENCY_WINDOW_MS, isBackendError, type BackendErrorCode } from '@montagio/comfy-adapter';
 import { compileJob, CompileError, validatePreset, type Preset } from '@montagio/presets';
 import { ensureTools, tagClip } from '@montagio/sequence';
+import { MAX_PRESET_YAML_BYTES, MAX_REQUEST_BYTES } from '@/lib/limits';
 import { getEnv } from './env';
 import { getServices } from './services';
 import {
@@ -19,10 +20,8 @@ import { readUploadMeta } from './uploads';
 
 // The backend forgets a key after the same window: one constant for both layers.
 export { IDEMPOTENCY_WINDOW_MS };
-/** A remixed preset is a small text file: 16 KiB of UTF-8 at most. */
-export const MAX_PRESET_YAML_BYTES = 16 * 1024;
-/** Request bodies that may carry a preset: room for its JSON escaping, nothing near a pasted megabyte. */
-export const MAX_REQUEST_BYTES = 128 * 1024;
+// The showcase's in-page router applies the same limits.
+export { MAX_PRESET_YAML_BYTES, MAX_REQUEST_BYTES };
 const TERMINAL = new Set(['succeeded', 'failed', 'canceled']);
 
 export type GenerationErrorCode =

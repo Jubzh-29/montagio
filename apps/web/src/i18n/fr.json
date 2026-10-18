@@ -68,5 +68,10 @@
   "downloadVertical": "Télécharger en 9:16",
   "removeShot": "Retirer le plan {i}",
   "shotPrompt": "Texte du plan {i}",
-  "shotPromptPlaceholder": "Facultatif : ce qui se passe dans ce plan"
+  "shotPromptPlaceholder": "Facultatif : ce qui se passe dans ce plan",
+  "errorShowcaseUpload": "La vitrine ne peut pas animer votre photo : ses clips sont pré-générés. Installez Montagio chez vous pour utiliser la vôtre.",
+  "errorShowcaseRemix": "La vitrine ne fait pas le rendu des remix. Installez Montagio chez vous pour générer celui-ci.",
+  "errorNotInShowcase": "Cette combinaison n'est pas dans la vitrine.",
+  "errorFfmpegUnavailable": "FFmpeg n'a pas pu démarrer dans ce navigateur : le film ne peut pas être monté ici. Les clips seuls fonctionnent.",
+  "errorMontageBusy": "Un film est déjà en cours de montage."
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
+import { apiFetch } from '@/lib/api';
 import {
   TERMINAL_STATES,
   type GenerationRecord,
@@ -102,8 +103,8 @@ export function Studio() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/presets').then((res) => res.json() as Promise<PresetSummary[]>),
-      fetch('/api/models').then((res) => res.json() as Promise<ModelSummary[]>),
+      apiFetch('/api/presets').then((res) => res.json() as Promise<PresetSummary[]>),
+      apiFetch('/api/models').then((res) => res.json() as Promise<ModelSummary[]>),
     ])
       .then(([presetList, modelList]) => {
         setPresets(presetList);
@@ -140,7 +141,7 @@ export function Studio() {
     const delay = POLL_MS * (pollFailures.current + 1);
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(endpoint(tracked));
+        const res = await apiFetch(endpoint(tracked));
         if (res.status === 404) {
           pollFailures.current = 0;
           setJob(lostJob(tracked));
@@ -189,7 +190,7 @@ export function Studio() {
         if (token === uploadToken.current) setUpload(next);
       };
       try {
-        const res = await fetch('/api/uploads', { method: 'POST', body: form });
+        const res = await apiFetch('/api/uploads', { method: 'POST', body: form });
         if (res.status === 413) return settle({ status: 'error', message: t('errorUpload413') });
         if (res.status === 415) return settle({ status: 'error', message: t('errorUpload415') });
         if (!res.ok) return settle({ status: 'error', message: t('errorGeneric') });
@@ -229,7 +230,7 @@ export function Studio() {
     const baseName = presets.find((preset) => preset.id === id)?.name ?? id;
     let next: Remix;
     try {
-      const res = await fetch(source);
+      const res = await apiFetch(source);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       next = { baseId: id, baseName, original: text, text, generationId };
@@ -260,7 +261,7 @@ export function Studio() {
     const model = modelId;
     setRemixCheck(text, model, { kind: 'checking' });
     try {
-      const res = await fetch('/api/presets/validate', {
+      const res = await apiFetch('/api/presets/validate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ yaml: text, modelId: model }),
@@ -289,7 +290,7 @@ export function Studio() {
     submitting.current = true;
     setJob({ status: 'submitting' });
     try {
-      const res = await fetch(kind === 'sequence' ? '/api/sequences' : '/api/generations', {
+      const res = await apiFetch(kind === 'sequence' ? '/api/sequences' : '/api/generations', {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
         body: JSON.stringify(body),
@@ -347,7 +348,7 @@ export function Studio() {
   const cancel = async () => {
     if (!tracked) return;
     try {
-      const res = await fetch(`${endpoint(tracked)}/cancel`, { method: 'POST' });
+      const res = await apiFetch(`${endpoint(tracked)}/cancel`, { method: 'POST' });
       if (res.status === 404) setJob(lostJob(tracked));
       else if (res.ok) setJob({ ...tracked, record: await res.json() } as Tracked);
     } catch {
@@ -389,11 +390,15 @@ export function Studio() {
           {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
             <div className={styles.actions}>
               {tracked.record.outputUrl && (
-                <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download>
+                <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.presetId}.mp4`}>
                   {t('download')}
                 </a>
               )}
-              <a className={styles.buttonSecondary} href={`/api/workflows/${tracked.record.id}`} download>
+              <a
+                className={styles.buttonSecondary}
+                href={tracked.record.workflowUrl ?? `/api/workflows/${tracked.record.id}`}
+                download={`montagio-${tracked.record.presetId}.json`}
+              >
                 {t('openInComfy')}
               </a>
               <button
@@ -408,12 +413,12 @@ export function Studio() {
           {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
             <div className={styles.actions}>
               {tracked.record.outputUrl && (
-                <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download>
+                <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download="montagio-film.mp4">
                   {t('downloadFilm')}
                 </a>
               )}
               {tracked.record.verticalUrl && (
-                <a className={styles.buttonSecondary} href={tracked.record.verticalUrl} download>
+                <a className={styles.buttonSecondary} href={tracked.record.verticalUrl} download="montagio-film-9x16.mp4">
                   {t('downloadVertical')}
                 </a>
               )}

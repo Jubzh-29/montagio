@@ -68,5 +68,10 @@
   "downloadVertical": "Download 9:16",
   "removeShot": "Remove shot {i}",
   "shotPrompt": "Text for shot {i}",
-  "shotPromptPlaceholder": "Optional: what happens in this shot"
+  "shotPromptPlaceholder": "Optional: what happens in this shot",
+  "errorShowcaseUpload": "The showcase cannot animate your photo: its clips are pre-generated. Run Montagio on your machine to use your own.",
+  "errorShowcaseRemix": "The showcase does not render remixes. Run Montagio on your machine to generate this one.",
+  "errorNotInShowcase": "This combination is not in the showcase.",
+  "errorFfmpegUnavailable": "FFmpeg could not start in this browser, so the film cannot be assembled here. Single clips still work.",
+  "errorMontageBusy": "A film is already being assembled."
 }
