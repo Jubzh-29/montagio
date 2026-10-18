@@ -1,4 +1,4 @@
-import { assertLocalBaseUrl, checkWorkflow, comboOptions, guardFetch, parseNvidiaSmiLine } from '../lib/comfy';
+import { assertLocalBaseUrl, cameraMove, checkWorkflow, comboOptions, guardFetch, parseNvidiaSmiLine } from '../lib/comfy';
 
 describe('assertLocalBaseUrl', () => {
   test('accepts the local proxy and says it is loopback', () => {
@@ -232,6 +232,15 @@ describe('checkWorkflow: dynamic combos (SaveVideo format and codec)', () => {
       'node 3 (SaveVideo): unknown input "format.colour"',
     ]);
   });
+});
+
+test.each([
+  [{ cameraPose: 'Zoom In', cameraPose2: null, cameraCombine: null }, 'Zoom In'],
+  [{ cameraPose: 'Pan Up', cameraPose2: 'Zoom In', cameraCombine: 'together' as const }, 'Pan Up + Zoom In'],
+  [{ cameraPose: 'Zoom In', cameraPose2: 'Static', cameraCombine: 'then' as const }, 'Zoom In, then Static'],
+  [{ cameraPose: null, cameraPose2: null, cameraCombine: null }, null],
+])('cameraMove names the move of a compiled job: %o', (params, label) => {
+  expect(cameraMove(params)).toBe(label);
 });
 
 test('parseNvidiaSmiLine reads used and total MiB', () => {

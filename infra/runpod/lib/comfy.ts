@@ -1,6 +1,13 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import type { ApiWorkflow } from '@montagio/presets';
+import type { ApiWorkflow, CompiledParams } from '@montagio/presets';
+
+/** The camera move of a compiled job in words: "Zoom In", "Pan Up + Zoom In", "Zoom In, then Static"; null in prompt mode. */
+export function cameraMove(params: Pick<CompiledParams, 'cameraPose' | 'cameraPose2' | 'cameraCombine'>): string | null {
+  if (!params.cameraPose) return null;
+  if (!params.cameraPose2) return params.cameraPose;
+  return `${params.cameraPose}${params.cameraCombine === 'then' ? ', then ' : ' + '}${params.cameraPose2}`;
+}
 
 // The SDK target guards live in the adapter, which the app's local backend uses too.
 export { assertLocalBaseUrl, guardFetch } from '@montagio/comfy-adapter';
