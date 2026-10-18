@@ -6,7 +6,34 @@ import type { ApiWorkflow } from '@montagio/presets';
 export { assertLocalBaseUrl, guardFetch } from '@montagio/comfy-adapter';
 
 type InputSpecs = Record<string, unknown>;
-export type ObjectInfo = Record<string, { input?: { required?: InputSpecs; optional?: InputSpecs } }>;
+export type ObjectInfo = Record<
+  string,
+  {
+    input?: { required?: InputSpecs; optional?: InputSpecs; hidden?: InputSpecs };
+    output?: string[];
+    output_name?: string[];
+    python_module?: string;
+  }
+>;
+
+/** The type of an input as /object_info describes it: a combo (legacy option list) counts as COMBO. */
+function inputType(spec: unknown): string | null {
+  if (!Array.isArray(spec)) return null;
+  const type = spec[0] as unknown;
+  if (Array.isArray(type)) return 'COMBO';
+  return typeof type === 'string' ? type : null;
+}
+
+/** ComfyUI's rule: "*" matches anything, and a type may list several, comma-separated. */
+function typesMatch(expected: string, received: string): boolean {
+  if (expected === '*' || received === '*') return true;
+  const received_ = new Set(received.split(','));
+  return expected.split(',').some((type) => received_.has(type));
+}
+
+function isLink(value: unknown): value is [string, number] {
+  return Array.isArray(value) && value.length === 2 && typeof value[0] === 'string' && typeof value[1] === 'number';
+}
 
 /** Options of a combo input as /object_info describes it, or null for any other input. */
 export function comboOptions(spec: unknown): (string | number)[] | null {
@@ -21,8 +48,11 @@ export function comboOptions(spec: unknown): (string | number)[] | null {
 
 /**
  * Compare a workflow with what the running ComfyUI accepts: installed node
- * classes and combo values (camera poses, weight files present on disk).
- * `skip` lists "node.field" inputs that are filled at submit time (uploaded image).
+ * classes, input names (unknown ones, missing required ones), links (to an
+ * existing node, an existing output, of the expected type) and combo values
+ * (camera poses, weight files present on disk).
+ * `skip` lists "node.field" inputs that are filled at submit time (uploaded
+ * image): their combo value is not checked, their presence still is.
  */
 export function checkWorkflow(workflow: ApiWorkflow, info: ObjectInfo, opts: { skip?: string[] } = {}): string[] {
   const skip = new Set(opts.skip ?? []);
@@ -33,7 +63,32 @@ export function checkWorkflow(workflow: ApiWorkflow, info: ObjectInfo, opts: { s
       problems.push(`node ${id}: class ${node.class_type} is not installed`);
       continue;
     }
+    const required = spec.input?.required ?? {};
+    const declared = { ...spec.input?.optional, ...required };
+    for (const field of Object.keys(required)) {
+      if (!(field in node.inputs)) problems.push(`node ${id} (${node.class_type}): missing required input "${field}"`);
+    }
     for (const [field, value] of Object.entries(node.inputs)) {
+      if (!(field in declared)) {
+        problems.push(`node ${id} (${node.class_type}): unknown input "${field}"`);
+        continue;
+      }
+      if (isLink(value)) {
+        const [from, index] = value;
+        const source = workflow[from];
+        const outputs = source ? info[source.class_type]?.output : undefined;
+        if (!source) {
+          problems.push(`node ${id} (${node.class_type}).${field} links to missing node "${from}"`);
+        } else if (outputs && index >= outputs.length) {
+          problems.push(`node ${id} (${node.class_type}).${field} links to output ${index} of node ${from} (${source.class_type}), which has ${outputs.length} output(s)`);
+        } else if (outputs) {
+          const expected = inputType(declared[field]);
+          if (expected && !typesMatch(expected, outputs[index]!)) {
+            problems.push(`node ${id} (${node.class_type}).${field} expects ${expected}, output ${index} of node ${from} is ${outputs[index]}`);
+          }
+        }
+        continue;
+      }
       if (Array.isArray(value) || skip.has(`${id}.${field}`)) continue;
       const options = comboOptions(spec.input?.required?.[field] ?? spec.input?.optional?.[field]);
       if (options && (typeof value === 'string' || typeof value === 'number') && !options.includes(value)) {

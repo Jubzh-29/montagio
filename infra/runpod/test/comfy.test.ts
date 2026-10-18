@@ -96,6 +96,83 @@ describe('checkWorkflow against /object_info', () => {
   });
 });
 
+describe('checkWorkflow: input names, required inputs and links', () => {
+  const info = {
+    UNETLoader: { input: { required: { unet_name: [['a.safetensors'], {}] } }, output: ['MODEL'] },
+    ModelSamplingSD3: { input: { required: { model: ['MODEL'], shift: ['FLOAT', { default: 3 }] } }, output: ['MODEL'] },
+    WanCameraEmbedding: {
+      input: { required: { camera_pose: ['COMBO', { options: ['Static'] }], width: ['INT', {}] }, optional: { speed: ['FLOAT', {}] } },
+      output: ['WAN_CAMERA_EMBEDDING', 'INT', 'INT', 'INT'],
+    },
+    WanCameraImageToVideo: {
+      input: { required: { width: ['INT', {}] }, optional: { camera_conditions: ['WAN_CAMERA_EMBEDDING', {}] } },
+      output: ['CONDITIONING', 'CONDITIONING', 'LATENT'],
+    },
+    PreviewAny: { input: { required: { source: ['*', {}] } }, output: [] },
+  };
+  const valid = () => ({
+    '1': { class_type: 'UNETLoader', inputs: { unet_name: 'a.safetensors' } },
+    '2': { class_type: 'ModelSamplingSD3', inputs: { model: ['1', 0], shift: 8 } },
+    '3': { class_type: 'WanCameraEmbedding', inputs: { camera_pose: 'Static', width: 832 } },
+    '4': { class_type: 'WanCameraImageToVideo', inputs: { width: ['3', 1], camera_conditions: ['3', 0] } },
+  });
+
+  test('a workflow whose links and inputs all match has no problem', () => {
+    expect(checkWorkflow(valid(), info)).toEqual([]);
+  });
+
+  test('an input filled by a link may be a widget input', () => {
+    const workflow = valid();
+    expect(workflow['4'].inputs.width).toEqual(['3', 1]);
+    expect(checkWorkflow(workflow, info)).toEqual([]);
+  });
+
+  test('reports an input the class does not declare', () => {
+    const workflow = valid();
+    (workflow['2'].inputs as Record<string, unknown>).seed = 3;
+    expect(checkWorkflow(workflow, info)).toEqual(['node 2 (ModelSamplingSD3): unknown input "seed"']);
+  });
+
+  test('reports a missing required input', () => {
+    const workflow = valid();
+    delete (workflow['2'].inputs as Record<string, unknown>).shift;
+    expect(checkWorkflow(workflow, info)).toEqual(['node 2 (ModelSamplingSD3): missing required input "shift"']);
+  });
+
+  test('reports a link to a node that is not in the workflow', () => {
+    const workflow = valid();
+    workflow['2'].inputs.model = ['9', 0];
+    expect(checkWorkflow(workflow, info)).toEqual(['node 2 (ModelSamplingSD3).model links to missing node "9"']);
+  });
+
+  test('reports a link to an output the node does not have', () => {
+    const workflow = valid();
+    workflow['2'].inputs.model = ['1', 1];
+    expect(checkWorkflow(workflow, info)).toEqual(['node 2 (ModelSamplingSD3).model links to output 1 of node 1 (UNETLoader), which has 1 output(s)']);
+  });
+
+  test('reports a link whose output type is not the input type', () => {
+    const workflow = valid();
+    workflow['4'].inputs.camera_conditions = ['3', 2];
+    expect(checkWorkflow(workflow, info)).toEqual([
+      'node 4 (WanCameraImageToVideo).camera_conditions expects WAN_CAMERA_EMBEDDING, output 2 of node 3 is INT',
+    ]);
+  });
+
+  test('an input typed * accepts any output', () => {
+    const workflow = { ...valid(), '5': { class_type: 'PreviewAny', inputs: { source: ['3', 3] } } };
+    expect(checkWorkflow(workflow, info)).toEqual([]);
+  });
+
+  test('skip still skips combo checks only', () => {
+    const workflow = valid();
+    (workflow['1'].inputs as Record<string, unknown>).unet_name = 'later.safetensors';
+    expect(checkWorkflow(workflow, info, { skip: ['1.unet_name'] })).toEqual([]);
+    delete (workflow['1'].inputs as Record<string, unknown>).unet_name;
+    expect(checkWorkflow(workflow, info, { skip: ['1.unet_name'] })).toEqual(['node 1 (UNETLoader): missing required input "unet_name"']);
+  });
+});
+
 test('parseNvidiaSmiLine reads used and total MiB', () => {
   expect(parseNvidiaSmiLine('20480, 24564')).toEqual({ usedMiB: 20480, totalMiB: 24564 });
   expect(parseNvidiaSmiLine('garbage')).toBeNull();
