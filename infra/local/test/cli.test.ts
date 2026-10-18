@@ -1,4 +1,10 @@
-import { main, parseArgs } from '../src/cli.ts';
+import { argvFrom, main, parseArgs } from '../src/cli.ts';
+
+test('montagio.ps1 hands the arguments over as JSON, untouched by PowerShell 5.1', () => {
+  expect(argvFrom({ MONTAGIO_ARGV: '["install","--dir=C:\\\\A B","--bogus option"]' }, ['ignored'])).toEqual(['install', '--dir=C:\\A B', '--bogus option']);
+  expect(argvFrom({}, ['install', '--dry-run'])).toEqual(['install', '--dry-run']);
+  expect(() => argvFrom({ MONTAGIO_ARGV: '{"a":1}' }, [])).toThrow(/MONTAGIO_ARGV/);
+});
 
 test('install options are read', () => {
   expect(parseArgs(['install', '--dry-run', '--ignore-vram', '--dir', 'D:\\Shot Rig', '--comfy-port', '8288', '--no-start', '--no-browser'])).toEqual({

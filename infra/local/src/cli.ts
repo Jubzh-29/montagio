@@ -189,9 +189,25 @@ export async function main(argv: string[]): Promise<number> {
   );
 }
 
+/**
+ * The arguments. montagio.ps1 sends them as JSON in MONTAGIO_ARGV: Windows
+ * PowerShell 5.1 splits an argument that starts with "-" and holds a space
+ * ("--dir=C:\Shot Rig") when it passes it to a program.
+ */
+export function argvFrom(env: Record<string, string | undefined>, argv: string[]): string[] {
+  const raw = env.MONTAGIO_ARGV;
+  if (!raw) return argv;
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed) || !parsed.every((arg) => typeof arg === 'string')) throw new Error('MONTAGIO_ARGV must be a JSON list of strings');
+  return parsed;
+}
+
 const entry = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : '';
 if (entry === import.meta.url) {
-  main(process.argv.slice(2)).then(
+  const argv = argvFrom(process.env, process.argv.slice(2));
+  // Not for the programs the installer starts.
+  delete process.env.MONTAGIO_ARGV;
+  main(argv).then(
     (code) => {
       process.exitCode = code;
     },
