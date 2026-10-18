@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BackendError, ComfyBackend, isBackendError, type SubmitJob } from '../src/index';
+import { BackendError, ComfyBackend, IDEMPOTENCY_WINDOW_MS, isBackendError, type SubmitJob } from '../src/index';
 import { startFakeProxy, type FakeJobState, type FakeProxy } from '../src/testing/fake-proxy';
 
 const sample = fileURLToPath(new URL('../../../demo-assets/images/sample-16x9.png', import.meta.url));
@@ -22,6 +22,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await fake.close();
+  rmSync(outputsDir, { recursive: true, force: true });
   for (const [name, value] of [['COMFY_API_KEY', saved.key], ['COMFY_BASE_URL', saved.base]] as const) {
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
@@ -100,6 +101,33 @@ test('a succeeded job downloads its video once', async () => {
   expect(await backend().get(id)).toEqual(done); // a restarted app reuses the file
   expect(contentRequests()).toBe(1);
   expect(readdirSync(outputsDir)).toEqual([`${id}.mp4`]);
+});
+
+test('a clip removed from disk is downloaded again on the next get', async () => {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(job());
+  fake.setJob(id, { status: 'succeeded', outputs: [output('Montagio_00001.mp4', 'video', 'video/mp4')] });
+  const done = await b.get(id);
+  rmSync(done.outputPath!);
+  expect(await b.get(id)).toEqual(done);
+  expect(readFileSync(done.outputPath!).equals(readFileSync(clip))).toBe(true);
+  expect(contentRequests()).toBe(2);
+});
+
+test('a clip download that stalls hits its deadline, leaves no partial file, and is retried on the next get', async () => {
+  const b = new ComfyBackend({ baseUrl: fake.url, outputsDir, downloadTimeoutMs: 300 });
+  const { backendJobId: id } = await b.submit(job());
+  const video = output('Montagio_00001.mp4', 'video', 'video/mp4');
+  fake.assets.get(video.assetId)!.stall = true;
+  fake.setJob(id, { status: 'succeeded', outputs: [video] });
+  const t0 = Date.now();
+  const error = await b.get(id).catch((e: unknown) => e);
+  expect(error).toBeInstanceOf(BackendError);
+  expect(error).toMatchObject({ code: 'backend-unavailable', retryable: true });
+  expect(Date.now() - t0).toBeLessThan(3000);
+  expect(readdirSync(outputsDir)).toEqual([]);
+  fake.assets.get(video.assetId)!.stall = false;
+  expect(await b.get(id)).toEqual({ id, state: 'succeeded', progress: 1, outputPath: join(outputsDir, `${id}.mp4`) });
 });
 
 test('the video output is preferred over an image preview', async () => {
@@ -182,6 +210,19 @@ test('same idempotency key, one job', async () => {
   expect(fake.requests.filter((r) => r.method === 'POST' && r.path === '/api/v2/jobs')).toHaveLength(1);
 });
 
+test('a key reused after the idempotency window is a new job, as in the web layer', async () => {
+  let now = 1_000_000;
+  const b = new ComfyBackend({ baseUrl: fake.url, outputsDir, now: () => now });
+  const same = job();
+  const first = await b.submit(same);
+  now += IDEMPOTENCY_WINDOW_MS - 1;
+  expect(await b.submit(same)).toEqual(first);
+  now += 1;
+  const second = await b.submit(same);
+  expect(second.backendJobId).not.toBe(first.backendJobId);
+  expect(fake.requests.filter((r) => r.method === 'POST' && r.path === '/api/v2/jobs')).toHaveLength(2);
+});
+
 test('a rejected workflow is a non-retryable workflow-rejected', async () => {
   const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   try {
@@ -236,14 +277,18 @@ test('a job id with path characters is refused at submit', async () => {
 test('an output name cannot leave outputsDir', async () => {
   // Nested in a temporary root, so a regression writes there and not next to the system temp folder.
   const root = mkdtempSync(join(tmpdir(), 'montagio-escape-'));
-  const nested = join(root, 'a', 'b', 'outputs');
-  const b = new ComfyBackend({ baseUrl: fake.url, outputsDir: nested });
-  const { backendJobId: id } = await b.submit(job());
-  fake.setJob(id, { status: 'succeeded', outputs: [output('../../evil.sh', 'video', 'video/mp4')] });
-  expect((await b.get(id)).outputPath).toBe(join(nested, `${id}.bin`));
-  expect(readdirSync(nested)).toEqual([`${id}.bin`]);
-  expect(existsSync(resolve(nested, '../../evil.sh'))).toBe(false);
-  expect(readdirSync(join(root, 'a'))).toEqual(['b']);
+  try {
+    const nested = join(root, 'a', 'b', 'outputs');
+    const b = new ComfyBackend({ baseUrl: fake.url, outputsDir: nested });
+    const { backendJobId: id } = await b.submit(job());
+    fake.setJob(id, { status: 'succeeded', outputs: [output('../../evil.sh', 'video', 'video/mp4')] });
+    expect((await b.get(id)).outputPath).toBe(join(nested, `${id}.bin`));
+    expect(readdirSync(nested)).toEqual([`${id}.bin`]);
+    expect(existsSync(resolve(nested, '../../evil.sh'))).toBe(false);
+    expect(readdirSync(join(root, 'a'))).toEqual(['b']);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('a cancel link to another origin is refused', async () => {

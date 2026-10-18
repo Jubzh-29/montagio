@@ -1,8 +1,10 @@
-import { mkdtempSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createBackend, DemoBackend } from '../src/index';
+import { startFakeProxy } from '../src/testing/fake-proxy';
 
 const fixtureClips = fileURLToPath(new URL('./fixtures/clips', import.meta.url));
 let t = 0;
@@ -85,8 +87,30 @@ test('local refuses a Comfy-hosted URL', () => {
 });
 
 test('local builds the Comfy backend', () => {
+  expect(createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: 'http://127.0.0.1:8189' }).kind).toBe('local');
+});
+
+test('local keeps its clips under <MONTAGIO_DATA>/comfy-outputs, else under <MONTAGIO_ROOT>/data/comfy-outputs', async () => {
+  const fake = await startFakeProxy();
   const tmp = mkdtempSync(join(tmpdir(), 'montagio-factory-'));
-  expect(createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: 'http://127.0.0.1:8189', MONTAGIO_DATA: tmp }).kind).toBe('local');
+  try {
+    fake.assets.set('clip', { bytes: Buffer.from('clip'), contentType: 'video/mp4', filePath: 'Montagio_00001.mp4' });
+    const outputPath = async (env: Record<string, string>) => {
+      const b = createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: fake.url, ...env });
+      const workflow = { '2': { class_type: 'SaveVideo', inputs: {} } };
+      const { backendJobId: id } = await b.submit({ workflow, presetId: 'p', idempotencyKey: randomUUID() });
+      const outputs = [{ node_id: '2', name: 'Montagio_00001.mp4', type: 'video', content_type: 'video/mp4', assetId: 'clip' }];
+      fake.setJob(id, { status: 'succeeded', outputs });
+      return [id, (await b.get(id)).outputPath];
+    };
+    const [a, inData] = await outputPath({ MONTAGIO_DATA: join(tmp, 'data-dir'), MONTAGIO_ROOT: join(tmp, 'root') });
+    expect(inData).toBe(join(tmp, 'data-dir', 'comfy-outputs', `${a}.mp4`));
+    const [b, inRoot] = await outputPath({ MONTAGIO_ROOT: join(tmp, 'root') });
+    expect(inRoot).toBe(join(tmp, 'root', 'data', 'comfy-outputs', `${b}.mp4`));
+  } finally {
+    await fake.close();
+    rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 test('hosted is not available yet', () => {

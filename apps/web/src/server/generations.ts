@@ -1,7 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import { access } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
-import { isBackendError, type BackendErrorCode } from '@montagio/comfy-adapter';
+import { IDEMPOTENCY_WINDOW_MS, isBackendError, type BackendErrorCode } from '@montagio/comfy-adapter';
 import { compileJob, CompileError, validatePreset, type Preset } from '@montagio/presets';
 import { ensureTools, tagClip } from '@montagio/sequence';
 import { getEnv } from './env';
@@ -17,7 +17,8 @@ import {
 } from './store';
 import { readUploadMeta } from './uploads';
 
-export const IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
+// The backend forgets a key after the same window: one constant for both layers.
+export { IDEMPOTENCY_WINDOW_MS };
 /** A remixed preset is a small text file: 16 KiB of UTF-8 at most. */
 export const MAX_PRESET_YAML_BYTES = 16 * 1024;
 /** Request bodies that may carry a preset: room for its JSON escaping, nothing near a pasted megabyte. */

@@ -10,7 +10,7 @@ import {
   type Output,
   type WorkflowGraph,
 } from '@comfyorg/sdk';
-import type { BackendJob, GenerationBackend, SubmitJob } from './backend';
+import { IDEMPOTENCY_WINDOW_MS, type BackendJob, type GenerationBackend, type SubmitJob } from './backend';
 import { BackendError } from './errors';
 import { assertLocalBaseUrl, guardFetch } from './target';
 
@@ -18,6 +18,11 @@ import { assertLocalBaseUrl, guardFetch } from './target';
 const JOB_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const ERROR_CODE = /^[a-z0-9_.-]{1,64}$/i;
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.mov', '.mkv', '.gif']);
+/**
+ * A clip is a few megabytes: a download still running after this is stuck (a tunnel
+ * gone silent). The SDK sets no deadline of its own on a download.
+ */
+const CLIP_DOWNLOAD_TIMEOUT_MS = 2 * 60 * 1000;
 
 const isJobId = (id: string) => JOB_ID.test(id) && id !== '..';
 const lost = (id: string): BackendJob => ({ id, state: 'failed', progress: 0, error: 'lost' });
@@ -52,23 +57,39 @@ const describe = (error: unknown) => (error instanceof Error ? error.message : S
 export class ComfyBackend implements GenerationBackend {
   readonly kind = 'local' as const;
   private readonly client: Comfy;
-  private readonly submissions = new Map<string, Promise<{ backendJobId: string }>>();
+  /** Submits by idempotency key, kept for the idempotency window and no longer. */
+  private readonly submissions = new Map<string, { at: number; pending: Promise<{ backendJobId: string }> }>();
+  /** Downloads in flight, by job id: once a clip is on disk, the file is the record. */
   private readonly downloads = new Map<string, Promise<string>>();
 
-  constructor(private readonly opts: { baseUrl: string; outputsDir: string; fetch?: typeof fetch }) {
+  constructor(
+    private readonly opts: {
+      baseUrl: string;
+      outputsDir: string;
+      fetch?: typeof fetch;
+      downloadTimeoutMs?: number;
+      now?: () => number;
+    },
+  ) {
     const target = assertLocalBaseUrl(opts.baseUrl);
     this.client = buildClient(target.base, () => new Comfy({ fetch: guardFetch(target.url, opts.fetch), clientInfo: 'montagio/0.1' }));
   }
 
   submit(job: SubmitJob): Promise<{ backendJobId: string }> {
-    let pending = this.submissions.get(job.idempotencyKey);
-    if (!pending) {
-      pending = this.submitOnce(job);
-      this.submissions.set(job.idempotencyKey, pending);
-      // A failed submit is not remembered: the same key may try again.
-      pending.catch(() => this.submissions.delete(job.idempotencyKey));
+    const now = this.opts.now?.() ?? Date.now();
+    // Past the window the web layer treats a reused key as a new request: so does the backend.
+    for (const [key, entry] of this.submissions) {
+      if (now - entry.at >= IDEMPOTENCY_WINDOW_MS) this.submissions.delete(key);
     }
-    return pending;
+    const known = this.submissions.get(job.idempotencyKey);
+    if (known) return known.pending;
+    const entry = { at: now, pending: this.submitOnce(job) };
+    this.submissions.set(job.idempotencyKey, entry);
+    // A failed submit is not remembered: the same key may try again.
+    entry.pending.catch(() => {
+      if (this.submissions.get(job.idempotencyKey) === entry) this.submissions.delete(job.idempotencyKey);
+    });
+    return entry.pending;
   }
 
   private async submitOnce(job: SubmitJob): Promise<{ backendJobId: string }> {
@@ -134,14 +155,16 @@ export class ComfyBackend implements GenerationBackend {
     }
   }
 
-  /** Download the clip once per job; a file already on disk (from before a restart) is reused. */
+  /** Download the clip once, however many polls ask at the same time; a file already on disk is reused. */
   private download(id: string, output: Output): Promise<string> {
-    let pending = this.downloads.get(id);
-    if (!pending) {
-      pending = this.downloadOnce(id, output);
-      this.downloads.set(id, pending);
-      pending.catch(() => this.downloads.delete(id));
-    }
+    const inFlight = this.downloads.get(id);
+    if (inFlight) return inFlight;
+    const pending = this.downloadOnce(id, output);
+    this.downloads.set(id, pending);
+    const settle = () => {
+      if (this.downloads.get(id) === pending) this.downloads.delete(id);
+    };
+    pending.then(settle, settle);
     return pending;
   }
 
@@ -158,7 +181,7 @@ export class ComfyBackend implements GenerationBackend {
     await mkdir(this.opts.outputsDir, { recursive: true });
     const partial = `${target}.part`;
     try {
-      await output.toFile(partial);
+      await output.toFile(partial, { timeoutMs: this.opts.downloadTimeoutMs ?? CLIP_DOWNLOAD_TIMEOUT_MS });
       await rename(partial, target);
     } finally {
       await rm(partial, { force: true });

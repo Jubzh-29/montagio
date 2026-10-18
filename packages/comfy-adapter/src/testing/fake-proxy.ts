@@ -22,7 +22,14 @@ export type FakeJobState = {
   cancelUrl?: string;
 };
 
-export type FakeAsset = { bytes: Buffer; contentType: string; filePath: string; hash?: string };
+export type FakeAsset = {
+  bytes: Buffer;
+  contentType: string;
+  filePath: string;
+  hash?: string;
+  /** Its content is sent in part, then the connection goes silent (a stuck tunnel). */
+  stall?: boolean;
+};
 
 export type FakeProxy = {
   url: string;
@@ -185,6 +192,11 @@ export async function startFakeProxy(opts: { autoRun?: { clip: string }; port?: 
     if (method === 'GET' && (match = /^\/api\/v2\/assets\/([^/]+)\/content$/.exec(path))) {
       const asset = assets.get(decodeURIComponent(match[1]!));
       if (!asset) return send(res, 404, envelope('asset_not_found', 'no such asset'));
+      if (asset.stall) {
+        res.writeHead(200, { 'content-type': asset.contentType, 'content-length': asset.bytes.length });
+        res.write(asset.bytes.subarray(0, Math.floor(asset.bytes.length / 2)));
+        return;
+      }
       return send(res, 200, asset.bytes, asset.contentType);
     }
 

@@ -14,6 +14,12 @@ export type BackendJob = {
 
 export type BackendKind = 'demo' | 'local' | 'hosted';
 
+/**
+ * How long an idempotency key holds: the web layer replays a request whose key it saw
+ * less than this ago, and a backend remembers the job a key started for as long.
+ */
+export const IDEMPOTENCY_WINDOW_MS = 10 * 60 * 1000;
+
 /** A compiled workflow to run, plus the local files its loader nodes need (the start image). */
 export type SubmitJob = {
   workflow: ApiWorkflow;
