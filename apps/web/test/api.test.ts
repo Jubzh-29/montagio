@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { POST as postGenerations } from '@/app/api/generations/route';
@@ -174,6 +174,19 @@ describe('generations', () => {
     expect(readFileSync(clip, 'utf8')).toBe('tagged before the restart');
     expect(tagClip).not.toHaveBeenCalled();
   });
+
+  test('a clip.mp4 removed after delivery is tagged again on the next delivery', async () => {
+    const id = await finishedGeneration('retag');
+    const dir = join(dataDir(), 'generations', id);
+    const delivered = await poll(id);
+    // The record still says running, as if its save after the first delivery was lost: the next poll delivers again.
+    seedRecordFile(dataDir(), { ...delivered, state: 'running', progress: 0, outputUrl: undefined });
+    rmSync(join(dir, 'clip.mp4'));
+    vi.mocked(tagClip).mockClear();
+    expect(await poll(id)).toMatchObject({ state: 'succeeded', outputUrl: `/media/data/generations/${id}/clip.mp4` });
+    expect(tagClip).toHaveBeenCalledTimes(1);
+    expect(await readTags(join(dir, 'clip.mp4'))).toMatchObject({ comment: 'AI-generated' });
+  }, 30_000);
 
   test('concurrent polls of a finished render tag its clip once', async () => {
     const id = await finishedGeneration('concurrent');

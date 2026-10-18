@@ -75,7 +75,7 @@ const holder = globalThis as typeof globalThis & {
   __montagioTaggedClips?: Map<string, Promise<string | undefined>>;
 };
 const inflight = (holder.__montagioInflight ??= new Map());
-// One tagging per finished clip and per process, whichever poll sees the success first.
+// Taggings in flight, by clip: concurrent polls share one; once written, clip.mp4 on disk is the record.
 const taggedClips = (holder.__montagioTaggedClips ??= new Map());
 
 export async function createGeneration(input: CreateGenerationInput): Promise<CreateResult> {
@@ -260,7 +260,7 @@ function deliverClip(id: string, outputPath: string): Promise<string | undefined
         console.error(`[montagio] generation ${id}: the AI-generated mention could not be written, clip delivered untagged`, error);
         return mediaUrlFor(outputPath);
       }
-    })();
+    })().finally(() => taggedClips.delete(clip));
     taggedClips.set(clip, delivery);
   }
   return delivery;
