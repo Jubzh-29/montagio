@@ -6,6 +6,7 @@ import { useI18n } from '@/i18n';
 import { apiFetch } from '@/lib/api';
 import type { OpenStackReport } from '@/lib/api-types';
 import { Header } from './Header';
+import { ShowcaseFooter } from './ShowcaseFooter';
 import styles from './openstack.module.css';
 
 export function OpenStack() {
@@ -85,6 +86,7 @@ export function OpenStack() {
           ← {t('backToStudio')}
         </Link>
       </main>
+      <ShowcaseFooter />
     </>
   );
 }

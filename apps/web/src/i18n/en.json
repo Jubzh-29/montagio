@@ -73,5 +73,22 @@
   "errorShowcaseRemix": "The showcase does not render remixes. Run Montagio on your machine to generate this one.",
   "errorNotInShowcase": "This combination is not in the showcase.",
   "errorFfmpegUnavailable": "FFmpeg could not start in this browser, so the film cannot be assembled here. Single clips still work.",
-  "errorMontageBusy": "A film is already being assembled."
+  "errorMontageBusy": "A film is already being assembled.",
+  "showcaseNote": "This online showcase plays clips pre-generated with Montagio on open weights ({model}, {license}). To animate your own photo, run Montagio on your machine.",
+  "showcasePickSample": "Pick a sample photo",
+  "showcaseOtherSample": "Other sample photo",
+  "showcaseShowClip": "Show clip",
+  "showcaseAssembleFilm": "Assemble film",
+  "showcaseCaption": "Pre-generated with Montagio · {model} ({license}) · AI-generated",
+  "showcasePlaceholderCaption": "Placeholder: camera move simulated by FFmpeg until the GPU session, not a model output.",
+  "showcaseRemixNote": "Your remix is checked here for real. The showcase does not render: run Montagio on your machine to generate it.",
+  "showcaseSequenceNote": "In this showcase every shot starts from the sample photo. Run locally, each shot starts on the last frame of the previous one.",
+  "showcaseLocalOnly": "local only",
+  "showcasePromptLocal": "Scene text applies when you generate locally.",
+  "showcaseLoadingFfmpeg": "Loading FFmpeg (31 MB, only once)…",
+  "showcaseFooter": "Showcase: pre-generated clips · No account, no cookie, no analytics: Montagio collects nothing",
+  "showcaseSource": "Source code (AGPL-3.0)",
+  "showcaseSourcePending": "Source link added at release",
+  "showcaseRunLocally": "Run it yourself",
+  "showcasePlaceholderBadge": "placeholder"
 }

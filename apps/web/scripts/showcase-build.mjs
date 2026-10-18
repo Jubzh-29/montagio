@@ -7,15 +7,16 @@
 //    workflows, data.json) — strict in a release;
 // 3. ffmpeg.wasm is copied to public/ffmpeg (served from the showcase's own origin);
 // 4. `next build` exports the pages (MONTAGIO_SHOWCASE_EXPORT=1);
-// 5. the Hugging Face Space card is copied to out/README.md.
+// 5. Next 16.4.2 export fixes (export-fixes.mjs), then the Hugging Face Space card is copied to out/README.md.
 //
 // A release needs MONTAGIO_REPO_URL, the public repository (source link, AGPL-3.0 §13).
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, cpSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { flattenSegmentPrefetches } from './export-fixes.mjs';
 
 const web = fileURLToPath(new URL('..', import.meta.url));
 const root = join(web, '..', '..');
@@ -48,8 +49,16 @@ run(npm, ['run', 'showcase', '--', 'prepare', ...(values.release ? ['--strict'] 
 const ffmpegOut = join(web, 'public', 'ffmpeg');
 rmSync(ffmpegOut, { recursive: true, force: true });
 mkdirSync(ffmpegOut, { recursive: true });
-const ffmpegPkg = dirname(require.resolve('@ffmpeg/ffmpeg/package.json'));
-const corePkg = dirname(require.resolve('@ffmpeg/core/package.json'));
+/** The folder of an installed package (its exports may not include package.json). */
+function packageDir(name) {
+  for (let dir = dirname(require.resolve(name)); dir !== dirname(dir); dir = dirname(dir)) {
+    const manifest = join(dir, 'package.json');
+    if (existsSync(manifest) && JSON.parse(readFileSync(manifest, 'utf8')).name === name) return dir;
+  }
+  throw new Error(`cannot find the folder of ${name}`);
+}
+const ffmpegPkg = packageDir('@ffmpeg/ffmpeg');
+const corePkg = packageDir('@ffmpeg/core');
 cpSync(join(ffmpegPkg, 'dist', 'esm'), join(ffmpegOut, 'esm'), { recursive: true, filter: (path) => !path.endsWith('.d.ts') && !path.endsWith('.d.mts') });
 for (const file of ['ffmpeg-core.js', 'ffmpeg-core.wasm']) copyFileSync(join(corePkg, 'dist', 'esm', file), join(ffmpegOut, file));
 writeFileSync(
@@ -75,6 +84,7 @@ run(npx, ['next', 'build'], {
   },
 });
 
+for (const file of flattenSegmentPrefetches(join(web, 'out'))) console.log(`export fix: ${file}`);
 copyFileSync(join(web, 'showcase-space', 'README.md'), join(web, 'out', 'README.md'));
 // GitHub Pages runs Jekyll unless told not to, and Jekyll drops the _next/ folder.
 if (basePath) writeFileSync(join(web, 'out', '.nojekyll'), '');

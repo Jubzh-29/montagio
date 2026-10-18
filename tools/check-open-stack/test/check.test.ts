@@ -372,3 +372,15 @@ test('the real repository is clean', async () => {
   const r = await checkOpenStack(repoRoot());
   expect(r.violations).toEqual([]);
 });
+
+test('the source scan skips the static export of the web app (out/), its own bundle output', async () => {
+  // Next's minified router reads `x.router`; the showcase export holds it under apps/web/out.
+  const routerLike = 'export const go = (x) => x.router.push("/");\n';
+  const root = scratchRepo({
+    'apps/web/out/_next/static/chunks/app.js': routerLike,
+    'apps/web/src/lib/x.ts': routerLike,
+  });
+  const r = await checkOpenStack(root);
+  const hits = r.violations.filter((v) => v.rule === 'forbidden-pattern');
+  expect(hits.map((v) => v.file)).toEqual([join('apps', 'web', 'src', 'lib', 'x.ts')]);
+});

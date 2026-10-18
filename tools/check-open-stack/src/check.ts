@@ -24,6 +24,8 @@ const SOURCE_EXTENSIONS = /\.(ts|tsx|js|mjs|cjs|py)$/;
 const SKIPPED_DIRS = new Set([
   'node_modules',
   '.next',
+  // a Next static export (apps/web/out): bundled output, not source
+  'out',
   'dist',
   'test-results',
   'playwright-report',

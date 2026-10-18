@@ -2,24 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, IS_SHOWCASE } from '@/lib/api';
 import {
   TERMINAL_STATES,
   type GenerationRecord,
   type JobState,
   type ModelSummary,
   type PresetSummary,
+  type SampleSummary,
   type SequenceSummary,
   type UploadResult,
 } from '@/lib/api-types';
 import { refusalMessageKey } from '@/lib/refusals';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
+import { primaryLabelKey } from '@/lib/showcase-ui';
+import { useShowcase } from '@/lib/use-showcase';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
 import { Monitor, type GenerationState, type TrackedJob, type UploadState } from './Monitor';
 import { PresetGallery } from './PresetGallery';
 import { RemixEditor, type RemixCheck } from './RemixEditor';
 import { ShotList } from './ShotList';
+import { ShowcaseFooter } from './ShowcaseFooter';
 import styles from './studio.module.css';
 
 const POLL_MS = 1000;
@@ -100,6 +104,8 @@ export function Studio() {
   const remixTextRef = useRef<HTMLTextAreaElement>(null);
   const remixToggleRef = useRef<HTMLButtonElement>(null);
   const remixFocus = useRef<'editor' | 'toggle' | null>(null);
+  // The static showcase: sample photos instead of uploads, pre-generated clips, no remix render.
+  const showcase = useShowcase();
 
   useEffect(() => {
     Promise.all([
@@ -207,6 +213,13 @@ export function Studio() {
     const res = await fetch('/media/demo-assets/images/sample-16x9.png');
     if (!res.ok) return setUpload({ status: 'error', message: t('errorGeneric') });
     await onFile(new File([await res.blob()], 'sample.png', { type: 'image/png' }));
+  };
+
+  /** Showcase: a sample photo stands in for an upload; nothing is sent anywhere. */
+  const pickSample = (sample: SampleSummary) => {
+    if (busyRef.current) return;
+    setJob({ status: 'idle' });
+    setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef });
   };
 
   const onPreset = (id: string) => {
@@ -360,7 +373,9 @@ export function Studio() {
     job.status === 'tracking' ? { status: 'tracking', record: trackedJob(job) } : job;
   const statusLabel =
     tracked?.kind === 'sequence' && tracked.record.state === 'assembling'
-      ? t('assembling')
+      ? tracked.record.stage === 'loading-ffmpeg'
+        ? t('showcaseLoadingFfmpeg')
+        : t('assembling')
       : tracked?.kind === 'sequence'
         ? t('shotProgress', {
             i: tracked.record.currentShot + 1,
@@ -372,6 +387,10 @@ export function Studio() {
   const selectedModel = models.find((model) => model.id === modelId);
   const estimate = selectedModel?.estimate_s['480p'] ?? 0;
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
+  const primaryLabel = primaryLabelKey(mode, remix !== null, IS_SHOWCASE);
+  const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
+  const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
+  const repoUrl = showcase?.repoUrl ?? null;
 
   return (
     <>
@@ -386,7 +405,30 @@ export function Studio() {
             onCancel={cancel}
             onRetry={() => setJob({ status: 'idle' })}
             statusLabel={statusLabel}
+            showcase={
+              IS_SHOWCASE
+                ? {
+                    samples: showcase?.samples ?? [],
+                    selectedId: selectedSample,
+                    note: showcase ? t('showcaseNote', { model: showcase.model.name, license: showcase.model.license }) : '',
+                    onPick: pickSample,
+                    onOtherSample: () => {
+                      if (busyRef.current) return;
+                      setJob({ status: 'idle' });
+                      setUpload({ status: 'idle' });
+                    },
+                    onRefusedFile: () => setJob({ status: 'error', message: t('errorShowcaseUpload') }),
+                  }
+                : undefined
+            }
           />
+          {IS_SHOWCASE && succeeded && (
+            <p className={styles.caption} data-testid="result-caption">
+              {succeeded.placeholder
+                ? t('showcasePlaceholderCaption')
+                : t('showcaseCaption', { model: showcase?.model.name ?? '', license: showcase?.model.license ?? '' })}
+            </p>
+          )}
           {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
             <div className={styles.actions}>
               {tracked.record.outputUrl && (
@@ -435,7 +477,11 @@ export function Studio() {
                 className={styles.mode}
                 aria-pressed={mode === value}
                 disabled={busy || remix !== null}
-                onClick={() => setMode(value)}
+                onClick={() => {
+                  setMode(value);
+                  // The film is joined by FFmpeg in the browser: start fetching it now.
+                  if (IS_SHOWCASE && value === 'sequence') void apiFetch('/api/showcase/preload', { method: 'POST' }).catch(() => undefined);
+                }}
               >
                 {value === 'single' ? t('modeSingle') : t('modeSequence')}
               </button>
@@ -482,9 +528,16 @@ export function Studio() {
               onPromptChange={(index, text) =>
                 setShots((current) => current.map((shot, i) => (i === index ? { ...shot, prompt: text } : shot)))
               }
+              promptsDisabled={IS_SHOWCASE}
             />
           )}
-          <ModelPicker models={models} selectedId={modelId} onSelect={setModelId} />
+          {mode === 'sequence' && IS_SHOWCASE && <p className={styles.hint}>{t('showcaseSequenceNote')}</p>}
+          <ModelPicker
+            models={models}
+            selectedId={modelId}
+            onSelect={setModelId}
+            onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
+          />
           <div className={styles.panelSection}>
             <label htmlFor="scene-prompt" className={styles.sectionTitle}>
               {t('prompt')}
@@ -496,22 +549,37 @@ export function Studio() {
               maxLength={500}
               placeholder={t('promptPlaceholder')}
               value={prompt}
+              disabled={IS_SHOWCASE}
+              aria-describedby={IS_SHOWCASE ? 'scene-local' : undefined}
               onChange={(event) => setPrompt(event.target.value)}
             />
+            {IS_SHOWCASE && (
+              <p id="scene-local" className={styles.hint}>
+                {t('showcasePromptLocal')}
+              </p>
+            )}
           </div>
           <div className={styles.generateBlock}>
-            <button type="button" className={styles.buttonPrimary} disabled={!canGenerate} onClick={generate}>
-              {remix
-                ? t('generateRemix', { s: estimate })
-                : mode === 'single'
-                  ? t('generate', { s: estimate })
-                  : t('generateFilm', { s: filmEstimate })}
-            </button>
-            {upload.status !== 'ready' && <p className={styles.hint}>{t('generateHint')}</p>}
-            <p className={styles.note}>{t('localNote')}</p>
+            {primaryLabel ? (
+              <button type="button" className={styles.buttonPrimary} disabled={!canGenerate} onClick={generate}>
+                {t(primaryLabel, { s: mode === 'sequence' && !remix ? filmEstimate : estimate })}
+              </button>
+            ) : (
+              <div className={styles.showcaseNote} role="note">
+                <p>{t('showcaseRemixNote')}</p>
+                {repoUrl && (
+                  <a className={styles.buttonSecondary} href={repoUrl} rel="noreferrer">
+                    {t('showcaseRunLocally')}
+                  </a>
+                )}
+              </div>
+            )}
+            {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
+            {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}
           </div>
         </aside>
       </main>
+      <ShowcaseFooter />
     </>
   );
 }

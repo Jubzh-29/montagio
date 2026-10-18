@@ -2,7 +2,9 @@
 
 import { useState, type DragEvent } from 'react';
 import { useI18n } from '@/i18n';
-import type { JobState } from '@/lib/api-types';
+import type { JobState, SampleSummary } from '@/lib/api-types';
+import { refusalMessageKey } from '@/lib/refusals';
+import { SamplePicker } from './SamplePicker';
 
 /** What the monitor needs from a generation or a sequence. */
 export type TrackedJob = { id: string; state: JobState; progress: number; outputUrl?: string; error?: string };
@@ -28,6 +30,7 @@ export function Monitor({
   onCancel,
   onRetry,
   statusLabel,
+  showcase,
 }: {
   upload: UploadState;
   generation: GenerationState;
@@ -37,6 +40,18 @@ export function Monitor({
   onRetry: () => void;
   /** Replaces the default running text, e.g. "Shot 2/3 — 40%". */
   statusLabel?: string;
+  /**
+   * The static showcase takes no upload: sample photos replace the drop zone,
+   * and a dropped file is answered with `onRefusedFile` (an explanation).
+   */
+  showcase?: {
+    samples: SampleSummary[];
+    selectedId: string | null;
+    note: string;
+    onPick: (sample: SampleSummary) => void;
+    onOtherSample: () => void;
+    onRefusedFile: () => void;
+  };
 }) {
   const { t } = useI18n();
   const [dragging, setDragging] = useState(false);
@@ -50,6 +65,7 @@ export function Monitor({
     event.preventDefault();
     setDragging(false);
     if (rendering) return;
+    if (showcase) return showcase.onRefusedFile();
     const file = event.dataTransfer.files[0];
     if (file) onFile(file);
   };
@@ -57,6 +73,7 @@ export function Monitor({
   return (
     <div
       className={styles.monitor}
+      data-testid="monitor"
       data-dragging={dragging}
       onDragOver={(event) => {
         event.preventDefault();
@@ -65,18 +82,20 @@ export function Monitor({
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
     >
-      <input
-        id="photo-input"
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        className="visually-hidden"
-        disabled={rendering}
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          if (file) onFile(file);
-          event.target.value = '';
-        }}
-      />
+      {!showcase && (
+        <input
+          id="photo-input"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="visually-hidden"
+          disabled={rendering}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) onFile(file);
+            event.target.value = '';
+          }}
+        />
+      )}
 
       {record?.state === 'succeeded' && record.outputUrl ? (
         <video
@@ -93,6 +112,12 @@ export function Monitor({
       ) : localUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- local object URL preview
         <img className={styles.monitorMedia} data-dimmed={rendering} src={localUrl} alt="" />
+      ) : showcase ? (
+        <div className={styles.monitorEmpty}>
+          <p className={styles.monitorEmptyTitle}>{t('showcasePickSample')}</p>
+          <SamplePicker samples={showcase.samples} selectedId={showcase.selectedId} onPick={showcase.onPick} />
+          <p className={styles.monitorEmptyHint}>{showcase.note}</p>
+        </div>
       ) : (
         <div className={styles.monitorEmpty}>
           <p className={styles.monitorEmptyTitle}>{t('monitorEmpty')}</p>
@@ -108,10 +133,15 @@ export function Monitor({
         </div>
       )}
 
-      {localUrl && !rendering && (
+      {localUrl && !rendering && !showcase && (
         <label htmlFor="photo-input" className={`${styles.buttonGhost} ${styles.replace}`}>
           {upload.status === 'uploading' ? t('uploading') : t('replacePhoto')}
         </label>
+      )}
+      {localUrl && !rendering && showcase && (
+        <button type="button" className={`${styles.buttonGhost} ${styles.replace}`} onClick={showcase.onOtherSample}>
+          {t('showcaseOtherSample')}
+        </button>
       )}
 
       {rendering && (
@@ -147,7 +177,9 @@ export function Monitor({
                 ? t('canceled')
                 : record?.error === 'lost'
                   ? t('lost')
-                  : t('failed', { error: record?.error ?? '?' })}
+                  : refusalMessageKey(record?.error) !== 'errorGeneric'
+                    ? t(refusalMessageKey(record?.error))
+                    : t('failed', { error: record?.error ?? '?' })}
           </p>
           <button type="button" className={styles.buttonSecondary} onClick={onRetry}>
             {t('tryAgain')}
