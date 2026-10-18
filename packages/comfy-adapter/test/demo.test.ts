@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createBackend, DemoBackend } from '../src/index';
+import { createBackend, DemoBackend, IDEMPOTENCY_WINDOW_MS } from '../src/index';
 import { startFakeProxy } from '../src/testing/fake-proxy';
 
 const fixtureClips = fileURLToPath(new URL('./fixtures/clips', import.meta.url));
@@ -43,6 +43,18 @@ test('same idempotency key, same job', async () => {
   expect(c.backendJobId).toBe(a.backendJobId);
   expect(a.backendJobId).toMatch(/^demo-[0-9a-f]{12}$/);
   expect((await b.get(a.backendJobId)).progress).toBeCloseTo(1 / 3);
+});
+
+test('a key reused after the idempotency window is a new job, as in the web layer', async () => {
+  const b = make();
+  const first = await b.submit({ workflow: {}, presetId: 'crash-push', idempotencyKey: 'again' });
+  t = IDEMPOTENCY_WINDOW_MS - 1;
+  expect(await b.submit({ workflow: {}, presetId: 'crash-push', idempotencyKey: 'again' })).toEqual(first);
+  t = IDEMPOTENCY_WINDOW_MS;
+  const second = await b.submit({ workflow: {}, presetId: 'unknown-preset', idempotencyKey: 'again' });
+  expect(second.backendJobId).not.toBe(first.backendJobId);
+  expect(await b.get(second.backendJobId)).toMatchObject({ state: 'running', progress: 0 });
+  expect((await b.get(first.backendJobId)).outputPath).toMatch(/[\\/]crash-push\.mp4$/);
 });
 
 test('different keys, different jobs', async () => {
