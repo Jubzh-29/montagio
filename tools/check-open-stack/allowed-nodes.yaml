@@ -18,6 +18,12 @@ nodes:
   - { class_type: WanCameraEmbedding, source: comfyui-core, license: GPL-3.0 }
   - { class_type: WanCameraImageToVideo, source: comfyui-core, license: GPL-3.0 }
   - { class_type: Wan22ImageToVideoLatent, source: comfyui-core, license: GPL-3.0 }
+  # Added on 2026-10-18 with the workflows converted from the official templates; each is defined in
+  # ComfyUI v0.41.0 itself (python_module of /object_info): comfy_extras/nodes_model_advanced.py ...
+  - { class_type: ModelSamplingSD3, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ModelSamplingAuraFlow, source: comfyui-core, license: GPL-3.0 }
+  # ... and nodes.py
+  - { class_type: ConditioningZeroOut, source: comfyui-core, license: GPL-3.0 }
   # Montagio's own node pack (comfy-nodes/, GPL-3.0-only): WanCameraEmbedding with a second move;
   # the compiler uses it only for presets that combine two moves.
   - { class_type: MontagioCameraEmbedding, source: montagio-nodes, license: GPL-3.0 }

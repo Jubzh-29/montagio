@@ -31,6 +31,16 @@ test('an i2v-only model does not need camera bindings', () => {
   expect(parseModel(i2v, 'i2v.yaml').capabilities).toEqual(['i2v']);
 });
 
+test('a t2i model needs no negative binding', () => {
+  // Z-Image-Turbo runs at cfg 1 with ConditioningZeroOut as its negative: there is no negative prompt to bind
+  const t2i = replaceOnce(
+    replaceOnce(replaceOnce(model, 'kind: video', 'kind: image'), 'capabilities: [i2v-camera]', 'capabilities: [t2i]'),
+    /  negative: .*\n/,
+    '',
+  );
+  expect(parseModel(t2i, 't2i.yaml').bindings.negative).toBeUndefined();
+});
+
 test('non-permissive model license is refused', () => {
   expect(() => parseModel(replaceOnce(model, 'license: Apache-2.0', 'license: LTX-2 Community'), 'm.yaml'))
     .toThrow(RegistryError);

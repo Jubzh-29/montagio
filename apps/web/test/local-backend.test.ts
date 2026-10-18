@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startFakeProxy, type FakeProxy } from '@montagio/comfy-adapter/testing';
+import { parseModel } from '@montagio/registry';
 import { readTags } from '@montagio/sequence';
 import { POST as postGenerations } from '@/app/api/generations/route';
 import { GET as getGeneration } from '@/app/api/generations/[id]/route';
@@ -62,8 +63,10 @@ async function pollSequence(id: string, timeoutMs = 60_000) {
   }
 }
 
+// bindings.image of wan22-i2v-a14b-fun-camera, the model of crash-push and pan-left
+const imageBinding = parseModel(readFileSync(join(repoRoot, 'registry', 'models', 'wan22-i2v-a14b-fun-camera.yaml'), 'utf8'), 'fun-camera').bindings.image!;
 const imageAssetOf = (workflow: Record<string, { inputs: Record<string, unknown> }>) =>
-  workflow['3']!.inputs.image as { __type: string; info: { id: string } };
+  workflow[imageBinding.node]!.inputs[imageBinding.field] as { __type: string; info: { id: string } };
 
 test('a generation runs through the SDK and the proxy', async () => {
   const imageRef = await uploadedImageRef();
@@ -71,7 +74,6 @@ test('a generation runs through the SDK and the proxy', async () => {
   expect(res.status).toBe(201);
   const rec = await pollUntilDone((await res.json()).id);
   expect(rec).toMatchObject({ state: 'succeeded', backendKind: 'local', outputUrl: `/media/data/generations/${rec.id}/clip.mp4` });
-  // bindings.image of wan22-i2v-a14b-fun-camera (provisional template): node 3, field image
   const sent = [...fake.jobs.values()][0]!.workflow;
   const asset = imageAssetOf(sent);
   expect(asset).toMatchObject({ __type: 'core/ASSET' });

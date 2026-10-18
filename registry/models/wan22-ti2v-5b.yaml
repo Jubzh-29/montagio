@@ -8,14 +8,14 @@ license: Apache-2.0
 weights: [wan22-ti2v-5b, umt5-xxl-fp8, wan22-vae]
 workflow: workflows/wan22-ti2v-5b.api.json
 bindings:
-  image: { node: "3", field: image }
+  image: { node: "56", field: image }
   prompt: { node: "6", field: text }
   negative: { node: "7", field: text }
-  seed: { node: "10", field: seed }
-  width: { node: "20", field: width }
-  height: { node: "20", field: height }
-  frames: { node: "20", field: length }
-  fps: { node: "16", field: fps }
+  seed: { node: "3", field: seed }
+  width: { node: "55", field: width }
+  height: { node: "55", field: height }
+  frames: { node: "55", field: length }
+  fps: { node: "57", field: fps }
 limits:
   resolutions: [480p, 720p]
   fps: [24]
