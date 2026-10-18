@@ -149,7 +149,7 @@ def test_then_moves_a_over_the_first_half_then_b():
         t = [2.0 * BASE_T * (w_a * a + w_b * b) for a, b in zip(a_t, b_t)]
         angle = [2.0 * BASE_ANGLE * (w_a * a + w_b * b) for a, b in zip(a_angle, b_angle)]
         assert np.allclose(then[i], reference_frame(angle, t), rtol=0, atol=1e-12), f"frame {i}"
-    # by the middle of the clip A is complete and B has not started
+    # at frame 41 of 81, just past the middle, A is complete and B has gone 1/81 of its way
     middle = then[(length + 1) // 2]
     assert middle[2][3] == pytest.approx(2.0 * BASE_T * 2.0) and middle[0][3] == pytest.approx(-2.0 * BASE_T * (2 * (41 / 81) - 1))
 

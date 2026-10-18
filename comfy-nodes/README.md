@@ -6,7 +6,7 @@ The nodes use the V3 node API, so they need ComfyUI 0.41.0 or newer.
 
 ## Install
 
-The pack is not on the Comfy Registry yet (see [Publishing](#publishing)). For now, copy the `comfy-nodes` folder of this repository to `ComfyUI/custom_nodes/montagio` and restart ComfyUI. The only dependency is PyYAML, which ComfyUI already installs. The nodes appear in the `Montagio` category.
+The pack is not on the Comfy Registry yet (see [Publishing](#publishing)). For now, copy the `comfy-nodes` folder of this repository to `ComfyUI/custom_nodes/montagio` and restart ComfyUI. Its two dependencies, PyYAML and numpy, come with ComfyUI. The nodes appear in the `Montagio` category.
 
 Once the pack is published, `comfy node install montagio` will install it.
 

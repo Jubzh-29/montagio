@@ -216,7 +216,7 @@ Faites un rendu de `roll_cw` à 0,3 avec `--camera-pose "ClockWise (CW)" --camer
 Pod : GPU ______  driver ______  CUDA ______  prix ____ $/h  début __:__  fin __:__  coût total ____ $
 Install : durée ____ min  torch ______  ligne « partner node(s) » : ______________________
 Pack Montagio : smoke « 33 » oui / non   test lourd du node : oui / non
-Poids : ____ Go en ____ min (____ Mo/s)  tous « matches Hugging Face » : oui / non   dérive signalée : ______
+Poids : ____ Gio en ____ min (____ Mio/s)  tous « matches Hugging Face » : oui / non   dérive signalée : ______
 
 Mesures (smoke.jsonl les contient ; noter ici la qualité) :
 | modèle | preset / pose | vitesse | résolution | images | wall s (froid / chaud) | VRAM max | qualité 1-5 | artefacts |
