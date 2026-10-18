@@ -91,6 +91,8 @@ Lecture du code de ComfyUI v0.41.0 :
 2. **Adaptateur caméra.** Même si la détection passait, `WanCamAdapter` (`comfy/ldm/wan/model.py`, l. 321 et 325) fixe le pixel-unshuffle à 8. Il attend donc 24 × 64 = 1536 canaux, alors que le 5B en a 6144 = 24 × 256 (un unshuffle de 16, aligné sur le VAE ×16). Les poids ne se chargeraient pas.
 3. **Latent.** `WanCameraImageToVideo` (`comfy_extras/nodes_wan.py`, l. 430 et 431) fabrique un latent Wan 2.1 à **16 canaux en /8**, et `WAN22_Camera` hérite de `latent_format = Wan21`. Le 5B travaille avec le VAE Wan 2.2 : **48 canaux en /16** (`Wan22ImageToVideoLatent`, l. 1439). Le `in_dim` de 100 vaut 48 (bruit) + 4 (masque) + 48 (image) : c'est la version Wan 2.2 de l'entrée à 36 canaux du 14B.
 
+**Piste écartée : Fun Control 5B.** Le template officiel `video_wan2_2_5B_fun_control` existe, contrairement à un template « 5B Fun Camera ». Il charge `wan2.2_fun_control_5B_bf16.safetensors` avec `Wan22FunControlToVideo`. Son en-tête, lu de la même façon, ne contient pas de `control_adapter`, et son `patch_embedding` a 148 canaux d'entrée (48 de bruit, 48 de contrôle, 48 d'image, 4 de masque). Le cœur le charge donc comme un Wan 2.2 ordinaire, et `Wan22FunControlToVideo` (`comfy_extras/nodes_wan.py`, l. 151 à 163) gère bien le latent à 48 canaux. Mais ce modèle suit une **vidéo de contrôle** (canny, profondeur, pose), pas une trajectoire de caméra. Il faudrait fabriquer une vidéo de contrôle du mouvement voulu, ce qui relève d'un projet de recherche et non du concours.
+
 **Décision :** pas de caméra paramétrique en 5B avec le cœur de ComfyUI v0.41.0. Le mode « Rapide » garde la caméra pilotée par le texte, que le compilateur gère déjà (`cameraMode: 'prompt'`). Il faudrait sinon une classe de modèle, un adaptateur et un node de latent nouveaux dans le cœur, ce qui sort du périmètre du concours. La S2 n'a **rien à tester** sur ce point. Il faudra rouvrir la question si une version de ComfyUI ajoute une classe `camera_2.2` à `in_dim` 100.
 
 ## 4. Vrais workflows (Q6)
@@ -155,5 +157,9 @@ Ce que ni le code ni les métadonnées ne peuvent dire :
 
 ## 9. Ce qui vous revient
 
-- **Q5, Comfy Cloud** (avec votre compte, sur votre PC, sans rien lancer de payant) : ouvrez les templates « Wan 2.2 Fun Camera », « Wan 2.2 5B » et « Z-Image-Turbo » sur cloud.comfy.org et vérifiez qu'aucun modèle n'est signalé manquant. Notez la version de ComfyUI (Settings → About). Les presets à une pose n'utilisent que des nodes du cœur. Les presets combinés, eux, ont besoin du pack Montagio, absent de Comfy Cloud tant qu'il n'est pas publié sur le Registry.
+- **Q5, Comfy Cloud.**
+  - *Templates : observé.* Dans `templates/index.json` de Comfy-Org/workflow_templates (branche `main`, 18/10), aucun des trois templates n'a de champ `includeOnDistributions`. Le `docs/SPEC.md` du même dépôt présente ce champ comme facultatif, avec les valeurs `cloud`, `local`, `desktop`, `mac` et `windows`. On en déduit que ces templates sont proposés partout, Comfy Cloud compris.
+  - *Fichiers de poids sur Cloud : non vérifiable sans compte.* Aucune liste publique ne dit lesquels sont préinstallés. La session principale indique que des poids manquants s'importent depuis Hugging Face avec un abonnement Creator ou supérieur ; ce point n'a pas été vérifié ici.
+  - *À faire avec votre compte* (sur votre PC, sans rien lancer de payant) : ouvrez les trois templates sur cloud.comfy.org, vérifiez qu'aucun modèle n'est signalé manquant, et notez la version de ComfyUI (Settings → About).
+  - Les presets à une pose n'utilisent que des nodes du cœur. Les presets combinés ont besoin du pack Montagio, absent de Comfy Cloud tant qu'il n'est pas publié sur le Registry.
 - **sha256 de `ae.safetensors`** chez BFL (partie 1) : à comparer avec votre compte Hugging Face.
