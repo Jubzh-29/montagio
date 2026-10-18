@@ -23,6 +23,7 @@ test('the Windows layout uses Scripts\\*.exe', () => {
   expect(l.comfyDir).toBe('C:\\S R\\ComfyUI');
   expect(l.comfyTmp).toBe('C:\\S R\\ComfyUI.tmp');
   expect(l.comfyPython).toBe('C:\\S R\\venvs\\comfyui\\Scripts\\python.exe');
+  expect(l.proxyPython).toBe('C:\\S R\\venvs\\comfy-api-proxy\\Scripts\\python.exe');
   expect(l.proxyExe).toBe('C:\\S R\\venvs\\comfy-api-proxy\\Scripts\\comfy-api-proxy.exe');
   expect(l.packLink).toBe('C:\\S R\\ComfyUI\\custom_nodes\\montagio');
   expect(l.modelsDir).toBe('C:\\S R\\ComfyUI\\models');
@@ -38,6 +39,7 @@ test('the Linux layout uses bin/', () => {
     comfyVenv: '/s/venvs/comfyui',
     proxyVenv: '/s/venvs/comfy-api-proxy',
     comfyPython: '/s/venvs/comfyui/bin/python',
+    proxyPython: '/s/venvs/comfy-api-proxy/bin/python',
     proxyExe: '/s/venvs/comfy-api-proxy/bin/comfy-api-proxy',
     modelsDir: '/s/ComfyUI/models',
     packLink: '/s/ComfyUI/custom_nodes/montagio',

@@ -11,6 +11,7 @@ export type Layout = {
   comfyVenv: string;
   proxyVenv: string;
   comfyPython: string;
+  proxyPython: string;
   proxyExe: string;
   modelsDir: string;
   /** ComfyUI/custom_nodes/montagio, a link (a junction on Windows) to the repository's comfy-nodes. */
@@ -54,6 +55,7 @@ export function layout(dir: string, os: Os): Layout {
     comfyVenv,
     proxyVenv,
     comfyPython: bin(comfyVenv, 'python'),
+    proxyPython: bin(proxyVenv, 'python'),
     proxyExe: bin(proxyVenv, 'comfy-api-proxy'),
     modelsDir: join(comfyDir, 'models'),
     packLink: join(comfyDir, 'custom_nodes', 'montagio'),
