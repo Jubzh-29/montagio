@@ -74,3 +74,21 @@ Origine des LoRA du template officiel : `wan2.2_i2v_lightx2v_4steps_lora_v1_{hig
 | `flux-ae` | 335 304 388 | `afc8e28272cd15db3919bacdb6918ce9c1ed22e96cb12c4d5ed0fba823529e38` |
 
 Total : 69,7 Go (64,9 Gio). Au téléchargement en S2, `fetch-weights` vérifie chaque fichier contre ce sha256. Il refuse, avant de télécharger, un fichier dont Hugging Face annonce un autre sha256 ou une autre taille.
+
+## 3. Contrôle caméra pour Wan 2.2 5B (Q3)
+
+En-têtes lus par deux requêtes Range chacun, sans télécharger les poids : `npm run weights -w @montagio/infra-runpod -- --inspect <url>`. Résultats :
+
+| Fichier | `patch_embedding.weight` (`in_dim` = dim. 1) | `head.head.weight` (`out_dim` = dim. 0 ÷ 4) | `control_adapter.conv.weight` | `img_emb.*` |
+|---|---|---|---|---|
+| `alibaba-pai/Wan2.2-Fun-5B-Control-Camera/diffusion_pytorch_model.safetensors` (831 tenseurs, 5,25 G paramètres, BF16) | [3072, **100**, 1, 2, 2] | [192, 3072] → 48 | [3072, **6144**, 2, 2] | absent |
+| `wan2.2_ti2v_5B_fp16.safetensors` (lock) | [3072, 48, 1, 2, 2] | [192, 3072] → 48 | absent | absent |
+| `wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors` (lock) | [5120, **36**, 1, 2, 2] | [64, 5120] → 16 | [5120, **1536**, 2, 2] | absent |
+
+Lecture du code de ComfyUI v0.41.0 :
+
+1. **Détection.** `comfy/model_detection.py` (l. 762 à 773) lit `in_dim` dans `patch_embedding.weight`. Le 5B Control-Camera a un `control_adapter` et pas de `img_emb` : il devient donc `model_type = "camera_2.2"` avec `in_dim = 100`. Or la seule classe pour `camera_2.2`, `WAN22_Camera` (`comfy/supported_models.py`, l. 1435 à 1440), exige `in_dim: 36`. Et `matches` (`comfy/supported_models_base.py`, l. 57 à 65) demande l'égalité de chaque clé. Aucune classe ne correspond : **`UNETLoader` refuse le fichier** (modèle non reconnu). Le format VideoX-Fun n'est pas en cause : le Fun-Camera 14B bf16 de Comfy-Org est le fichier d'alibaba-pai, octet pour octet, et il se charge.
+2. **Adaptateur caméra.** Même si la détection passait, `WanCamAdapter` (`comfy/ldm/wan/model.py`, l. 321 et 325) fixe le pixel-unshuffle à 8. Il attend donc 24 × 64 = 1536 canaux, alors que le 5B en a 6144 = 24 × 256 (un unshuffle de 16, aligné sur le VAE ×16). Les poids ne se chargeraient pas.
+3. **Latent.** `WanCameraImageToVideo` (`comfy_extras/nodes_wan.py`, l. 430 et 431) fabrique un latent Wan 2.1 à **16 canaux en /8**, et `WAN22_Camera` hérite de `latent_format = Wan21`. Le 5B travaille avec le VAE Wan 2.2 : **48 canaux en /16** (`Wan22ImageToVideoLatent`, l. 1439). Le `in_dim` de 100 vaut 48 (bruit) + 4 (masque) + 48 (image) : c'est la version Wan 2.2 de l'entrée à 36 canaux du 14B.
+
+**Décision :** pas de caméra paramétrique en 5B avec le cœur de ComfyUI v0.41.0. Le mode « Rapide » garde la caméra pilotée par le texte, que le compilateur gère déjà (`cameraMode: 'prompt'`). Il faudrait sinon une classe de modèle, un adaptateur et un node de latent nouveaux dans le cœur, ce qui sort du périmètre du concours. La S2 n'a **rien à tester** sur ce point. Il faudra rouvrir la question si une version de ComfyUI ajoute une classe `camera_2.2` à `in_dim` 100.
