@@ -3,8 +3,9 @@
 
 scripts/smoke_comfyui.py is run by hand against a real ComfyUI (its docstring says how).
 These tests check what can be checked without one: the prompt wires the outputs of the Montagio
-nodes into the core WanCameraEmbedding node the way the nodes declare them, and main() turns the
-answers of a stand-in HTTP server into the right exit code.
+nodes into the core WanCameraEmbedding node and, in combined mode, into Montagio Camera Embedding,
+the way the nodes declare them, and main() turns the answers of a stand-in HTTP server into the
+right exit code.
 """
 import importlib.util
 import json
@@ -14,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from montagio_nodes.nodes import MontagioLoadPreset, MontagioPresetFromYAML
+from montagio_nodes.nodes import MontagioCameraEmbedding, MontagioLoadPreset, MontagioPresetFromYAML
 from montagio_nodes.params import frame_count
 from montagio_nodes.preset import parse_preset
 
@@ -49,14 +50,33 @@ def test_prompt_wires_preset_outputs_into_wan_camera_embedding():
     }
 
 
-def test_prompt_links_follow_the_outputs_the_node_declares():
+def test_prompt_wires_combined_outputs_into_montagio_camera_embedding():
+    inputs = smoke.build_prompt()["7"]["inputs"]
+    assert inputs == {
+        "camera_pose": ["6", 0],
+        "camera_pose_2": ["6", 11],
+        "combine": ["6", 12],
+        "speed": ["6", 1],
+        "width": ["6", 2],
+        "height": ["6", 3],
+        "length": ["6", 4],
+    }
+
+
+@pytest.mark.parametrize("camera", ["3", "7"])
+def test_prompt_links_follow_the_outputs_the_node_declares(camera):
     """The links are indexes: they must point at the outputs of that name in the schema."""
     prompt = smoke.build_prompt()
     names = [output.display_name for output in MontagioPresetFromYAML.define_schema().outputs]
-    for input_name, link in prompt["3"]["inputs"].items():
+    for input_name, link in prompt[camera]["inputs"].items():
         node_id, index = link
         assert prompt[node_id]["class_type"] == "MontagioPresetFromYAML"
-        assert names[index] == input_name  # WanCameraEmbedding names its inputs like our outputs
+        assert names[index] == input_name  # both camera nodes name their inputs like our outputs
+
+
+def test_prompt_sets_every_required_input_of_montagio_camera_embedding():
+    required = {item.id for item in MontagioCameraEmbedding.define_schema().inputs if not item.optional}
+    assert required <= set(smoke.build_prompt()["7"]["inputs"])
 
 
 def test_prompt_nodes():
@@ -72,6 +92,13 @@ def test_prompt_nodes():
         "camera_mode": "parametric",
     }
     assert prompt["3"]["class_type"] == "WanCameraEmbedding"
+    assert prompt["6"]["class_type"] == "MontagioPresetFromYAML"
+    assert {key: value for key, value in prompt["6"]["inputs"].items() if key != "yaml"} == {
+        "aspect": "16:9",
+        "resolution": "preset",
+        "camera_mode": "combined",
+    }
+    assert prompt["7"]["class_type"] == "MontagioCameraEmbedding"
 
 
 def test_prompt_yaml_is_crash_push_for_two_seconds():
@@ -82,12 +109,27 @@ def test_prompt_yaml_is_crash_push_for_two_seconds():
     assert frame_count(2, preset["defaults"]["fps"]) == 33  # what the run should show for the length
 
 
+def test_prompt_combined_yaml_is_breathing_for_two_seconds():
+    text = smoke.build_prompt()["6"]["inputs"]["yaml"]
+    preset = parse_preset(text, "smoke prompt")
+    assert preset["camera"] == {"poses": ["zoom_in", "zoom_out"], "speed": 1.0, "combine": "then"}
+    assert preset["defaults"]["duration_s"] == 2 and frame_count(2, preset["defaults"]["fps"]) == 33
+    # what node 6 sends to node 7: both moves, one after the other
+    out = MontagioPresetFromYAML.execute(yaml=text, aspect="16:9", resolution="preset", camera_mode="combined")
+    assert (out.args[0], out.args[11], out.args[12], out.args[4]) == ("Zoom In", "Zoom Out", "then", 33)
+
+
 def test_prompt_displays_info_and_length():
     prompt = smoke.build_prompt()
     names = [output.display_name for output in MontagioLoadPreset.define_schema().outputs]
     outputs = [(node_id, node) for node_id, node in sorted(prompt.items()) if node["class_type"] == "PreviewAny"]
-    assert [node["inputs"] for _, node in outputs] == [{"source": ["1", names.index("info")]}, {"source": ["3", 3]}]
+    assert [node["inputs"] for _, node in outputs] == [
+        {"source": ["1", names.index("info")]},
+        {"source": ["3", 3]},
+        {"source": ["7", 3]},
+    ]
     assert names.index("info") == 10  # the 11th output; WanCameraEmbedding's 4th (index 3) is its length
+    assert [output.display_name for output in MontagioCameraEmbedding.define_schema().outputs][3] == "length"
 
 
 def test_prompt_is_api_format_and_json():
@@ -110,10 +152,10 @@ def test_each_call_builds_a_new_prompt():
 
 # --- main() against a stand-in ComfyUI ----------------------------------------------
 
-KNOWN = ("MontagioLoadPreset", "MontagioPresetFromYAML", "WanCameraEmbedding", "PreviewAny")
+KNOWN = ("MontagioLoadPreset", "MontagioPresetFromYAML", "WanCameraEmbedding", "PreviewAny", "MontagioCameraEmbedding")
 SUCCESS = {
     "p1": {
-        "outputs": {"4": {"text": ["two lines of info"]}, "5": {"text": ["33"]}},
+        "outputs": {"4": {"text": ["two lines of info"]}, "5": {"text": ["33"]}, "8": {"text": ["33"]}},
         "status": {"status_str": "success", "completed": True, "messages": []},
     }
 }
@@ -236,10 +278,19 @@ def test_main_returns_1_when_the_pack_is_not_loaded(stand_in, capsys):
 
 
 def test_main_returns_1_when_a_core_node_is_missing(stand_in, capsys):
-    server = stand_in(known=("MontagioLoadPreset", "MontagioPresetFromYAML", "PreviewAny"))
+    server = stand_in(known=("MontagioLoadPreset", "MontagioPresetFromYAML", "PreviewAny", "MontagioCameraEmbedding"))
     code, out = run(server, capsys)
     assert code == 1
     assert "WanCameraEmbedding" in out
+    assert server.posted == []
+
+
+def test_main_returns_1_when_the_pack_has_no_camera_node(stand_in, capsys):
+    # a pack installed before Montagio Camera Embedding existed
+    server = stand_in(known=("MontagioLoadPreset", "MontagioPresetFromYAML", "WanCameraEmbedding", "PreviewAny"))
+    code, out = run(server, capsys)
+    assert code == 1
+    assert "MontagioCameraEmbedding is not in" in out and "custom_nodes/montagio" in out
     assert server.posted == []
 
 
@@ -268,16 +319,17 @@ def test_main_returns_1_when_only_part_of_the_prompt_passes_validation(stand_in,
     assert "MontagioLoadPreset" in out
 
 
-def test_main_returns_1_when_an_output_node_shows_nothing(stand_in, capsys):
+@pytest.mark.parametrize("silent", ["4", "8"])
+def test_main_returns_1_when_an_output_node_shows_nothing(stand_in, capsys, silent):
     skipped = {
         "p1": {
-            "outputs": {"5": {"text": ["33"]}},
+            "outputs": {node_id: output for node_id, output in SUCCESS["p1"]["outputs"].items() if node_id != silent},
             "status": {"status_str": "success", "completed": True, "messages": []},
         }
     }
     code, out = run(stand_in(history=skipped), capsys)
     assert code == 1
-    assert "node 4" in out
+    assert f"node {silent} (PreviewAny) shows nothing" in out
 
 
 def test_main_returns_1_when_the_run_does_not_end_in_time(stand_in, capsys):

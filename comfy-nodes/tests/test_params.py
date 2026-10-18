@@ -10,15 +10,20 @@ The node does not apply the limits of a model (spec section 4: the app trims the
 picks the fps a model can render, the pack leaves that to the workflow), so the requests that
 compare duration, fps and frames give compileJob a copy of the model with its limits out of the
 way (wide_limits in tests/ts_bridge.ts). Then any preset the schema accepts must agree with the
-app: the same numbers, or the same refusal (two moves for the camera node, LoRAs).
+app: the same numbers, or the same refusal (two moves for the core camera node, LoRAs). In
+combined mode the second move and how both combine are what the app sends to Montagio Camera
+Embedding: for a preset with one move the app leaves them out (null), and the node gives Static
+together, which is the core node's path.
 """
 import dataclasses
 
 import pytest
 
+from montagio_nodes.camera import COMBINE_MODES
 from montagio_nodes.params import (
     ASPECTS,
     AUTO,
+    CAMERA_MODES,
     DIMENSIONS,
     POSE_PROMPTS,
     POSE_VALUES,
@@ -172,6 +177,7 @@ def test_crash_push_parametric():
     assert p.negative == "blurry, distorted, warped faces, extra limbs, flicker, low quality"
     assert (p.duration_s, p.resolution) == (5, "480p")
     assert p.info == "Crash Push (crash-push) — by montagio-community — CC-BY-4.0"
+    assert (p.camera_pose_2, p.combine) == ("Static", "together")  # no second move
     assert isinstance(p.speed, float) and isinstance(p.fps, float)
 
 
@@ -179,16 +185,26 @@ def test_params_are_frozen():
     p = compute_params(CRASH, aspect="16:9")
     assert [field.name for field in dataclasses.fields(NodeParams)] == [
         "camera_pose", "speed", "width", "height", "length", "fps", "prompt", "negative", "duration_s", "resolution", "info",
+        "camera_pose_2", "combine",
     ]
     with pytest.raises(dataclasses.FrozenInstanceError):
         p.width = 1
 
 
+def test_camera_modes_keep_parametric_first():
+    # the first one is the default of the nodes' camera_mode menu
+    assert CAMERA_MODES == ("parametric", "prompt", "combined")
+
+
 def test_prompt_mode_is_camera_neutral():
     p = compute_params(CRASH, aspect="1:1", camera_mode="prompt")
     assert (p.camera_pose, p.speed, p.width, p.height) == ("Static", 1.0, 640, 640)
+    assert (p.camera_pose_2, p.combine) == ("Static", "together")
     assert isinstance(p.speed, float)
     assert p.prompt == "dynamic camera push-in, cinematic, sharp focus on subject, the camera pushes in toward the subject"
+    # two moves too: they are in the words only
+    p = compute_params(TWO_POSES, aspect="1:1", camera_mode="prompt")
+    assert (p.camera_pose, p.speed, p.camera_pose_2, p.combine) == ("Static", 1.0, "Static", "together")
 
 
 def test_two_poses_refused_in_parametric_but_phrased_in_prompt_mode():
@@ -204,7 +220,7 @@ def test_two_poses_message():
         compute_params(TWO_POSES, aspect="16:9")
     assert str(caught.value) == (
         "preset crash-push combines 2 camera moves (Pan Up + Zoom In); WanCameraEmbedding takes one move. "
-        'Use camera_mode "prompt", or the Montagio Camera Embedding node with the second move set by hand.'
+        'Use camera_mode "combined" with the Montagio Camera Embedding node, or camera_mode "prompt".'
     )
 
 
@@ -221,9 +237,49 @@ def test_prompt_mode_chains_moves_that_come_one_after_the_other():
     )
 
 
+def test_combined_mode_gives_both_moves():
+    p = compute_params(TWO_POSES, aspect="16:9", prompt="a cat", camera_mode="combined")
+    assert (p.camera_pose, p.speed, p.camera_pose_2, p.combine) == ("Pan Up", 1.5, "Zoom In", "together")
+    # the moves go to the camera node, not into the words
+    assert p.prompt == "a cat, dynamic camera push-in, cinematic, sharp focus on subject"
+    assert (p.width, p.height, p.length, p.fps) == (832, 480, 81, 16.0)
+
+
+def test_combined_mode_passes_then_on():
+    preset = parse_preset(edit("poses: [zoom_in]", "poses: [zoom_in, static]\n  combine: then"), "settle.yaml")
+    p = compute_params(preset, aspect="16:9", camera_mode="combined")
+    assert (p.camera_pose, p.camera_pose_2, p.combine) == ("Zoom In", "Static", "then")
+
+
+def test_combined_mode_with_one_move_gives_what_parametric_mode_gives():
+    # Static together is the core node's path on Montagio Camera Embedding: a one-move preset runs the same
+    assert compute_params(CRASH, aspect="16:9", camera_mode="combined") == compute_params(CRASH, aspect="16:9")
+
+
+def test_one_move_is_together_whatever_the_preset_says():
+    # the schema lets a one-move preset say "then"; on Montagio Camera Embedding the move would stop halfway
+    preset = parse_preset(edit("poses: [zoom_in]", "poses: [zoom_in]\n  combine: then"), "one-then.yaml")
+    for mode in CAMERA_MODES:
+        p = compute_params(preset, aspect="16:9", camera_mode=mode)
+        assert (p.camera_pose_2, p.combine) == ("Static", "together"), mode
+
+
+def test_second_move_outputs_are_values_montagio_camera_embedding_takes():
+    presets = [parse_preset(then_preset(a, b), "then.yaml") for a, b in THEN_PAIRS]
+    presets += [parse_preset(edit("poses: [zoom_in]", f"poses: [{a}, {b}]"), "pair.yaml") for a, b in POSE_PAIRS]
+    presets += [parse_preset(edit("poses: [zoom_in]", f"poses: [{pose}]"), "one.yaml") for pose in CAMERA_POSES]
+    for preset in presets:
+        for mode in CAMERA_MODES:
+            if mode == "parametric" and len(preset["camera"]["poses"]) > 1:
+                continue  # refused, see above
+            p = compute_params(preset, aspect="16:9", camera_mode=mode)
+            assert p.camera_pose in WAN_CAMERA_POSES and p.camera_pose_2 in WAN_CAMERA_POSES
+            assert p.combine in COMBINE_MODES
+
+
 def test_loras_refused():
     preset = parse_preset(BASE + LORA_BLOCK, "lora.yaml")
-    for mode in ("parametric", "prompt"):
+    for mode in CAMERA_MODES:
         with pytest.raises(ParamsError) as caught:
             compute_params(preset, aspect="16:9", camera_mode=mode)
         assert str(caught.value) == "preset crash-push uses LoRAs, which are not supported yet"
@@ -284,10 +340,12 @@ def assert_same_as_compile_job(p, expected, *, camera=True):
     assert (p.prompt, p.negative) == (expected["prompt"], expected["negative"])
     if camera:
         assert (p.camera_pose, p.speed) == (expected["cameraPose"], expected["cameraSpeed"])
+        # the app leaves out (null) the second move of a one-move preset; Static together is the core node's path
+        assert (p.camera_pose_2, p.combine) == (expected["cameraPose2"] or "Static", expected["cameraCombine"] or "together")
 
 
 def assert_parametric_parity(ts, name, text, *, aspect="16:9", resolution=None, prompt=None):
-    """The node in parametric mode against compileJob for the camera model, limits out of the way.
+    """The node in parametric and combined modes against compileJob for the camera model, limits out of the way.
 
     Whatever the preset holds, the pack and the app agree: the same numbers, or the same refusal.
     """
@@ -296,21 +354,24 @@ def assert_parametric_parity(ts, name, text, *, aspect="16:9", resolution=None, 
     arguments = {"aspect": aspect, "resolution": resolution, "prompt": prompt or ""}
     if preset["loras"]:
         # the app refuses the job and the pack does too, in the same words
-        with pytest.raises(ParamsError) as caught:
-            compute_params(preset, **arguments)
-        assert str(caught.value) == expected["error"]
+        for mode in ("parametric", "combined"):
+            with pytest.raises(ParamsError) as caught:
+                compute_params(preset, camera_mode=mode, **arguments)
+            assert str(caught.value) == expected["error"]
         return
     assert "error" not in expected, expected.get("error")
     assert expected["cameraMode"] == "parametric"
     if len(preset["camera"]["poses"]) > 1:
-        # the app sends the two moves to Montagio Camera Embedding; the pack's nodes have one camera_pose
-        # output, so they refuse and name the same pair
+        # parametric mode feeds the core WanCameraEmbedding, which takes one move: the pack refuses and
+        # names the pair the app sends to Montagio Camera Embedding
         with pytest.raises(ParamsError) as caught:
             compute_params(preset, **arguments)
         joiner = ", then " if expected["cameraCombine"] == "then" else " + "
         assert f"({expected['cameraPose']}{joiner}{expected['cameraPose2']});" in str(caught.value)
-        return
-    assert_same_as_compile_job(compute_params(preset, **arguments), expected)
+    else:
+        assert_same_as_compile_job(compute_params(preset, **arguments), expected)
+    # combined mode feeds Montagio Camera Embedding the way the app does, one move or two
+    assert_same_as_compile_job(compute_params(preset, camera_mode="combined", **arguments), expected)
 
 
 def assert_prompt_mode_parity(ts, name, text, *, prompt=None):
@@ -328,10 +389,10 @@ def assert_prompt_mode_parity(ts, name, text, *, prompt=None):
         assert str(caught.value) == expected["error"]
         return
     assert "error" not in expected, expected.get("error")
-    assert expected["cameraMode"] == "prompt" and expected["cameraPose"] is None
+    assert expected["cameraMode"] == "prompt" and expected["cameraPose"] is None and expected["cameraPose2"] is None
     p = compute_params(preset, **arguments)
     assert p.prompt == expected["prompt"]
-    assert (p.camera_pose, p.speed) == ("Static", 1.0)
+    assert (p.camera_pose, p.speed, p.camera_pose_2, p.combine) == ("Static", 1.0, "Static", "together")
 
 
 def test_in_memory_presets_cover_what_the_monorepo_may_never_hold():
@@ -386,12 +447,15 @@ def test_compile_parity_prompt_mode_5b(ts, name, text):
 def test_two_poses_parity(ts, pair):
     text = edit("poses: [zoom_in]", f"poses: [{pair[0]}, {pair[1]}]")
     preset = parse_preset(text, "pair.yaml")
-    # the app sends both values to Montagio Camera Embedding, together: the pack names them in its refusal
+    # the app sends both values to Montagio Camera Embedding, together: the pack names them in its refusal,
+    # and gives them in combined mode
     app = ts_compile(ts, compile_request(text, FUN_CAMERA, user_prompt=USER_PROMPT))
     assert (app["cameraPose"], app["cameraPose2"], app["cameraCombine"]) == (POSE_VALUES[pair[0]], POSE_VALUES[pair[1]], "together")
     with pytest.raises(ParamsError) as caught:
         compute_params(preset, aspect="16:9", prompt=USER_PROMPT)
     assert f"({app['cameraPose']} + {app['cameraPose2']});" in str(caught.value)
+    # combined mode gives the node what the app gives it
+    assert_same_as_compile_job(compute_params(preset, aspect="16:9", prompt=USER_PROMPT, camera_mode="combined"), app)
     # prompt mode phrases both moves, like the app does for a model without camera control
     expected = ts_compile(ts, compile_request(text, WAN_5B, user_prompt=USER_PROMPT))
     assert compute_params(preset, aspect="16:9", prompt=USER_PROMPT, camera_mode="prompt").prompt == expected["prompt"]
@@ -406,6 +470,7 @@ def test_then_pairs_parity(ts, pair):
     with pytest.raises(ParamsError) as caught:
         compute_params(preset, aspect="16:9", prompt=USER_PROMPT)
     assert f"({app['cameraPose']}, then {app['cameraPose2']});" in str(caught.value)
+    assert_same_as_compile_job(compute_params(preset, aspect="16:9", prompt=USER_PROMPT, camera_mode="combined"), app)
     # prompt mode chains the words with "then", like the app
     expected = ts_compile(ts, compile_request(text, WAN_5B, user_prompt=USER_PROMPT))
     assert compute_params(preset, aspect="16:9", prompt=USER_PROMPT, camera_mode="prompt").prompt == expected["prompt"]

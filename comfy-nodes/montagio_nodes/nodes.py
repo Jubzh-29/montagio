@@ -8,8 +8,11 @@ sys.path, so "from montagio_nodes.preset import ..." would fail there.
 
 Two nodes turn a Montagio preset into the values ComfyUI's own nodes take:
 camera_pose, speed, width, height and length go to WanCameraEmbedding, prompt and negative to
-CLIPTextEncode, fps to CreateVideo. "Load Montagio Preset" reads a preset file chosen in a menu;
-"Montagio Preset from YAML" reads the text written in the node.
+CLIPTextEncode, fps to CreateVideo. In camera_mode "combined" they go with camera_pose_2 and
+combine to Montagio Camera Embedding instead, which takes the presets with two moves; "parametric"
+refuses those, since the core node would drop the second move without a word. "Load Montagio
+Preset" reads a preset file chosen in a menu; "Montagio Preset from YAML" reads the text written
+in the node.
 
 Where the presets are: ComfyUI/models/montagio_presets (the user's folder, which comes first and
 wins on a name clash), any folder that extra_model_paths.yaml adds under the name
@@ -115,6 +118,9 @@ def _declared_outputs():
         io.Int.Output(display_name="duration_s"),
         io.String.Output(display_name="resolution"),
         io.String.Output(display_name="info"),
+        # added after info, so that the links of a graph saved before keep their indexes
+        io.Combo.Output(display_name="camera_pose_2"),
+        io.Combo.Output(display_name="combine"),
     ]
 
 
