@@ -24,7 +24,14 @@ from comfy_api.latest import ComfyExtension
 
 from montagio_nodes import nodes
 from montagio_nodes.catalog import BUNDLED_DIR
-from montagio_nodes.nodes import MontagioExtension, MontagioLoadPreset, MontagioPresetFromYAML, comfy_entrypoint, preset_dirs
+from montagio_nodes.nodes import (
+    MontagioCameraEmbedding,
+    MontagioExtension,
+    MontagioLoadPreset,
+    MontagioPresetFromYAML,
+    comfy_entrypoint,
+    preset_dirs,
+)
 from montagio_nodes.params import NodeParams, ParamsError
 from montagio_nodes.preset import PresetError
 
@@ -392,7 +399,7 @@ def test_package_entrypoint_is_v3_only(pack):
     # with a NODE_CLASS_MAPPINGS, ComfyUI would stop there and never call comfy_entrypoint
     assert hasattr(pack, "comfy_entrypoint") and not hasattr(pack, "NODE_CLASS_MAPPINGS")
     ext = asyncio.run(pack.comfy_entrypoint())
-    assert {n.__name__ for n in asyncio.run(ext.get_node_list())} == {"MontagioLoadPreset", "MontagioPresetFromYAML"}
+    assert {n.__name__ for n in asyncio.run(ext.get_node_list())} == {"MontagioLoadPreset", "MontagioPresetFromYAML", "MontagioCameraEmbedding"}
 
 
 def test_the_extension_is_what_the_comfyui_loader_accepts():
@@ -400,8 +407,8 @@ def test_the_extension_is_what_the_comfyui_loader_accepts():
     extension = asyncio.run(comfy_entrypoint())
     assert isinstance(extension, MontagioExtension) and isinstance(extension, ComfyExtension)
     node_list = asyncio.run(extension.get_node_list())
-    assert node_list == [MontagioLoadPreset, MontagioPresetFromYAML]
-    assert sorted(node.GET_SCHEMA().node_id for node in node_list) == ["MontagioLoadPreset", "MontagioPresetFromYAML"]
+    assert node_list == [MontagioLoadPreset, MontagioPresetFromYAML, MontagioCameraEmbedding]
+    assert sorted(node.GET_SCHEMA().node_id for node in node_list) == ["MontagioCameraEmbedding", "MontagioLoadPreset", "MontagioPresetFromYAML"]
     asyncio.run(extension.on_load())
 
 
@@ -441,7 +448,7 @@ def test_the_pack_loads_when_its_folder_is_not_on_sys_path(tmp_path):
     )
     assert done.returncode == 0, done.stderr
     assert json.loads(done.stdout.strip().splitlines()[-1]) == {
-        "ids": ["MontagioLoadPreset", "MontagioPresetFromYAML"],
+        "ids": ["MontagioCameraEmbedding", "MontagioLoadPreset", "MontagioPresetFromYAML"],
         "pack_dir_on_sys_path": False,
     }
 
@@ -461,9 +468,9 @@ def pack_sources():
 
 @pytest.mark.parametrize("path", pack_sources(), ids=lambda path: path.name)
 def test_pack_modules_import_only_what_they_may(path):
-    allowed = set(sys.stdlib_module_names) - FORBIDDEN_MODULES | {"yaml"}
-    if path.name == "nodes.py":  # the only module that talks to ComfyUI
-        allowed |= {"comfy_api", "folder_paths"}
+    allowed = set(sys.stdlib_module_names) - FORBIDDEN_MODULES | {"yaml", "numpy"}
+    if path.name == "nodes.py":  # the only module that talks to ComfyUI (and to torch, which comes with it)
+        allowed |= {"comfy_api", "folder_paths", "comfy", "torch"}
     tree = ast.parse(path.read_text(encoding="utf-8"))
     imported, called = set(), set()
     for node in ast.walk(tree):

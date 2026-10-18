@@ -1,6 +1,6 @@
 # Montagio nodes for ComfyUI
 
-Two nodes that read a Montagio camera preset (a YAML file) and output the values ComfyUI's own nodes take: camera move and speed, size, frame count, fps, prompt and negative prompt. The same preset file drives a clip in the Montagio app and in a ComfyUI graph.
+Two nodes that read a Montagio camera preset (a YAML file) and output the values ComfyUI's own nodes take: camera move and speed, size, frame count, fps, prompt and negative prompt. The same preset file drives a clip in the Montagio app and in a ComfyUI graph. A third node, Montagio Camera Embedding, gives the Wan 2.2 Fun Camera models two camera moves at once or one after the other.
 
 The nodes use the V3 node API, so they need ComfyUI 0.41.0 or newer.
 
@@ -19,7 +19,7 @@ No example workflow ships with the pack yet.
 | Load Montagio Preset | `MontagioLoadPreset` | the `preset` menu, which lists the `.yaml` and `.yml` files of the [preset folders](#preset-folders) |
 | Montagio Preset from YAML | `MontagioPresetFromYAML` | the `yaml` text field: paste a preset, for example one remixed in the Montagio app (it starts with the text of Crash Push) |
 
-Both nodes have the same other inputs and the same 11 outputs.
+Both nodes have the same other inputs and the same 11 outputs. A third node, [Montagio Camera Embedding](#montagio-camera-embedding), combines two camera moves.
 
 ### Inputs
 
@@ -68,6 +68,23 @@ The node reads a preset with the same rules as the app, apart from a few rare YA
 
 `duration_s`, `resolution` and `info` are for your own use, for example to name the saved file or to keep the credit with the clip.
 
+## Montagio Camera Embedding
+
+`MontagioCameraEmbedding` is the core `WanCameraEmbedding` node with a second move. It takes the same inputs, with the same names and bounds, plus two more:
+
+| Input | Type | Default | Meaning |
+|---|---|---|---|
+| `camera_pose_2` | COMBO, the 9 poses of `WanCameraEmbedding` | `Static` | the second move |
+| `combine` | COMBO: `together`, `then` | `together` | `together`: both moves at once, over the whole clip (their vectors add up). `then`: the first move over the first half of the clip, then the second one from where the first ended |
+
+Its outputs are the core node's: `camera_embedding`, `width`, `height`, `length`. It therefore takes the place of `WanCameraEmbedding` in a Wan 2.2 Fun Camera workflow without any link changing: its `camera_embedding` goes to `camera_conditions` of `WanCameraImageToVideo`, and `width`, `height` and `length` go to the inputs of the same names.
+
+With `camera_pose_2` set to `Static` and `combine` set to `together`, it computes exactly what `WanCameraEmbedding` computes (a test compares both tensors on a ComfyUI install). `then` with `Static` second gives a move that stops halfway; `Zoom In` then `Zoom Out` breathes in and out. `length` must be of the form 4n+1 (1, 5, …, 81), as the core node assumes; any other length is refused with a message.
+
+The node builds the camera path itself, and the Plücker embedding comes from ComfyUI's own `process_pose_params` (`comfy_extras/nodes_camera_trajectory.py`). It is written against ComfyUI v0.41.0. numpy, which it uses, comes with ComfyUI.
+
+The Montagio app sends this node only for presets that combine two moves. A preset with one move uses the core node, so it runs on a ComfyUI that does not have this pack.
+
 ## App Mode
 
 App Mode needs ComfyUI frontend 1.41.13 or newer (ComfyUI v0.41.0 ships 1.55.17).
@@ -106,7 +123,7 @@ A new file shows up in the menu when the frontend refreshes the node definitions
 The node accepts the presets the app accepts, and its values are the app's own (tests compare both with the app's code), with these exceptions:
 
 - **Model limits are not applied.** The app trims a job to what its model can render, such as the allowed fps and the maximum duration. The node does not know which model follows, so it outputs the preset's values as they are.
-- **A preset with two camera moves is refused in `parametric` mode.** `WanCameraEmbedding` takes one move. The error says so and suggests `camera_mode` `prompt`. A node for combined moves is planned.
+- **A preset with two camera moves is refused in `parametric` mode.** `WanCameraEmbedding` takes one move, and the preset nodes have one `camera_pose` output. The error says so and suggests `camera_mode` `prompt`, or [Montagio Camera Embedding](#montagio-camera-embedding) with the second move set by hand.
 - **`prompt` mode gives a neutral camera.** For models without camera control, such as Wan 2.2 5B, `camera_pose` is `Static` and `speed` is 1.0, and the moves go into the `prompt` output as words. The node cannot see the graph, so it does not know whether `camera_pose` is linked: in this mode, do not link `camera_pose` if you want a driven camera.
 - **Presets with LoRAs are refused**, as in the app. A clip that dropped the LoRA would not be what the preset promises.
 - **A few rare YAML spellings with tabs.** A tab works as a separator, as in the app: after a colon, before a comment, at the end of a line, inside a value, or on a blank line. A tab used as indentation is refused, as in the app. Two spellings still differ: a tab right after a tag (`!!str<TAB>text`) or inside a `%YAML` directive line is refused by the node but accepted by the app, and a quoted text that goes on over lines indented with a tab alone is accepted by the node but refused by the app. Indent with spaces and a file reads the same in both. The other rare corners are listed at the top of `montagio_nodes/preset.py`.
