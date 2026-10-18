@@ -30,7 +30,7 @@ DESCRIPTION = "description: Fast push toward the subject, ending tight."
 
 # (replace, with, start of the message after the file name)
 REJECTED = [
-    # the 7 refusals of schema.test.ts
+    # the 9 refusals of schema.test.ts
     ("id: crash-push", "id: Crash Push", "id"),
     ("poses: [zoom_in]", "poses: [static, zoom_in]", "camera.poses"),
     ("poses: [zoom_in]", "poses: [zoom_in, zoom_in]", "camera.poses"),
@@ -38,6 +38,12 @@ REJECTED = [
     ("license: CC-BY-4.0", "license: CC-BY-NC-4.0", "license"),
     ("duration_s: 5", "duration_s: 11", "defaults.duration_s"),
     ("duration_s: 5", "duration_s: 1", "defaults.duration_s"),
+    ("poses: [zoom_in]", "poses: [zoom_in, zoom_out]\n  combine: sideways", "camera.combine"),
+    ("poses: [zoom_in]", "poses: [zoom_in, zoom_in]\n  combine: then", "camera.poses"),
+    # combine: "static" at the same time as a move, a combine that is not a string
+    ("poses: [zoom_in]", "poses: [zoom_in, static]\n  combine: together", "camera.poses"),
+    ("poses: [zoom_in]", "poses: [zoom_in, pan_up]\n  combine: true", "camera.combine"),
+    ("poses: [zoom_in]", "poses: [zoom_in, pan_up]\n  combine: Then", "camera.combine"),
     # numbers: a boolean is never a number, nothing non finite, integers stay integers
     ("speed: 1.5", "speed: true", "camera.speed"),
     ("speed: 1.5", "speed: 0.05", "camera.speed"),
@@ -90,10 +96,16 @@ REJECTED = [
 
 # (replace, with, path into the parsed preset, expected value)
 ACCEPTED = [
-    # the 3 acceptances of schema.test.ts
+    # the 6 acceptances of schema.test.ts
     ("duration_s: 5", "duration_s: 2", ("defaults", "duration_s"), 2),
     ("duration_s: 5", "duration_s: 10", ("defaults", "duration_s"), 10),
     ("poses: [zoom_in]", "poses: [pan_up, zoom_in]", ("camera", "poses"), ["pan_up", "zoom_in"]),
+    ("poses: [zoom_in]", "poses: [zoom_in, static]\n  combine: then", ("camera", "poses"), ["zoom_in", "static"]),
+    ("poses: [zoom_in]", "poses: [static, zoom_in]\n  combine: then", ("camera", "combine"), "then"),
+    ("poses: [zoom_in]", "poses: [zoom_in]\n  combine: then", ("camera", "combine"), "then"),
+    # two moves happen together unless the preset says otherwise
+    ("poses: [zoom_in]", "poses: [pan_up, zoom_in]", ("camera", "combine"), "together"),
+    ("poses: [zoom_in]", "poses: [pan_up, zoom_in]\n  combine: together", ("camera", "combine"), "together"),
     # a whole number written as a float or with leading zeros is an int
     ("duration_s: 5", "duration_s: 5.0", ("defaults", "duration_s"), 5),
     ("duration_s: 5", "duration_s: 1e1", ("defaults", "duration_s"), 10),
@@ -298,8 +310,14 @@ ASPECT_CHOICES = ("16:9", "9:16", "1:1")
 RESOLUTION_CHOICES = ("480p", "720p")
 USER_PROMPT = "a cat on a sofa"
 
-# every ordered pair of distinct moves the schema accepts (a pair never holds "static")
+# every ordered pair of distinct moves the schema accepts together (such a pair never holds "static")
 POSE_PAIRS = [(a, b) for a in CAMERA_POSES for b in CAMERA_POSES if a != b and "static" not in (a, b)]
+# every ordered pair of distinct moves the schema accepts one after the other ("static" included)
+THEN_PAIRS = [(a, b) for a in CAMERA_POSES for b in CAMERA_POSES if a != b]
+
+
+def then_preset(a, b):
+    return edit("poses: [zoom_in]", f"poses: [{a}, {b}]\n  combine: then")
 
 SUFFIX = '"dynamic camera push-in, cinematic, sharp focus on subject"'
 NEGATIVE = '"blurry, distorted, warped faces, extra limbs, flicker, low quality"'
@@ -409,6 +427,8 @@ COMPILE: list[dict] = (
         for a, b in POSE_PAIRS
         for model in (FUN_CAMERA, WAN_5B)
     ]
+    # test_then_pairs_parity
+    + [compile_request(then_preset(a, b), model, user_prompt=USER_PROMPT) for a, b in THEN_PAIRS for model in (FUN_CAMERA, WAN_5B)]
     # test_loras_parity
     + [compile_request(BASE + LORA_BLOCK, model, user_prompt=USER_PROMPT) for model in (FUN_CAMERA, WAN_5B)]
 )

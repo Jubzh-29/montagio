@@ -1,6 +1,6 @@
 # Draft (plan 2b): provisional name and settings, tuned in GPU session S2.
-# Note: the core WanCameraEmbedding node takes a single pose and the Montagio node pack refuses combined moves; GPU session S1 decides how this preset renders.
-# Note: "Pan Up" / "Pan Down" of WanCameraEmbedding move the camera (translation) rather than rotate it; GPU session S1 decides how a tilt renders.
+# Note: the two moves run together, through the Montagio Camera Embedding node (comfy-nodes); a preset with one move keeps the core WanCameraEmbedding.
+# Note: "Pan Up" / "Pan Down" of WanCameraEmbedding move the camera (translation) rather than rotate it; GPU session S2 decides how a tilt renders (see docs/S1_ANALYSE.md).
 schema: montagio/preset@0.1
 id: pull-back-tilt-up
 name: Pull Back & Tilt Up

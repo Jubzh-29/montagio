@@ -1,5 +1,5 @@
 # Draft (plan 2b): provisional name and settings, tuned in GPU session S2.
-# Note: preset schema v0.1 has no timing; the rhythm lives in the speed and the prompt only.
+# Note: the two moves run one after the other (combine: then), through the Montagio Camera Embedding node (comfy-nodes).
 schema: montagio/preset@0.1
 id: push-and-settle
 name: Push & Settle
@@ -9,7 +9,8 @@ license: CC-BY-4.0
 author: montagio-community
 capability: i2v-camera
 camera:
-  poses: [zoom_in]
+  poses: [zoom_in, static]
+  combine: then
   speed: 0.7
 prompt:
   suffix: "camera pushes in, then settles and holds still on the subject, cinematic"

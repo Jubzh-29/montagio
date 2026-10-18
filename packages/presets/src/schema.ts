@@ -3,20 +3,26 @@ import { z } from 'zod';
 export const CAMERA_POSES = ['static', 'pan_left', 'pan_right', 'pan_up', 'pan_down', 'zoom_in', 'zoom_out'] as const;
 export type CameraPose = (typeof CAMERA_POSES)[number];
 
+/** How two moves combine: both at once over the whole clip, or the first then the second. */
+export const CAMERA_COMBINES = ['together', 'then'] as const;
+export type CameraCombine = (typeof CAMERA_COMBINES)[number];
+
 const kebabId = z.string().max(48).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'must be kebab-case (a-z, 0-9, -)');
 
 const CameraSchema = z
   .object({
     poses: z.array(z.enum(CAMERA_POSES)).min(1).max(2),
     speed: z.number().min(0.1).max(3).default(1),
+    combine: z.enum(CAMERA_COMBINES).default('together'),
   })
   .strict()
   .superRefine((camera, ctx) => {
     if (new Set(camera.poses).size !== camera.poses.length) {
       ctx.addIssue({ code: 'custom', path: ['poses'], message: 'poses must not repeat' });
     }
-    if (camera.poses.includes('static') && camera.poses.length > 1) {
-      ctx.addIssue({ code: 'custom', path: ['poses'], message: '"static" cannot be combined with another pose' });
+    // "static" at the same time as a move adds nothing; before or after one, it is a hold
+    if (camera.poses.includes('static') && camera.poses.length > 1 && camera.combine !== 'then') {
+      ctx.addIssue({ code: 'custom', path: ['poses'], message: '"static" can only be combined with another pose when combine is "then"' });
     }
   });
 

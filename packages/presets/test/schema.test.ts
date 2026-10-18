@@ -42,6 +42,8 @@ test.each([
   ['license: CC-BY-4.0', 'license: CC-BY-NC-4.0'],
   ['duration_s: 5', 'duration_s: 11'],
   ['duration_s: 5', 'duration_s: 1'],
+  ['poses: [zoom_in]', 'poses: [zoom_in, zoom_out]\n  combine: sideways'],
+  ['poses: [zoom_in]', 'poses: [zoom_in, zoom_in]\n  combine: then'],
 ])('rejects %s -> %s', (from, to) => {
   expect(() => parsePreset(edit(from, to), 'crash-push.yaml')).toThrow(PresetError);
 });
@@ -50,8 +52,22 @@ test.each([
   ['duration_s: 5', 'duration_s: 2'],
   ['duration_s: 5', 'duration_s: 10'],
   ['poses: [zoom_in]', 'poses: [pan_up, zoom_in]'],
+  ['poses: [zoom_in]', 'poses: [zoom_in, static]\n  combine: then'],
+  ['poses: [zoom_in]', 'poses: [static, zoom_in]\n  combine: then'],
+  ['poses: [zoom_in]', 'poses: [zoom_in]\n  combine: then'],
 ])('accepts %s -> %s', (from, to) => {
   expect(() => parsePreset(edit(from, to), 'crash-push.yaml')).not.toThrow();
+});
+
+test('two moves happen together unless the preset says then', () => {
+  expect(parsePreset(edit('poses: [zoom_in]', 'poses: [pan_up, zoom_in]'), 'p.yaml').camera.combine).toBe('together');
+  expect(parsePreset(edit('poses: [zoom_in]', 'poses: [zoom_in, static]\n  combine: then'), 'p.yaml').camera.combine).toBe('then');
+});
+
+test('static joins another move only when they come one after the other', () => {
+  expect(() => parsePreset(edit('poses: [zoom_in]', 'poses: [static, zoom_in]'), 'p.yaml')).toThrow(
+    /camera\.poses: "static" can only be combined with another pose when combine is "then"/,
+  );
 });
 
 test('invalid YAML is reported as a PresetError naming the file', () => {

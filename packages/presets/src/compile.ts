@@ -1,6 +1,6 @@
 import type { BindingKey, ModelEntry } from '@montagio/registry';
 import { dimensionsFor, frameCount, type Aspect, type Resolution } from './dimensions';
-import type { CameraPose, Preset } from './schema';
+import type { CameraCombine, CameraPose, Preset } from './schema';
 
 export type ApiWorkflow = Record<string, { class_type: string; inputs: Record<string, unknown> }>;
 
@@ -24,15 +24,26 @@ export type CompiledParams = {
   prompt: string;
   negative: string;
   seed: number;
+  /** First (or only) move, as the camera node spells it; null in prompt mode. */
   cameraPose: string | null;
+  /** Second move of a combined preset; null for one move or in prompt mode. */
+  cameraPose2: string | null;
+  cameraCombine: CameraCombine | null;
   cameraSpeed: number | null;
   cameraMode: 'parametric' | 'prompt';
 };
 
 /**
- * Values expected by the camera node. Provisional: confirmed against the real
- * Wan 2.2 Fun-Camera node after GPU session S1 (plan 2).
+ * The node a combined preset needs: WanCameraEmbedding with `camera_pose_2`
+ * and `combine` (comfy-nodes, Montagio node pack). It keeps the core node's
+ * inputs and outputs, so the compiler swaps the class of the bound camera node
+ * and adds the two inputs. A one-move preset keeps the core node, which any
+ * ComfyUI has.
  */
+export const COMBINED_CAMERA_NODE = 'MontagioCameraEmbedding';
+const CAMERA_NODES = new Set(['WanCameraEmbedding', COMBINED_CAMERA_NODE]);
+
+/** Values of WanCameraEmbedding.camera_pose (ComfyUI v0.41.0, comfy_extras/nodes_camera_trajectory.py). */
 export const CAMERA_POSE_VALUES: Record<CameraPose, string> = {
   static: 'Static',
   pan_left: 'Pan Left',
@@ -99,9 +110,13 @@ export function compileJob(
   const { width, height } = dimensionsFor(inputs.aspect, resolution);
   const frames = frameCount(duration_s, fps);
   const poses = preset.camera.poses;
+  const combined = poses.length > 1;
   const promptParts = [inputs.userPrompt?.trim(), preset.prompt.suffix.trim()];
-  if (cameraMode === 'prompt') promptParts.push(poses.map((pose) => CAMERA_POSE_PROMPTS[pose]).join(', '));
+  if (cameraMode === 'prompt') {
+    promptParts.push(poses.map((pose) => CAMERA_POSE_PROMPTS[pose]).join(preset.camera.combine === 'then' ? ', then ' : ', '));
+  }
   const prompt = promptParts.filter((part): part is string => Boolean(part)).join(', ');
+  const parametric = cameraMode === 'parametric';
 
   const params: CompiledParams = {
     width,
@@ -113,8 +128,10 @@ export function compileJob(
     prompt,
     negative: preset.prompt.negative,
     seed: inputs.seed,
-    cameraPose: cameraMode === 'parametric' ? poses.map((pose) => CAMERA_POSE_VALUES[pose]).join(' + ') : null,
-    cameraSpeed: cameraMode === 'parametric' ? preset.camera.speed : null,
+    cameraPose: parametric ? CAMERA_POSE_VALUES[poses[0]!] : null,
+    cameraPose2: parametric && combined ? CAMERA_POSE_VALUES[poses[1]!] : null,
+    cameraCombine: parametric && combined ? preset.camera.combine : null,
+    cameraSpeed: parametric ? preset.camera.speed : null,
     cameraMode,
   };
 
@@ -145,6 +162,18 @@ export function compileJob(
   if (missing.size > 0) {
     const details = [...missing].map(([node, keys]) => `${keys.join(', ')} → node ${node}`).join('; ');
     throw new CompileError(`bindings not found in the workflow template of ${model.id}: ${details}`);
+  }
+  if (parametric && combined) {
+    const id = model.bindings.camera_pose!.node;
+    const node = workflow[id]!;
+    if (!CAMERA_NODES.has(node.class_type)) {
+      throw new CompileError(
+        `preset ${preset.id} combines 2 camera moves, but node ${id} is ${node.class_type}, not a camera node (${[...CAMERA_NODES].join(' or ')})`,
+      );
+    }
+    node.class_type = COMBINED_CAMERA_NODE;
+    node.inputs.camera_pose_2 = params.cameraPose2;
+    node.inputs.combine = params.cameraCombine;
   }
   return { workflow, params };
 }

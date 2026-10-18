@@ -118,16 +118,19 @@ def compute_params(preset, *, aspect, resolution=None, prompt="", camera_mode="p
         raise ParamsError(f"preset {preset['id']} uses LoRAs, which are not supported yet")
 
     poses = preset["camera"]["poses"]
+    one_after_the_other = preset["camera"]["combine"] == "then"
     parts = [_trim(prompt), _trim(preset["prompt"]["suffix"])]
     if camera_mode == "prompt":
         camera_pose, speed = "Static", 1.0  # the camera is only in the words of the prompt
-        parts.append(", ".join(POSE_PROMPTS[pose] for pose in poses))
+        parts.append((", then " if one_after_the_other else ", ").join(POSE_PROMPTS[pose] for pose in poses))
     else:
         values = [POSE_VALUES[pose] for pose in poses]
         if len(values) > 1:
+            # the app sends both moves to Montagio Camera Embedding; these nodes have one camera_pose output
             raise ParamsError(
-                f"preset {preset['id']} combines {len(values)} camera moves ({' + '.join(values)}); "
-                'WanCameraEmbedding takes one move. Use camera_mode "prompt", or a combined-move node (planned).'
+                f"preset {preset['id']} combines {len(values)} camera moves "
+                f"({(', then ' if one_after_the_other else ' + ').join(values)}); WanCameraEmbedding takes one move. "
+                'Use camera_mode "prompt", or the Montagio Camera Embedding node with the second move set by hand.'
             )
         camera_pose, speed = values[0], float(preset["camera"]["speed"])
 
