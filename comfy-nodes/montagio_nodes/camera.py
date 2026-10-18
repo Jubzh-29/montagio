@@ -7,7 +7,8 @@ are (i / n) * speed times the pose's vectors (scaled by base_angle and base_T_no
 rotation is Rz.Ry.Rx. This module builds the same path for two poses:
 
 - "together" adds the two poses' vectors, so both moves happen at once over the whole clip
-  (with "Static" as the second pose, this is exactly the path of the core node);
+  (with "Static" as the second pose, the vector is the first pose's own and every product is
+  the one get_camera_motion makes, in its order: the path of the core node, bit for bit);
 - "then" runs the first move over the first half of the clip and the second over the second
   half, starting where the first one ended.
 
@@ -26,11 +27,17 @@ def check_length(length):
 
 
 def _rotation(angles):
+    """Rz.(Ry.Rx), grouped and multiplied with np.dot as in the core."""
     x, y, z = angles
     rx = np.array([[1, 0, 0], [0, np.cos(x), -np.sin(x)], [0, np.sin(x), np.cos(x)]])
     ry = np.array([[np.cos(y), 0, np.sin(y)], [0, 1, 0], [-np.sin(y), 0, np.cos(y)]])
     rz = np.array([[np.cos(z), -np.sin(z), 0], [np.sin(z), np.cos(z), 0], [0, 0, 1]])
-    return rz @ ry @ rx
+    return np.dot(rz, np.dot(ry, rx))
+
+
+def _scaled(w, speed, base, v):
+    """((w * speed) * base) * v: the scalars from the left, then the vector, as get_camera_motion does."""
+    return w * speed * base * v
 
 
 def _weights(combine, p):
@@ -49,8 +56,13 @@ def trajectory(motion_a, motion_b, combine, speed, length, *, base_angle, base_t
     frames = []
     for i in range(length):
         w_a, w_b = _weights(combine, i / length)
-        angle = speed * base_angle * (w_a * angle_a + w_b * angle_b)
-        t = speed * base_t * (w_a * t_a + w_b * t_b)
+        if combine == "together":
+            # one move along the sum of the two vectors (w_a == w_b)
+            angle = _scaled(w_a, speed, base_angle, angle_a + angle_b)
+            t = _scaled(w_a, speed, base_t, t_a + t_b)
+        else:
+            angle = _scaled(w_a, speed, base_angle, angle_a) + _scaled(w_b, speed, base_angle, angle_b)
+            t = _scaled(w_a, speed, base_t, t_a) + _scaled(w_b, speed, base_t, t_b)
         frames.append(np.concatenate([_rotation(angle), t.reshape(3, 1)], axis=1))
     return np.stack(frames)
 
