@@ -35,7 +35,7 @@ Tout ce qui sort de la session va dans `s1-results/`. Le nom est resté celui de
 | 1. Créer le pod | 10 min | à partir du démarrage |
 | 2. Copier le dépôt | 5 min | oui |
 | 3. Installer et lancer, pack Montagio compris | 20 à 30 min | oui |
-| 4. Télécharger les poids | 20 à 50 min | oui |
+| 4. Télécharger les poids | 28 à 70 min | oui |
 | 5. Premiers rendus et mesures | 45 min | oui |
 | 6. Vérifications et réglage des presets | 2 à 3 h | oui |
 | 6.8 Les extensions | ≈ 2 h 30 | oui |
@@ -111,14 +111,14 @@ MONTAGIO_COMFYUI_DIR=/workspace/ComfyUI MONTAGIO_COMFYUI_PYTHON=/workspace/venvs
 ```
 Attendu : tous les tests passent, aucun n'est ignoré. Les trois tests lourds comparent le node au `WanCameraEmbedding` du pod.
 
-## 4. Télécharger les poids (≈ 20 à 50 min)
+## 4. Télécharger les poids (≈ 28 à 70 min)
 
 ```bash
 npm run weights -w @montagio/infra-runpod -- --dry-run
 npm run weights -w @montagio/infra-runpod -- --models-dir /workspace/ComfyUI/models
 ```
 
-- Le `--dry-run` affiche les 43 fichiers, soit 188,7 Go (175,7 Gio) : les 9 des presets (69,7 Go) et les 34 des extensions (édition 31,9 Go, effets 20,6 Go, transitions 31,0 Go, avatar et sa voix 21,5 Go, musique 10,0 Go, upscale 4,0 Go), avec leur dossier ComfyUI et leur URL exacte. Les fichiers de la voix vont dans `tts/chatterbox/resembleai-mtl-v3/`, les LoRA dans `loras/`. Pour ne prendre que les presets : `--extensions none`. Une ligne `the file changed upstream` signifie que Hugging Face sert un autre fichier que celui du lock : **arrêtez-vous** et notez-la.
+- Le `--dry-run` affiche les 43 fichiers, soit 188,6 Go (175,7 Gio) : les 9 des presets (69,7 Go) et les 34 des extensions (édition 31,9 Go, effets 20,6 Go, transitions 31,0 Go, avatar et sa voix 21,5 Go, musique 10,0 Go, upscale 4,0 Go), avec leur dossier ComfyUI et leur URL exacte. Les fichiers de la voix vont dans `tts/chatterbox/resembleai-mtl-v3/`, les LoRA dans `loras/`. Pour ne prendre que les presets : `--extensions none`. Une ligne `the file changed upstream` signifie que Hugging Face sert un autre fichier que celui du lock : **arrêtez-vous** et notez-la.
 - Chaque ligne du vrai lancement doit finir par `(matches Hugging Face)`. Le sha256 est aussi comparé à celui du lock.
 - À noter : le débit (Mo/s) et la durée totale.
 - Le lock est déjà exact : `s1-results/models.lock.patch` doit être vide.
