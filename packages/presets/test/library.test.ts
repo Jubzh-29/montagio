@@ -155,6 +155,11 @@ test('a missing extension workflow is a problem', async () => {
   expect(await problemsOf(root)).toContainEqual(expect.stringMatching(/extension model ace-music: workflow workflows\/ext-gone\.api\.json not found/));
 });
 
+test('an extension workflow that is not valid JSON is a problem, not a crash', async () => {
+  const root = musicRepo({ 'workflows/ext-music.api.json': MUSIC_WORKFLOW.slice(0, -1) });
+  expect(await problemsOf(root)).toEqual([expect.stringMatching(/^extension model ace-music: workflow workflows\/ext-music\.api\.json is not valid JSON \(/)]);
+});
+
 test('extension models without registry/extensions.yaml are a problem', async () => {
   const root = repoWith({
     'registry/extensions/ace-music.yaml': extModel('ace-music', 'music', ['ace-step15-vae']),

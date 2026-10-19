@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parse as parseYaml } from 'yaml';
 import { checkOpenStack } from '../src/index';
 
 const fixture = (name: string) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
@@ -495,8 +496,78 @@ test('a mirror named as the source fails', async () => {
   expect(sourceViolations(r).map((v) => v.detail)).toEqual([expect.stringMatching(/extra-lora names the mirror Comfy-Org\/Wan_2.2_ComfyUI_Repackaged as its source/)]);
 });
 
+test('a refused repository is refused whatever the case of its name', async () => {
+  const r = await checkOpenStack(
+    withExtraWeight(
+      'https://huggingface.co/kijai/wanvideo_comfy/resolve/main/x.safetensors',
+      'https://huggingface.co/lightx2v/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v',
+    ),
+  );
+  expect(sourceViolations(r).map((v) => v.detail)).toEqual([expect.stringMatching(/extra-lora is fetched from kijai\/wanvideo_comfy, a refused repository: .*CC BY-NC-SA/)]);
+});
+
+test('a listed repository is found whatever the case of its name', async () => {
+  const r = await checkOpenStack(withExtraWeight('https://huggingface.co/remade-ai/squish/resolve/main/squish_18.safetensors', 'https://huggingface.co/REMADE-AI/Squish'));
+  expect(sourceViolations(r)).toEqual([]);
+});
+
+// allowed-sources.yaml itself: a broken list is reported like any other violation.
+
+/** A copy of the tool's config files whose allowed-sources.yaml is `sources`. */
+const configWith = (sources: string): string => {
+  const dir = scratchRepo({ 'allowed-sources.yaml': sources });
+  for (const name of ['allowed-nodes.yaml', 'forbidden-packages.yaml', 'forbidden-patterns.yaml', 'forbidden-python-packages.yaml']) {
+    writeFileSync(join(dir, name), readFileSync(join(toolDir, name)));
+  }
+  return dir;
+};
+const realSources = () => readFileSync(join(toolDir, 'allowed-sources.yaml'), 'utf8');
+/** `sources` with one more entry at the end of its `sources:` list. */
+const withSource = (sources: string, repo: string) =>
+  sources.replace('\n# Never a source', `  - repo: ${repo}\n    license: Apache-2.0\n    role: source\n    revision: 0123456789abcdef\n    license_file: false\n\n# Never a source`);
+
+test.each<[string, (text: string) => string, RegExp]>([
+  ['no denied list', (text) => text.replace(/\ndenied:[\s\S]*$/, '\n'), /^denied: /],
+  ['a license other than Apache-2.0 or MIT', (text) => text.replace('license: MIT\n    role: source\n    revision: 19671f40', 'license: CC-BY-NC-4.0\n    role: source\n    revision: 19671f40'), /^sources\.\d+\.license: /],
+  ['a role other than source or mirror', (text) => text.replace('role: mirror', 'role: copy'), /^sources\.0\.role: /],
+  ['a revision that is a branch name', (text) => text.replace('revision: ee6f4a40737a995bf5818954cfce6d59443b0f04', 'revision: main'), /^sources\.0\.revision: /],
+  ['a revision shorter than 8 hex digits', (text) => text.replace('revision: ee6f4a40737a995bf5818954cfce6d59443b0f04', 'revision: ee6f4a4'), /^sources\.0\.revision: /],
+  ['a * in a listed repository', (text) => text.replace('repo: Remade-AI/Squish', 'repo: Remade-AI/*'), /^sources\.\d+\.repo: /],
+  ['a repository listed twice', (text) => withSource(text, 'remade-ai/SQUISH'), /Remade-AI\/Squish.*twice/],
+  ['a listed repository that is also refused', (text) => withSource(text, 'kijai/WanVideo_comfy'), /kijai\/WanVideo_comfy is both listed and refused/],
+  ['a listed repository that a refused pattern matches', (text) => withSource(text, 'artificialguybr/Wan-Redmond-Squish'), /artificialguybr\/Wan-Redmond-Squish is both listed and refused \(artificialguybr\/\*-Redmond-\*\)/],
+  ['YAML that does not parse', () => 'sources: [\n', /invalid YAML/],
+])('%s in allowed-sources.yaml is a violation, not a crash', async (_case, edit, detail) => {
+  const r = await checkOpenStack(fixture('clean'), { configDir: configWith(edit(realSources())) });
+  expect(r.ok).toBe(false);
+  expect(sourceViolations(r)).toEqual([expect.objectContaining({ file: expect.stringMatching(/allowed-sources\.yaml$/), detail: expect.stringMatching(detail) })]);
+});
+
 test('the refused repositories include the two license traps of the official templates', () => {
   const text = readFileSync(join(toolDir, 'allowed-sources.yaml'), 'utf8');
   expect(text).toMatch(/- repo: Kijai\/WanVideo_comfy\n\s+reason: .*CC BY-NC-SA/);
   expect(text).toMatch(/- repo: Comfy-Org\/HunyuanVideo_1\.5_repackaged\n\s+reason: .*Tencent/);
+});
+
+// A third-party node is allowed at the commit the GPU pod installs (infra/runpod/versions.env), not another one.
+test('every third-party node is allowed at the commit that versions.env pins for its repository', () => {
+  const env = Object.fromEntries(
+    readFileSync(join(repoRoot(), 'infra', 'runpod', 'versions.env'), 'utf8')
+      .split(/\r?\n/)
+      .filter((line) => /^[A-Z0-9_]+=/.test(line))
+      .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1).trim()]),
+  );
+  const pinned = new Map(
+    Object.entries(env)
+      .filter(([key]) => key.endsWith('_NODE_REPO'))
+      .map(([key, url]) => [/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/.exec(url)?.[1], env[key.replace(/_REPO$/, '_COMMIT')]]),
+  );
+  const { nodes } = parseYaml(readFileSync(join(toolDir, 'allowed-nodes.yaml'), 'utf8')) as { nodes: { class_type: string; source: string }[] };
+  const thirdParty = nodes.filter((node) => node.source.includes('@'));
+  expect(thirdParty.map((node) => node.class_type)).toContain('ChatterboxMTLTTS');
+  for (const node of thirdParty) {
+    const [repo, commit] = node.source.split('@') as [string, string];
+    expect(commit.length, node.class_type).toBeGreaterThanOrEqual(8);
+    expect(pinned.get(repo), `${node.class_type} from ${repo}`).toMatch(new RegExp(`^${commit}`));
+  }
 });

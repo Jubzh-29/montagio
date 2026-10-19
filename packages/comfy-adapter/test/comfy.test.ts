@@ -459,6 +459,38 @@ test('after a restart without a hint, a job is read as a video job, as before', 
   expect(await backend().get(id)).toMatchObject({ state: 'failed', error: 'no-output' });
 });
 
+test('the output kind of a job is kept for a late poll, then forgotten an idempotency window after the job ended', async () => {
+  let now = 0;
+  const b = new ComfyBackend({ baseUrl: fake.url, outputsDir, now: () => now });
+  const { backendJobId: id } = await b.submit(outputJob('image'));
+  fake.setJob(id, { status: 'succeeded', outputs: [outputOf('9', 'edit_00001_.png', 'image', 'image/png', Buffer.from('png'))] });
+  const png = join(outputsDir, `${id}.png`);
+  expect((await b.get(id)).outputPath).toBe(png);
+
+  // a second tab that polls once more still gets the image
+  now += IDEMPOTENCY_WINDOW_MS - 1;
+  await b.submit(outputJob('audio'));
+  expect((await b.get(id)).outputPath).toBe(png);
+
+  // past the window the backend no longer holds it: like a restarted app, the caller passes the kind
+  now += 1;
+  await b.submit(outputJob('audio'));
+  expect(await b.get(id)).toMatchObject({ state: 'failed', error: 'no-output' });
+  expect((await b.get(id, { output: 'image' })).outputPath).toBe(png);
+});
+
+test('a job still running is never forgotten, however long it takes', async () => {
+  let now = 0;
+  const b = new ComfyBackend({ baseUrl: fake.url, outputsDir, now: () => now });
+  const { backendJobId: id } = await b.submit(outputJob('image'));
+  fake.setJob(id, { status: 'running', outputs: [] });
+  expect((await b.get(id)).state).toBe('running');
+  now += 10 * IDEMPOTENCY_WINDOW_MS;
+  await b.submit(outputJob('audio'));
+  fake.setJob(id, { status: 'succeeded', outputs: [outputOf('9', 'edit_00001_.png', 'image', 'image/png', Buffer.from('png'))] });
+  expect((await b.get(id)).outputPath).toBe(join(outputsDir, `${id}.png`));
+});
+
 test('an output with an unknown audio extension is saved as .bin', async () => {
   const b = backend();
   const { backendJobId: id } = await b.submit(outputJob('audio'));

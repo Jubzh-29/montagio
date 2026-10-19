@@ -74,6 +74,7 @@ test('data.json lists presets with their YAML, the library, the samples and the 
   expect(new Map(data.library.models).get('wan22-i2v-a14b-fun-camera')?.workflow).toBe('workflows/wan22-fun-camera.api.json');
   expect(new Map(data.library.templates).has('workflows/wan22-fun-camera.api.json')).toBe(true);
   expect(data.library.lock.length).toBeGreaterThan(0);
+  expect(data.library.lock.filter(([, entry]) => entry.extension)).toEqual([]);
   expect(data.samples).toEqual([
     {
       id: 'landscape-a',

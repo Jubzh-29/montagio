@@ -78,9 +78,11 @@ function pickOutput(outputs: Output[], kind: OutputKind, node?: string): Output 
 
 /**
  * Backend "local": the open-weights workflows run on a ComfyUI reached through
- * comfy-api-proxy, with @comfyorg/sdk. It keeps no job state of its own: `get`
- * reads the job back from the proxy by id, so a restarted app finds a render that
- * kept going on the pod.
+ * comfy-api-proxy, with @comfyorg/sdk. The proxy holds the jobs: `get` reads a job
+ * back by id, so a restarted app finds a render that kept going on the pod. The
+ * backend only remembers the output each job it submitted delivers (video, image or
+ * audio), until an idempotency window after `get` read the job's end; a restarted
+ * app, or a poll after that, passes it to `get`.
  */
 export class ComfyBackend implements GenerationBackend {
   readonly kind = 'local' as const;
@@ -89,8 +91,11 @@ export class ComfyBackend implements GenerationBackend {
   private readonly submissions = new Map<string, { at: number; pending: Promise<{ backendJobId: string }> }>();
   /** Downloads in flight, by job id: once a clip is on disk, the file is the record. */
   private readonly downloads = new Map<string, Promise<string>>();
-  /** The output each job submitted here delivers; a restarted app passes it to `get` instead. */
-  private readonly wanted = new Map<string, OutputWanted>();
+  /**
+   * The output each job submitted here delivers, and when `get` first read its end. Kept an
+   * idempotency window past that end, so a second tab polling late still gets the right file.
+   */
+  private readonly wanted = new Map<string, { want: OutputWanted; endedAt: number | null }>();
 
   constructor(
     private readonly opts: {
@@ -110,6 +115,9 @@ export class ComfyBackend implements GenerationBackend {
     // Past the window the web layer treats a reused key as a new request: so does the backend.
     for (const [key, entry] of this.submissions) {
       if (now - entry.at >= IDEMPOTENCY_WINDOW_MS) this.submissions.delete(key);
+    }
+    for (const [id, entry] of this.wanted) {
+      if (entry.endedAt !== null && now - entry.endedAt >= IDEMPOTENCY_WINDOW_MS) this.wanted.delete(id);
     }
     const known = this.submissions.get(job.idempotencyKey);
     if (known) return known.pending;
@@ -138,11 +146,19 @@ export class ComfyBackend implements GenerationBackend {
     if (!isJobId(submitted.id)) {
       throw new BackendError('backend-error', false, `the proxy returned an unusable job id ${JSON.stringify(submitted.id)}`);
     }
-    this.wanted.set(submitted.id, { output: job.output ?? 'video', ...(job.outputNode ? { outputNode: job.outputNode } : {}) });
+    const want: OutputWanted = { output: job.output ?? 'video', ...(job.outputNode ? { outputNode: job.outputNode } : {}) };
+    this.wanted.set(submitted.id, { want, endedAt: null });
     return { backendJobId: submitted.id };
   }
 
   async get(id: string, want?: OutputWanted): Promise<BackendJob> {
+    const job = await this.read(id, want);
+    const entry = this.wanted.get(id);
+    if (entry && entry.endedAt === null && job.state !== 'queued' && job.state !== 'running') entry.endedAt = this.opts.now?.() ?? Date.now();
+    return job;
+  }
+
+  private async read(id: string, want?: OutputWanted): Promise<BackendJob> {
     if (!isJobId(id)) return lost(id);
     let job: Job;
     try {
@@ -168,7 +184,7 @@ export class ComfyBackend implements GenerationBackend {
       case 'expired':
         return { id, state: 'failed', progress, error: 'expired' };
       case 'succeeded': {
-        const wanted = want ?? this.wanted.get(id) ?? {};
+        const wanted = want ?? this.wanted.get(id)?.want ?? {};
         const kind = wanted.output ?? 'video';
         const result = pickOutput(job.outputs, kind, wanted.outputNode);
         if (!result) return { id, state: 'failed', progress: 1, error: 'no-output' };

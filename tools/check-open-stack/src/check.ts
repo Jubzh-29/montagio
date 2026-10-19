@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { LibraryError, loadLibrary, type Library } from '@montagio/presets';
 import { ALLOWED_WEIGHT_LICENSES, parseLock, type LockEntry } from '@montagio/registry';
 import { parse as parseYaml } from 'yaml';
+import { z } from 'zod';
 
 export type Violation = {
   rule: 'weight-license' | 'weight-source' | 'weight-file' | 'node-not-allowed' | 'forbidden-pattern' | 'closed-package' | 'library';
@@ -264,43 +265,98 @@ async function sourceDirs(root: string): Promise<string[]> {
   return dirs;
 }
 
+/**
+ * A refused repository; its `repo` may hold `*`, which stands for any run of characters but `/`.
+ * Hugging Face names are compared without case, as its URLs are.
+ */
+function deniedEntry(denied: readonly { repo: string; reason: string }[], repo: string) {
+  return denied.find(({ repo: pattern }) => {
+    const parts = pattern.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
+    return new RegExp(`^${parts.join('[^/]*')}$`, 'i').test(repo);
+  });
+}
+
 /** allowed-sources.yaml: the Hugging Face repositories a lock weight may come from, and those it never may. */
-type AllowedSources = {
-  sources: { repo: string; license: string; role: 'source' | 'mirror'; revision: string; license_file: boolean; note?: string }[];
-  denied: { repo: string; reason: string }[];
-};
+const AllowedSourcesSchema = z
+  .object({
+    schema: z.literal('montagio/allowed-sources@0.1'),
+    sources: z.array(
+      z
+        .object({
+          repo: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'must be <owner>/<repo>, without *'),
+          license: z.enum(ALLOWED_WEIGHT_LICENSES),
+          role: z.enum(['source', 'mirror']),
+          revision: z.string().regex(/^[0-9a-f]{8,40}$/, 'must be the commit read, 8 to 40 hex digits'),
+          license_file: z.boolean(),
+          note: z.string().min(1).optional(),
+        })
+        .strict(),
+    ),
+    denied: z.array(
+      z
+        .object({
+          repo: z.string().regex(/^[\w.*-]+\/[\w.*-]+$/, 'must be <owner>/<repo>, where * stands for any run of characters'),
+          reason: z.string().min(1),
+        })
+        .strict(),
+    ),
+  })
+  .strict()
+  .superRefine((list, ctx) => {
+    const seen = new Map<string, string>();
+    list.sources.forEach(({ repo }, index) => {
+      const first = seen.get(repo.toLowerCase());
+      if (first) ctx.addIssue({ code: 'custom', path: ['sources', index, 'repo'], message: `${first} is listed twice` });
+      else seen.set(repo.toLowerCase(), repo);
+      const denied = deniedEntry(list.denied, repo);
+      if (denied) ctx.addIssue({ code: 'custom', path: ['sources', index, 'repo'], message: `${repo} is both listed and refused (${denied.repo})` });
+    });
+  });
+
+type AllowedSources = z.infer<typeof AllowedSourcesSchema>;
+
+/** allowed-sources.yaml, or the problems ("<path>: <message>") that keep it from being used. */
+async function readAllowedSources(path: string): Promise<{ list: AllowedSources } | { problems: string[] }> {
+  const text = await readFile(path, 'utf8');
+  let raw: unknown;
+  try {
+    raw = parseYaml(text);
+  } catch (error) {
+    return { problems: [`invalid YAML (${(error as Error).message})`] };
+  }
+  const result = AllowedSourcesSchema.safeParse(raw);
+  if (result.success) return { list: result.data };
+  return {
+    problems: result.error.issues.map((issue) => {
+      const keys = 'keys' in issue && Array.isArray(issue.keys) ? `.${issue.keys.join(',')}` : '';
+      return `${issue.path.join('.') || '(root)'}${keys}: ${issue.message}`;
+    }),
+  };
+}
 
 /** "<owner>/<repo>" of a Hugging Face URL, whether it names the repository or a file in it. */
 function hfRepo(url: string): string | null {
   return /^https:\/\/huggingface\.co\/([^/]+\/[^/?#]+)/.exec(url)?.[1] ?? null;
 }
 
-/** A refused repository; its `repo` may hold `*`, which stands for any run of characters but `/`. */
-function deniedEntry(sources: AllowedSources, repo: string) {
-  return sources.denied.find(({ repo: pattern }) => {
-    const parts = pattern.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
-    return new RegExp(`^${parts.join('[^/]*')}$`).test(repo);
-  });
-}
-
 /**
  * A lock entry is fetched from its url and licensed by its source: the url's repository must be
  * listed (a mirror or a source) and not refused, the source must be listed as a source, and the
- * lock's license must be the source's (a mirror never changes it).
+ * lock's license must be the source's (a mirror never changes it). Names are compared without case.
  */
 function weightSourceProblems(lock: LockEntry[], sources: AllowedSources): string[] {
   const problems: string[] = [];
-  const listed = new Map(sources.sources.map((source) => [source.repo, source]));
+  const listed = new Map(sources.sources.map((source) => [source.repo.toLowerCase(), source]));
   const unknown = 'an unknown source repo (list it in allowed-sources.yaml with the license read at the source)';
   for (const entry of lock) {
     const fetched = hfRepo(entry.url);
-    const denied = fetched ? deniedEntry(sources, fetched) : undefined;
+    const denied = fetched ? deniedEntry(sources.denied, fetched) : undefined;
     if (denied) problems.push(`${entry.id} is fetched from ${fetched}, a refused repository: ${denied.reason}`);
-    else if (!fetched || !listed.has(fetched)) problems.push(`${entry.id} is fetched from ${fetched ?? entry.url}, ${unknown}`);
+    else if (!fetched || !listed.has(fetched.toLowerCase())) problems.push(`${entry.id} is fetched from ${fetched ?? entry.url}, ${unknown}`);
 
     const named = hfRepo(entry.source);
-    const source = named ? listed.get(named) : undefined;
-    const deniedSource = named ? deniedEntry(sources, named) : undefined;
+    const source = named ? listed.get(named.toLowerCase()) : undefined;
+    const deniedSource = named ? deniedEntry(sources.denied, named) : undefined;
     if (deniedSource) problems.push(`${entry.id} names ${named} as its source, a refused repository: ${deniedSource.reason}`);
     else if (!source) problems.push(`${entry.id} names ${named ?? entry.source} as its source, ${unknown}`);
     else if (source.role !== 'source') problems.push(`${entry.id} names the mirror ${named} as its source; name the repository the weights were published in`);
@@ -347,8 +403,14 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
   }
 
   // Weight sources: the repository each file is fetched from, and the one its license is read from.
-  const sources = await readYaml<AllowedSources>(join(configDir, 'allowed-sources.yaml'));
-  for (const detail of weightSourceProblems(lock, sources)) violations.push({ rule: 'weight-source', file: lockFile, detail });
+  // A broken allowed-sources.yaml is a violation of its own, and no weight is checked against it.
+  const sourcesFile = join(configDir, 'allowed-sources.yaml');
+  const sources = await readAllowedSources(sourcesFile);
+  if ('problems' in sources) {
+    for (const detail of sources.problems) violations.push({ rule: 'weight-source', file: relative(root, sourcesFile), detail });
+  } else {
+    for (const detail of weightSourceProblems(lock, sources.list)) violations.push({ rule: 'weight-source', file: lockFile, detail });
+  }
 
   // Weight files actually loaded: every file a workflow node or a preset LoRA
   // names must be a lock entry (whose license was checked above) and, for a

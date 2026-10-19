@@ -27,7 +27,7 @@ import { Comfy, type Job, type WorkflowGraph } from '@comfyorg/sdk';
 import { CAMERA_POSE_VALUES, compileJob, loadLibrary, pickAspect, type ApiWorkflow, type Aspect, type Library, type Resolution } from '@montagio/presets';
 import { probe, probeAudio } from '@montagio/sequence';
 import { imageSize } from 'image-size';
-import { EXTENSION_JOBS, extensionJobs, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
+import { EXTENSION_JOBS, extensionJobs, jobTexts, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
 import { imageFingerprint } from './lib/image';
 import { assertLocalBaseUrl, cameraMove, checkWorkflow, comboOptions, guardFetch, VramSampler, type ObjectInfo, type VramStats } from './lib/comfy';
 
@@ -66,7 +66,7 @@ const { values: args } = parseArgs({
     look: { type: 'string' },
     clip: { type: 'string' },
     audio: { type: 'string' },
-    text: { type: 'string' },
+    text: { type: 'string', multiple: true, default: [] },
     language: { type: 'string', default: 'en' },
     duration: { type: 'string', default: '10' },
     help: { type: 'boolean', default: false },
@@ -103,7 +103,9 @@ Extensions (instead of presets):
   --look LOOK        a look of the edit job: infl8, action or angles
   --clip PATH        the clip to upscale (required by upscale)
   --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
-  --text TEXT        the music description, the edit instruction, the effect's subject or the words to say (each has a default)
+  --text [JOB=]TEXT  the edit instruction, the effects' subject, the words to say or the music description (each has
+                     a default), for the one job of the run that reads a text; when several do, name it:
+                     --text edit=… --text effect=… --text voice=… --text music=… (repeatable)
   --language en|fr   the language of the voice (default en)
   --duration S       music: the length of the film it goes under (default 10)`);
   process.exit(0);
@@ -417,18 +419,26 @@ async function runExtensions(
   // Without an end frame, the transition ends on the hook's edit: the edit runs first.
   const chainedHook = names.includes('transition') && !args.end;
   if (chainedHook && !names.includes('hook-edit')) names.splice(names.indexOf('transition'), 0, 'hook-edit');
+  // Each text feeds one job (the voice, for an avatar that speaks its output).
+  const text = jobTexts(args.text, names);
 
   const input = args.input ? fromCaller(args.input) : join(repoRoot, 'demo-assets', 'images', 'sample-16x9.png');
   const input2 = args.input2 ? fromCaller(args.input2) : undefined;
   let end = args.end ? fromCaller(args.end) : undefined;
   const clip = args.clip ? fromCaller(args.clip) : undefined;
+  // The photo sizes the jobs that read it; the clip to upscale is probed on its own, so that
+  // "--extension all" never upscales it to the photo's aspect nor past the model's frame limit.
   let aspect: Aspect = '16:9';
   if (names.some((name) => name !== 'voice' && name !== 'music' && name !== 'upscale')) {
     const { width, height } = imageSize(await readFile(input));
     aspect = pickAspect(width, height);
-  } else if (clip) {
-    const { width, height } = await probe(clip);
-    aspect = pickAspect(width, height);
+  }
+  let clipAspect: Aspect | undefined;
+  let clipFrames: number | undefined;
+  if (clip && names.includes('upscale')) {
+    const { width, height, duration_s, fps } = await probe(clip);
+    clipAspect = pickAspect(width, height);
+    clipFrames = Math.round(duration_s * fps);
   }
   let audio = args.audio ? fromCaller(args.audio) : undefined;
   let audio_s = audio ? (await probeAudio(audio))?.duration_s : undefined;
@@ -443,9 +453,11 @@ async function runExtensions(
     fast: !args.quality,
     look: args.look,
     clip,
+    clipAspect,
+    clipFrames,
     audio: audio ?? (args['dry-run'] ? 'speech.flac' : undefined),
     audio_s: audio_s ?? (args['dry-run'] ? 5 : undefined),
-    text: args.text,
+    text,
     language: args.language as 'en' | 'fr',
     duration_s,
     seed: Number.parseInt(args.seed, 10) || 0,

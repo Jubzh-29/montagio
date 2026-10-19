@@ -187,7 +187,7 @@ Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`)
 
 L'avatar, les effets et les transitions réutilisent aussi `umt5-xxl-fp8` et `wan21-vae`, déjà au lock pour les presets (même sha256) et donc sans marque `extension`. Les LoRA posées à la racine de leur dépôt portent `folder: loras` au lock, pour que l'installeur sache où les ranger.
 
-Édition : 31,9 Go (le bf16, 40,9 Go, n'est pas retenu). Effets : 20,6 Go. Transitions : 31,0 Go. Avatar : 18,25 Go, plus la voix, 3,2 Go, dans le dossier `models/tts/chatterbox/resembleai-mtl-v3` que le lock nomme (`folder:`). Musique : 10,0 Go. Upscale : 3,96 Go. Au total, le lock compte 43 fichiers et 188,7 Go (175,7 Gio), dont 69,7 Go pour les presets ; `fetch-weights --lock-from-hf` en redonne un patch vide.
+Édition : 31,9 Go (le bf16, 40,9 Go, n'est pas retenu). Effets : 20,6 Go. Transitions : 31,0 Go. Avatar : 18,25 Go, plus la voix, 3,2 Go, dans le dossier `models/tts/chatterbox/resembleai-mtl-v3` que le lock nomme (`folder:`). Musique : 10,0 Go. Upscale : 3,96 Go. Au total, le lock compte 43 fichiers et 188,6 Go (175,7 Gio), dont 69,7 Go pour les presets ; `fetch-weights --lock-from-hf` en redonne un patch vide.
 
 Le tokenizer de la voix est un petit fichier que Hugging Face garde hors LFS : l'API ne publie que son identifiant git (SHA-1). Son sha256 a été calculé sur le fichier (70 Ko, pas un poids). Le lock porte les deux ; `fetch-weights` compare l'identifiant git avant le téléchargement, puis le sha256 après.
 

@@ -87,6 +87,18 @@ describe('the library checks each effect against its model and the lock', () => 
     );
   });
 
+  test.each(['wan21-i2v-480p-14b-fp8', 'clip-vision-h', 'wan21-vae'])('a weight of the model outside folder loras (%s)', async (id) => {
+    expect(await problemsOf({ 'presets/effects/squish.yaml': squish().replace('lora: remade-squish', `lora: ${id}`) })).toMatch(
+      new RegExp(`effect squish: LoRA "${id}" is not in folder loras`),
+    );
+  });
+
+  test('the 4-step LoRA of the model', async () => {
+    expect(await problemsOf({ 'presets/effects/squish.yaml': squish().replace('lora: remade-squish', 'lora: lightx2v-wan21-i2v-480p-4step') })).toMatch(
+      /effect squish: LoRA "lightx2v-wan21-i2v-480p-4step" is the 4-step LoRA of model wan21-i2v-effects, not an effect/,
+    );
+  });
+
   test('a model of another task, or an unknown one', async () => {
     expect(await problemsOf({ 'presets/effects/squish.yaml': squish().replace('preferred: wan21-i2v-effects', 'preferred: qwen-image-edit-2511') })).toMatch(
       /effect squish: model qwen-image-edit-2511 runs task i2i-edit, not i2v-effect/,
@@ -163,6 +175,26 @@ describe('compileEffect (Wan 2.1 I2V 480p + an effect LoRA)', () => {
 
   test("a preset without a negative keeps the template's", () => {
     expect(compile().workflow['7']!.inputs.text).toBe(fx().template['7']!.inputs.text);
+  });
+
+  test('a subject over the max_chars of the model is refused before any GPU', () => {
+    expect(() => compile('squish', { subject: 'x'.repeat(121) })).toThrow(/the subject has 121 characters, over the 120 of model wan21-i2v-effects/);
+    expect(compile('squish', { subject: 'x'.repeat(120) }).params.prompt).toContain('x'.repeat(120));
+  });
+
+  const withLora = (lora: string) => ({ ...lib.effects.get('squish')!, effect: { ...lib.effects.get('squish')!.effect, lora } });
+  const compileWith = (lora: string) => () => compileEffect(withLora(lora), fx().model, fx().template, { imageRef: 'start.png', seed: 1, aspect: '16:9' }, lib.lock);
+
+  test('a LoRA outside the model is refused', () => {
+    expect(compileWith('systms-infl8-qwen-edit-2511')).toThrow(CompileError);
+    expect(compileWith('systms-infl8-qwen-edit-2511')).toThrow(/LoRA "systms-infl8-qwen-edit-2511" is not a weight of model wan21-i2v-effects/);
+  });
+
+  test('a weight of the model that is not an effect LoRA is refused: the base model, the 4-step LoRA', () => {
+    expect(compileWith('wan21-i2v-480p-14b-fp8')).toThrow(CompileError);
+    expect(compileWith('wan21-i2v-480p-14b-fp8')).toThrow(/LoRA "wan21-i2v-480p-14b-fp8" is not in folder loras/);
+    expect(compileWith('lightx2v-wan21-i2v-480p-4step')).toThrow(CompileError);
+    expect(compileWith('lightx2v-wan21-i2v-480p-4step')).toThrow(/is the 4-step LoRA of model wan21-i2v-effects/);
   });
 
   test('an effect made for another model is refused', () => {

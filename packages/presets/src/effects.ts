@@ -27,8 +27,28 @@ export type EffectInputs = {
 };
 
 /**
- * A one-photo effect: the preset's LoRA (a weight of the effects model, its file read from
- * the lock) and its prompt template with the subject, on Wan 2.1 I2V at 480p and 16 fps.
+ * Why the LoRA an effect names cannot be its effect, or null. It must be a weight of the effects
+ * model that ComfyUI finds in models/loras (the lock's `folder`, or the URL's last folder): not
+ * the base model, its encoders or VAE, and not the 4-step LoRA the template already loads.
+ */
+export function effectLoraProblem(
+  preset: EffectPreset,
+  model: ExtensionModel,
+  template: ApiWorkflow | undefined,
+  lock: ReadonlyMap<string, LockEntry>,
+): string | null {
+  const id = preset.effect.lora;
+  const entry = lock.get(id);
+  if (!entry || !model.weights.includes(id)) return `LoRA "${id}" is not a weight of model ${model.id}`;
+  const folder = entry.folder ?? new URL(entry.url).pathname.split('/').at(-2);
+  if (folder !== 'loras') return `LoRA "${id}" is not in folder loras (${folder}): it is not a LoRA`;
+  if (template?.[EFFECT_NODES.speed]?.inputs.lora_name === entry.file) return `LoRA "${id}" is the 4-step LoRA of model ${model.id}, not an effect`;
+  return null;
+}
+
+/**
+ * A one-photo effect: the preset's LoRA (see effectLoraProblem, its file read from the lock)
+ * and its prompt template with the subject, on Wan 2.1 I2V at 480p and 16 fps.
  */
 export function compileEffect(
   preset: EffectPreset,
@@ -40,8 +60,9 @@ export function compileEffect(
   if (model.task !== 'i2v-effect') throw new CompileError(`model ${model.id} runs task ${model.task}, not i2v-effect`);
   if (preset.models.preferred !== model.id) throw new CompileError(`effect ${preset.id} runs on model ${preset.models.preferred}, not ${model.id}`);
   requireNodes(model, template, Object.values(EFFECT_NODES));
-  const lora = lock.get(preset.effect.lora);
-  if (!lora || !model.weights.includes(lora.id)) throw new CompileError(`effect ${preset.id}: LoRA ${preset.effect.lora} is not a weight of model ${model.id}`);
+  const problem = effectLoraProblem(preset, model, template, lock);
+  if (problem) throw new CompileError(`effect ${preset.id}: ${problem}`);
+  const lora = lock.get(preset.effect.lora)!;
 
   const subject = (inputs.subject ?? preset.prompt.subject).trim();
   if (!subject) throw new CompileError('the subject is empty');

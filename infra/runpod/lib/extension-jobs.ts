@@ -37,6 +37,10 @@ const TASKS: Record<ExtensionJobName, ExtensionTask> = {
   upscale: 'v2v-upscale',
 };
 
+/** The jobs that read a text: the edit instruction, the effects' subject, the words to say, the music description. */
+export const TEXT_JOBS = ['edit', 'effect', 'voice', 'music'] as const satisfies readonly ExtensionJobName[];
+export type TextJobName = (typeof TEXT_JOBS)[number];
+
 const DEFAULT_TEXT: Record<'music' | 'edit' | 'voice', string> = {
   music: 'calm cinematic piano, slow strings',
   edit: 'make it a rainy night scene',
@@ -54,18 +58,20 @@ export type ExtensionJobOptions = {
   input2?: string;
   /** The end frame of a transition run on its own (a hook's edit output otherwise). */
   end?: string;
-  /** The clip to upscale. */
+  /** The clip to upscale, with its aspect and frame count (the caller probes it): its own, never the photo's. */
   clip?: string;
+  clipAspect?: Aspect;
+  clipFrames?: number;
   /** The speech of avatar, and its length in seconds (the caller reads it). */
   audio?: string;
   audio_s?: number;
-  /** The music description, the edit instruction, the effect's subject or the words to say; each job has a default. */
-  text?: string;
+  /** The text of each job that reads one, read by that job only; a job given none keeps its default. */
+  text?: Partial<Record<TextJobName, string>>;
   language: 'en' | 'fr';
   /** Music: the length of the film it goes under. */
   duration_s: number;
   seed: number;
-  /** The aspect of the input (upscale target, effect, transition and avatar size). */
+  /** The aspect of the photo (effect, transition and avatar size). */
   aspect: Aspect;
   /** The effect presets to run (every one when absent). */
   effects?: readonly string[];
@@ -108,13 +114,33 @@ function known<T>(map: Map<string, T>, id: string, what: string): T {
   return value;
 }
 
+/**
+ * The texts of smoke --text, each for one job of the run: "music=calm piano" names its job, a
+ * bare text goes to the one job of the run that reads a text. A bare text is refused when
+ * several do, since it would feed them all (the edit instruction becoming the effects' subject).
+ */
+export function jobTexts(values: readonly string[], jobs: readonly ExtensionJobName[]): Partial<Record<TextJobName, string>> {
+  const readers = TEXT_JOBS.filter((job) => jobs.includes(job));
+  const texts: Partial<Record<TextJobName, string>> = {};
+  for (const value of values) {
+    const named = TEXT_JOBS.find((job) => value.startsWith(`${job}=`));
+    if (named && !readers.includes(named)) throw new Error(`--text ${named}=…: the ${named} job is not part of this run`);
+    if (!named && readers.length === 0) throw new Error(`--text "${value}": no job of this run reads a text`);
+    if (!named && readers.length > 1) throw new Error(`--text "${value}": ${readers.join(', ')} read a text: name the job, as in --text ${readers[0]}="${value}"`);
+    const job = named ?? readers[0]!;
+    if (texts[job] !== undefined) throw new Error(`--text: two texts for the ${job} job`);
+    texts[job] = named ? value.slice(named.length + 1) : value;
+  }
+  return texts;
+}
+
 /** Compile the jobs asked for; a file a job needs and was not given fails before anything runs. */
 export function extensionJobs(library: Library, opts: ExtensionJobOptions): ExtensionJob[] {
   return opts.jobs.flatMap((name): ExtensionJob[] => {
     const model = [...library.extensionModels.values()].find((m) => m.task === TASKS[name]);
     if (!model) throw new Error(`no extension model runs task ${TASKS[name]} (job ${name})`);
     const template = library.extensionTemplates.get(model.workflow)!;
-    const text = (key: keyof typeof DEFAULT_TEXT) => opts.text?.trim() || DEFAULT_TEXT[key];
+    const text = (key: keyof typeof DEFAULT_TEXT) => opts.text?.[key]?.trim() || DEFAULT_TEXT[key];
     const file = (key: ExtensionBindingKey, path: string) => ({ ...fileInput(model, key), path });
     const fast = opts.fast ?? true;
     switch (name) {
@@ -130,7 +156,8 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
         return (opts.effects ?? [...library.effects.keys()]).map((id) => {
           const effect = known(library.effects, id, 'effect');
           const effectModel = known(library.extensionModels, effect.models.preferred, 'effect model');
-          const inputs = { imageRef: basename(photo), seed: opts.seed, aspect: opts.aspect, fast, ...(opts.text?.trim() ? { subject: opts.text } : {}) };
+          const subject = opts.text?.effect?.trim();
+          const inputs = { imageRef: basename(photo), seed: opts.seed, aspect: opts.aspect, fast, ...(subject ? { subject } : {}) };
           const job = compileEffect(effect, effectModel, library.extensionTemplates.get(effectModel.workflow)!, inputs, library.lock);
           return { name, tag: `${name}:${id}`, model: effectModel, ...job, files: [{ ...fileInput(effectModel, 'image'), path: photo }] };
         });
@@ -172,7 +199,8 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
       }
       case 'upscale': {
         const clip = need(opts.clip, '--clip', name);
-        const job = compileUpscale(model, template, { videoRef: basename(clip), aspect: opts.aspect, seed: opts.seed });
+        if (opts.clipAspect === undefined || opts.clipFrames === undefined) throw new Error('the upscale job needs the aspect and the frame count of its clip');
+        const job = compileUpscale(model, template, { videoRef: basename(clip), aspect: opts.clipAspect, frames: opts.clipFrames, seed: opts.seed });
         return [{ name, tag: name, model, ...job, files: [file('video', clip)] }];
       }
     }

@@ -235,6 +235,18 @@ function streamsOf(media: string): { video: { duration: number; frames: number }
   };
 }
 
+test.each<[string, { gainDb?: number; fadeOut_s?: number }, RegExp]>([
+  ['gainDb NaN', { gainDb: Number.NaN }, /gainDb NaN is not a number of decibels/],
+  ['gainDb Infinity', { gainDb: Number.POSITIVE_INFINITY }, /gainDb Infinity is not a number of decibels/],
+  ['fadeOut_s -1', { fadeOut_s: -1 }, /fadeOut_s -1 is not a number of seconds above 0/],
+  ['fadeOut_s 0', { fadeOut_s: 0 }, /fadeOut_s 0 is not a number of seconds above 0/],
+  ['fadeOut_s NaN', { fadeOut_s: Number.NaN }, /fadeOut_s NaN is not a number of seconds above 0/],
+])('mixMusic refuses %s before FFmpeg runs', async (_case, opts, message) => {
+  const mix = () => mixMusic(join(dir, 'no-film.mp4'), join(dir, 'no-music.flac'), join(dir, 'never.mp4'), opts);
+  await expect(mix()).rejects.toThrow(SequenceToolError);
+  await expect(mix()).rejects.toThrow(message);
+});
+
 describe('mixMusic and the 9:16 cut with music', () => {
   beforeAll(() => {
     for (const [out, seconds] of [[music5, 5], [music1, 1]] as const) {

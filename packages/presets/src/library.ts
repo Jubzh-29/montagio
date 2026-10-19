@@ -12,6 +12,7 @@ import {
   type ModelEntry,
 } from '@montagio/registry';
 import type { ApiWorkflow } from './compile';
+import { effectLoraProblem } from './effects';
 import { parseEffectPreset, parsePreset, parseTransitionPreset } from './parse';
 import type { EffectPreset, Preset, TransitionPreset } from './schema';
 
@@ -254,7 +255,10 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
     const model = extensionModels.get(effect.models.preferred);
     if (!model) problems.push(`effect ${effect.id}: unknown effect model "${effect.models.preferred}"`);
     else if (model.task !== 'i2v-effect') problems.push(`effect ${effect.id}: model ${model.id} runs task ${model.task}, not i2v-effect`);
-    else if (!model.weights.includes(effect.effect.lora)) problems.push(`effect ${effect.id}: LoRA "${effect.effect.lora}" is not a weight of model ${model.id}`);
+    else {
+      const problem = effectLoraProblem(effect, model, extensionTemplates.get(model.workflow), lock);
+      if (problem) problems.push(`effect ${effect.id}: ${problem}`);
+    }
     if (!(await exists(join(effectsDir, ...effect.preview.split('/'))))) {
       warnings.push(`effect ${effect.id}: preview ${effect.preview} not found yet`);
     }
