@@ -7,7 +7,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { LibraryError, loadLibrary } from './library';
-import { validatePreset } from './validate';
+import { validatePresetFile } from './validate';
 
 export type CliIo = { cwd: string; root: string; out(line: string): void; err(line: string): void };
 
@@ -76,16 +76,18 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
   }
 
   let failed = false;
-  // loadLibrary refuses a folder where two files share a preset id: so does the check.
+  // loadLibrary refuses a folder where two files share a preset id: so does the check. Camera
+  // presets, effects and hooks live in their own folders, so an id is unique per capability.
   const ids = new Map<string, string>();
   for (const file of files) {
     const read = await readPresetText(file.path);
-    const result = 'text' in read ? validatePreset(read.text, file.shown, library) : { ok: false as const, problems: [read.problem] };
+    const result = 'text' in read ? validatePresetFile(read.text, file.shown, library) : { ok: false as const, problems: [read.problem] };
     const problems = result.ok ? [] : result.problems;
     if (result.ok) {
-      const other = ids.get(result.preset.id);
+      const key = `${result.preset.capability}:${result.preset.id}`;
+      const other = ids.get(key);
       if (other) problems.push(`id: duplicate preset id "${result.preset.id}" (also in ${other})`);
-      else ids.set(result.preset.id, file.shown);
+      else ids.set(key, file.shown);
     }
     if (problems.length === 0) {
       io.out(`✓ ${file.shown}`);

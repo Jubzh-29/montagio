@@ -24,7 +24,7 @@ export {
   type JobInputs,
 } from './compile';
 export { loadLibrary, LibraryError, type Library } from './library';
-export { validatePreset, type PresetValidation } from './validate';
+export { validatePreset, validatePresetFile, type PresetFileValidation, type PresetValidation } from './validate';
 export {
   AVATAR_DEFAULT_PROMPT,
   bindExtension,

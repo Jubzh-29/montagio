@@ -94,6 +94,22 @@ test('two files with the same preset id fail, as the app library would', async (
   expect(lines).toEqual([`✓ ${first}`, `✗ ${second}`, `  - id: duplicate preset id "crash-push" (also in ${first})`]);
 });
 
+test('the effects and the hooks are each read with the schema of their capability', async () => {
+  const effects = join(repoRoot(), 'presets', 'effects');
+  const hooks = join(repoRoot(), 'presets', 'transitions');
+  expect(await runCli(['preset', 'validate', effects, hooks], io)).toBe(0);
+  expect(lines).toHaveLength(10);
+  expect(lines.every((line) => line.startsWith('✓ '))).toBe(true);
+});
+
+test('a camera preset and an effect may share an id: the library keeps them apart', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'montagio-cli-kinds-'));
+  const effect = join(dir, 'crash-push-fx.yaml');
+  writeFileSync(effect, readFileSync(join(repoRoot(), 'presets', 'effects', 'squish.yaml'), 'utf8').replace('id: squish', 'id: crash-push'));
+  expect(await runCli(['preset', 'validate', good, effect], io)).toBe(0);
+  expect(lines).toEqual([`✓ ${good}`, `✓ ${effect}`]);
+});
+
 test('a file named twice is validated once', async () => {
   expect(await runCli(['preset', 'validate', good, good], io)).toBe(0);
   expect(lines).toEqual([`✓ ${good}`]);
