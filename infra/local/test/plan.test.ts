@@ -114,6 +114,12 @@ test('a ComfyUI folder Montagio did not install is refused', () => {
   );
 });
 
+test('a real custom_nodes/montagio folder is refused by the plan, as the run refuses it', () => {
+  // readLink gives the link's own path when it is a folder, not a link.
+  expect(() => buildPlan(installed({ packTarget: L.packLink }))).toThrow(/is a folder, not a link to .*comfy-nodes: move it away/);
+  expect(() => buildPlan(installed({ packTarget: L.packLink.toUpperCase() }))).toThrow(/is a folder/);
+});
+
 test('a clone left half done is removed first, then cloned again', () => {
   const comfy = step(buildPlan(fresh({ comfy: { head: null, exists: false, tmpExists: true } })), 'comfyui');
   expect(comfy.detail[0]).toContain(`remove ${L.comfyTmp}`);

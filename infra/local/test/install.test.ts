@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -171,6 +171,16 @@ test('dry run executes nothing and writes nothing', async () => {
   }
   expect(out).toContain(`git clone --depth 1 --branch v0.41.0 https://github.com/Comfy-Org/ComfyUI.git ${h.L.comfyTmp}`);
   expect(out).toContain('nothing was changed');
+});
+
+test('the dry run refuses a real custom_nodes/montagio folder, as the real run does', async () => {
+  await install(repo, options({ start: false }), harness().deps);
+  const h = harness();
+  unlinkSync(h.L.packLink);
+  mkdirSync(h.L.packLink);
+  expect(await install(repo, options({ dryRun: true }), h.deps)).toBe(2);
+  expect(h.output()).toContain(`${h.L.packLink} is a folder, not a link`);
+  expect(h.output()).not.toContain('[run]');
 });
 
 test('a 4 GB GPU: the dry run points to --app-only and exits 2', async () => {

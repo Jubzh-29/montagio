@@ -40,7 +40,7 @@ export type PlanInput = {
   weightStat: (weight: LockWeight) => FileStat | null;
   /** head: the commit of layout.comfyDir (null if absent or unreadable); tmpExists: an interrupted clone is left. */
   comfy: { head: string | null; exists: boolean; tmpExists: boolean };
-  /** Where custom_nodes/montagio points today, null if it does not exist. */
+  /** Where custom_nodes/montagio points today: null if it does not exist, its own path if it is a real folder. */
   packTarget: string | null;
   /** What the stamps stand for is still there: the venv Python, the proxy launcher, the app build (BUILD_ID). */
   artifacts: { comfyPython: boolean; proxyExe: boolean; appBuild: boolean };
@@ -206,6 +206,10 @@ export function buildPlan(input: PlanInput): Step[] {
     });
 
     const packDir = path.join(input.repoRoot, 'comfy-nodes');
+    // The run never replaces a real folder: the dry run says so too, instead of a [run].
+    if (samePath(input.packTarget, L.packLink, os)) {
+      throw new Error(`${L.packLink} is a folder, not a link to ${packDir}: move it away, then run the same command again`);
+    }
     const linked = samePath(input.packTarget, packDir, os);
     add({
       id: 'node-pack',
