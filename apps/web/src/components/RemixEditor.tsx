@@ -50,9 +50,15 @@ export function RemixEditor({
   const { t } = useI18n();
   return (
     <section id="remix-editor" className={styles.panelSection} aria-labelledby="remix-heading">
-      <h2 id="remix-heading" className={styles.sectionTitle}>
-        {t('remixTitle', { name: baseName })}
-      </h2>
+      <div className={styles.sectionHead}>
+        <h2 id="remix-heading" className={styles.sectionTitle}>
+          {t('remixTitle', { name: baseName })}
+        </h2>
+        <button type="button" className={styles.toolButton} onClick={onClose}>
+          <span aria-hidden="true">←</span>
+          {t('remixClose')}
+        </button>
+      </div>
       <label htmlFor="remix-yaml" className={styles.remixLabel}>
         {t('remixYaml')}
       </label>
@@ -83,9 +89,6 @@ export function RemixEditor({
         </button>
         <button type="button" className={styles.buttonGhost} onClick={onReset} disabled={text === original}>
           {t('remixReset')}
-        </button>
-        <button type="button" className={styles.buttonGhost} onClick={onClose}>
-          {t('remixClose')}
         </button>
       </div>
       <div id="remix-status" className={styles.remixStatus} aria-live="polite">

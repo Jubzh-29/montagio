@@ -187,7 +187,8 @@ export function Monitor({
       )}
 
       {(record?.state === 'failed' || record?.state === 'canceled' || generation.status === 'error') && (
-        <div className={styles.monitorNotice} role="alert">
+        // A cancel is the user's own doing: a plain notice. Everything else failed: the error tone.
+        <div className={styles.monitorNotice} role="alert" data-tone={record?.state === 'canceled' ? 'neutral' : 'error'}>
           <p>
             {generation.status === 'error'
               ? generation.message
@@ -206,8 +207,13 @@ export function Monitor({
       )}
 
       {upload.status === 'error' && (
-        <div className={styles.monitorNotice} role="alert">
+        <div className={styles.monitorNotice} role="alert" data-tone="error">
           <p>{upload.message}</p>
+          {acceptsFiles && (
+            <label htmlFor="photo-input" className={styles.buttonSecondary}>
+              {t('chooseAnother')}
+            </label>
+          )}
         </div>
       )}
     </div>

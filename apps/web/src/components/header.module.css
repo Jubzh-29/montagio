@@ -127,6 +127,17 @@
   color: var(--ink);
 }
 
+/* Touch screens: the language buttons and the badge are thumb-sized. */
+@media (pointer: coarse) {
+  .lang {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .badge {
+    min-height: 44px;
+  }
+}
+
 @media (max-width: 640px) {
   .header {
     padding: var(--space-3) var(--space-4);

@@ -21,7 +21,7 @@ import { useShowcase } from '@/lib/use-showcase';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
 import { Monitor, type GenerationState, type TrackedJob, type UploadState } from './Monitor';
-import { PresetGallery } from './PresetGallery';
+import { PresetGallery, type SequenceTiles } from './PresetGallery';
 import { RemixEditor, type RemixCheck } from './RemixEditor';
 import { ShotList } from './ShotList';
 import { ShowcaseFooter } from './ShowcaseFooter';
@@ -91,6 +91,7 @@ export function Studio() {
   const [mode, setMode] = useState<Mode>('single');
   const [presets, setPresets] = useState<PresetSummary[]>([]);
   const [models, setModels] = useState<ModelSummary[]>([]);
+  const [catalog, setCatalog] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [presetId, setPresetId] = useState<string | null>(null);
   const [shots, setShots] = useState<ShotDraft[]>([]);
   const [modelId, setModelId] = useState<string | null>(null);
@@ -119,10 +120,14 @@ export function Studio() {
       .then(([presetList, modelList]) => {
         setPresets(presetList);
         setModels(modelList.filter((model) => model.kind === 'video'));
+        setCatalog('ready');
         setPresetId((current) => current ?? presetList[0]?.id ?? null);
         setModelId((current) => current ?? presetList[0]?.defaultModel ?? null);
       })
-      .catch(() => setJob({ status: 'error', message: t('errorGeneric') }));
+      .catch(() => {
+        setCatalog('failed');
+        setJob({ status: 'error', message: t('errorGeneric') });
+      });
     // t only changes with the language; the catalog is fetched once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -394,6 +399,10 @@ export function Studio() {
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
   const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
   const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
+  const sequenceTiles: SequenceTiles = {
+    shotsOf: (id) => shots.flatMap((shot, index) => (shot.presetId === id ? [index + 1] : [])),
+    nextShot: shots.length < MAX_SHOTS ? shots.length + 1 : null,
+  };
   const repoUrl = showcase?.repoUrl ?? null;
   // The empty monitor plays the move in hand: the preset being remixed, the chosen one, or the last shot added.
   const moveId = remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
@@ -519,13 +528,31 @@ export function Studio() {
               onClose={closeRemix}
             />
           ) : (
-            <PresetGallery
-              presets={presets}
-              selectedId={mode === 'single' ? presetId : null}
-              paused={motionPaused}
-              onPause={setMotionPaused}
-              onSelect={onPreset}
-            />
+            <>
+              {/* The shots come first: what each tile adds stays in sight. */}
+              {mode === 'sequence' && (
+                <ShotList
+                  shots={shots}
+                  presets={presets}
+                  max={MAX_SHOTS}
+                  onRemove={(index) => setShots((current) => current.filter((_, i) => i !== index))}
+                  onPromptChange={(index, text) =>
+                    setShots((current) => current.map((shot, i) => (i === index ? { ...shot, prompt: text } : shot)))
+                  }
+                  promptsDisabled={IS_SHOWCASE}
+                />
+              )}
+              {mode === 'sequence' && IS_SHOWCASE && <p className={styles.hint}>{t('showcaseSequenceNote')}</p>}
+              <PresetGallery
+                presets={presets}
+                catalog={catalog}
+                selectedId={mode === 'single' ? presetId : null}
+                paused={motionPaused}
+                onPause={setMotionPaused}
+                sequence={mode === 'sequence' ? sequenceTiles : undefined}
+                onSelect={onPreset}
+              />
+            </>
           )}
           {mode === 'single' && !remix && (
             <button
@@ -539,21 +566,9 @@ export function Studio() {
               {t('remix')}
             </button>
           )}
-          {mode === 'sequence' && (
-            <ShotList
-              shots={shots}
-              presets={presets}
-              max={MAX_SHOTS}
-              onRemove={(index) => setShots((current) => current.filter((_, i) => i !== index))}
-              onPromptChange={(index, text) =>
-                setShots((current) => current.map((shot, i) => (i === index ? { ...shot, prompt: text } : shot)))
-              }
-              promptsDisabled={IS_SHOWCASE}
-            />
-          )}
-          {mode === 'sequence' && IS_SHOWCASE && <p className={styles.hint}>{t('showcaseSequenceNote')}</p>}
           <ModelPicker
             models={models}
+            loading={catalog === 'loading'}
             selectedId={modelId}
             onSelect={setModelId}
             onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
@@ -595,8 +610,9 @@ export function Studio() {
               </div>
             )}
             {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
-            {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}
           </div>
+          {/* Outside the sticky block: on a phone that block stays one button high over the gallery. */}
+          {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}
         </aside>
       </main>
       <ShowcaseFooter />

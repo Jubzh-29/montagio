@@ -6,15 +6,20 @@ import type { PresetSummary } from '@/lib/api-types';
 import { MoveGlyph } from './MoveGlyph';
 import styles from './studio.module.css';
 
+/** In a sequence a tile adds a shot: the shots it already is, and the number the next one would take (null when full). */
+export type SequenceTiles = { shotsOf: (presetId: string) => number[]; nextShot: number | null };
+
 function PresetTile({
   preset,
   selected,
   paused,
+  sequence,
   onSelect,
 }: {
   preset: PresetSummary;
   selected: boolean;
   paused: boolean;
+  sequence?: SequenceTiles;
   onSelect: () => void;
 }) {
   const { t } = useI18n();
@@ -29,9 +34,27 @@ function PresetTile({
     else element.play().catch(() => undefined);
   }, [paused, preset.previewUrl]);
 
+  const shots = sequence?.shotsOf(preset.id) ?? [];
   return (
-    <button type="button" className={styles.preset} aria-pressed={selected} onClick={onSelect}>
+    <button
+      type="button"
+      className={styles.preset}
+      // A single shot selects one move; a sequence adds shots, nothing stays pressed.
+      aria-pressed={sequence ? undefined : selected}
+      data-full={sequence?.nextShot === null}
+      onClick={onSelect}
+    >
       <span className={styles.presetMedia}>
+        {sequence && (
+          <span className={styles.shotMarks} aria-hidden="true">
+            {shots.map((n) => (
+              <span key={n} className={styles.shotMark}>
+                {n}
+              </span>
+            ))}
+            {sequence.nextShot !== null && <span className={styles.shotAdd}>+</span>}
+          </span>
+        )}
         <MoveGlyph poses={preset.poses} speed={preset.speed} />
         {preset.previewUrl && (
           <video
@@ -54,22 +77,36 @@ function PresetTile({
         <span className={styles.presetName}>{preset.name}</span>
         <span className={styles.presetDescription}>{preset.description}</span>
       </span>
+      {sequence && (
+        <span className="visually-hidden">
+          {shots.length > 0 && t('inShots', { list: shots.join(', ') })}{' '}
+          {sequence.nextShot === null ? t('shotsFull') : t('addAsShot', { i: sequence.nextShot })}
+        </span>
+      )}
     </button>
   );
 }
 
+/** Tiles drawn while the catalogue loads: the gallery keeps its shape instead of jumping in. */
+const SKELETON_TILES = 6;
+
 export function PresetGallery({
   presets,
+  catalog = 'ready',
   selectedId,
   paused,
   onPause,
+  sequence,
   onSelect,
 }: {
   presets: PresetSummary[];
+  catalog?: 'loading' | 'ready' | 'failed';
   selectedId: string | null;
   /** The looping previews are stopped (the toggle, or reduced motion). */
   paused: boolean;
   onPause: (paused: boolean) => void;
+  /** Sequence mode: tiles add shots. */
+  sequence?: SequenceTiles;
   onSelect: (id: string) => void;
 }) {
   const { t } = useI18n();
@@ -81,7 +118,7 @@ export function PresetGallery({
         </h2>
         <button
           type="button"
-          className={styles.motionToggle}
+          className={styles.toolButton}
           aria-label={paused ? t('motionPlayLabel') : t('motionPauseLabel')}
           onClick={() => onPause(!paused)}
         >
@@ -89,13 +126,17 @@ export function PresetGallery({
           {paused ? t('motionPlay') : t('motionPause')}
         </button>
       </div>
-      <div className={styles.presetGrid}>
+      {catalog === 'failed' && <p className={styles.hint}>{t('catalogFailed')}</p>}
+      <div className={styles.presetGrid} aria-busy={catalog === 'loading'}>
+        {catalog === 'loading' &&
+          Array.from({ length: SKELETON_TILES }, (_, i) => <span key={i} className={styles.presetSkeleton} aria-hidden="true" />)}
         {presets.map((preset) => (
           <PresetTile
             key={preset.id}
             preset={preset}
             selected={preset.id === selectedId}
             paused={paused}
+            sequence={sequence}
             onSelect={() => onSelect(preset.id)}
           />
         ))}
