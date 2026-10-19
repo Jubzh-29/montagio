@@ -12,7 +12,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, write
 import { join } from 'node:path';
 import type { Ports } from './checks.ts';
 import { nextBin, type Capture } from './exec.ts';
-import type { Layout, Os } from './platform.ts';
+import { withoutVars, type Layout, type Os } from './platform.ts';
 import { portBusy } from './probe.ts';
 import type { InstallState } from './state.ts';
 
@@ -81,12 +81,10 @@ export function serviceSpecs(input: {
 }): ServiceSpec[] {
   const { layout: L, state } = input;
   const ports: Ports = state.ports;
-  const env: NodeJS.ProcessEnv = { ...input.baseEnv };
-  delete env.COMFY_API_KEY;
+  const env: NodeJS.ProcessEnv = withoutVars(input.baseEnv, ['COMFY_API_KEY'], input.os);
   const local = (port: number, path: string) => `http://127.0.0.1:${port}${path}`;
 
-  const appEnv: NodeJS.ProcessEnv = { ...env, NEXT_TELEMETRY_DISABLED: '1', MONTAGIO_ROOT: input.repoRoot };
-  delete appEnv.COMFY_BASE_URL;
+  const appEnv: NodeJS.ProcessEnv = { ...withoutVars(env, ['COMFY_BASE_URL'], input.os), NEXT_TELEMETRY_DISABLED: '1', MONTAGIO_ROOT: input.repoRoot };
   if (state.mode === 'full') Object.assign(appEnv, { MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: local(ports.proxy, '') });
   else if (state.proxyUrl) Object.assign(appEnv, { MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: state.proxyUrl });
   else appEnv.MONTAGIO_BACKEND = 'demo';

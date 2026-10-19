@@ -34,6 +34,15 @@ export function pathFor(os: Os): typeof posix {
   return os === 'windows' ? win32 : posix;
 }
 
+/**
+ * A copy of env without these variables. Windows ignores the case of a name, but a copy of
+ * process.env does not: `delete env.COMFY_API_KEY` would leave a Comfy_Api_Key for the child to read.
+ */
+export function withoutVars(env: Record<string, string | undefined>, names: string[], os: Os): Record<string, string | undefined> {
+  const same = (a: string, b: string) => (os === 'windows' ? a.toUpperCase() === b.toUpperCase() : a === b);
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !names.some((name) => same(key, name))));
+}
+
 export function defaultInstallDir(os: Os, env: Record<string, string | undefined>, home: string): string {
   if (env.MONTAGIO_HOME) return env.MONTAGIO_HOME;
   const path = pathFor(os);

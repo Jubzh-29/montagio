@@ -38,7 +38,7 @@ import {
   type Step,
   type StepId,
 } from './plan.ts';
-import { layout, osOf, type Os } from './platform.ts';
+import { layout, osOf, withoutVars, type Os } from './platform.ts';
 import type { probe as probeMachine } from './probe.ts';
 import { readState, recordWeights, writeState, type InstallState } from './state.ts';
 
@@ -145,8 +145,11 @@ function venvPython(venv: string): string | null {
 export async function install(repoRoot: string, opts: InstallOptions, deps: InstallDeps): Promise<number> {
   const os = deps.os ?? osOf(process.platform);
   const L = layout(opts.dir, os ?? 'linux');
-  const env: NodeJS.ProcessEnv = { ...(deps.env ?? process.env), NEXT_TELEMETRY_DISABLED: '1', CUDA_DEVICE_ORDER: 'PCI_BUS_ID' };
-  delete env.COMFY_API_KEY;
+  const env: NodeJS.ProcessEnv = {
+    ...withoutVars(deps.env ?? process.env, ['COMFY_API_KEY'], os ?? 'linux'),
+    NEXT_TELEMETRY_DISABLED: '1',
+    CUDA_DEVICE_ORDER: 'PCI_BUS_ID',
+  };
   const execPath = deps.execPath ?? process.execPath;
   const versions = readVersions(repoRoot);
   const lock = readLock(repoRoot);

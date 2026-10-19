@@ -82,6 +82,25 @@ test('the app runs the local backend, without any Comfy key', () => {
   expect(specsOf(full).map((s) => s.name)).toEqual(['comfyui', 'proxy', 'app']);
 });
 
+test('on Windows, no Comfy key or stale base URL reaches the services, whatever the case of their names', () => {
+  const W = layout('C:\\S R', 'windows');
+  const specs = serviceSpecs({
+    os: 'windows',
+    layout: W,
+    repoRoot: 'C:\\repo dir',
+    state: full,
+    nodePath: 'C:\\node.exe',
+    baseEnv: { Comfy_Api_Key: 'secret', comfy_base_url: 'http://stale:1', Path: 'C:\\bin' },
+    extraComfyArgs: [],
+  });
+  for (const spec of specs) {
+    const names = Object.keys(spec.env).map((name) => name.toUpperCase());
+    expect(names).not.toContain('COMFY_API_KEY');
+    expect(names.filter((name) => name === 'COMFY_BASE_URL').length).toBeLessThanOrEqual(1);
+  }
+  expect(specs.find((s) => s.name === 'app')!.env.COMFY_BASE_URL).toBe('http://127.0.0.1:8189');
+});
+
 test('the app alone runs the demo, or a remote proxy', () => {
   const demo = specsOf({ ...full, mode: 'app-only' }, { COMFY_BASE_URL: 'http://stale:1' });
   expect(demo.map((s) => s.name)).toEqual(['app']);

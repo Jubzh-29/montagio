@@ -364,6 +364,15 @@ test('a saved --proxy-url is kept by the next runs, and --demo forgets it', asyn
   expect(readState(h.L.statePath).proxyUrl).toBeNull();
 });
 
+test('no Comfy key reaches the programs install runs, whatever the case of its name on Windows', async () => {
+  const h = harness();
+  h.deps.env = { PATH: process.env.PATH, COMFY_API_KEY: 'secret', Comfy_Api_Key: 'secret' };
+  await install(repo, options({ start: false }), h.deps);
+  const names = new Set(h.calls.flatMap((c) => Object.keys(c.env ?? {})).filter((name) => name.toUpperCase() === 'COMFY_API_KEY'));
+  // On Linux, Comfy_Api_Key is another variable than COMFY_API_KEY.
+  expect([...names]).toEqual(os === 'windows' ? [] : ['Comfy_Api_Key']);
+});
+
 test('running services are stopped before anything else', async () => {
   const h = harness();
   h.deps.runningPorts = async () => [8188, 8189, 3000];

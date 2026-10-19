@@ -1,4 +1,11 @@
-import { defaultInstallDir, layout, osOf } from '../src/platform.ts';
+import { defaultInstallDir, layout, osOf, withoutVars } from '../src/platform.ts';
+
+test('withoutVars drops a variable whatever its case on Windows, its exact name on Linux', () => {
+  const env = { Comfy_Api_Key: 'secret', COMFY_API_KEY: 'secret', PATH: '/bin' };
+  expect(withoutVars(env, ['COMFY_API_KEY'], 'windows')).toEqual({ PATH: '/bin' });
+  expect(withoutVars(env, ['COMFY_API_KEY'], 'linux')).toEqual({ Comfy_Api_Key: 'secret', PATH: '/bin' });
+  expect(env.COMFY_API_KEY).toBe('secret');
+});
 
 test('osOf knows Windows and Linux only', () => {
   expect(osOf('win32')).toBe('windows');
