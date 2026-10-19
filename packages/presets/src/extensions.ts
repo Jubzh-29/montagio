@@ -141,3 +141,30 @@ export function compileEdit(model: ExtensionModel, template: ApiWorkflow, inputs
   const workflow = bindExtension(model, template, { image: inputs.imageRef, prompt: instruction, seed: inputs.seed });
   return { workflow, output: { ...model.output }, params: { instruction, seed: inputs.seed } };
 }
+
+export type SpeechInputs = {
+  /** What the avatar says. */
+  text: string;
+  language: 'en' | 'fr';
+  seed: number;
+};
+
+/**
+ * Speech for the talking avatar (Chatterbox Multilingual V3), in its built-in voice: no
+ * reference clip, so no cloned voice to consent to, and none left in the node's cache.
+ * The built-in voice is English: for French, the model card's advice is cfg_weight 0,
+ * so its accent does not carry over. Square brackets go (the node reads them as tags);
+ * seed 0 means "random" to the node, so it is written as 1.
+ */
+export function compileSpeech(
+  model: ExtensionModel,
+  template: ApiWorkflow,
+  inputs: SpeechInputs,
+): ExtensionCompiled<{ text: string; language: 'en' | 'fr'; seed: number; cfg: number }> {
+  expectTask(model, 'tts');
+  const text = userText(inputs.text.replace(/[[\]]/g, ''), 'text to speak', model);
+  const cfg = inputs.language === 'fr' ? 0 : 0.5;
+  const seed = Math.max(1, inputs.seed);
+  const workflow = bindExtension(model, template, { text, language: inputs.language, seed, cfg });
+  return { workflow, output: { ...model.output }, params: { text, language: inputs.language, seed, cfg } };
+}

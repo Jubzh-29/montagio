@@ -80,6 +80,8 @@ export const LockEntrySchema = z
     file: z.string().min(1),
     url: z.string().startsWith('https://huggingface.co/', 'url must point to https://huggingface.co/'),
     sha256: z.string().regex(/^[a-f0-9]{64}$/, 'sha256 must be 64 lowercase hex characters').optional(),
+    /** Git blob id of a small file Hugging Face keeps out of LFS, and so publishes no sha256 for. */
+    git_sha1: z.string().regex(/^[a-f0-9]{40}$/, 'git_sha1 must be 40 lowercase hex characters').optional(),
     /** Size of the file in bytes, as Hugging Face publishes it. */
     size: z.number().int('size must be a whole number of bytes').positive('size must be a positive number of bytes').optional(),
     license: z.string().min(1),

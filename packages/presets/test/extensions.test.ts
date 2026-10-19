@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { compileEdit, compileMusic, compileUpscale, CompileError, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Library } from '../src/index';
+import { compileEdit, compileMusic, compileSpeech, compileUpscale, CompileError, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -152,5 +152,45 @@ describe('compileEdit (Qwen-Image-Edit-2511)', () => {
       'index_timestep_zero',
       'index_timestep_zero',
     ]);
+  });
+});
+
+describe('compileSpeech (Chatterbox Multilingual V3)', () => {
+  const voice = () => extension('chatterbox-mtl-voice');
+  const compile = (inputs: Partial<Parameters<typeof compileSpeech>[2]> = {}) =>
+    compileSpeech(voice().model, voice().template, { text: 'Bonjour, je suis votre avatar.', language: 'fr', seed: 8, ...inputs });
+
+  test('French speech gets cfg_weight 0, English 0.5', () => {
+    expect(compile({ language: 'fr' }).workflow['2']!.inputs).toMatchObject({ language: 'fr', cfg_weight: 0 });
+    expect(compile({ language: 'en' }).workflow['2']!.inputs).toMatchObject({ language: 'en', cfg_weight: 0.5 });
+  });
+
+  test('square brackets are removed from the text', () => {
+    expect(compile({ text: 'Hello [laugh] there [pause]' }).params.text).toBe('Hello laugh there pause');
+  });
+
+  test('an empty text, or one over 300 characters, is refused', () => {
+    expect(() => compile({ text: '  ' })).toThrow(CompileError);
+    expect(() => compile({ text: '[]' })).toThrow(CompileError);
+    expect(() => compile({ text: 'a'.repeat(301) })).toThrow(/300/);
+  });
+
+  test('seed 0 is written as 1: the node reads 0 as random', () => {
+    expect(compile({ seed: 0 }).workflow['2']!.inputs.seed).toBe(1);
+    expect(compile({ seed: 41 }).workflow['2']!.inputs.seed).toBe(41);
+  });
+
+  test('no reference clip is connected: the built-in voice speaks', () => {
+    const { workflow } = compile();
+    expect(workflow['2']!.inputs.audio_prompt).toBeUndefined();
+    expect(Object.values(workflow).some((node) => node.class_type === 'LoadAudio')).toBe(false);
+  });
+
+  test('the output is node 3, audio', () => {
+    expect(compile().output).toEqual({ node: '3', kind: 'audio' });
+  });
+
+  test('the shipped workflow pads no short text with "hmm"', () => {
+    expect(voice().template['2']!.inputs.crash_protection_template).toBe('');
   });
 });

@@ -219,6 +219,14 @@ describe('lockDrift', () => {
   test('a pinned sha256 that Hugging Face no longer publishes is drift', () => {
     expect(lockDrift({ sha256: sha }, { sha256: null, size: 10 })).toMatch(/publishes no sha256/);
   });
+
+  test('a small file kept out of LFS is checked by its git blob id, then by its sha256 once downloaded', () => {
+    const git = 'd27fb3f2fd38ca39b7bbfbf83a13b3c617e551df';
+    expect(lockDrift({ sha256: sha, size: 10, git_sha1: git }, { sha256: null, size: 10, git_sha1: git })).toBeNull();
+    expect(lockDrift({ sha256: sha, size: 10, git_sha1: git }, { sha256: null, size: 10, git_sha1: 'e'.repeat(40) })).toMatch(
+      new RegExp(`lock pins git blob ${git}, Hugging Face serves e{40}`),
+    );
+  });
 });
 
 test('lockPatch produces a patch that git apply accepts on the repository file', () => {

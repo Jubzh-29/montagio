@@ -15,7 +15,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { compileEdit, compileJob, compileMusic, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
+import { compileEdit, compileJob, compileMusic, compileSpeech, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -143,9 +143,22 @@ test('the edit job is accepted', () => {
   expect(checkWorkflow(workflow, info)).toEqual([]);
 });
 
+test('the voice job is accepted', () => {
+  const model = library.extensionModels.get('chatterbox-mtl-voice')!;
+  for (const language of ['en', 'fr'] as const) {
+    const { workflow } = compileSpeech(model, library.extensionTemplates.get(model.workflow)!, { text: 'Hello there.', language, seed: 3 });
+    expect({ language, problems: checkWorkflow(workflow, info) }).toEqual({ language, problems: [] });
+  }
+});
+
 test('every class of the fixture comes from the core of ComfyUI or from the Montagio pack', () => {
   for (const [name, spec] of Object.entries(info)) {
-    const origin = name === 'MontagioCameraEmbedding' ? 'custom_nodes.montagio' : /^(nodes|comfy_extras\.[a-z0-9_]+)$/;
+    const origin =
+      name === 'MontagioCameraEmbedding'
+        ? 'custom_nodes.montagio'
+        : name === 'ChatterboxMTLTTS'
+          ? 'custom_nodes.ComfyUI-Chatterbox'
+          : /^(nodes|comfy_extras\.[a-z0-9_]+)$/;
     expect({ name, module: spec.python_module }).toEqual({ name, module: expect.stringMatching(origin) });
   }
 });

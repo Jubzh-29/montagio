@@ -364,6 +364,20 @@ test('--extensions all fetches the extension weights with --only', async () => {
   expect(fetchedIds(h.calls).sort()).toEqual(['tiny-music', 'tiny-te', 'tiny-vae']);
 });
 
+test('the local installer leaves the avatar out, whose voice node it does not install yet', async () => {
+  withMusicWeight(5);
+  writeFileSync(
+    join(repo, 'registry', 'models.lock.yaml'),
+    readFileSync(join(repo, 'registry', 'models.lock.yaml'), 'utf8') +
+      `  - id: tiny-avatar\n    file: tiny_avatar.safetensors\n    url: https://huggingface.co/Comfy-Org/x/resolve/main/split_files/vae/tiny_avatar.safetensors\n` +
+      `    sha256: ${'a'.repeat(64)}\n    size: 5\n    license: MIT\n    source: https://huggingface.co/x/y\n    extension: avatar\n`,
+  );
+  const h = harness();
+  expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
+  expect(fetchedIds(h.calls).sort()).toEqual(['tiny-music', 'tiny-te', 'tiny-vae']);
+  expect(h.output()).toMatch(/avatar.*infra\/runpod\/bootstrap\.sh/);
+});
+
 test('an unknown extension is refused before anything runs', async () => {
   withMusicWeight(5);
   const h = harness();

@@ -77,6 +77,21 @@ Les quatre workflows partent des templates officiels de [Comfy-Org/workflow_temp
 - L'encodeur « Plus » est celui du template et du pipeline de référence (multi-images). Le node de méthode de référence n'a pas de valeur par défaut : sans valeur écrite, il prend `offset`, faux pour 2511. Le workflow l'écrit sur les deux encodeurs, et un test le garde.
 - Taille de sortie : `FluxKontextImageScale` recadre au centre sur l'une de 17 tailles d'≈ 1 Mpx (16:9 → 1392×752, 4 % de la hauteur coupés). Le PNG édité a cette taille ; il garde l'aspect 16:9, 9:16 ou 1:1 que lit `pickAspect`. `ImageScaleToTotalPixels` (sans recadrage) est un essai de la S2.
 
+### Voix de l'avatar : Chatterbox Multilingual V3, un node tiers épinglé et patché
+
+- **Pas de node de cœur.** ComfyUI v0.41.0 n'a pas de synthèse vocale locale ; ses seuls nodes TTS sont des nodes partenaires (ElevenLabs, FishAudio, HeyGen), exclus.
+- **Qwen3-TTS écarté, faute de node sûr.** Le modèle est Apache-2.0 et parle français, mais :
+  - `flybirdxx/ComfyUI-Qwen-TTS` n'a pas de fichier LICENSE et modifie `transformers` pour tout le processus ;
+  - le paquet officiel `qwen-tts` épingle `transformers==4.57.3`, alors que ComfyUI v0.41.0 tourne avec la 5.20.1 ;
+  - `1038lab/ComfyUI-QwenTTS` (GPL-3.0) est ancien et probablement cassé sous transformers 5 ; les autres n'ont pas de LICENSE ou tirent trop de dépendances.
+- **Retenu : [wildminder/ComfyUI-Chatterbox](https://github.com/wildminder/ComfyUI-Chatterbox) au commit `4597af8f`** (Apache-2.0, code chatterbox MIT), après un audit ligne à ligne : poids en safetensors, `.pt` chargés en `weights_only=True`, ni `eval`, ni sous-processus, ni télémétrie. Trois mesures, appliquées par `infra/runpod/bootstrap.sh` :
+  - un patch d'un bloc retire ses 7 routes `/chatterbox/*`, dont `register_model_path` et `validate_directory`, qui acceptent n'importe quel chemin absolu (sonde du disque, authentification SMB sortante sur Windows, substitution de voix) ;
+  - ComfyUI tourne avec `HF_HUB_OFFLINE=1` : sinon un fichier manquant fait télécharger tout le dépôt (13,9 Go) ;
+  - ses 5 paquets Python sont installés en `--no-deps --require-hashes` (`infra/runpod/requirements-chatterbox.txt`) ; jamais ses extras (`spacy-pkuseg` télécharge depuis GitHub, `pykakasi` est GPL).
+- **Choix de la v0.1 :** la voix intégrée (anglaise), sans clonage ; en français, `cfg_weight` 0, comme le conseille la carte du modèle. Pas de voix clonée, donc pas de consentement à recueillir, et pas de voix restée dans le cache du node pour le rendu suivant.
+- **Fixture :** la classe `ChatterboxMTLTTS` est écrite d'après `nodes/mtl_node.py` au commit épinglé (aucun ComfyUI local n'a ce node) ; la S2 la régénère depuis le `/object_info` du pod.
+- **Installeur local :** il laisse l'avatar de côté, avec un message, tant qu'il n'installe pas ce node.
+
 ## 3. Poids
 
 Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`), recoupés par `fetch-weights --lock-from-hf`, dont le patch est vide. Chaque entrée du lock porte `extension:` : l'installeur local ne la télécharge que pour son extension.
@@ -93,7 +108,15 @@ Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`)
 | Édition | `qwen25-vl-7b-fp8` | `qwen_2.5_vl_7b_fp8_scaled.safetensors`, chez `Comfy-Org/Qwen-Image_ComfyUI` | 9 384 670 680 | `cb5636d8…` |
 | Édition | `qwen-image-vae` | `qwen_image_vae.safetensors` | 253 806 246 | `a70580f0…` |
 
-Musique : 10,0 Go. Upscale : 3,96 Go. Édition : 30,2 Go (le bf16, 40,9 Go, n'est pas retenu).
+| Voix | `chatterbox-t3-mtl-v3` | `t3_mtl23ls_v3.safetensors` | 2 143 989 928 | `5abca832…` |
+| Voix | `chatterbox-s3gen` | `s3gen.safetensors` | 1 056 484 620 | `2b78103c…` |
+| Voix | `chatterbox-ve` | `ve.safetensors` | 5 695 784 | `f0921cab…` |
+| Voix | `chatterbox-conds` | `conds.pt` (voix intégrée) | 107 374 | `6552d705…` |
+| Voix | `chatterbox-grapheme-mtl` | `grapheme_mtl_merged_expanded_v1.json` (tokenizer, hors LFS) | 69 989 | `69632f47…`, SHA-1 git `d27fb3f2…` |
+
+Musique : 10,0 Go. Upscale : 3,96 Go. Édition : 30,2 Go (le bf16, 40,9 Go, n'est pas retenu). Voix : 3,2 Go, dans le dossier `models/tts/chatterbox/resembleai-mtl-v3` que le lock nomme (`folder:`).
+
+Le tokenizer de la voix est un petit fichier que Hugging Face garde hors LFS : l'API ne publie que son identifiant git (SHA-1). Son sha256 a été calculé sur le fichier (70 Ko, pas un poids). Le lock porte les deux ; `fetch-weights` compare l'identifiant git avant le téléchargement, puis le sha256 après.
 
 ## 4. VRAM et temps sur une RTX 4090 (24 Go)
 

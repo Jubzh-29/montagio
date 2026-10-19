@@ -175,6 +175,11 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     deps.log(`error: ${(error as Error).message}`);
     return 2;
   }
+  if (enabled.includes('avatar')) {
+    // Its voice runs on a pinned, patched custom node that only infra/runpod/bootstrap.sh installs for now.
+    deps.log('note: the avatar extension is left out: its voice node is installed by infra/runpod/bootstrap.sh only, not by this installer yet');
+    enabled = enabled.filter((id) => id !== 'avatar');
+  }
   // The weights of the extensions nobody asked for stay out of the plan and of the disk check.
   const lock = weightsFor(readLock(repoRoot), enabled);
   let state: InstallState = readState(L.statePath);

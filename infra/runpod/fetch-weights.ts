@@ -203,7 +203,10 @@ async function main(): Promise<number> {
       candidate = pickCandidate(entry.file, await Promise.all(repos.map(listing)), { allowGated: Boolean(token) });
     }
     if (!candidate.ok) throw new Error(candidate.reason);
-    const drift = lockDrift({ sha256: entry.sha256, size: entry.size }, { sha256: candidate.sha256, size: candidate.size });
+    const drift = lockDrift(
+      { sha256: entry.sha256, size: entry.size, git_sha1: entry.git_sha1 },
+      { sha256: candidate.sha256, size: candidate.size, git_sha1: candidate.gitSha1 },
+    );
     if (drift) throw new Error(`${drift} (${resolveUrl(candidate.repo, candidate.path)})`);
     const folder = folderFor(entry.file, candidate.path, folders, entry.folder);
     if (!folder) throw new Error(`cannot tell the ComfyUI folder of ${entry.file} (no loader names it, repository path ${candidate.path})`);

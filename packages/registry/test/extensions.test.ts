@@ -101,3 +101,9 @@ test('a lock entry may give a nested models/ folder', () => {
 test.each(['../outside', '/absolute', 'tts/../../x', 'tts/./x', 'tts\\x'])('the folder %s is refused', (folder) => {
   expect(() => parseLock(`${lock}    folder: "${folder}"\n`, 'l.yaml')).toThrow(/folder/);
 });
+
+test('a lock entry may pin the git blob id of a small file Hugging Face keeps out of LFS', () => {
+  const sha1 = 'd27fb3f2fd38ca39b7bbfbf83a13b3c617e551df';
+  expect(parseLock(`${lock}    git_sha1: ${sha1}\n`, 'l.yaml')[0]?.git_sha1).toBe(sha1);
+  expect(() => parseLock(`${lock}    git_sha1: d27fb3f2\n`, 'l.yaml')).toThrow(/git_sha1/);
+});

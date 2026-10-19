@@ -17,10 +17,12 @@ export {
   bindExtension,
   compileEdit,
   compileMusic,
+  compileSpeech,
   compileUpscale,
   UPSCALE_TARGETS,
   type EditInputs,
   type ExtensionCompiled,
   type MusicInputs,
+  type SpeechInputs,
   type UpscaleInputs,
 } from './extensions';

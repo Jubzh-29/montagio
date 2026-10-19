@@ -57,6 +57,7 @@ The four extensions decided on 2026-10-19 (music, upscale, image edit, talking a
 | `ace-step15-music.api.json` | `templates/audio_ace_step_1_5_split.json` | ACE-Step 1.5 turbo (2B) | node 107, FLAC |
 | `seedvr2-upscale.api.json` | `templates/utility_seedvr2_3b_int8_upscale_video.json` | SeedVR2 3B int8 | node 76, MP4 |
 | `qwen-image-edit-2511.api.json` | `templates/image_qwen_image_edit_2511.json` | Qwen-Image-Edit-2511 fp8mixed | node 9, PNG |
+| `chatterbox-mtl-voice.api.json` | none (no official template: ComfyUI has no local text-to-speech node) | Chatterbox Multilingual V3 | node 3, FLAC |
 
 ### ace-step15-music
 
@@ -82,6 +83,13 @@ The four extensions decided on 2026-10-19 (music, upscale, image edit, talking a
 - `FluxKontextImageScale` (160) is kept: it center-crops the photo to one of 17 sizes of about 1 megapixel (16:9 gives 1392×752), which is also the size of the edited PNG. Replacing it with `ImageScaleToTotalPixels` (no crop) is a GPU session S2 comparison.
 - The text encoder file is the template's, but the lock downloads it from `Comfy-Org/Qwen-Image_ComfyUI` (Apache-2.0 card) instead of `Comfy-Org/HunyuanVideo_1.5_repackaged` (territory-restricted card): same file, same sha256. `SaveImage` writes `montagio/edit`.
 
+### chatterbox-mtl-voice
+
+- Written for Montagio: `ChatterboxMTLTTS` from `wildminder/ComfyUI-Chatterbox` (pinned at `4597af8f`, patched, installed by `infra/runpod/bootstrap.sh`), then the core `SaveAudioAdvanced` in FLAC, `montagio/voice`.
+- The voice pack is the folder `models/tts/chatterbox/resembleai-mtl-v3` (`model_pack_name`), with `t3_mtl23ls_v3.safetensors`. `s3gen_v3.safetensors` is deliberately absent: the loader would prefer it, while the official V3 code pairs V3 with `s3gen`.
+- No `audio_prompt`: the built-in voice speaks (no cloned voice, and none left in the node's cache). `crash_protection_template` is empty (by default a text under 21 characters is wrapped in "hmm"); the watermark is off (`resemble-perth` is not installed).
+- The compiler writes `cfg_weight` 0 in French (the model card's advice when the voice is of another language) and 0.5 in English, removes square brackets (read as tags), and never sends seed 0 (random to this node).
+
 ## Bindings
 
 | Model | image | prompt | negative | seed | width / height / frames | fps | camera_pose / camera_speed |
@@ -97,3 +105,4 @@ Extension models (a binding with several inputs gets the same value in each):
 | `ace-step15-music` | prompt 94.tags; duration_s 98.seconds + 94.duration; seed 3.seed + 94.seed; bpm 94.bpm | 107 (audio) |
 | `seedvr2-upscale` | video 73.file; width / height 57.resize_type.width / 57.resize_type.height; seed 54.seed | 76 (video) |
 | `qwen-image-edit-2511` | image 41.image; prompt 151.prompt; seed 169.seed | 9 (image) |
+| `chatterbox-mtl-voice` | text 2.text; language 2.language; seed 2.seed; cfg 2.cfg_weight | 3 (audio) |

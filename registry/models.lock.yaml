@@ -146,3 +146,52 @@ weights:
     license: Apache-2.0
     source: https://huggingface.co/Qwen/Qwen-Image
     extension: edit
+  # The voice of the avatar: a pack folder that the Chatterbox node reads by name.
+  - id: chatterbox-t3-mtl-v3
+    file: t3_mtl23ls_v3.safetensors
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/t3_mtl23ls_v3.safetensors
+    sha256: 5abca8321ede76f8e61f1cc0d19aea6c946b28871017ce8726f8a69203f05953
+    size: 2143989928
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
+  - id: chatterbox-s3gen
+    file: s3gen.safetensors
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/s3gen.safetensors
+    sha256: 2b78103c654207393955e4900aac14a12de8ef25f4b09424f1ef91941f161d4e
+    size: 1056484620
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
+  - id: chatterbox-ve
+    file: ve.safetensors
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/ve.safetensors
+    sha256: f0921cab452fa278bc25cd23ffd59d36f816d7dc5181dd1bef9751a7fb61f63c
+    size: 5695784
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
+  - id: chatterbox-conds
+    file: conds.pt
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/conds.pt
+    sha256: 6552d70568833628ba019c6b03459e77fe71ca197d5c560cef9411bee9d87f4e
+    size: 107374
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
+  # Kept out of LFS by Hugging Face, which publishes only its git blob id: the sha256 was
+  # computed on the 69,989-byte file (a tokenizer table, not weights) on 2026-10-19.
+  - id: chatterbox-grapheme-mtl
+    file: grapheme_mtl_merged_expanded_v1.json
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/grapheme_mtl_merged_expanded_v1.json
+    sha256: 69632f47220a788a52ce2661d096453c5655e9bf25289d89a8d832c46ee07dbf
+    git_sha1: d27fb3f2fd38ca39b7bbfbf83a13b3c617e551df
+    size: 69989
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
