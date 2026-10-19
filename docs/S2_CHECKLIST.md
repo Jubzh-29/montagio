@@ -62,7 +62,7 @@ Tout ce qui sort de la session va dans `s1-results/`. Le nom est resté celui de
 4. Template : **Runpod PyTorch**, le plus récent.
 5. **Edit Template** :
    - Container Disk : 40 Go ;
-   - Volume Disk : **150 Go**, monté sur `/workspace` (70 Go de poids, plus la marge) ;
+   - Volume Disk : **150 Go**, monté sur `/workspace` (70 Go de poids, plus la marge) ; **250 Go** si vous prévoyez l'essai de l'installeur local (encadré de la partie 7) ;
    - Expose HTTP Ports : `8888` et **`8188`** ;
    - aucune variable d'environnement contenant une clé.
 6. **On-Demand**, pas Spot. Notez l'heure de démarrage.
@@ -205,8 +205,29 @@ Faites un rendu de `roll_cw` à 0,3 avec `--camera-pose "ClockWise (CW)" --camer
    ```
 2. Téléchargez `/workspace/s1-results-<date>.tgz` (clic droit → **Download**) et vérifiez qu'il s'ouvre sur votre PC.
 3. Si vous avez modifié des workflows dans l'interface : **Workflow → Export (API)**, puis aussi **Save**.
-4. Runpod → Pods → **Terminate** (et pas seulement Stop : un pod arrêté continue de facturer son disque).
+4. Runpod → Pods → **Terminate** (et pas seulement Stop : un pod arrêté continue de facturer son disque). Si vous faites l'essai de l'installeur local (encadré ci-dessous), faites-le avant.
 5. Billing : plus aucun pod actif. Notez l'heure d'arrêt et le coût total.
+
+> **Facultatif : essai de l'installeur local sur le pod.** L'installeur (`./montagio.sh install`, guide : [INSTALL.md](INSTALL.md)) est dans `main` depuis le 19/10 (fusion de `feat/installer`, commit `6066021`) : le bundle de la partie 0 le contient. Il n'a pas encore tourné sous Linux sur un vrai GPU de 24 Go, et ce pod en est un.
+>
+> **1. Contrôles et plan, sans rien changer** (quelques secondes, rien n'est téléchargé), à tout moment après la partie 3 :
+> ```bash
+> source /workspace/montagio.env
+> apt-get update && apt-get install -y ffmpeg
+> ./montagio.sh install --dry-run --dir /workspace/montagio-local --comfy-port 8288 --proxy-port 8289 --app-port 3001
+> ```
+> Les ports changent pour ne pas buter sur ComfyUI et le proxy du bootstrap. Attendu : la RTX 4090 avec 24 Go, `driver …, CUDA 13.x: torch 2.14.1+cu130`, puis la liste des étapes. Notez toute ligne en échec. Avec le volume de 150 Go, la ligne du disque devrait échouer : c'est attendu, voir le point 2.
+>
+> **2. Vraie installation**, après le téléchargement de l'archive (étape 2 ci-dessus) et avant Terminate. Comptez 30 à 45 min de pod en plus, soit environ 0,25 $, dont 10 à 25 min de poids. Il faut environ 80 Gio libres sur `/workspace` (65 Gio de poids, 12 Gio de PyTorch) : avec 150 Go, l'installeur refuse au contrôle du disque, avant de rien changer. D'où les 250 Go de la partie 1.
+> ```bash
+> bash infra/runpod/bootstrap.sh stop
+> df -h /workspace
+> ./montagio.sh install --dir /workspace/montagio-local --no-browser
+> ./montagio.sh status --dir /workspace/montagio-local
+> ./montagio.sh stop --dir /workspace/montagio-local
+> tar -czf /workspace/installeur-local.tgz -C /workspace/montagio-local logs install-state.json
+> ```
+> L'arrêt du bootstrap libère la VRAM et les ports par défaut. Attendu à la fin de `install` : `<n> node classes loaded, 0 partner node(s)`, sans ligne `the Montagio node pack did not load`, puis `Montagio is ready: http://127.0.0.1:3000`. Téléchargez `/workspace/installeur-local.tgz` comme l'archive de la partie 7.
 
 ## 8. La fiche à remplir
 
@@ -227,6 +248,7 @@ Combinés : together ____ / then ____   (Rise & Push __, Drift Left Push __, Pul
 Tilt → Crane : oui / non     Négatif Wan par défaut : ajouté / non
 LightX2V : gain ____ ×   mouvement conservé : oui / non   adoptée / exclue
 Séquence : continuité ____   film 16:9 ok   coupe 9:16 ok
+Installeur local (facultatif) : dry-run, lignes en échec ______________   vraie install ____ min, « Montagio is ready » oui / non
 Presets réglés : ______________________________________________
 ```
 
@@ -242,6 +264,7 @@ Presets réglés : ______________________________________________
 |---|---|---|
 | `torch sees no CUDA device` | pod sans GPU visible, ou pilote | redéployer un pod |
 | avertissement de repli cu128, puis erreur au démarrage | pilote limité à CUDA 12.8 | redéployer avec le filtre CUDA 13.0 |
+| `found no CUDA version in nvidia-smi's banner` | bannière d'un format que le script ne connaît pas (il lit `CUDA Version:` et le `CUDA UMD Version:` des pilotes R6xx) | noter les 4 premières lignes de `nvidia-smi` ; le repli cu128 marche aussi sur un pilote CUDA 13 |
 | `ComfyUI exited during startup` | erreur Python | lire `/workspace/logs/comfyui.log` |
 | `partner nodes are loaded` | ComfyUI lancé sans `--disable-partner-nodes` | `bootstrap.sh stop`, puis `bootstrap.sh start --expose-ui` |
 | `warning: nodes missing: MontagioCameraEmbedding` ou `class MontagioCameraEmbedding is not installed` | le pack Montagio ne s'est pas chargé | chercher son erreur d'import dans `/workspace/logs/comfyui.log`, puis `bootstrap.sh stop` et `bootstrap.sh start --expose-ui` |
