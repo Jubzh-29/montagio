@@ -400,7 +400,18 @@ export async function startAll(ctx: ServiceContext, opts: { browser: boolean }):
     }
 
     if (spec.name === 'comfyui') {
-      const info = (await (await fetch(`http://127.0.0.1:${spec.port}/object_info`)).json()) as ObjectInfo;
+      // The partner-node check needs this answer: without it, what started is stopped again.
+      let info: ObjectInfo;
+      try {
+        const res = await fetch(`http://127.0.0.1:${spec.port}/object_info`, { signal: AbortSignal.timeout(60_000) });
+        if (!res.ok) {
+          await res.body?.cancel();
+          throw new Error(`HTTP ${res.status}`);
+        }
+        info = (await res.json()) as ObjectInfo;
+      } catch (error) {
+        return fail(`ComfyUI answers, but its /object_info cannot be read (${(error as Error).message}) (full log: ${log})`);
+      }
       const partners = partnerNodes(info);
       ctx.log(`${Object.keys(info).length} node classes loaded, ${partners.length} partner node(s)`);
       if (partners.length > 0) {

@@ -144,12 +144,12 @@ function alive(pid: number): boolean {
   }
 }
 
-async function fakeContext(opts: { partner?: boolean; dying?: 'proxy' } = {}) {
+async function fakeContext(opts: { partner?: boolean; dying?: 'proxy'; brokenInfo?: boolean } = {}) {
   const dir = join(base, 'install dir');
   const l = layout(dir, os);
   const ports = { comfy: await freePort(), proxy: await freePort(), app: await freePort() };
   const info = join(base, 'object info.json');
-  writeFileSync(info, JSON.stringify(opts.partner ? { ...fixture, PartnerThing: { api_node: true } } : fixture));
+  writeFileSync(info, opts.brokenInfo ? '{"cut short' : JSON.stringify(opts.partner ? { ...fixture, PartnerThing: { api_node: true } } : fixture));
   const spec = (name: ServiceSpec['name'], port: number, args: string[] = []): ServiceSpec => ({
     name,
     cmd: process.execPath,
@@ -267,6 +267,17 @@ test('a partner node loaded in ComfyUI stops everything', async () => {
   expect(lines.join('\n')).toContain('PartnerThing');
   expect(lines.join('\n')).toContain('--disable-partner-nodes');
   expect(existsSync(join(l.runDir, 'comfyui.pid'))).toBe(false);
+}, 30_000);
+
+test('an unreadable /object_info stops what had started and says so', async () => {
+  const { ctx, l, lines } = await fakeContext({ brokenInfo: true });
+  try {
+    expect(await startAll(ctx, { browser: false })).toBe(1);
+    expect(lines.join('\n')).toContain('/object_info');
+    expect(existsSync(join(l.runDir, 'comfyui.pid'))).toBe(false);
+  } finally {
+    await stopAll(ctx);
+  }
 }, 30_000);
 
 test('start refuses an install that never finished', async () => {
