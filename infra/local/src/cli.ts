@@ -40,8 +40,11 @@ Options:
   --app-port N       install: app port (default 3000)
   --no-start         install: do not start Montagio at the end
   --no-browser       install, start: do not open the browser
+  --extensions LIST  install: the extensions whose weights to fetch: validated (default, those a GPU session
+                     validated), all, none, or a list such as music,edit
 
 Environment:
+  MONTAGIO_EXTENSIONS     install: the default of --extensions (the app reads it too)
   MONTAGIO_COMFYUI_ARGS   extra ComfyUI arguments, for example "--lowvram"
   HF_TOKEN               Hugging Face token, only if a download is refused
   MONTAGIO_FFMPEG, MONTAGIO_FFPROBE   FFmpeg binaries outside the PATH
@@ -59,13 +62,15 @@ export type CliOptions = {
   proxyUrl: string | null;
   demo: boolean;
   ports: Partial<Ports>;
+  /** --extensions; null leaves it to MONTAGIO_EXTENSIONS, then "validated". */
+  extensions: string | null;
 };
 
 const COMMANDS: Command[] = ['install', 'start', 'stop', 'status', 'help'];
 const PORT_FLAGS = { comfy: 'comfy-port', proxy: 'proxy-port', app: 'app-port' } as const;
 /** The options each command reads: another one is refused, not ignored (start --dry-run would start). */
 const COMMAND_OPTIONS: Record<Exclude<Command, 'help'>, string[]> = {
-  install: ['dry-run', 'app-only', 'ignore-vram', 'no-start', 'no-browser', 'dir', 'proxy-url', 'demo', 'comfy-port', 'proxy-port', 'app-port'],
+  install: ['dry-run', 'app-only', 'ignore-vram', 'no-start', 'no-browser', 'dir', 'proxy-url', 'demo', 'comfy-port', 'proxy-port', 'app-port', 'extensions'],
   start: ['dir', 'no-browser'],
   stop: ['dir'],
   status: ['dir'],
@@ -90,6 +95,7 @@ export function parseArgs(argv: string[]): { command: Command; options: CliOptio
         'comfy-port': { type: 'string' },
         'proxy-port': { type: 'string' },
         'app-port': { type: 'string' },
+        extensions: { type: 'string' },
         help: { type: 'boolean' },
       },
     });
@@ -143,6 +149,7 @@ export function parseArgs(argv: string[]): { command: Command; options: CliOptio
       proxyUrl,
       demo: Boolean(values.demo),
       ports,
+      extensions: typeof values.extensions === 'string' ? values.extensions : null,
     },
   };
 }
@@ -198,6 +205,7 @@ export async function main(argv: string[]): Promise<number> {
       dryRun: options.dryRun,
       start: options.start,
       browser: options.browser,
+      extensions: options.extensions,
     },
     {
       capture,

@@ -70,3 +70,315 @@ weights:
     size: 335304388
     license: Apache-2.0
     source: https://huggingface.co/black-forest-labs/FLUX.1-schnell
+  # Extensions (2026-10-19): weights fetched only for their extension (`extension:`);
+  # licenses read at the source in docs/EXTENSIONS_ANALYSE.md.
+  - id: ace-step15-turbo
+    file: acestep_v1.5_turbo.safetensors
+    url: https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/diffusion_models/acestep_v1.5_turbo.safetensors
+    sha256: 3f6e0797fad420a39bd33979eb6e840e30989e34a3794e843d23b60ec6e422d7
+    size: 4787825604
+    license: MIT
+    source: https://huggingface.co/ACE-Step/Ace-Step1.5
+    extension: music
+  - id: qwen3-embedding-06b-ace15
+    file: qwen_0.6b_ace15.safetensors
+    url: https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/text_encoders/qwen_0.6b_ace15.safetensors
+    sha256: fd4590c82153b8ddb67e15a2e7aaa8afa8b83a858c8a9b82a4831063156aa7a7
+    size: 1191588248
+    license: Apache-2.0
+    source: https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
+    extension: music
+  - id: ace-step15-lm-17b
+    file: qwen_1.7b_ace15.safetensors
+    url: https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/text_encoders/qwen_1.7b_ace15.safetensors
+    sha256: ed63e9247d1f55f3ace04fa11e95b085fc82d459c82c5626f0b2e37b91ebd710
+    size: 3708523360
+    license: MIT
+    source: https://huggingface.co/ACE-Step/Ace-Step1.5
+    extension: music
+  - id: ace-step15-vae
+    file: ace_1.5_vae.safetensors
+    url: https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/vae/ace_1.5_vae.safetensors
+    sha256: 6de92e3a862acd287e08b024ac90f0783a8635451b728721a33ff03565bcb2bb
+    size: 337431732
+    license: MIT
+    source: https://huggingface.co/ACE-Step/Ace-Step1.5
+    extension: music
+  - id: seedvr2-3b-int8
+    file: seedvr2_3b_int8_convrot.safetensors
+    url: https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/diffusion_models/seedvr2_3b_int8_convrot.safetensors
+    sha256: c3dec8bcc5916843a8a858572970597462e1f2dc598d6dfd818f6cd40f53a157
+    size: 3458259704
+    license: Apache-2.0
+    source: https://huggingface.co/ByteDance-Seed/SeedVR2-3B
+    extension: upscale
+  - id: seedvr2-vae
+    file: seedvr2_ema_vae_fp16.safetensors
+    url: https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/vae/seedvr2_ema_vae_fp16.safetensors
+    sha256: 20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1
+    size: 501324814
+    license: Apache-2.0
+    source: https://huggingface.co/ByteDance-Seed/SeedVR2-3B
+    extension: upscale
+  - id: qwen-image-edit-2511-fp8mixed
+    file: qwen_image_edit_2511_fp8mixed.safetensors
+    url: https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI/resolve/main/split_files/diffusion_models/qwen_image_edit_2511_fp8mixed.safetensors
+    sha256: c9fdc158e46d3b61ef75f21ae866ca2fe808bf4a53643120d1c1e87c19280a4e
+    size: 20533762817
+    license: Apache-2.0
+    source: https://huggingface.co/Qwen/Qwen-Image-Edit-2511
+    extension: edit
+  # Same file as the copy in Comfy-Org/HunyuanVideo_1.5_repackaged that the template names,
+  # whose card carries a territory-restricted license: this mirror is Apache-2.0.
+  - id: qwen25-vl-7b-fp8
+    file: qwen_2.5_vl_7b_fp8_scaled.safetensors
+    url: https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors
+    sha256: cb5636d852a0ea6a9075ab1bef496c0db7aef13c02350571e388aea959c5c0b4
+    size: 9384670680
+    license: Apache-2.0
+    source: https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct
+    extension: edit
+  - id: qwen-image-vae
+    file: qwen_image_vae.safetensors
+    url: https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/vae/qwen_image_vae.safetensors
+    sha256: a70580f0213e67967ee9c95f05bb400e8fb08307e017a924bf3441223e023d1f
+    size: 253806246
+    license: Apache-2.0
+    source: https://huggingface.co/Qwen/Qwen-Image
+    extension: edit
+  # 4-step LoRA of Qwen-Image-Edit-2511 (lightx2v): 4 steps at cfg 1 instead of 40 at cfg 4.
+  - id: qwen-edit-2511-lightning-4step
+    file: Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors
+    url: https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors
+    sha256: 22226e8d05d354bb356627d428809f5afd7819399b077238a2b70a82883a904f
+    size: 849608296
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning
+    extension: edit
+    folder: loras
+  # Edit look "inflate" (prompt: inflate the <subject>).
+  - id: systms-infl8-qwen-edit-2511
+    file: SYSTMS_INFL8_LoRA_Qwen_Image_Edit_2511.safetensors
+    url: https://huggingface.co/systms/SYSTMS-INFL8-LoRA-Qwen-Image-Edit-2511/resolve/main/SYSTMS_INFL8_LoRA_Qwen_Image_Edit_2511.safetensors
+    sha256: 48cff1497edf7610c904a18d94e996f97466c8c3784de4e790a31f9d45f33998
+    size: 295146200
+    license: Apache-2.0
+    source: https://huggingface.co/systms/SYSTMS-INFL8-LoRA-Qwen-Image-Edit-2511
+    extension: edit
+    folder: loras
+  # Edit look "action figure" (prompt: action the <thing>); the end frame of the figurine hook.
+  - id: systms-action-qwen-edit-2511
+    file: QWEN_EDIT_ACTION_V1.safetensors
+    url: https://huggingface.co/systms/SYSTMS-ACTION-LoRA-Qwen-Image-Edit-2511/resolve/main/QWEN_EDIT_ACTION_V1.safetensors
+    sha256: 52287ccc0544b0fa611df7ee15c96f1320548b7eec5feed759f7ffbf7adeae3a
+    size: 295146192
+    license: Apache-2.0
+    source: https://huggingface.co/systms/SYSTMS-ACTION-LoRA-Qwen-Image-Edit-2511
+    extension: edit
+    folder: loras
+  # Edit look "angles" (prompt: <sks> <azimuth> <elevation> <distance>); trained on synthetic renders by fal.
+  - id: fal-multiple-angles-qwen-edit-2511
+    file: qwen-image-edit-2511-multiple-angles-lora.safetensors
+    url: https://huggingface.co/fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA/resolve/main/qwen-image-edit-2511-multiple-angles-lora.safetensors
+    sha256: 42426ded4e25fd22879d9e198b857556445ef4ca56e8da3246d0345155bb6765
+    size: 295140688
+    license: Apache-2.0
+    source: https://huggingface.co/fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA
+    extension: edit
+    folder: loras
+  # The voice of the avatar: a pack folder that the Chatterbox node reads by name.
+  - id: chatterbox-t3-mtl-v3
+    file: t3_mtl23ls_v3.safetensors
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/t3_mtl23ls_v3.safetensors
+    sha256: 5abca8321ede76f8e61f1cc0d19aea6c946b28871017ce8726f8a69203f05953
+    size: 2143989928
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
+  - id: chatterbox-s3gen
+    file: s3gen.safetensors
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/s3gen.safetensors
+    sha256: 2b78103c654207393955e4900aac14a12de8ef25f4b09424f1ef91941f161d4e
+    size: 1056484620
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
+  - id: chatterbox-ve
+    file: ve.safetensors
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/ve.safetensors
+    sha256: f0921cab452fa278bc25cd23ffd59d36f816d7dc5181dd1bef9751a7fb61f63c
+    size: 5695784
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
+  - id: chatterbox-conds
+    file: conds.pt
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/conds.pt
+    sha256: 6552d70568833628ba019c6b03459e77fe71ca197d5c560cef9411bee9d87f4e
+    size: 107374
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
+  # Kept out of LFS by Hugging Face, which publishes only its git blob id: the sha256 was
+  # computed on the 69,989-byte file (a tokenizer table, not weights) on 2026-10-19.
+  - id: chatterbox-grapheme-mtl
+    file: grapheme_mtl_merged_expanded_v1.json
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/grapheme_mtl_merged_expanded_v1.json
+    sha256: 69632f47220a788a52ce2661d096453c5655e9bf25289d89a8d832c46ee07dbf
+    git_sha1: d27fb3f2fd38ca39b7bbfbf83a13b3c617e551df
+    size: 69989
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
+  - id: wan22-s2v-14b-fp8
+    file: wan2.2_s2v_14B_fp8_scaled.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_s2v_14B_fp8_scaled.safetensors
+    sha256: 140e75af5534ac3d91e710d9df756f7032addd64b341ba2c1c70e3e6da9aa216
+    size: 16394832474
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.2-S2V-14B
+    extension: avatar
+  # The same files are in the Apache-2.0 Wan-AI/Wan2.2-S2V-14B repository (fp32); this is Comfy-Org's fp16 conversion.
+  - id: wav2vec2-large-xlsr53-en
+    file: wav2vec2_large_english_fp16.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/audio_encoders/wav2vec2_large_english_fp16.safetensors
+    sha256: f0017a43ea57ef6b3d4866be607844bbd8cada6d30966f7d70044ed0d63d3f9e
+    size: 630997322
+    license: Apache-2.0
+    source: https://huggingface.co/jonatasgrosman/wav2vec2-large-xlsr-53-english
+    extension: avatar
+  # Byte-identical to lightx2v/Wan2.2-Lightning Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/high_noise_model.safetensors.
+  - id: lightx2v-wan22-t2v-4step-high-v1-1
+    file: wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors
+    sha256: 698321cb86bd30c4af06c9b84e656a1048c8cb54e06d50694536fb5de37fde41
+    size: 1226977424
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Wan2.2-Lightning
+    extension: avatar
+  # The effects pack: Wan 2.1 I2V 480p, the base the Remade-AI effect LoRAs were trained on.
+  - id: wan21-i2v-480p-14b-fp8
+    file: wan2.1_i2v_480p_14B_fp8_scaled.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_480p_14B_fp8_scaled.safetensors
+    sha256: b2de21b99b2e72cb0ff15253b07e926f26e7cf1b7e229efc32f94ad1f1ed9395
+    size: 16401356938
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P
+    extension: effects
+  # The vision tower of OpenCLIP ViT-H-14 (LAION-2B, MIT), as Wan 2.1 I2V reads the start image.
+  - id: clip-vision-h
+    file: clip_vision_h.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors
+    sha256: 64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161
+    size: 1264219396
+    license: MIT
+    source: https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K
+    extension: effects
+  # The original lightx2v 4-step LoRA (Apache-2.0 with LICENSE.txt), not the Kijai extraction the templates fetch.
+  - id: lightx2v-wan21-i2v-480p-4step
+    file: Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors
+    url: https://huggingface.co/lightx2v/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v/resolve/main/loras/Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors
+    sha256: 8833bd4fd7c8eabebf0bc8ee5cfaf47f4f310ce116928a02c1adf8941dd4b0f1
+    size: 739472104
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v
+    extension: effects
+  # Effect Squish: license declared in the card metadata only, no LICENSE file; trigger "sq41sh squish effect".
+  - id: remade-squish
+    file: squish_18.safetensors
+    url: https://huggingface.co/Remade-AI/Squish/resolve/main/squish_18.safetensors
+    sha256: c2195da8077b02674775929e94b43caa30dc069ed74b1818a2e2adf8fe559cf7
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/Squish
+    extension: effects
+    folder: loras
+  # Effect Cakeify: license declared in the card metadata only, no LICENSE file; trigger "c4k3 cakeify it".
+  - id: remade-cakeify
+    file: cakeify_16_epochs.safetensors
+    url: https://huggingface.co/Remade-AI/Cakeify/resolve/main/cakeify_16_epochs.safetensors
+    sha256: 4078cd32c45ad6f0206b87bd8de7e25700bd8419b9c0e0267bb828aec7eb6bf1
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/Cakeify
+    extension: effects
+    folder: loras
+  # Effect Explode: license declared in the card metadata only, no LICENSE file; trigger "3xp105ion huge explosion".
+  - id: remade-explode
+    file: explode_30_epochs.safetensors
+    url: https://huggingface.co/Remade-AI/Explode/resolve/main/explode_30_epochs.safetensors
+    sha256: 040dfee5d106acd4e027b6a493b2f228cef2adf090c23fb2040ff6ce016eccc5
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/Explode
+    extension: effects
+    folder: loras
+  # Effect Crash zoom in: license declared in the card metadata only, no LICENSE file; trigger "cr34sh crash zoom in effect".
+  - id: remade-crash-zoom-in
+    file: crash_zoom_in.safetensors
+    url: https://huggingface.co/Remade-AI/Crash-zoom-in/resolve/main/crash_zoom_in.safetensors
+    sha256: bcc26f0e2ae5f1d2fbe08e8278c2a89c7ef0c0ff7f595ebecc7f4602a92ffdd8
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/Crash-zoom-in
+    extension: effects
+    folder: loras
+  # Effect bullet time: license declared in the card metadata only, no LICENSE file; trigger "b4ll3t t1m3 bullet time shot".
+  - id: remade-matrix-shot
+    file: matrix_shot.safetensors
+    url: https://huggingface.co/Remade-AI/matrix-shot/resolve/main/matrix_shot.safetensors
+    sha256: 9e9b4952022c68014ad93d5e11fd949bd2ad46e26152b5e31c6f61725964f7a0
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/matrix-shot
+    extension: effects
+    folder: loras
+  # Effect 360 orbit: license declared in the card metadata only, no LICENSE file; trigger "0rb4it 360 degree orbit".
+  - id: remade-360-orbit
+    file: 360_Orbit.safetensors
+    url: https://huggingface.co/Remade-AI/360-Orbit/resolve/main/360_Orbit.safetensors
+    sha256: 5a99f1fd2db47344211fe6836a8664cfd5f053d03647b67c981cf163d65ffa82
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/360-Orbit
+    extension: effects
+    folder: loras
+  # The keyframe transitions: Wan 2.2 I2V A14B, first-last frame to video (FLF2V).
+  - id: wan22-i2v-high-fp8
+    file: wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors
+    sha256: 6122e79d55e0f235698d11d657f3b196c5273c830da00b2b013c5a048d5e6a42
+    size: 14294742832
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B
+    extension: transitions
+  - id: wan22-i2v-low-fp8
+    file: wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
+    sha256: 5471a457b6ac404202a5fbe6c11595a3d5641fc766b00f38763f72303fffc21e
+    size: 14294742832
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B
+    extension: transitions
+  # Byte-identical to lightx2v/Wan2.2-Lightning Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/{high,low}_noise_model.safetensors.
+  - id: lightx2v-wan22-i2v-4step-high
+    file: wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors
+    sha256: d176c808d6fc461999b68e321efcb7501b20b8c3797523ed0df14f7d1deff11e
+    size: 1226977424
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Wan2.2-Lightning
+    extension: transitions
+  - id: lightx2v-wan22-i2v-4step-low
+    file: wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors
+    sha256: 024f21de095bc8fad9809ded3e9e49a2e170dcf27075da8145ba7d60d8aab7f9
+    size: 1226977424
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Wan2.2-Lightning
+    extension: transitions

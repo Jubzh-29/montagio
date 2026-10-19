@@ -12,6 +12,9 @@
  *   npm run smoke -w @montagio/infra-runpod -- --model wan22-ti2v-5b
  *   npm run smoke -w @montagio/infra-runpod -- --camera-pose all --camera-speed 1   # one clip per pose
  *   npm run smoke -w @montagio/infra-runpod -- --dry-run         # compile only, no network
+ *   npm run smoke -w @montagio/infra-runpod -- --extension music --duration 12
+ *   npm run smoke -w @montagio/infra-runpod -- --extension all --input photo.png --clip clip.mp4 --language fr
+ *   npm run smoke -w @montagio/infra-runpod -- --extension effect,hook --input photo.png --hook outfit-morph --input2 outfit.png
  *
  * The SDK only ever talks to --base-url (default: the local proxy). Comfy Cloud
  * and the Router are refused, and no Router method is called.
@@ -21,8 +24,10 @@ import { basename, extname, isAbsolute, join, relative, resolve } from 'node:pat
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { Comfy, type Job, type WorkflowGraph } from '@comfyorg/sdk';
-import { CAMERA_POSE_VALUES, compileJob, loadLibrary, pickAspect, type ApiWorkflow, type Resolution } from '@montagio/presets';
+import { CAMERA_POSE_VALUES, compileJob, loadLibrary, pickAspect, type ApiWorkflow, type Aspect, type Library, type Resolution } from '@montagio/presets';
+import { probe, probeAudio } from '@montagio/sequence';
 import { imageSize } from 'image-size';
+import { EXTENSION_JOBS, extensionJobs, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
 import { imageFingerprint } from './lib/image';
 import { assertLocalBaseUrl, cameraMove, checkWorkflow, comboOptions, guardFetch, VramSampler, type ObjectInfo, type VramStats } from './lib/comfy';
 
@@ -51,6 +56,19 @@ const { values: args } = parseArgs({
     vram: { type: 'string', default: 'auto' },
     'timeout-min': { type: 'string', default: '30' },
     'dry-run': { type: 'boolean', default: false },
+    extension: { type: 'string' },
+    input: { type: 'string' },
+    input2: { type: 'string' },
+    end: { type: 'string' },
+    effect: { type: 'string', default: 'all' },
+    hook: { type: 'string' },
+    quality: { type: 'boolean', default: false },
+    look: { type: 'string' },
+    clip: { type: 'string' },
+    audio: { type: 'string' },
+    text: { type: 'string' },
+    language: { type: 'string', default: 'en' },
+    duration: { type: 'string', default: '10' },
     help: { type: 'boolean', default: false },
   },
 });
@@ -72,7 +90,22 @@ if (args.help) {
   --out DIR          results folder (default s1-results)
   --vram MODE        auto (nvidia-smi, else /system_stats), comfyui (/system_stats only: use it through an SSH tunnel), none
   --timeout-min N    give up on a job after N minutes (default 30)
-  --dry-run          compile and write the workflows, contact nothing`);
+  --dry-run          compile and write the workflows, contact nothing
+
+Extensions (instead of presets):
+  --extension LIST   edit, effect, hook (= hook-edit then transition), voice, avatar, music, upscale (comma list) or "all"
+  --input PATH       the photo of edit, effect, hook and avatar (default demo-assets/images/sample-16x9.png)
+  --effect LIST      the effects to run, e.g. squish,explode, or "all" (default all)
+  --hook ID          the hook of hook-edit and transition (default eyes-in)
+  --input2 PATH      the second image of a two-reference hook (the outfit of outfit-morph)
+  --end PATH         the end frame of a transition run alone; without it, the hook's edit runs first and makes it
+  --quality          the edit, the effects and the transition without their 4-step LoRAs (more steps, slower)
+  --look LOOK        a look of the edit job: infl8, action or angles
+  --clip PATH        the clip to upscale (required by upscale)
+  --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
+  --text TEXT        the music description, the edit instruction, the effect's subject or the words to say (each has a default)
+  --language en|fr   the language of the voice (default en)
+  --duration S       music: the length of the film it goes under (default 10)`);
   process.exit(0);
 }
 
@@ -128,6 +161,7 @@ async function main(): Promise<number> {
   if (resolution && resolution !== '480p' && resolution !== '720p') throw new Error(`--resolution must be 480p or 720p`);
 
   const library = await loadLibrary(repoRoot);
+  if (args.extension) return runExtensions(library, target, comfyuiUrl, outDir, timeoutMs);
   const presetIds = args.preset === 'all' ? [...library.presets.keys()] : args.preset.split(',').map((id) => id.trim());
   const { width: imageWidth, height: imageHeight } = imageSize(await readFile(imagePath));
   const aspect = pickAspect(imageWidth, imageHeight);
@@ -248,7 +282,7 @@ async function main(): Promise<number> {
           record.error = problems;
           for (const problem of problems) console.error(`  ✗ ${problem}`);
         } else {
-          await runJob(client, workflow, imageBinding, imagePath, comfyuiUrl, timeoutMs, record, outDir, tag);
+          await runJob(client, workflow, [{ ...imageBinding, path: imagePath }], comfyuiUrl, timeoutMs, record, outDir, tag);
         }
         await appendFile(join(outDir, 'smoke.jsonl'), `${JSON.stringify(record)}\n`);
       }
@@ -269,19 +303,21 @@ async function main(): Promise<number> {
   return records.every((r) => r.status === 'succeeded' || r.status === 'compiled') ? 0 : 1;
 }
 
+/** What runJob fills in, for a preset clip as for an extension job. */
+type RunRecord = Pick<SmokeRecord, 'at' | 'run' | 'status' | 'error' | 'metrics' | 'exec_s' | 'wall_s' | 'vram' | 'outputs'>;
+
 async function runJob(
   client: Comfy,
   workflow: ApiWorkflow,
-  imageBinding: { node: string; field: string },
-  imagePath: string,
+  files: { node: string; field: string; path: string }[],
   comfyuiUrl: string | null,
   timeoutMs: number,
-  record: SmokeRecord,
+  record: RunRecord,
   outDir: string,
   tag: string,
 ): Promise<void> {
   const wf = client.workflows.fromJson(structuredClone(workflow) as WorkflowGraph);
-  wf.setInput(imageBinding.node, imageBinding.field, client.assets.fromFile(imagePath));
+  for (const file of files) wf.setInput(file.node, file.field, client.assets.fromFile(file.path));
 
   const sampler = new VramSampler(comfyuiUrl, vramMode);
   const vramSource = await sampler.start();
@@ -336,6 +372,187 @@ async function runJob(
   } else if (record.status !== 'aborted' && record.status !== 'error') {
     console.error(`  ✗ job ended ${record.status}: ${JSON.stringify(record.error)}`);
   }
+}
+
+type ExtensionRecord = RunRecord & {
+  kind: 'extension';
+  /** The job and the effect or hook it runs, e.g. "effect:squish". */
+  job: string;
+  model: string;
+  params: Record<string, unknown>;
+  inputs: string[];
+  comfyui_version: string | null;
+  gpu: string | null;
+  sdk: string;
+  base_url: string;
+};
+
+/**
+ * The extension jobs (edit, effects, hooks, voice, avatar, music, upscale): compiled first,
+ * checked against the running ComfyUI's /object_info, run one after the other, timed, with
+ * peak VRAM, their outputs downloaded into <out>/clips. Without --audio, the avatar speaks the
+ * voice job's output; without --end, a hook's transition ends on its edit's output.
+ */
+async function runExtensions(
+  library: Library,
+  target: { base: string; url: URL },
+  comfyuiUrl: string | null,
+  outDir: string,
+  timeoutMs: number,
+): Promise<number> {
+  const asked =
+    args.extension === 'all'
+      ? [...EXTENSION_JOBS]
+      : args.extension!.split(',').flatMap((name) => (name.trim() === 'hook' ? ['hook-edit', 'transition'] : [name.trim()]));
+  for (const name of asked) {
+    if (!(EXTENSION_JOBS as readonly string[]).includes(name)) throw new Error(`unknown extension job "${name}" (known: ${EXTENSION_JOBS.join(', ')})`);
+  }
+  if (args.language !== 'en' && args.language !== 'fr') throw new Error('--language must be en or fr');
+  const duration_s = Number(args.duration);
+  if (!(duration_s > 0)) throw new Error('--duration takes a number of seconds');
+  const names = EXTENSION_JOBS.filter((name) => asked.includes(name));
+  // Without a speech file, the avatar speaks the voice job's output: the voice runs first.
+  const chained = names.includes('avatar') && !args.audio;
+  if (chained && !names.includes('voice')) names.splice(names.indexOf('avatar'), 0, 'voice');
+  // Without an end frame, the transition ends on the hook's edit: the edit runs first.
+  const chainedHook = names.includes('transition') && !args.end;
+  if (chainedHook && !names.includes('hook-edit')) names.splice(names.indexOf('transition'), 0, 'hook-edit');
+
+  const input = args.input ? fromCaller(args.input) : join(repoRoot, 'demo-assets', 'images', 'sample-16x9.png');
+  const input2 = args.input2 ? fromCaller(args.input2) : undefined;
+  let end = args.end ? fromCaller(args.end) : undefined;
+  const clip = args.clip ? fromCaller(args.clip) : undefined;
+  let aspect: Aspect = '16:9';
+  if (names.some((name) => name !== 'voice' && name !== 'music' && name !== 'upscale')) {
+    const { width, height } = imageSize(await readFile(input));
+    aspect = pickAspect(width, height);
+  } else if (clip) {
+    const { width, height } = await probe(clip);
+    aspect = pickAspect(width, height);
+  }
+  let audio = args.audio ? fromCaller(args.audio) : undefined;
+  let audio_s = audio ? (await probeAudio(audio))?.duration_s : undefined;
+  if (audio && !audio_s) throw new Error(`no audio stream in ${audio}`);
+  const options = (jobs: ExtensionJobName[]) => ({
+    jobs,
+    input,
+    input2,
+    end: end ?? (args['dry-run'] ? 'end.png' : undefined),
+    effects: args.effect === 'all' ? undefined : args.effect.split(',').map((id) => id.trim()),
+    hook: args.hook,
+    fast: !args.quality,
+    look: args.look,
+    clip,
+    audio: audio ?? (args['dry-run'] ? 'speech.flac' : undefined),
+    audio_s: audio_s ?? (args['dry-run'] ? 5 : undefined),
+    text: args.text,
+    language: args.language as 'en' | 'fr',
+    duration_s,
+    seed: Number.parseInt(args.seed, 10) || 0,
+    aspect,
+  });
+  // Compile what can be compiled now: a missing file fails before any GPU second is spent.
+  const first = names.filter(
+    (name) => args['dry-run'] || !((chained && name === 'avatar') || (chainedHook && name === 'transition')),
+  );
+  const jobs = extensionJobs(library, options(first));
+  await mkdir(join(outDir, 'workflows'), { recursive: true });
+  await mkdir(join(outDir, 'clips'), { recursive: true });
+
+  let client: Comfy | null = null;
+  let objectInfo: ObjectInfo | null = null;
+  let comfyuiVersion: string | null = null;
+  let gpu: string | null = null;
+  if (!args['dry-run']) {
+    process.env.COMFY_BASE_URL = target.base;
+    delete process.env.COMFY_API_KEY;
+    const guarded = guardFetch(target.url);
+    client = new Comfy({ fetch: guarded, clientInfo: 'montagio-smoke/0.1' });
+    const health = await guarded(`${target.base}/api/v2/health`);
+    if (!health.ok) throw new Error(`comfy-api-proxy health check failed: HTTP ${health.status}`);
+    if (comfyuiUrl) {
+      const stats = await getJson<{ system?: { comfyui_version?: string }; devices?: { name?: string }[] }>(`${comfyuiUrl}/system_stats`);
+      comfyuiVersion = stats.system?.comfyui_version ?? null;
+      gpu = stats.devices?.[0]?.name ?? null;
+      objectInfo = await getJson<ObjectInfo>(`${comfyuiUrl}/object_info`);
+    }
+  }
+
+  const records: ExtensionRecord[] = [];
+  const run = async (job: ExtensionJob): Promise<ExtensionRecord> => {
+    const tag = `ext-${job.tag.replace(':', '-')}__${job.model.id}`;
+    await writeFile(join(outDir, 'workflows', `${tag}.api.json`), `${JSON.stringify(job.workflow, null, 2)}\n`);
+    const record: ExtensionRecord = {
+      kind: 'extension',
+      at: new Date().toISOString(),
+      job: job.tag,
+      model: job.model.id,
+      run: 1,
+      status: 'compiled',
+      error: null,
+      params: job.params,
+      inputs: job.files.map((file) => basename(file.path)),
+      wall_s: null,
+      exec_s: null,
+      metrics: null,
+      vram: null,
+      outputs: [],
+      comfyui_version: comfyuiVersion,
+      gpu,
+      sdk: SDK_VERSION,
+      base_url: target.base,
+    };
+    console.log(`\n▶ ${job.tag} on ${job.model.id}: ${JSON.stringify(job.params)}`);
+    if (client) {
+      const skip = job.files.map((file) => `${file.node}.${file.field}`);
+      const problems = objectInfo ? checkWorkflow(job.workflow, objectInfo, { skip }) : [];
+      if (problems.length > 0) {
+        record.status = 'preflight-failed';
+        record.error = problems;
+        for (const problem of problems) console.error(`  ✗ ${problem}`);
+      } else {
+        await runJob(client, job.workflow, job.files, comfyuiUrl, timeoutMs, record, outDir, tag);
+      }
+      await appendFile(join(outDir, 'smoke.jsonl'), `${JSON.stringify(record)}\n`);
+    }
+    records.push(record);
+    return record;
+  };
+
+  for (const job of jobs) {
+    const record = await run(job);
+    if (chained && job.name === 'voice' && !args['dry-run']) {
+      const speech = record.outputs[0];
+      if (record.status !== 'succeeded' || !speech) {
+        console.error('  ✗ no speech for the avatar: the avatar job is skipped');
+        continue;
+      }
+      audio = join(outDir, speech);
+      audio_s = (await probeAudio(audio))?.duration_s;
+      const [avatar] = extensionJobs(library, options(['avatar']));
+      await run(avatar!);
+    }
+    if (chainedHook && job.name === 'hook-edit' && !args['dry-run']) {
+      const frame = record.outputs[0];
+      if (record.status !== 'succeeded' || !frame) {
+        console.error('  ✗ no end frame for the transition: the transition job is skipped');
+        continue;
+      }
+      end = join(outDir, frame);
+      const [transition] = extensionJobs(library, options(['transition']));
+      await run(transition!);
+    }
+  }
+
+  console.log('\njob                      model                       status            wall s  exec s  peak VRAM MiB');
+  for (const r of records) {
+    console.log(
+      `${r.job.padEnd(24)} ${r.model.padEnd(27)} ${r.status.padEnd(17)} ` +
+        `${String(r.wall_s ?? '-').padStart(6)}  ${String(r.exec_s ?? '-').padStart(6)}  ${String(r.vram?.peakMiB ?? '-').padStart(13)}`,
+    );
+  }
+  console.log(`\nresults: ${relative(callerDir, outDir) || '.'}${args['dry-run'] ? ' (dry run: workflows only)' : '/smoke.jsonl'}`);
+  return records.every((r) => r.status === 'succeeded' || r.status === 'compiled') ? 0 : 1;
 }
 
 main().then(

@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import {
   downloadFile,
   folderFor,
+  forExtensions,
   gib,
   lockDrift,
   lockFromHf,
@@ -58,6 +59,41 @@ test('the ComfyUI folder of a weight comes from the loader that names it, else f
   expect(folderFor('unet.safetensors', 'x/unet.safetensors', folders)).toBe('diffusion_models');
   expect(folderFor('lora.safetensors', 'split_files/loras/lora.safetensors', folders)).toBe('loras');
   expect(folderFor('odd.safetensors', 'odd.safetensors', folders)).toBeNull();
+});
+
+test('the loaders of the extension workflows give their ComfyUI folder', () => {
+  const folders = weightFolders([
+    {
+      '57': { class_type: 'AudioEncoderLoader', inputs: { audio_encoder_name: 'wav2vec2.safetensors' } },
+      '105': { class_type: 'DualCLIPLoader', inputs: { clip_name1: 'qwen_0.6b.safetensors', clip_name2: 'qwen_1.7b.safetensors', type: 'ace' } },
+      '107': { class_type: 'LoraLoaderModelOnly', inputs: { lora_name: 'lightx2v.safetensors', strength_model: 1 } },
+    },
+  ]);
+  expect(Object.fromEntries(folders)).toEqual({
+    'wav2vec2.safetensors': 'audio_encoders',
+    'qwen_0.6b.safetensors': 'text_encoders',
+    'qwen_1.7b.safetensors': 'text_encoders',
+    'lightx2v.safetensors': 'loras',
+  });
+  expect(folderFor('w.safetensors', 'split_files/audio_encoders/w.safetensors', new Map())).toBe('audio_encoders');
+});
+
+test('the folder of the lock wins over the loaders and the repository path', () => {
+  const folders = new Map([['t3_mtl23ls_v3.safetensors', 'diffusion_models']]);
+  expect(folderFor('t3_mtl23ls_v3.safetensors', 't3_mtl23ls_v3.safetensors', folders, 'tts/chatterbox/resembleai-mtl-v3')).toBe(
+    'tts/chatterbox/resembleai-mtl-v3',
+  );
+  expect(folderFor('t3_mtl23ls_v3.safetensors', 't3_mtl23ls_v3.safetensors', folders, null)).toBe('diffusion_models');
+});
+
+describe('forExtensions', () => {
+  const lock = [{ id: 'core' }, { id: 'music-vae', extension: 'music' }, { id: 'edit-te', extension: 'edit' }];
+  test('--extensions none keeps only the core weights', () => {
+    expect(forExtensions(lock, []).map((w) => w.id)).toEqual(['core']);
+  });
+  test('--extensions music adds the music weights', () => {
+    expect(forExtensions(lock, ['music']).map((w) => w.id)).toEqual(['core', 'music-vae']);
+  });
 });
 
 describe('pickCandidate', () => {
@@ -134,12 +170,19 @@ test('proposeLock replaces an existing size', () => {
 });
 
 describe('lockFromHf', () => {
-  const plan = (id: string, hf_sha256: string | null, extra = false) => ({
+  const plan = (id: string, hf_sha256: string | null, extra = false, lock_sha256: string | null = null) => ({
     id,
     url: `https://huggingface.co/o/r/resolve/main/${id}.safetensors`,
     size: 1000,
     hf_sha256,
+    lock_sha256,
     extra,
+  });
+
+  test("a small file kept out of LFS keeps the lock's sha256 (its git blob id was checked before)", () => {
+    const { updates, problems } = lockFromHf([plan('tokenizer', null, false, 'c'.repeat(64))]);
+    expect(problems).toEqual([]);
+    expect(updates.get('tokenizer')).toEqual({ url: 'https://huggingface.co/o/r/resolve/main/tokenizer.safetensors', sha256: 'c'.repeat(64), size: 1000 });
   });
 
   test('turns every resolved file into url, sha256 and size', () => {
@@ -182,6 +225,14 @@ describe('lockDrift', () => {
 
   test('a pinned sha256 that Hugging Face no longer publishes is drift', () => {
     expect(lockDrift({ sha256: sha }, { sha256: null, size: 10 })).toMatch(/publishes no sha256/);
+  });
+
+  test('a small file kept out of LFS is checked by its git blob id, then by its sha256 once downloaded', () => {
+    const git = 'd27fb3f2fd38ca39b7bbfbf83a13b3c617e551df';
+    expect(lockDrift({ sha256: sha, size: 10, git_sha1: git }, { sha256: null, size: 10, git_sha1: git })).toBeNull();
+    expect(lockDrift({ sha256: sha, size: 10, git_sha1: git }, { sha256: null, size: 10, git_sha1: 'e'.repeat(40) })).toMatch(
+      new RegExp(`lock pins git blob ${git}, Hugging Face serves e{40}`),
+    );
   });
 });
 

@@ -1,17 +1,19 @@
 # Session GPU S2 : pas-à-pas
 
-Date prévue : 21–22/10/2026. C'est la **première session GPU** : la S1 du 18/10 a été remplacée par une analyse sans GPU ([S1_ANALYSE.md](S1_ANALYSE.md)). Durée visée : 4 à 6 h de RTX 4090. Budget : environ 0,34 $/h en Community Cloud, soit 1,5 à 2 $ (spec §10).
+Date prévue : 21–22/10/2026. C'est la **première session GPU** : la S1 du 18/10 a été remplacée par une analyse sans GPU ([S1_ANALYSE.md](S1_ANALYSE.md)). Durée visée : 6 h 30 à 8 h 30 de RTX 4090, dont 2 h 30 pour les extensions. Budget : environ 0,34 $/h en Community Cloud, soit 2,20 à 2,90 $ (spec §10).
 
 **Objet :**
 - premier rendu réel ;
 - mesures de mémoire et de temps ;
 - réglage des 12 presets et test de l'enchaînement de plans ;
-- les vérifications que l'analyse a laissées au GPU (partie 6).
+- les vérifications que l'analyse a laissées au GPU (partie 6) ;
+- les extensions du 19/10, dans leur ordre de priorité réorienté : édition d'image, pack de 6 effets, transitions par images clés, avatar parlant, musique, upscale HD (partie 6.8, [EXTENSIONS_ANALYSE.md](EXTENSIONS_ANALYSE.md)). Une extension que la session n'a pas validée sera masquée de la démo le 25/10 au soir ; si la session déborde, l'upscale est le premier à couper.
 
 **Déjà prêt, grâce à l'analyse :**
 - lock exact (URL, taille et sha256 de chaque poids) ;
 - workflows tirés des templates officiels et validés par un vrai ComfyUI v0.41.0 ;
 - node « Montagio Camera Embedding » pour les mouvements combinés ;
+- workflows, poids (au lock) et compilateurs des 6 extensions, validés par un vrai ComfyUI v0.41.0 sauf la voix de l'avatar ;
 - licences lues à la source.
 
 Les outils sont dans [`infra/runpod/`](../infra/runpod/README.md) :
@@ -33,9 +35,10 @@ Tout ce qui sort de la session va dans `s1-results/`. Le nom est resté celui de
 | 1. Créer le pod | 10 min | à partir du démarrage |
 | 2. Copier le dépôt | 5 min | oui |
 | 3. Installer et lancer, pack Montagio compris | 20 à 30 min | oui |
-| 4. Télécharger les poids | 10 à 25 min | oui |
+| 4. Télécharger les poids | 20 à 50 min | oui |
 | 5. Premiers rendus et mesures | 45 min | oui |
 | 6. Vérifications et réglage des presets | 2 à 3 h | oui |
+| 6.8 Les extensions | ≈ 2 h 30 | oui |
 | 7. Rassembler, télécharger, éteindre | 15 min | jusqu'à l'arrêt |
 
 ## 0. La veille, sur votre PC (sans GPU)
@@ -62,7 +65,7 @@ Tout ce qui sort de la session va dans `s1-results/`. Le nom est resté celui de
 4. Template : **Runpod PyTorch**, le plus récent.
 5. **Edit Template** :
    - Container Disk : 40 Go ;
-   - Volume Disk : **150 Go**, monté sur `/workspace` (70 Go de poids, plus la marge) ; **250 Go** si vous prévoyez l'essai de l'installeur local (encadré de la partie 7) ;
+   - Volume Disk : **300 Go**, monté sur `/workspace` : 189 Go de poids (70 Go pour les presets, 119 Go pour les extensions), 15 Go de PyTorch et d'outils, les sorties et la marge ; **350 Go** si vous prévoyez aussi l'essai de l'installeur local (encadré de la partie 7), qui télécharge sa propre copie des 70 Go des presets ;
    - Expose HTTP Ports : `8888` et **`8188`** ;
    - aucune variable d'environnement contenant une clé.
 6. **On-Demand**, pas Spot. Notez l'heure de démarrage.
@@ -91,6 +94,8 @@ source /workspace/montagio.env
 - **`<n> node classes loaded, 0 partner node(s)`**, la preuve « aucun Partner Node », **sans** ligne `warning: nodes missing` à la suite ;
 - `proxy: {"status": "healthy", …}`.
 
+**Node de la voix (extension avatar).** Le bootstrap clone `wildminder/ComfyUI-Chatterbox` au commit de `versions.env`, lui retire ses routes HTTP (patch `infra/runpod/patches/`), installe ses 5 paquets Python par leurs hash (`requirements-chatterbox.txt`) et lance ComfyUI avec `HF_HUB_OFFLINE=1`. Il le fait en dernier : un échec (clone, patch, paquet) affiche `warning: the avatar's voice node is not installed` sans arrêter l'installation. Une ligne `warning: nodes missing: ChatterboxMTLTTS` signifie que le node ne s'est pas chargé ; son erreur est dans `/workspace/logs/comfyui.log` (cause probable : `torchaudio` 2.11.0 sur torch 2.14.1). Ce n'est bloquant que pour l'avatar.
+
 **Pack Montagio, obligatoire.** Les presets combinés (Rise & Push, Drift Left Push, Pull Back & Tilt Up, Push & Settle et Breathing) passent par son node `MontagioCameraEmbedding`. Le bootstrap relie le pack dans `custom_nodes` avant de lancer ComfyUI, puis vérifie que ce node est chargé : rien à faire à la main. Pour le contrôler :
 ```bash
 python3 comfy-nodes/scripts/smoke_comfyui.py http://127.0.0.1:8188; echo "code $?"
@@ -106,25 +111,19 @@ MONTAGIO_COMFYUI_DIR=/workspace/ComfyUI MONTAGIO_COMFYUI_PYTHON=/workspace/venvs
 ```
 Attendu : tous les tests passent, aucun n'est ignoré. Les trois tests lourds comparent le node au `WanCameraEmbedding` du pod.
 
-## 4. Télécharger les poids (≈ 10 à 25 min)
+## 4. Télécharger les poids (≈ 20 à 50 min)
 
 ```bash
 npm run weights -w @montagio/infra-runpod -- --dry-run
 npm run weights -w @montagio/infra-runpod -- --models-dir /workspace/ComfyUI/models
 ```
 
-- Le `--dry-run` affiche les 9 fichiers, soit 69,7 Go (64,9 Gio), avec leur dossier ComfyUI et leur URL exacte. Une ligne `the file changed upstream` signifie que Hugging Face sert un autre fichier que celui du lock : **arrêtez-vous** et notez-la.
+- Le `--dry-run` affiche les 43 fichiers, soit 188,7 Go (175,7 Gio) : les 9 des presets (69,7 Go) et les 34 des extensions (édition 31,9 Go, effets 20,6 Go, transitions 31,0 Go, avatar et sa voix 21,5 Go, musique 10,0 Go, upscale 4,0 Go), avec leur dossier ComfyUI et leur URL exacte. Les fichiers de la voix vont dans `tts/chatterbox/resembleai-mtl-v3/`, les LoRA dans `loras/`. Pour ne prendre que les presets : `--extensions none`. Une ligne `the file changed upstream` signifie que Hugging Face sert un autre fichier que celui du lock : **arrêtez-vous** et notez-la.
 - Chaque ligne du vrai lancement doit finir par `(matches Hugging Face)`. Le sha256 est aussi comparé à celui du lock.
 - À noter : le débit (Mo/s) et la durée totale.
 - Le lock est déjà exact : `s1-results/models.lock.patch` doit être vide.
 
-LoRA LightX2V, pour la vérification 6.6 seulement. La licence est acceptée, mais les LoRA restent hors du lock :
-```bash
-npm run weights -w @montagio/infra-runpod -- --models-dir /workspace/ComfyUI/models \
-  --extra loras=https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors \
-  --extra loras=https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors
-```
-Les sha256 attendus sont dans [S1_ANALYSE.md](S1_ANALYSE.md), partie 1 (`d176c808…` et `024f21de…`).
+Les LoRA LightX2V de Wan 2.2 I2V de la vérification 6.6 (`d176c808…` et `024f21de…`) sont désormais au lock, avec l'extension « transitions » : le téléchargement ci-dessus les prend, plus besoin de `--extra`.
 
 ## 5. Premiers rendus et mesures (≈ 45 min)
 
@@ -191,6 +190,56 @@ Si c'est adopté, le plan suivant ajoutera :
 ### 6.7 Rotations
 Faites un rendu de `roll_cw` à 0,3 avec `--camera-pose "ClockWise (CW)" --camera-speed 0.3`. Décidez ensuite d'un preset « Dutch », ou non.
 
+### 6.8 Les extensions (≈ 2 h 30)
+
+Dans l'ordre de priorité réorienté. Le détail de ce qu'il faut regarder est dans [EXTENSIONS_ANALYSE.md](EXTENSIONS_ANALYSE.md), partie 7. Chaque commande note temps, VRAM et sortie dans `s1-results/smoke.jsonl`, et range la sortie dans `s1-results/clips/`. Il faut `ffprobe` pour l'avatar : `apt-get install -y ffmpeg`. Groupez les jobs par modèle : chaque changement de famille recharge des poids. Préparez trois photos dont vous avez les droits : une personne de face (`/workspace/person.png`), un animal (`animal.png`), un objet (`object.png`), plus une tenue sur fond neutre (`outfit.png`).
+
+1. **Édition** (≈ 20 min) :
+   ```bash
+   npm run smoke -w @montagio/infra-runpod -- --extension edit --input /workspace/person.png --text "make it a rainy night scene"
+   npm run smoke -w @montagio/infra-runpod -- --extension edit --input /workspace/person.png --text "ajoute de la neige"
+   npm run smoke -w @montagio/infra-runpod -- --extension edit --quality --input /workspace/person.png --text "make it a rainy night scene"
+   npm run smoke -w @montagio/infra-runpod -- --extension edit --look infl8 --input /workspace/person.png --text "inflate the person"
+   npm run smoke -w @montagio/infra-runpod -- --extension edit --look action --input /workspace/person.png --text "action the person"
+   npm run smoke -w @montagio/infra-runpod -- --extension edit --look angles --input /workspace/object.png --text "front-left quarter view eye-level shot medium shot"
+   ```
+   Les deux premières tournent en 4 étapes (LoRA Lightning), la troisième en 40 : comparez le temps et la fidélité à l'instruction. Les trois dernières valident chaque look : aucune ligne `lora key not loaded` dans `/workspace/logs/comfyui.log`, et l'effet attendu (gonflé, figurine, autre angle de vue). Un look qui échoue se note dans la fiche : l'édition peut être datée sans lui, mais le hook Figurine (look ACTION) ne le sera pas.
+   Le journal de ComfyUI dit-il `loaded completely` ou `loaded partially` ? Notez le temps par image et le pic de VRAM. Puis animez l'image éditée : `npm run smoke -w @montagio/infra-runpod -- --image s1-results/clips/<l'image éditée>.png`.
+2. **Effets** (≈ 45 min) : les 6 effets sur chaque photo, en 4 étapes ; `--text` donne le sujet que reprend le prompt.
+   ```bash
+   npm run smoke -w @montagio/infra-runpod -- --extension effect --input /workspace/person.png --text "woman"
+   npm run smoke -w @montagio/infra-runpod -- --extension effect --input /workspace/animal.png --text "dog"
+   npm run smoke -w @montagio/infra-runpod -- --extension effect --input /workspace/object.png --text "red toy car"
+   ```
+   Critères, pour chaque clip : le sujet reste reconnaissable, l'effet se lit dès la première seconde, aucun artefact bloquant. Dans `/workspace/logs/comfyui.log`, aucune ligne `lora key not loaded` : sinon, la LoRA 4 étapes de lightx2v n'est pas lue (partie 1 de l'analyse). Dans ce cas, téléchargez la copie que les templates utilisent (`npm run weights -w @montagio/infra-runpod -- --models-dir /workspace/ComfyUI/models --extra loras=https://huggingface.co/Comfy-Org/Wan-Animate-2/resolve/main/loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors`) et comparez dans l'interface en changeant le fichier du node 201. Notez les effets qui cassent en 4 étapes, les grands mouvements surtout (explosion, crash zoom) : ils repasseront en 20 étapes en S3 (`--quality --effect explode`).
+3. **Hooks par images clés** (≈ 30 min) :
+   ```bash
+   npm run smoke -w @montagio/infra-runpod -- --extension hook --hook eyes-in --input /workspace/person.png
+   npm run smoke -w @montagio/infra-runpod -- --extension hook --hook outfit-morph --input /workspace/person.png --input2 /workspace/outfit.png
+   npm run smoke -w @montagio/infra-runpod -- --extension hook --hook eyes-in --quality --input /workspace/person.png
+   ```
+   L'édition fait d'abord l'image finale (la macro de l'iris, la personne dans la tenue), puis la transition anime le passage depuis la photo. Regardez d'abord l'image finale dans `s1-results/clips/` : si elle est ratée, la transition le sera aussi. Puis la continuité (pas de saut au milieu, l'identité gardée) et le temps total d'un hook, rechargements compris. Figurine et Ignite sont pour la S3.
+4. **Voix seule** (≈ 5 min) : `npm run smoke -w @montagio/infra-runpod -- --extension voice --text "Bonjour, ceci est un essai." --language fr`. Le node est-il chargé (fin du bootstrap) ? Combien de temps pour la phrase ?
+5. **Avatar et sa voix** (≈ 30 min) : une photo d'une personne dont vous avez les droits, de face.
+   ```bash
+   npm run smoke -w @montagio/infra-runpod -- --extension avatar --input /workspace/face.png --text "Hello, this is a test of the Montagio avatar." --language en
+   npm run smoke -w @montagio/infra-runpod -- --extension avatar --input /workspace/face.png --text "Bonjour, ceci est un essai de l'avatar de Montagio." --language fr
+   ```
+   La voix tourne d'abord, puis l'avatar dit sa sortie. Regardez la synchronisation des lèvres (sur les « p » et les « b »), l'identité, les coutures à 5 et 10 s, et l'accent de la voix en français. Si le temps le permet, comparez dans l'interface : le chemin 20 étapes sans LoRA (`steps` 20, `cfg` 6, LoRA retirée), et `ImageFromBatch.batch_index` à 1 et 3 au lieu de 4.
+6. **Musique** (≈ 10 min, en fond) :
+   ```bash
+   npm run smoke -w @montagio/infra-runpod -- --extension music --duration 10 --text "tense cinematic synth pulse"
+   npm run smoke -w @montagio/infra-runpod -- --extension music --duration 60 --text "calm piano, slow strings"
+   ```
+   Écoutez : aucune voix ? Le tempo de 90 est-il suivi ? Notez le temps juste après un rendu Wan (rechargement des modèles). Puis, dans le Studio en mode local, une Séquence de 2 plans : la musique est mixée plus tard, dans la phase d'intégration ; ici, gardez seulement le FLAC.
+7. **Upscale HD** (≈ 15 min, s'il reste du temps) : sur un clip de la partie 5.
+   ```bash
+   npm run smoke -w @montagio/infra-runpod -- --extension upscale --clip s1-results/clips/<un clip 720p>.mp4
+   ```
+   Comparez au même clip agrandi par FFmpeg (`ffmpeg -i clip.mp4 -vf scale=1920:1080:flags=lanczos lanczos.mp4`) : la netteté est-elle meilleure, ou artificielle ? Regardez les coutures entre morceaux (toutes les 33 images). Pour comparer la correction de couleur, changez `color_correction_method` du node 59 (`lab`, `wavelet`, `none`) dans `s1-results/workflows/ext-upscale__seedvr2-upscale.api.json`, chargé dans l'interface.
+8. **Fixture de la voix** : `curl -s http://127.0.0.1:8188/object_info/ChatterboxMTLTTS > s1-results/object_info-chatterbox.json`. De retour sur le PC, elle remplace l'entrée écrite à la main dans `infra/runpod/test/fixtures/object_info-v0.41.0.json`.
+9. **Décision** : pour chaque extension qui donne un résultat montrable, notez-la dans la fiche (partie 8). De retour sur le PC, sa date ira dans `gpu_validated` de `registry/extensions.yaml` ; une extension non datée le 25/10 au soir est masquée de la démo. Les repasses sans distillation, les hooks Figurine et Ignite, et Earth Zoom Out en cinq images clés (si le temps le permet) sont pour la S3 (24–25/10).
+
 > **Le Studio en mode local sur le pod.** Une fois le proxy lancé :
 > ```bash
 > apt-get update && apt-get install -y ffmpeg
@@ -216,9 +265,9 @@ Faites un rendu de `roll_cw` à 0,3 avec `--camera-pose "ClockWise (CW)" --camer
 > apt-get update && apt-get install -y ffmpeg
 > ./montagio.sh install --dry-run --dir /workspace/montagio-local --comfy-port 8288 --proxy-port 8289 --app-port 3001
 > ```
-> Les ports changent pour ne pas buter sur ComfyUI et le proxy du bootstrap. Attendu : la RTX 4090 avec 24 Go, `driver …, CUDA 13.x: torch 2.14.1+cu130`, puis la liste des étapes. Notez toute ligne en échec. Avec le volume de 150 Go, la ligne du disque devrait échouer : c'est attendu, voir le point 2.
+> Les ports changent pour ne pas buter sur ComfyUI et le proxy du bootstrap. Attendu : la RTX 4090 avec 24 Go, `driver …, CUDA 13.x: torch 2.14.1+cu130`, puis la liste des étapes. Notez toute ligne en échec. Avec un volume de 300 Go, la ligne du disque passe de justesse une fois les poids de la session téléchargés (≈ 95 Go libres) ; avec 350 Go, largement. L'installeur ne prend pas les poids des extensions par défaut (`--extensions validated`, aucune n'est encore datée).
 >
-> **2. Vraie installation**, après le téléchargement de l'archive (étape 2 ci-dessus) et avant Terminate. Comptez 30 à 45 min de pod en plus, soit environ 0,25 $, dont 10 à 25 min de poids. Il faut environ 80 Gio libres sur `/workspace` (65 Gio de poids, 12 Gio de PyTorch) : avec 150 Go, l'installeur refuse au contrôle du disque, avant de rien changer. D'où les 250 Go de la partie 1.
+> **2. Vraie installation**, après le téléchargement de l'archive (étape 2 ci-dessus) et avant Terminate. Comptez 30 à 45 min de pod en plus, soit environ 0,25 $, dont 10 à 25 min de poids. Il faut environ 80 Gio libres sur `/workspace` (65 Gio de poids des presets, 12 Gio de PyTorch) en plus des ≈ 205 Go de la session (poids et outils) : sans assez de place, l'installeur refuse au contrôle du disque, avant de rien changer. D'où les 350 Go conseillés en partie 1 pour cet essai.
 > ```bash
 > bash infra/runpod/bootstrap.sh stop
 > df -h /workspace
@@ -250,6 +299,16 @@ LightX2V : gain ____ ×   mouvement conservé : oui / non   adoptée / exclue
 Séquence : continuité ____   film 16:9 ok   coupe 9:16 ok
 Installeur local (facultatif) : dry-run, lignes en échec ______________   vraie install ____ min, « Montagio is ready » oui / non
 Presets réglés : ______________________________________________
+Extensions (validée oui / non, temps, VRAM max, remarque) :
+  Édition 4 étapes ____ s, 40 étapes ____ s, VRAM ____ Mo, loaded completely / partially, français suivi oui / non : __________
+    Looks infl8 ___ action ___ angles ___ (« lora key not loaded » oui / non) : __________
+  Effets lisibles (personne / animal / objet) : squish ___ cakeify ___ explode ___ crash zoom ___ bullet time ___ orbit ___
+    ____ s par effet, VRAM ____ Mo, « lora key not loaded » oui / non, à repasser en 20 étapes : __________
+  Hooks eyes-in ____ s, outfit-morph ____ s (édition + transition), image finale réussie oui / non, continuité : __________
+  Voix node chargé oui / non, en ____ s, français : __________
+  Avatar 5 s ____ s, 10 s ____ s, VRAM ____ Mo, lèvres : __________, LoRA gardée oui / non
+  Musique 10 s ____ s, 60 s ____ s, VRAM ____ Mo, voix entendues oui / non : __________
+  Upscale 81 images ____ s, VRAM ____ Mo, mieux que lanczos oui / non, coutures : __________
 ```
 
 ## 9. De retour sur le PC
@@ -257,6 +316,7 @@ Presets réglés : ______________________________________________
 1. Décompressez l'archive dans `montagio/` (le dossier `s1-results/` y est ignoré par git).
 2. Reportez les réglages retenus dans `presets/*.yaml`. Lancez `python comfy-nodes/scripts/sync_presets.py`, puis `npm run montagio -- preset validate presets`, `npm test`, `npm run test:nodes` et `npm run check:open-stack`.
 3. Gardez la fiche remplie et les exports avec `s1-results/` : ce sont les entrées du plan suivant (galerie, aperçus, S3).
+4. Extensions : datez `gpu_validated` dans `registry/extensions.yaml` pour chaque extension validée (format `2026-10-22`) ; remplacez l'entrée `ChatterboxMTLTTS` de `infra/runpod/test/fixtures/object_info-v0.41.0.json` par celle de `s1-results/object_info-chatterbox.json` (sans les tooltips) ; reportez les mesures dans `docs/EXTENSIONS_ANALYSE.md` (parties 4 et 6) et les `estimate_s` dans `registry/extensions/*.yaml`. Relancez ensuite `npm test` et `npm run check:open-stack`.
 
 ## Dépannage
 

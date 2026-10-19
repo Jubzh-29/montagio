@@ -1,0 +1,30 @@
+# Python packages of the avatar's voice node (wildminder/ComfyUI-Chatterbox, see versions.env), installed
+# with --no-deps --require-hashes: its own requirements.txt would pull s3tokenizer's dev tools (pre-commit,
+# virtualenv, nodeenv), and its extras download from GitHub (spacy-pkuseg) or are GPL (pykakasi). Hashes from
+# PyPI's JSON API on 2026-10-19: Linux x86_64 wheels for CPython 3.10 to 3.13, and Windows x64 for 3.12.
+# torchaudio 2.11.0 is the last release, older than the pinned torch 2.14.1: GPU session S2 checks the import.
+# Licenses: s3tokenizer, onnx and ml_dtypes Apache-2.0; protobuf BSD-3-Clause; torchaudio BSD-2-Clause.
+s3tokenizer==0.3.0 \
+    --hash=sha256:c9e93b1892a124a2c4d958ab53610a1b4433fcb4172056e2f2bd3c09cfe249a6
+onnx==1.23.2 \
+    --hash=sha256:03334d6c834767c7acd37c7db51c98e98c8ceb61a964f6df96386e13272d2870 \
+    --hash=sha256:c03ecf6b835d136108eeaeeafbd0026fc7b3cf98661409fbc6b63d5a29361348 \
+    --hash=sha256:7abf381d278f31ac62487fddedc9dd42da842dce94d5d43536836ee3efdf4a2b \
+    --hash=sha256:9b382ba898a7c142a0801d03cf04ecabced96c1543c7b643a86f0928143802de
+protobuf==7.36.2 \
+    --hash=sha256:89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2 \
+    --hash=sha256:a300819d441e078a5608c0d3c709796bb548136058fda017ae51d425b44fd353 \
+    --hash=sha256:bdb3a345d48db958e6ce1f18e508beb0cc981d64f24088427549c866cd039f1e
+ml_dtypes==0.6.0 \
+    --hash=sha256:6ec0d244a5bba12239025389ad88bbfb45f9f10e25ab4f678e9a4768ebd47532 \
+    --hash=sha256:6c8e39b53e90afda8ce52859c93de4dba3e02b76d85dcf091cc469f9184c6dae \
+    --hash=sha256:3b4a480aa8fd54a1805b8ac10f3f91763926a74f73c0c364c10f9231854f4170 \
+    --hash=sha256:2a3e9d53925597fbffafd2a37048dadeddd0bdaba58058f6ae0869ed709a184d \
+    --hash=sha256:26b1f1fa4f0435a2946859823f6e2bf06796f1e9f10f5a05b08a5e3c8f46ff69
+torchaudio==2.11.0 \
+    --hash=sha256:5847fe2022b17c6580aeb39c8797a443411cc09edfd9183cd50ac1a3b8ccf97c \
+    --hash=sha256:1a07ec72fd6f26a588c39b5f029e0130d16bb40bc4221635580bf8fb18fcbc80 \
+    --hash=sha256:6503c0bdb29daf2e6281bb70ea2dfe2c3553b782b619eb5d73bdadd8a3f7cecf \
+    --hash=sha256:478110f981e5d40a8d82221732c57a56c85a1d5895fb8fe646e86ee15eded3bd \
+    --hash=sha256:1c1101c1243ef0e4063ec63298977e2d3655c15cf88d9eb0a1bd4fe2db9f47ea \
+    --hash=sha256:13cff988697ccbad539987599f9dc672f40c417bed67570b365e4e5002bbd096

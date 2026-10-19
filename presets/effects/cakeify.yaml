@@ -1,0 +1,19 @@
+# Effect LoRA: Remade-AI/Cakeify (Apache-2.0 in the card metadata, no LICENSE file).
+# The template is the card's, with {subject} for its [object].
+schema: montagio/preset@0.1
+id: cakeify
+name: Cake-ify
+description: A knife slices the subject open, and it was cake all along.
+preview: previews/cakeify.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-effect
+effect:
+  lora: remade-cakeify
+  strength: 1
+  trigger: c4k3 cakeify it
+prompt:
+  template: "The video opens on a {subject}. A knife, held by a hand, is coming into frame and hovering over the {subject}. The knife then begins cutting into the {subject} to c4k3 cakeify it. As the knife slices the {subject} open, the inside of the {subject} is revealed to be cake with chocolate layers. The knife cuts through and the contents of the {subject} are revealed."
+  subject: object
+models:
+  preferred: wan21-i2v-effects

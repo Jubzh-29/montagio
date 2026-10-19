@@ -3,6 +3,10 @@ import { z } from 'zod';
 /** Weight licenses the official distribution accepts: usable by anyone, anywhere, for any purpose. */
 export const ALLOWED_WEIGHT_LICENSES = ['Apache-2.0', 'MIT'] as const;
 
+/** The six extensions, in their order of priority (reoriented toward one-photo hooks on 2026-10-19). */
+export const EXTENSION_IDS = ['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale'] as const;
+export type ExtensionId = (typeof EXTENSION_IDS)[number];
+
 export const CAPABILITIES = ['i2v-camera', 'i2v', 't2i'] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
@@ -26,7 +30,7 @@ export const REQUIRED_BINDINGS: Record<Capability, BindingKey[]> = {
   t2i: ['prompt', 'seed', 'width', 'height'],
 };
 
-const kebabId = z.string().max(64).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'must be kebab-case (a-z, 0-9, -)');
+export const kebabId = z.string().max(64).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'must be kebab-case (a-z, 0-9, -)');
 const resolution = z.enum(['480p', '720p']);
 const binding = z.object({ node: z.string().min(1), field: z.string().min(1) }).strict();
 
@@ -76,10 +80,20 @@ export const LockEntrySchema = z
     file: z.string().min(1),
     url: z.string().startsWith('https://huggingface.co/', 'url must point to https://huggingface.co/'),
     sha256: z.string().regex(/^[a-f0-9]{64}$/, 'sha256 must be 64 lowercase hex characters').optional(),
+    /** Git blob id of a small file Hugging Face keeps out of LFS, and so publishes no sha256 for. */
+    git_sha1: z.string().regex(/^[a-f0-9]{40}$/, 'git_sha1 must be 40 lowercase hex characters').optional(),
     /** Size of the file in bytes, as Hugging Face publishes it. */
     size: z.number().int('size must be a whole number of bytes').positive('size must be a positive number of bytes').optional(),
     license: z.string().min(1),
     source: z.string().url(),
+    /** The extension this weight serves; absent for the weights of the camera presets. */
+    extension: z.enum(EXTENSION_IDS).optional(),
+    /** Folder under ComfyUI's models/, when the URL does not end in <folder>/<file>. */
+    folder: z
+      .string()
+      .regex(/^[a-z0-9_]+(\/[A-Za-z0-9._-]+)*$/, 'folder must be a relative path under models/, such as tts/chatterbox/<pack>')
+      .refine((folder) => folder.split('/').every((part) => part !== '.' && part !== '..'), 'folder must not contain . or ..')
+      .optional(),
   })
   .strict();
 

@@ -1,0 +1,15 @@
+# A hook of the GPU session S2: the end frame is a macro of the iris, made by the edit.
+schema: montagio/preset@0.1
+id: eyes-in
+name: Eyes In
+description: The camera dives into the subject's eye until the iris fills the frame.
+preview: previews/eyes-in.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-transition
+end_frame:
+  instruction: "Extreme macro close-up of one eye of the person in the photo: the iris fills the whole frame, its fibers and the reflection in the pupil sharp, same eye color and same light."
+prompt:
+  motion: "The camera pushes slowly and continuously into the person's eye, closer and closer, until the iris fills the frame in extreme macro detail. One smooth zoom, no cut."
+models:
+  preferred: wan22-flf2v-transition

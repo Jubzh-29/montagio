@@ -33,14 +33,18 @@ function inputType(spec: unknown): string | null {
   return typeof type === 'string' ? type : null;
 }
 
+/** A V3 io.MatchType (ResizeImageMaskNode takes IMAGE or MASK and gives back the type it got). */
+const MATCH_TYPE = 'COMFY_MATCHTYPE_V3';
+
 /**
- * ComfyUI's rule (comfy_execution/validation.py): "*" matches anything, a type may list
- * several, comma-separated, and an output typed as an option list goes into a combo.
+ * ComfyUI's rule (comfy_execution/validation.py): "*" matches anything, so does a
+ * MatchType on either side (the frontend checks those), a type may list several,
+ * comma-separated, and an output typed as an option list goes into a combo.
  */
 function typesMatch(expected: string, received: OutputType): boolean {
-  if (expected === '*') return true;
+  if (expected === '*' || expected === MATCH_TYPE) return true;
   if (Array.isArray(received)) return expected === 'COMBO';
-  if (received === '*') return true;
+  if (received === '*' || received === MATCH_TYPE) return true;
   const received_ = new Set(received.split(','));
   return expected.split(',').some((type) => received_.has(type));
 }

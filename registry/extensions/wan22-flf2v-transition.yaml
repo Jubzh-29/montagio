@@ -1,0 +1,34 @@
+# Keyframe transitions (extension "transitions"): Wan 2.2 I2V A14B animates the passage from
+# a start image to an end image (first-last frame to video, FLF2V), 2 to 5 s of 480p at 16 fps.
+# A hook of presets/transitions/ has its end image made first by the edit (Qwen-Image-Edit-2511):
+# that is why this extension requires "edit". compileTransition keeps or removes the two 4-step
+# LoRAs of lightx2v (91 on the high-noise expert, 92 on the low-noise one).
+schema: montagio/extension-model@0.1
+id: wan22-flf2v-transition
+name: Wan 2.2 FLF2V (keyframe transitions)
+extension: transitions
+task: flf2v
+license: Apache-2.0
+weights:
+  - wan22-i2v-high-fp8
+  - wan22-i2v-low-fp8
+  - lightx2v-wan22-i2v-4step-high
+  - lightx2v-wan22-i2v-4step-low
+  - umt5-xxl-fp8
+  - wan21-vae
+workflow: workflows/wan22-flf2v-transition.api.json
+bindings:
+  image: { node: "68", field: image }
+  end_image: { node: "62", field: image }
+  prompt: { node: "6", field: text }
+  negative: { node: "7", field: text }
+  # the low-noise sampler (58) adds no noise, as in the template
+  seed: { node: "57", field: noise_seed }
+  width: { node: "67", field: width }
+  height: { node: "67", field: height }
+  frames: { node: "67", field: length }
+output: { node: "61", kind: video }
+limits: { min_duration_s: 2, max_duration_s: 5, max_chars: 300 }
+# GPU seconds for 5 s at 832x480 on an RTX 4090 with the 4-step LoRAs (the template measures
+# 71 to 108 s at 640x640 on an RTX 4090D; about 9 min at 20 steps without them; S2 measures it)
+estimate_s: 110

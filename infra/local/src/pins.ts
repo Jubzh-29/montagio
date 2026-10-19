@@ -17,10 +17,22 @@ export type Versions = {
   torchFallback: TorchPin;
 };
 
-export type LockWeight = { id: string; file: string; url: string; sha256: string; size: number; folder: string };
+/** `folder` is relative to ComfyUI's models/; `extension` is null for the weights of the camera presets. */
+export type LockWeight = { id: string; file: string; url: string; sha256: string; size: number; folder: string; extension: string | null };
 
-/** ComfyUI models/ folders a lock file can go to (the same set as infra/runpod/lib/weights.ts). */
-const COMFY_FOLDERS = new Set(['checkpoints', 'diffusion_models', 'text_encoders', 'vae', 'loras', 'clip_vision', 'controlnet', 'upscale_models']);
+/** ComfyUI models/ folders a lock file can go to (the same set as infra/runpod/lib/weights.ts); `tts` holds the voice packs. */
+const COMFY_FOLDERS = new Set([
+  'checkpoints',
+  'diffusion_models',
+  'text_encoders',
+  'vae',
+  'loras',
+  'clip_vision',
+  'controlnet',
+  'upscale_models',
+  'audio_encoders',
+  'tts',
+]);
 
 export function parseVersionsEnv(text: string): Record<string, string> {
   const values: Record<string, string> = {};
@@ -100,11 +112,106 @@ export function parseLockWeights(text: string): LockWeight[] {
     }
     const size = Number(entry.size);
     if (!Number.isSafeInteger(size) || size <= 0) throw new Error(`lock entry ${id} has an invalid size ${entry.size}`);
-    const parts = new URL(entry.url!).pathname.split('/');
-    const folder = parts.at(-2) ?? '';
-    if (!COMFY_FOLDERS.has(folder)) throw new Error(`lock entry ${id}: ${entry.url} names no ComfyUI folder (…/<folder>/<file>)`);
-    return { id, file: entry.file!, url: entry.url!, sha256: entry.sha256!, size, folder };
+    let folder: string;
+    if (entry.folder) {
+      const parts = entry.folder.split('/');
+      if (!COMFY_FOLDERS.has(parts[0]!) || parts.some((part) => part === '' || part === '.' || part === '..')) {
+        throw new Error(`lock entry ${id}: folder "${entry.folder}" is not a path under a ComfyUI models/ folder`);
+      }
+      folder = entry.folder;
+    } else {
+      folder = new URL(entry.url!).pathname.split('/').at(-2) ?? '';
+      if (!COMFY_FOLDERS.has(folder)) throw new Error(`lock entry ${id}: ${entry.url} names no ComfyUI folder (…/<folder>/<file>)`);
+    }
+    return { id, file: entry.file!, url: entry.url!, sha256: entry.sha256!, size, folder, extension: entry.extension || null };
   });
+}
+
+/** One extension of registry/extensions.yaml: its id, priority, requirements, and the day a GPU session validated it. */
+export type ExtensionPin = { id: string; priority: number; requires: string[]; gpuValidated: string | null };
+
+/**
+ * registry/extensions.yaml, kept in block style (`  - id: …` then `    key: value`)
+ * like the lock; the parity test compares this reader with @montagio/registry's.
+ */
+export function parseExtensionsConfig(text: string): ExtensionPin[] {
+  const entries: Record<string, string>[] = [];
+  let inList = false;
+  for (const line of text.split(/\r?\n/)) {
+    if (/^\S/.test(line)) {
+      inList = /^extensions:\s*$/.test(line);
+      continue;
+    }
+    if (!inList) continue;
+    const item = /^\s*-\s+([A-Za-z0-9_]+):(.*)$/.exec(line);
+    const field = /^\s+([A-Za-z0-9_]+):(.*)$/.exec(line);
+    if (item) entries.push({ [item[1]!]: scalar(item[2]!) });
+    else if (field && entries.length > 0) entries.at(-1)![field[1]!] = scalar(field[2]!);
+  }
+  return entries.map((entry) => ({
+    id: entry.id ?? '?',
+    priority: Number(entry.priority),
+    // an inline list: "[edit]", "[edit, music]"
+    requires: (entry.requires ?? '')
+      .replace(/^\[|\]$/g, '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean),
+    gpuValidated: !entry.gpu_validated || entry.gpu_validated === 'null' ? null : entry.gpu_validated,
+  }));
+}
+
+/** The extensions of the repository; none when it has no registry/extensions.yaml. */
+export function readExtensions(repoRoot: string): ExtensionPin[] {
+  let text: string;
+  try {
+    text = readFileSync(join(repoRoot, 'registry', 'extensions.yaml'), 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+  return parseExtensionsConfig(text);
+}
+
+/**
+ * The extensions whose weights to install, by priority; the same rule as the app's
+ * (enabledExtensions of @montagio/registry): unset, empty or "validated" keeps those a GPU
+ * session validated, "all", "none", or a comma-separated list of ids.
+ */
+export function selectExtensions(config: ExtensionPin[], flag: string | null | undefined): string[] {
+  const byPriority = [...config].sort((a, b) => a.priority - b.priority);
+  const value = flag?.trim() ?? '';
+  if (value === '' || value === 'validated') {
+    const kept = new Set(byPriority.filter((e) => e.gpuValidated !== null).map((e) => e.id));
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const e of byPriority) {
+        if (kept.has(e.id) && !e.requires.every((id) => kept.has(id))) changed = kept.delete(e.id);
+      }
+    }
+    return byPriority.filter((e) => kept.has(e.id)).map((e) => e.id);
+  }
+  if (value === 'all') return byPriority.map((e) => e.id);
+  if (value === 'none') return [];
+  const asked = value
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const known = byPriority.map((e) => e.id);
+  const unknown = asked.filter((id) => !known.includes(id));
+  if (unknown.length > 0) {
+    throw new Error(`--extensions: unknown extension ${unknown.map((id) => JSON.stringify(id)).join(', ')} (expected validated, all, none or a list of ${known.join(', ')})`);
+  }
+  for (const e of byPriority.filter((entry) => asked.includes(entry.id))) {
+    const missing = e.requires.filter((id) => !asked.includes(id));
+    if (missing.length > 0) throw new Error(`--extensions: ${e.id} requires ${missing.join(', ')}; add ${missing.length > 1 ? 'them' : 'it'} to the list`);
+  }
+  return known.filter((id) => asked.includes(id));
+}
+
+/** The weights of the camera presets, plus those of the extensions in `enabled`. */
+export function weightsFor(lock: LockWeight[], enabled: readonly string[]): LockWeight[] {
+  return lock.filter((weight) => !weight.extension || enabled.includes(weight.extension));
 }
 
 export function readLock(repoRoot: string): LockWeight[] {

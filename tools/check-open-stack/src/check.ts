@@ -6,7 +6,7 @@ import { ALLOWED_WEIGHT_LICENSES, parseLock, type LockEntry } from '@montagio/re
 import { parse as parseYaml } from 'yaml';
 
 export type Violation = {
-  rule: 'weight-license' | 'weight-file' | 'node-not-allowed' | 'forbidden-pattern' | 'closed-package' | 'library';
+  rule: 'weight-license' | 'weight-source' | 'weight-file' | 'node-not-allowed' | 'forbidden-pattern' | 'closed-package' | 'library';
   file: string;
   detail: string;
 };
@@ -264,8 +264,53 @@ async function sourceDirs(root: string): Promise<string[]> {
   return dirs;
 }
 
+/** allowed-sources.yaml: the Hugging Face repositories a lock weight may come from, and those it never may. */
+type AllowedSources = {
+  sources: { repo: string; license: string; role: 'source' | 'mirror'; revision: string; license_file: boolean; note?: string }[];
+  denied: { repo: string; reason: string }[];
+};
+
+/** "<owner>/<repo>" of a Hugging Face URL, whether it names the repository or a file in it. */
+function hfRepo(url: string): string | null {
+  return /^https:\/\/huggingface\.co\/([^/]+\/[^/?#]+)/.exec(url)?.[1] ?? null;
+}
+
+/** A refused repository; its `repo` may hold `*`, which stands for any run of characters but `/`. */
+function deniedEntry(sources: AllowedSources, repo: string) {
+  return sources.denied.find(({ repo: pattern }) => {
+    const parts = pattern.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
+    return new RegExp(`^${parts.join('[^/]*')}$`).test(repo);
+  });
+}
+
 /**
- * `configDir` holds allowed-nodes.yaml and forbidden-patterns.yaml; it defaults to
+ * A lock entry is fetched from its url and licensed by its source: the url's repository must be
+ * listed (a mirror or a source) and not refused, the source must be listed as a source, and the
+ * lock's license must be the source's (a mirror never changes it).
+ */
+function weightSourceProblems(lock: LockEntry[], sources: AllowedSources): string[] {
+  const problems: string[] = [];
+  const listed = new Map(sources.sources.map((source) => [source.repo, source]));
+  const unknown = 'an unknown source repo (list it in allowed-sources.yaml with the license read at the source)';
+  for (const entry of lock) {
+    const fetched = hfRepo(entry.url);
+    const denied = fetched ? deniedEntry(sources, fetched) : undefined;
+    if (denied) problems.push(`${entry.id} is fetched from ${fetched}, a refused repository: ${denied.reason}`);
+    else if (!fetched || !listed.has(fetched)) problems.push(`${entry.id} is fetched from ${fetched ?? entry.url}, ${unknown}`);
+
+    const named = hfRepo(entry.source);
+    const source = named ? listed.get(named) : undefined;
+    const deniedSource = named ? deniedEntry(sources, named) : undefined;
+    if (deniedSource) problems.push(`${entry.id} names ${named} as its source, a refused repository: ${deniedSource.reason}`);
+    else if (!source) problems.push(`${entry.id} names ${named ?? entry.source} as its source, ${unknown}`);
+    else if (source.role !== 'source') problems.push(`${entry.id} names the mirror ${named} as its source; name the repository the weights were published in`);
+    else if (source.license !== entry.license) problems.push(`${entry.id}: license ${entry.license} differs from its source ${named} (${source.license})`);
+  }
+  return problems;
+}
+
+/**
+ * `configDir` holds allowed-nodes.yaml, allowed-sources.yaml and forbidden-patterns.yaml; it defaults to
  * this package directory and must be passed explicitly when the code is bundled.
  */
 export async function checkOpenStack(root: string, opts: { configDir?: string } = {}): Promise<OpenStackReport> {
@@ -301,12 +346,18 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
     }
   }
 
+  // Weight sources: the repository each file is fetched from, and the one its license is read from.
+  const sources = await readYaml<AllowedSources>(join(configDir, 'allowed-sources.yaml'));
+  for (const detail of weightSourceProblems(lock, sources)) violations.push({ rule: 'weight-source', file: lockFile, detail });
+
   // Weight files actually loaded: every file a workflow node or a preset LoRA
   // names must be a lock entry (whose license was checked above) and, for a
   // model's workflow, one of that model's declared weights.
   const lockFiles = new Map(lock.map((entry) => [entry.file, entry]));
   const allowedFilesFor = (workflowPath: string): { files: Set<string>; owner: string } => {
-    const owners = library ? [...library.models.values()].filter((model) => model.workflow === workflowPath) : [];
+    const owners = library
+      ? [...library.models.values(), ...library.extensionModels.values()].filter((model) => model.workflow === workflowPath)
+      : [];
     if (owners.length === 0) return { files: new Set(lockFiles.keys()), owner: 'any lock entry' };
     const ids = new Set(owners.flatMap((model) => model.weights));
     return {

@@ -1,0 +1,19 @@
+# Effect LoRA: Remade-AI/Explode (Apache-2.0 in the card metadata, no LICENSE file).
+# The card has no template, only example prompts; this one follows them.
+schema: montagio/preset@0.1
+id: explode
+name: Explode
+description: The subject bursts into a huge fiery explosion.
+preview: previews/explode.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-effect
+effect:
+  lora: remade-explode
+  strength: 1
+  trigger: 3xp105ion huge explosion
+prompt:
+  template: "The video shows the {subject}. Then a 3xp105ion huge explosion bursts out of the {subject}, throwing fire, smoke and debris in every direction as the blast fills the frame."
+  subject: subject
+models:
+  preferred: wan21-i2v-effects

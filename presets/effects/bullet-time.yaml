@@ -1,0 +1,19 @@
+# Effect LoRA: Remade-AI/matrix-shot (Apache-2.0 in the card metadata, no LICENSE file).
+# The card has no template; its example prompts start with the trigger and repeat it.
+schema: montagio/preset@0.1
+id: bullet-time
+name: Bullet Time
+description: Time freezes while the camera sweeps around the subject.
+preview: previews/bullet-time.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-effect
+effect:
+  lora: remade-matrix-shot
+  strength: 1
+  trigger: b4ll3t t1m3 bullet time shot
+prompt:
+  template: "b4ll3t t1m3 bullet time shot The {subject} is frozen mid-motion while the camera sweeps around it. The scene utilizes a b4ll3t t1m3 bullet time shot effect, time standing still as the camera circles the {subject}."
+  subject: subject
+models:
+  preferred: wan21-i2v-effects

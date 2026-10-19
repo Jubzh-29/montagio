@@ -43,9 +43,22 @@ const LOADER_FOLDERS: Record<string, Record<string, string>> = {
   LoraLoader: { lora_name: 'loras' },
   LoraLoaderModelOnly: { lora_name: 'loras' },
   CLIPVisionLoader: { clip_name: 'clip_vision' },
+  AudioEncoderLoader: { audio_encoder_name: 'audio_encoders' },
 };
 
-const COMFY_FOLDERS = new Set(['checkpoints', 'diffusion_models', 'text_encoders', 'vae', 'loras', 'clip_vision', 'controlnet', 'upscale_models']);
+/** ComfyUI models/ folders a weight may go to (the same set as infra/local/src/pins.ts); `tts` holds the voice packs. */
+const COMFY_FOLDERS = new Set([
+  'checkpoints',
+  'diffusion_models',
+  'text_encoders',
+  'vae',
+  'loras',
+  'clip_vision',
+  'controlnet',
+  'upscale_models',
+  'audio_encoders',
+  'tts',
+]);
 
 export function weightFolders(workflows: ApiWorkflow[]): Map<string, string> {
   const folders = new Map<string, string>();
@@ -60,15 +73,25 @@ export function weightFolders(workflows: ApiWorkflow[]): Map<string, string> {
   return folders;
 }
 
-/** Folder from the workflow loaders first, else from the repository layout (Comfy-Org's split_files/<folder>/). */
-export function folderFor(file: string, repoPath: string, folders: Map<string, string>): string | null {
+/**
+ * The folder the lock names first (a voice pack under tts/), else the one of the
+ * workflow loaders, else the repository layout (Comfy-Org's split_files/<folder>/).
+ */
+export function folderFor(file: string, repoPath: string, folders: Map<string, string>, lockFolder?: string | null): string | null {
+  if (lockFolder) return lockFolder;
   const fromLoader = folders.get(file);
   if (fromLoader) return fromLoader;
   const parent = repoPath.split('/').at(-2);
   return parent && COMFY_FOLDERS.has(parent) ? parent : null;
 }
 
-export type RepoFile = { path: string; size: number; sha256: string | null };
+/** The weights of the camera presets, plus those of the extensions in `enabled`. */
+export function forExtensions<T extends { extension?: string | null }>(lock: T[], enabled: readonly string[]): T[] {
+  return lock.filter((entry) => !entry.extension || enabled.includes(entry.extension));
+}
+
+/** `gitSha1` is the git blob id Hugging Face gives every file; `sha256` exists only for LFS files. */
+export type RepoFile = { path: string; size: number; sha256: string | null; gitSha1?: string | null };
 export type RepoListing = { repo: string; gated: boolean; revision: string | null; license: string | null; files: RepoFile[] };
 export type RepoInfo = Omit<RepoListing, 'files'>;
 
@@ -90,12 +113,17 @@ export async function listRepo(repo: string, headers: Record<string, string> = {
   const files: RepoFile[] = [];
   let next: string | null = `${HF}/api/models/${repo}/tree/main?recursive=true`;
   while (next) {
-    const { body, link }: { body: { type: string; path: string; size: number; lfs?: { oid?: string } }[]; link: string | null } =
+    const { body, link }: { body: { type: string; path: string; size: number; oid?: string; lfs?: { oid?: string } }[]; link: string | null } =
       await getJson(next, headers);
     for (const entry of body) {
       if (entry.type !== 'file') continue;
       const oid = entry.lfs?.oid;
-      files.push({ path: entry.path, size: entry.size, sha256: oid && /^[a-f0-9]{64}$/.test(oid) ? oid : null });
+      files.push({
+        path: entry.path,
+        size: entry.size,
+        sha256: oid && /^[a-f0-9]{64}$/.test(oid) ? oid : null,
+        gitSha1: entry.oid && /^[a-f0-9]{40}$/.test(entry.oid) ? entry.oid : null,
+      });
     }
     next = /<([^>]+)>;\s*rel="next"/.exec(link ?? '')?.[1] ?? null;
   }
@@ -159,26 +187,36 @@ export function proposeLock(lockText: string, updates: Map<string, LockUpdate>):
  * files never enter the lock.
  */
 export function lockFromHf(
-  plans: { id: string; url: string; size: number; hf_sha256: string | null; extra: boolean }[],
+  plans: { id: string; url: string; size: number; hf_sha256: string | null; lock_sha256: string | null; extra: boolean }[],
 ): { updates: Map<string, Required<LockUpdate>>; problems: string[] } {
   const updates = new Map<string, Required<LockUpdate>>();
   const problems: string[] = [];
   for (const plan of plans) {
     if (plan.extra) continue;
-    if (!plan.hf_sha256) {
+    // A small file Hugging Face keeps out of LFS publishes no sha256: a plan only exists once
+    // lockDrift has matched its git blob id against the lock's, so the lock's sha256 stands.
+    const sha256 = plan.hf_sha256 ?? plan.lock_sha256;
+    if (!sha256) {
       problems.push(`${plan.id}: Hugging Face publishes no sha256 for ${plan.url}; download it to hash it`);
       continue;
     }
-    updates.set(plan.id, { url: plan.url, sha256: plan.hf_sha256, size: plan.size });
+    updates.set(plan.id, { url: plan.url, sha256, size: plan.size });
   }
   return { updates, problems };
 }
 
 /** Why the file Hugging Face serves is not the one the lock pins, or null when it is (or the lock pins nothing). */
-export function lockDrift(lock: { sha256?: string; size?: number }, remote: { sha256: string | null; size: number }): string | null {
+export function lockDrift(
+  lock: { sha256?: string; size?: number; git_sha1?: string },
+  remote: { sha256: string | null; size: number; git_sha1?: string | null },
+): string | null {
   const problems: string[] = [];
-  if (lock.sha256 && remote.sha256 === null) problems.push(`lock pins sha256 ${lock.sha256}, Hugging Face publishes no sha256`);
-  else if (lock.sha256 && remote.sha256 !== lock.sha256) problems.push(`lock pins sha256 ${lock.sha256}, Hugging Face serves ${remote.sha256}`);
+  if (lock.sha256 && remote.sha256 === null) {
+    // A small file kept out of LFS: its git blob id answers, the download checks the sha256.
+    if (lock.git_sha1 && remote.git_sha1) {
+      if (remote.git_sha1 !== lock.git_sha1) problems.push(`lock pins git blob ${lock.git_sha1}, Hugging Face serves ${remote.git_sha1}`);
+    } else problems.push(`lock pins sha256 ${lock.sha256}, Hugging Face publishes no sha256`);
+  } else if (lock.sha256 && remote.sha256 !== lock.sha256) problems.push(`lock pins sha256 ${lock.sha256}, Hugging Face serves ${remote.sha256}`);
   if (lock.size !== undefined && remote.size !== lock.size) problems.push(`lock pins ${lock.size} bytes, Hugging Face serves ${remote.size}`);
   return problems.length > 0 ? `the file changed upstream: ${problems.join('; ')}` : null;
 }

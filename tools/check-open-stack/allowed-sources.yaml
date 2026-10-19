@@ -1,0 +1,240 @@
+# The Hugging Face repositories a weight of registry/models.lock.yaml may come from.
+#
+# A lock entry is fetched from its `url` and licensed by its `source`. check-open-stack
+# (rule weight-source) refuses an entry whose url is in a refused or unknown repository,
+# whose source is not listed with role "source", or whose license differs from the
+# license of its source. A mirror (Comfy-Org repackaging) never changes the license: the
+# lock follows the source.
+#
+# Each repository was read on 2026-10-19 at the revision noted (API `cardData.license`,
+# the README lines about licensing, and the files at its root). `license_file: false`
+# means the license is declared in the card metadata only, with no LICENSE file: true of
+# most Hugging Face repositories, and worth stating for the effect LoRAs of Remade-AI.
+# Details per weight: docs/EXTENSIONS_ANALYSE.md (part 1) and docs/S1_ANALYSE.md.
+schema: montagio/allowed-sources@0.1
+sources:
+  # Mirrors: the ComfyUI files, as the official templates download them.
+  - repo: Comfy-Org/Wan_2.2_ComfyUI_Repackaged
+    license: Apache-2.0
+    role: mirror
+    revision: ee6f4a40737a995bf5818954cfce6d59443b0f04
+    license_file: false
+  - repo: Comfy-Org/Wan_2.1_ComfyUI_repackaged
+    license: Apache-2.0
+    role: mirror
+    revision: 123acf1cc74bccbb9bfff8ac1ee72edc08c2341d
+    license_file: false
+  - repo: Comfy-Org/z_image_turbo
+    license: Apache-2.0
+    role: mirror
+    revision: 6fc90a3b1b653e935a0d175e260736de25b84df5
+    license_file: false
+  - repo: Comfy-Org/ace_step_1.5_ComfyUI_files
+    license: Apache-2.0
+    role: mirror
+    revision: 6707deb277e9e0907fd9c14ce6b6f1d695c6a3fc
+    license_file: false
+    note: the card says Apache-2.0, the source ACE-Step/Ace-Step1.5 says MIT; the lock follows the source
+  - repo: Comfy-Org/SeedVR2
+    license: Apache-2.0
+    role: mirror
+    revision: df48879708206a403d2a61acd55578c2e80fd233
+    license_file: false
+  - repo: Comfy-Org/Qwen-Image-Edit_ComfyUI
+    license: Apache-2.0
+    role: mirror
+    revision: f68ace85e60b4a02a323e394253731947657b7d2
+    license_file: false
+  - repo: Comfy-Org/Qwen-Image_ComfyUI
+    license: Apache-2.0
+    role: mirror
+    revision: 1f12b17be14c89b026c51a91d67c32f84bb047bc
+    license_file: false
+    note: holds the Qwen2.5-VL text encoder (same sha256) that the official templates fetch from the refused HunyuanVideo_1.5_repackaged
+
+  # Sources of the camera presets and the text-to-image model.
+  - repo: alibaba-pai/Wan2.2-Fun-A14B-Control-Camera
+    license: Apache-2.0
+    role: source
+    revision: da1f119dcf5626b2fa41219ce42ac175752f3892
+    license_file: false
+  - repo: Wan-AI/Wan2.2-TI2V-5B
+    license: Apache-2.0
+    role: source
+    revision: 921dbaf3f1674a56f47e83fb80a34bac8a8f203e
+    license_file: false
+    note: the README adds Wan's user-conduct paragraph (no illegal, harmful or misleading content), accepted in S1
+  - repo: Wan-AI/Wan2.1-I2V-14B-480P
+    license: Apache-2.0
+    role: source
+    revision: 6b73f84e66371cdfe870c72acd6826e1d61cf279
+    license_file: true
+  - repo: google/umt5-xxl
+    license: Apache-2.0
+    role: source
+    revision: 66cb9e7e85526fe440a945569e42c72fb6cbc0ad
+    license_file: false
+  - repo: Tongyi-MAI/Z-Image-Turbo
+    license: Apache-2.0
+    role: source
+    revision: f332072aa78be7aecdf3ee76d5c247082da564a6
+    license_file: false
+  - repo: Qwen/Qwen3-4B
+    license: Apache-2.0
+    role: source
+    revision: 1cfa9a7208912126459214e8b04321603b3df60c
+    license_file: true
+  - repo: black-forest-labs/FLUX.1-schnell
+    license: Apache-2.0
+    role: source
+    revision: 741f7c3ce8b383c54771c7003378a50191e9efe9
+    license_file: false
+    note: gated with automatic approval; only its VAE (ae.safetensors) is used, fetched from the Comfy-Org mirror
+
+  # Sources of the extensions: music, upscale, edit, avatar and its voice.
+  - repo: ACE-Step/Ace-Step1.5
+    license: MIT
+    role: source
+    revision: 19671f406d603126926c1b7e2adc169acbcade22
+    license_file: false
+  - repo: Qwen/Qwen3-Embedding-0.6B
+    license: Apache-2.0
+    role: source
+    revision: 97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3
+    license_file: false
+  - repo: ByteDance-Seed/SeedVR2-3B
+    license: Apache-2.0
+    role: source
+    revision: 37255ff8cccfb01071b87f635a5948ca8d53117c
+    license_file: false
+  - repo: Qwen/Qwen-Image-Edit-2511
+    license: Apache-2.0
+    role: source
+    revision: 6f3ccc0b56e431dc6a0c2b2039706d7d26f22cb9
+    license_file: false
+  - repo: Qwen/Qwen2.5-VL-7B-Instruct
+    license: Apache-2.0
+    role: source
+    revision: cc594898137f460bfe9f0759e9844b3ce807cfb5
+    license_file: false
+  - repo: Qwen/Qwen-Image
+    license: Apache-2.0
+    role: source
+    revision: 75e0b4be04f60ec59a75f475837eced720f823b6
+    license_file: true
+  - repo: Wan-AI/Wan2.2-S2V-14B
+    license: Apache-2.0
+    role: source
+    revision: dab4e9c55bbe4c8c4d03db1c2c98c7f0ac9c454b
+    license_file: false
+  - repo: jonatasgrosman/wav2vec2-large-xlsr-53-english
+    license: Apache-2.0
+    role: source
+    revision: 569a6236e92bd5f7652a0420bfe9bb94c5664080
+    license_file: false
+  - repo: lightx2v/Wan2.2-Lightning
+    license: Apache-2.0
+    role: source
+    revision: 18bccf8884ec0a078eed79785eb4ef13ea16ce1e
+    license_file: false
+    note: a CC BY-NC mention covers evaluation prompts, not the weights
+  - repo: ResembleAI/chatterbox
+    license: MIT
+    role: source
+    revision: 5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18
+    license_file: false
+    note: also the download repository of the voice (no mirror)
+
+  # Edit: the Lightning LoRA and the looks (each its own source and download repository).
+  - repo: lightx2v/Qwen-Image-Edit-2511-Lightning
+    license: Apache-2.0
+    role: source
+    revision: 107d238d68b8387e32843d0b4a2e24ceb0d3ad86
+    license_file: false
+  - repo: systms/SYSTMS-INFL8-LoRA-Qwen-Image-Edit-2511
+    license: Apache-2.0
+    role: source
+    revision: d12b29cd92da261f9f439629515618c15837a7dd
+    license_file: false
+    note: training data not described
+  - repo: systms/SYSTMS-ACTION-LoRA-Qwen-Image-Edit-2511
+    license: Apache-2.0
+    role: source
+    revision: fb1f50acc558148bf506467705479013f431de86
+    license_file: false
+  - repo: fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA
+    license: Apache-2.0
+    role: source
+    revision: e3066224ab74263f4a5b6179cd1a3b0a15577e44
+    license_file: false
+    note: trained on synthetic Gaussian-splat renders made by fal
+
+  # Effects: Wan 2.1 I2V 480p, its CLIP vision, the 4-step LoRA and the effect LoRAs.
+  - repo: laion/CLIP-ViT-H-14-laion2B-s32B-b79K
+    license: MIT
+    role: source
+    revision: 1c2b8495b28150b8a4922ee1c8edee224c284c0c
+    license_file: false
+    note: source of clip_vision_h, inferred from Wan's image_encoder config (Comfy-Org does not name it)
+  - repo: lightx2v/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v
+    license: Apache-2.0
+    role: source
+    revision: 9bedb7ceaf40d43b47d892382612ff157ca15c52
+    license_file: true
+  - repo: Remade-AI/Squish
+    license: Apache-2.0
+    role: source
+    revision: 1e0810850eac92c9a43cd7c7332df321f0d5bcc9
+    license_file: false
+    note: license in the card metadata only; no copyright holder named, training clips undisclosed
+  - repo: Remade-AI/Cakeify
+    license: Apache-2.0
+    role: source
+    revision: 01167db8cb4dad20a4c1d07fd1b9210cf581bff7
+    license_file: false
+    note: license in the card metadata only; no copyright holder named, training clips undisclosed
+  - repo: Remade-AI/Explode
+    license: Apache-2.0
+    role: source
+    revision: bf9da953b780d86d966e4b67d1084fb252367b4c
+    license_file: false
+    note: license in the card metadata only; no copyright holder named, training clips undisclosed
+  - repo: Remade-AI/Crash-zoom-in
+    license: Apache-2.0
+    role: source
+    revision: 96f8f59bfca64313ad16d7753e78a6b0bda67941
+    license_file: false
+    note: license in the card metadata only; no copyright holder named, training clips undisclosed
+  - repo: Remade-AI/matrix-shot
+    license: Apache-2.0
+    role: source
+    revision: f27f77c222c79eaf27096612e0b6c2dd336af044
+    license_file: false
+    note: license in the card metadata only; no copyright holder named, training clips undisclosed
+  - repo: Remade-AI/360-Orbit
+    license: Apache-2.0
+    role: source
+    revision: f22f9e46069d752dd0ab7a54c056de4113eedd82
+    license_file: false
+    note: license in the card metadata only; no copyright holder named, training clips undisclosed
+
+  # Transitions: Wan 2.2 I2V A14B (its 4-step LoRAs come from lightx2v/Wan2.2-Lightning, above).
+  - repo: Wan-AI/Wan2.2-I2V-A14B
+    license: Apache-2.0
+    role: source
+    revision: 206a9ee1b7bfaaf8f7e4d81335650533490646a3
+    license_file: false
+    note: the README adds Wan's user-conduct paragraph and links a LICENSE.txt the repository does not hold; GitHub Wan-Video/Wan2.2 has the plain Apache-2.0 text
+
+# Never a source or a download repository, whatever a template or a tutorial fetches from it.
+denied:
+  - repo: Kijai/WanVideo_comfy
+    reason: no declared license, and it ships a folder under CC BY-NC-SA 4.0 (LoRAs/Ditto); the InfiniteTalk template fetches its LoRA and VAE from it
+  - repo: Comfy-Org/HunyuanVideo_1.5_repackaged
+    reason: Tencent Hunyuan Community license, which excludes the EU, the UK and South Korea; the Qwen-Image-Edit templates fetch their text encoder from it
+  - repo: artificialguybr/*-Redmond-*
+    reason: CC0-1.0, outside the Apache-2.0 or MIT rule of the project (the Redmond effect LoRAs)
+  - repo: berkerdooo/qwen-image-edit-2511-camera-angle-lora
+    reason: trained on CC-BY Objaverse data, with an attribution list
+  - repo: dx8152/Qwen-Edit-2509-Multiple-angles
+    reason: made for Qwen-Image-Edit-2509, and its card asks business users to pay; the fal LoRA is used instead

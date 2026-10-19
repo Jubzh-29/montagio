@@ -1,0 +1,15 @@
+# A hook of the GPU session S3: an end frame made by the edit alone, instead of a CC0 fire LoRA.
+schema: montagio/preset@0.1
+id: ignite
+name: Ignite
+description: Flames catch and engulf the subject.
+preview: previews/ignite.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-transition
+end_frame:
+  instruction: "The same scene, with the main subject engulfed in flames, bright fire and embers all around it, same framing."
+prompt:
+  motion: "Flames catch on the subject and spread until it is engulfed in fire, embers rising, the framing unchanged."
+models:
+  preferred: wan22-flf2v-transition

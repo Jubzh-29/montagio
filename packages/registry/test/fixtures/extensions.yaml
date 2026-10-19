@@ -1,0 +1,21 @@
+schema: montagio/extensions@0.1
+extensions:
+  - id: edit
+    priority: 1
+    gpu_validated: 2026-10-22
+  - id: effects
+    priority: 2
+    gpu_validated: null
+  - id: transitions
+    priority: 3
+    requires: [edit]
+    gpu_validated: 2026-10-22
+  - id: avatar
+    priority: 4
+    gpu_validated: null
+  - id: music
+    priority: 5
+    gpu_validated: 2026-10-22
+  - id: upscale
+    priority: 6
+    gpu_validated: null

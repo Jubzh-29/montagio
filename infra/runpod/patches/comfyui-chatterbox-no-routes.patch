@@ -1,0 +1,28 @@
+diff --git a/__init__.py b/__init__.py
+index 7bb6a75..b9ef45c 100644
+--- a/__init__.py
++++ b/__init__.py
+@@ -64,20 +64,9 @@ else:
+         len(get_chatterbox_model_pack_names()),
+     )
+ 
+-    # 4. The `/chatterbox/*` API. Only a running server has a `PromptServer`;
+-    #    a headless or partially-booted process simply gets no routes.
+-    try:
+-        from server import PromptServer
+-
+-        register_routes(
+-            PromptServer.instance.routes, folder_paths, os.path.dirname(__file__)
+-        )
+-    except Exception as exc:
+-        logging.debug(
+-            "[Chatterbox TTS] The /chatterbox API routes were not registered "
+-            "on this process: %s",
+-            exc,
+-        )
++    # 4. Montagio: no `/chatterbox/*` API. Its routes take any absolute path
++    #    (register_model_path, validate_directory, models?path=); Montagio places
++    #    the voice pack itself and keeps ComfyUI offline.
+ 
+     from .chatterbox_nodes import comfy_entrypoint  # noqa: E402 (after bootstrap)
+ 

@@ -27,3 +27,54 @@ nodes:
   # Montagio's own node pack (comfy-nodes/, GPL-3.0-only): WanCameraEmbedding with a second move;
   # the compiler uses it only for presets that combine two moves.
   - { class_type: MontagioCameraEmbedding, source: montagio-nodes, license: GPL-3.0 }
+  # Extension "music" (2026-10-19), from the core of ComfyUI v0.41.0 (python_module of /object_info):
+  # nodes.py (DualCLIPLoader, type "ace"), comfy_extras/nodes_ace.py and comfy_extras/nodes_audio.py.
+  - { class_type: DualCLIPLoader, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: TextEncodeAceStepAudio1.5, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: EmptyAceStep1.5LatentAudio, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: VAEDecodeAudio, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SaveAudioAdvanced, source: comfyui-core, license: GPL-3.0 }
+  # Extension "upscale" (2026-10-19), core of ComfyUI v0.41.0: comfy_extras/nodes_video.py (LoadVideo,
+  # GetVideoComponents), comfy_extras/nodes_post_processing.py (ResizeImageMaskNode), nodes.py (VAEEncodeTiled,
+  # VAEDecodeTiled) and comfy_extras/nodes_seedvr.py (the five SeedVR2 nodes).
+  - { class_type: LoadVideo, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: GetVideoComponents, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ResizeImageMaskNode, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: VAEEncodeTiled, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: VAEDecodeTiled, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SeedVR2Preprocess, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SeedVR2TemporalChunk, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SeedVR2Conditioning, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SeedVR2TemporalMerge, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SeedVR2PostProcessing, source: comfyui-core, license: GPL-3.0 }
+  # Extension "edit" (2026-10-19), core of ComfyUI v0.41.0: comfy_extras/nodes_flux.py (FluxKontextImageScale,
+  # FluxKontextMultiReferenceLatentMethod), comfy_extras/nodes_cfg.py (CFGNorm), comfy_extras/nodes_qwen.py
+  # (TextEncodeQwenImageEditPlus) and nodes.py (VAEEncode).
+  - { class_type: FluxKontextImageScale, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: FluxKontextMultiReferenceLatentMethod, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: CFGNorm, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: TextEncodeQwenImageEditPlus, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: VAEEncode, source: comfyui-core, license: GPL-3.0 }
+  # Extension "avatar" (2026-10-19). Its voice: the one node it uses from wildminder/ComfyUI-Chatterbox
+  # (Apache-2.0, vendored chatterbox code MIT), pinned at commit 4597af8f and patched by
+  # infra/runpod/bootstrap.sh; ComfyUI v0.41.0 has no local text-to-speech node.
+  - { class_type: ChatterboxMTLTTS, source: wildminder/ComfyUI-Chatterbox@4597af8f, license: Apache-2.0 }
+  # Extension "avatar" (2026-10-19), the video: core of ComfyUI v0.41.0, comfy_extras/nodes_audio.py (LoadAudio),
+  # comfy_extras/nodes_audio_encoder.py, comfy_extras/nodes_wan.py (Wan 2.2 S2V), comfy_extras/nodes_latent.py,
+  # comfy_extras/nodes_images.py (ImageFromBatch) and nodes.py (LoraLoaderModelOnly: the 4-step LightX2V LoRA).
+  - { class_type: LoadAudio, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: AudioEncoderLoader, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: AudioEncoderEncode, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: WanSoundImageToVideo, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: WanSoundImageToVideoExtend, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: LatentConcat, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: LatentCut, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ImageFromBatch, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: LoraLoaderModelOnly, source: comfyui-core, license: GPL-3.0 }
+  # Effects pack (workflows/wan21-i2v-effect.api.json, Wan 2.1 I2V): nodes.py (CLIPVisionLoader, CLIPVisionEncode)
+  # and comfy_extras/nodes_wan.py (WanImageToVideo).
+  - { class_type: CLIPVisionLoader, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: CLIPVisionEncode, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: WanImageToVideo, source: comfyui-core, license: GPL-3.0 }
+  # Keyframe transitions (workflows/wan22-flf2v-transition.api.json, Wan 2.2 FLF2V): comfy_extras/nodes_wan.py.
+  - { class_type: WanFirstLastFrameToVideo, source: comfyui-core, license: GPL-3.0 }

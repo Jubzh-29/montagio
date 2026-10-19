@@ -32,10 +32,11 @@ import { isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { loadLibrary } from '@montagio/presets';
-import { parseLock, type LockEntry } from '@montagio/registry';
+import { enabledExtensions, parseLock, type LockEntry } from '@montagio/registry';
 import {
   downloadFile,
   folderFor,
+  forExtensions,
   gib,
   listRepo,
   lockDrift,
@@ -71,6 +72,7 @@ const { values: args } = parseArgs({
     concurrency: { type: 'string', default: '2' },
     'dry-run': { type: 'boolean', default: false },
     'lock-from-hf': { type: 'boolean', default: false },
+    extensions: { type: 'string', default: 'all' },
     inspect: { type: 'string', multiple: true, default: [] },
     help: { type: 'boolean', default: false },
   },
@@ -80,6 +82,8 @@ if (args.help) {
   console.log(`Usage: npm run weights -w @montagio/infra-runpod -- [options]
   --models-dir DIR        ComfyUI models/ folder (required unless --dry-run)
   --only ID[,ID]          only these lock entries
+  --extensions LIST       the weights of which extensions: all (default, the GPU sessions), none, validated
+                          (those dated in registry/extensions.yaml) or a list such as music,edit
   --extra FOLDER=URL      also fetch an evaluation-only file (repeatable); never added to the lock patch
   --out DIR               results folder (default s1-results)
   --concurrency N         parallel downloads (default 2)
@@ -158,9 +162,10 @@ async function main(): Promise<number> {
   const lock = parseLock(lockText, 'registry/models.lock.yaml');
   const only = args.only ? new Set(args.only.split(',').map((id) => id.trim())) : null;
   for (const id of only ?? []) if (!lock.some((entry) => entry.id === id)) throw new Error(`--only: unknown lock entry "${id}"`);
-  const entries = lock.filter((entry) => !only || only.has(entry.id));
   const library = await loadLibrary(repoRoot);
-  const folders = weightFolders([...library.templates.values()]);
+  const enabled = enabledExtensions(library.extensions ?? [], args.extensions);
+  const entries = forExtensions(lock, enabled).filter((entry) => !only || only.has(entry.id));
+  const folders = weightFolders([...library.templates.values(), ...library.extensionTemplates.values()]);
 
   const listings = new Map<string, Promise<RepoListing>>();
   const listing = (repo: string) => {
@@ -198,9 +203,12 @@ async function main(): Promise<number> {
       candidate = pickCandidate(entry.file, await Promise.all(repos.map(listing)), { allowGated: Boolean(token) });
     }
     if (!candidate.ok) throw new Error(candidate.reason);
-    const drift = lockDrift({ sha256: entry.sha256, size: entry.size }, { sha256: candidate.sha256, size: candidate.size });
+    const drift = lockDrift(
+      { sha256: entry.sha256, size: entry.size, git_sha1: entry.git_sha1 },
+      { sha256: candidate.sha256, size: candidate.size, git_sha1: candidate.gitSha1 },
+    );
     if (drift) throw new Error(`${drift} (${resolveUrl(candidate.repo, candidate.path)})`);
-    const folder = folderFor(entry.file, candidate.path, folders);
+    const folder = folderFor(entry.file, candidate.path, folders, entry.folder);
     if (!folder) throw new Error(`cannot tell the ComfyUI folder of ${entry.file} (no loader names it, repository path ${candidate.path})`);
     plans.push({
       ...base,

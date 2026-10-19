@@ -148,6 +148,8 @@ function harness(
     },
     runningPorts: async () => [],
     probe: async () => opts.facts ?? facts(),
+    // the developer's own choice of extensions (MONTAGIO_EXTENSIONS=all, say) stays out of the tests
+    env: Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'MONTAGIO_EXTENSIONS')),
   };
   return { calls, lines, events, timeline, existedBefore, deps, L, output: () => lines.join('\n') };
 }
@@ -327,6 +329,91 @@ test('the CUDA check looks at the GPU the checks chose, numbered as nvidia-smi n
   const check = h.calls.find((c) => c.args[0] === '-I')!;
   expect(check.env).toMatchObject({ CUDA_DEVICE_ORDER: 'PCI_BUS_ID', CUDA_VISIBLE_DEVICES: '1' });
   expect(readState(h.L.statePath).gpuIndex).toBe(1);
+});
+
+/** The two-file lock plus one weight of the music extension, and registry/extensions.yaml with nothing validated. */
+function withMusicWeight(size: number): void {
+  const sha = createHash('sha256').update('music').digest('hex');
+  writeFileSync(
+    join(repo, 'registry', 'models.lock.yaml'),
+    readFileSync(join(repo, 'registry', 'models.lock.yaml'), 'utf8') +
+      `  - id: tiny-music\n    file: tiny_music.safetensors\n    url: https://huggingface.co/Comfy-Org/x/resolve/main/split_files/vae/tiny_music.safetensors\n` +
+      `    sha256: ${sha}\n    size: ${size}\n    license: MIT\n    source: https://huggingface.co/x/y\n    extension: music\n`,
+  );
+  writeFileSync(
+    join(repo, 'registry', 'extensions.yaml'),
+    ['schema: montagio/extensions@0.1', 'extensions:', ...['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale'].flatMap((id, i) => [
+        `  - id: ${id}`,
+        `    priority: ${i + 1}`,
+        ...(id === 'transitions' ? ['    requires: [edit]'] : []),
+        '    gpu_validated: null',
+      ]),
+      '',
+    ].join('\n'),
+  );
+}
+
+const fetchedIds = (calls: Call[]) => {
+  const fetch = calls.find((c) => c.args.includes('--models-dir'));
+  return fetch ? fetch.args[fetch.args.indexOf('--only') + 1]!.split(',') : [];
+};
+
+test('with no extension validated, the plan and the disk check ignore the extension weights', async () => {
+  // 600 GiB of music weights on a 500 GiB drive: counted, they would fail the disk check
+  withMusicWeight(600 * GiB);
+  const h = harness();
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+  expect(fetchedIds(h.calls).sort()).toEqual(['tiny-te', 'tiny-vae']);
+});
+
+test("the developer's MONTAGIO_EXTENSIONS does not reach the installer under test", async () => {
+  const saved = process.env.MONTAGIO_EXTENSIONS;
+  process.env.MONTAGIO_EXTENSIONS = 'all';
+  try {
+    withMusicWeight(600 * GiB);
+    const h = harness();
+    expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+    expect(fetchedIds(h.calls).sort()).toEqual(['tiny-te', 'tiny-vae']);
+  } finally {
+    if (saved === undefined) delete process.env.MONTAGIO_EXTENSIONS;
+    else process.env.MONTAGIO_EXTENSIONS = saved;
+  }
+});
+
+test('--extensions transitions without edit is refused, saying to add it', async () => {
+  withMusicWeight(5);
+  const h = harness();
+  expect(await install(repo, options({ extensions: 'transitions' }), h.deps)).toBe(2);
+  expect(h.output()).toMatch(/transitions requires edit/);
+});
+
+test('--extensions all fetches the extension weights with --only', async () => {
+  withMusicWeight(5);
+  const h = harness();
+  expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
+  expect(fetchedIds(h.calls).sort()).toEqual(['tiny-music', 'tiny-te', 'tiny-vae']);
+});
+
+test('the local installer leaves the avatar out, whose voice node it does not install yet', async () => {
+  withMusicWeight(5);
+  writeFileSync(
+    join(repo, 'registry', 'models.lock.yaml'),
+    readFileSync(join(repo, 'registry', 'models.lock.yaml'), 'utf8') +
+      `  - id: tiny-avatar\n    file: tiny_avatar.safetensors\n    url: https://huggingface.co/Comfy-Org/x/resolve/main/split_files/vae/tiny_avatar.safetensors\n` +
+      `    sha256: ${'a'.repeat(64)}\n    size: 5\n    license: MIT\n    source: https://huggingface.co/x/y\n    extension: avatar\n`,
+  );
+  const h = harness();
+  expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
+  expect(fetchedIds(h.calls).sort()).toEqual(['tiny-music', 'tiny-te', 'tiny-vae']);
+  expect(h.output()).toMatch(/avatar.*infra\/runpod\/bootstrap\.sh/);
+});
+
+test('an unknown extension is refused before anything runs', async () => {
+  withMusicWeight(5);
+  const h = harness();
+  expect(await install(repo, options({ extensions: 'music,karaoke' }), h.deps)).toBe(2);
+  expect(h.calls).toEqual([]);
+  expect(h.output()).toMatch(/karaoke/);
 });
 
 test('a weight half downloaded counts only its missing bytes in the disk check', async () => {

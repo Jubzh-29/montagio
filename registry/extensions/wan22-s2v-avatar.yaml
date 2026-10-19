@@ -1,0 +1,26 @@
+# Talking avatar (extension "avatar"): a photo of a person and a speech file (the voice job's
+# output, chatterbox-mtl-voice) give a 480p video of that person speaking, at 16 fps. Wan 2.2
+# S2V (speech to video) renders 5 s of speech per chunk; the compiler keeps 1, 2 or 3 chunks.
+# Chosen by the user on 2026-10-19 instead of InfiniteTalk (see docs/EXTENSIONS_ANALYSE.md).
+schema: montagio/extension-model@0.1
+id: wan22-s2v-avatar
+name: Wan 2.2 S2V (talking avatar)
+extension: avatar
+task: ia2v-talk
+license: Apache-2.0
+weights: [wan22-s2v-14b-fp8, wav2vec2-large-xlsr53-en, lightx2v-wan22-t2v-4step-high-v1-1, umt5-xxl-fp8, wan21-vae]
+workflow: workflows/wan22-s2v-avatar.api.json
+bindings:
+  image: { node: "52", field: image }
+  audio: { node: "58", field: audio }
+  prompt: { node: "6", field: text }
+  # the two extension chunks take seed+1 and seed+2 (compileAvatar)
+  seed: { node: "3", field: seed }
+  # the extensions take their size from the latent
+  width: { node: "93", field: width }
+  height: { node: "93", field: height }
+  frames: { node: "96", field: length }
+output: { node: "113", kind: video }
+limits: { min_duration_s: 1, max_duration_s: 15, max_chars: 500 }
+# GPU seconds for 5 to 15 s of speech on an RTX 4090 with the 4-step LoRA (estimate: 3 to 11 min; S2 measures it)
+estimate_s: 480

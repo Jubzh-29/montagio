@@ -19,8 +19,15 @@ test('install options are read', () => {
       proxyUrl: null,
       demo: false,
       ports: { comfy: 8288 },
+      extensions: null,
     },
   });
+});
+
+test('--extensions is read for install only, and left to MONTAGIO_EXTENSIONS or the default when absent', () => {
+  expect(parseArgs(['install', '--extensions', 'music,edit']).options.extensions).toBe('music,edit');
+  expect(parseArgs(['install']).options.extensions).toBeNull();
+  expect(() => parseArgs(['start', '--extensions', 'all'])).toThrow(/--extensions only goes with install/);
 });
 
 test('no command means help', () => {

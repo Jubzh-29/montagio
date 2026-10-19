@@ -1,0 +1,19 @@
+# Effect LoRA: Remade-AI/Squish (Apache-2.0 in the card metadata, no LICENSE file).
+# The template is the card's, with {subject} for its [object].
+schema: montagio/preset@0.1
+id: squish
+name: Squish
+description: Hands press the subject flat like soft clay.
+preview: previews/squish.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-effect
+effect:
+  lora: remade-squish
+  strength: 1
+  trigger: sq41sh squish effect
+prompt:
+  template: "In the video, a miniature {subject} is presented. The {subject} is held in a person's hands. The person then presses on the {subject}, causing a sq41sh squish effect. The person keeps pressing down on the {subject}, further showing the sq41sh squish effect."
+  subject: figure
+models:
+  preferred: wan21-i2v-effects

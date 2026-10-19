@@ -10,11 +10,13 @@ import {
   exportVertical,
   extractLastFrame,
   headerHash,
+  mixMusic,
   normalizeClip,
   placeholderClip,
   PLACEHOLDER_METADATA,
   previewClip,
   probe,
+  probeAudio,
   readTags,
   SequenceToolError,
   SHOWCASE_COLOUR,
@@ -210,3 +212,94 @@ test('a placeholder made from a JPEG and a normalized render share their H.264 h
   expect(await headerHash(vertical)).toBe(await headerHash(verticalOfRender));
   expect(await probe(placeholder)).toMatchObject({ pixFmt: 'yuv420p' });
 }, FFMPEG_TEST_TIMEOUT_MS);
+
+// --- Film music: the soundtrack goes under the film, which keeps its exact length and frames.
+
+const music5 = join(dir, 'music-5s.flac');
+const music1 = join(dir, 'music-1s.flac');
+const music5mp3 = join(dir, 'music-5s.mp3');
+
+/** Duration and frame count of a file's first video and audio streams, as ffprobe reads them. */
+function streamsOf(media: string): { video: { duration: number; frames: number } | null; audio: { duration: number } | null } {
+  const out = execFileSync('ffprobe', [
+    '-v', 'error', '-count_frames',
+    '-show_entries', 'stream=codec_type,duration,nb_read_frames',
+    '-of', 'json', media,
+  ]).toString();
+  const streams = (JSON.parse(out) as { streams: { codec_type: string; duration?: string; nb_read_frames?: string }[] }).streams;
+  const video = streams.find((s) => s.codec_type === 'video');
+  const audio = streams.find((s) => s.codec_type === 'audio');
+  return {
+    video: video ? { duration: Number(video.duration), frames: Number(video.nb_read_frames) } : null,
+    audio: audio ? { duration: Number(audio.duration) } : null,
+  };
+}
+
+describe('mixMusic and the 9:16 cut with music', () => {
+  beforeAll(() => {
+    for (const [out, seconds] of [[music5, 5], [music1, 1]] as const) {
+      execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `sine=frequency=440:duration=${seconds}:sample_rate=44100`, '-ac', '2', out]);
+    }
+    execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=330:duration=5', '-c:a', 'libmp3lame', music5mp3]);
+  }, FIXTURES_TIMEOUT_MS);
+
+  test('mixMusic keeps every frame and the exact duration of the film when the music is longer', async () => {
+    const out = join(dir, 'mixed-long.mp4');
+    await mixMusic(clipA, music5, out);
+    const film = streamsOf(clipA).video!;
+    const mixed = streamsOf(out);
+    expect(mixed.video!.frames).toBe(film.frames);
+    expect(Math.abs(mixed.video!.duration - film.duration)).toBeLessThan(0.01);
+    expect(Math.abs(mixed.audio!.duration - film.duration)).toBeLessThan(0.05);
+  }, FFMPEG_TEST_TIMEOUT_MS);
+
+  test('mixMusic pads a shorter music with silence', async () => {
+    const out = join(dir, 'mixed-short.mp4');
+    await mixMusic(clipA, music1, out);
+    const mixed = streamsOf(out);
+    expect(Math.abs(mixed.audio!.duration - mixed.video!.duration)).toBeLessThan(0.05);
+    expect(mixed.video!.frames).toBe(streamsOf(clipA).video!.frames);
+  }, FFMPEG_TEST_TIMEOUT_MS);
+
+  test('mixMusic does not re-encode the video', async () => {
+    const out = join(dir, 'mixed-copy.mp4');
+    await mixMusic(clipA, music5, out);
+    expect(await headerHash(out)).toBe(await headerHash(clipA));
+  }, FFMPEG_TEST_TIMEOUT_MS);
+
+  test('the mixed film carries the AI-generated mention and an AAC 48 kHz stereo track', async () => {
+    const out = join(dir, 'mixed-tags.mp4');
+    await mixMusic(clipWithTitle, music5, out);
+    const tags = await readTags(out);
+    expect(tags).toMatchObject(AI_METADATA);
+    expect(tags.title).toBeUndefined();
+    expect(await probeAudio(out)).toMatchObject({ codec: 'aac', sampleRate: 48000, channels: 2 });
+  }, FFMPEG_TEST_TIMEOUT_MS);
+
+  test('mixMusic reads an MP3 as well as a FLAC', async () => {
+    const out = join(dir, 'mixed-mp3.mp4');
+    await mixMusic(clipA, music5mp3, out);
+    expect(Math.abs(streamsOf(out).audio!.duration - streamsOf(clipA).video!.duration)).toBeLessThan(0.05);
+  }, FFMPEG_TEST_TIMEOUT_MS);
+
+  test('the 9:16 cut of a film with music keeps the music', async () => {
+    const mixed = join(dir, 'mixed-for-vertical.mp4');
+    const vertical = join(dir, 'mixed-vertical.mp4');
+    await mixMusic(clipA, music5, mixed);
+    await exportVertical(mixed, vertical);
+    expect(await probe(vertical)).toMatchObject({ width: 720, height: 1280 });
+    const audio = await probeAudio(vertical);
+    expect(audio).toMatchObject({ codec: 'aac', channels: 2 });
+    expect(Math.abs(audio!.duration_s - streamsOf(vertical).video!.duration)).toBeLessThan(0.05);
+  }, FFMPEG_TEST_TIMEOUT_MS);
+
+  test('the 9:16 cut of a silent film has no audio stream', async () => {
+    const vertical = join(dir, 'silent-vertical.mp4');
+    await exportVertical(clipA, vertical);
+    expect(await probeAudio(vertical)).toBeNull();
+  }, FFMPEG_TEST_TIMEOUT_MS);
+
+  test('probeAudio is null for a silent clip', async () => {
+    expect(await probeAudio(clipA)).toBeNull();
+  }, FFMPEG_TEST_TIMEOUT_MS);
+});
