@@ -41,14 +41,16 @@ export function Monitor({
   /** Replaces the default running text, e.g. "Shot 2/3 — 40%". */
   statusLabel?: string;
   /**
-   * The static showcase takes no upload: sample photos replace the drop zone,
-   * and a dropped file is answered with `onRefusedFile` (an explanation).
+   * The showcase: sample photos replace the drop zone. Unless it takes uploads (its
+   * `uploads` capability, off in the static showcase), a dropped file is answered
+   * with `onRefusedFile` (an explanation).
    */
   showcase?: {
     samples: SampleSummary[];
     selectedId: string | null;
     note: string;
     onPick: (sample: SampleSummary) => void;
+    uploads: boolean;
     onOtherSample: () => void;
     onRefusedFile: () => void;
   };
@@ -60,12 +62,13 @@ export function Monitor({
   const rendering =
     generation.status === 'submitting' || (record !== undefined && (record.state === 'queued' || record.state === 'running'));
   const percent = record ? Math.round(record.progress * 100) : 0;
+  const acceptsFiles = !showcase || showcase.uploads;
 
   const onDrop = (event: DragEvent) => {
     event.preventDefault();
     setDragging(false);
     if (rendering) return;
-    if (showcase) return showcase.onRefusedFile();
+    if (showcase && !showcase.uploads) return showcase.onRefusedFile();
     const file = event.dataTransfer.files[0];
     if (file) onFile(file);
   };
@@ -82,7 +85,7 @@ export function Monitor({
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
     >
-      {!showcase && (
+      {acceptsFiles && (
         <input
           id="photo-input"
           type="file"
@@ -116,6 +119,11 @@ export function Monitor({
         <div className={styles.monitorEmpty}>
           <p className={styles.monitorEmptyTitle}>{t('showcasePickSample')}</p>
           <SamplePicker samples={showcase.samples} selectedId={showcase.selectedId} onPick={showcase.onPick} />
+          {showcase.uploads && (
+            <label htmlFor="photo-input" className={styles.buttonSecondary}>
+              {t('choosePhoto')}
+            </label>
+          )}
           <p className={styles.monitorEmptyHint}>{showcase.note}</p>
         </div>
       ) : (

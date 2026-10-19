@@ -214,7 +214,13 @@ Ce que la vitrine ne contrôle pas : **l'hébergeur** (Hugging Face, ou GitHub e
 ## 8. Plus tard : une vraie génération sur GPU loué (non construite)
 
 La décision viendra après la S2 (21–22/10). Le point d'extension est prévu :
-- **Côté page** : l'interface lit les capacités du routeur (`/api/showcase` : `uploads`, `remixRender`) plutôt que le nom du mode. Une génération réelle ajouterait une variable de build, par exemple `NEXT_PUBLIC_MONTAGIO_LIVE_API`. Le routeur enverrait alors les dépôts de photo, les remix et les couples absents du manifeste à un serveur Montagio distant, et passerait ces capacités à `true`.
+- **Côté page** : pour ce qu'un serveur GPU ajouterait, l'interface lit les capacités du routeur (`/api/showcase`) plutôt que le nom du mode (`studioCapabilities`, dans `apps/web/src/lib/showcase-ui.ts`) :
+  - `uploads` : choisir ou déposer sa propre photo, à côté des photos d'exemple ;
+  - `remixRender` : le bouton qui lance le rendu d'un remix (sans lui, la page explique pourquoi).
+
+  Tant que le routeur n'a pas répondu, les deux restent coupées. Le reste dépend du mode de build (`IS_SHOWCASE`) : les photos d'exemple, les textes propres à la vitrine, les champs de prompt désactivés (les clips sont pré-générés), le préchargement de ffmpeg.wasm, le modèle unique et le pied de page.
+
+  Une génération réelle ajouterait une variable de build, par exemple `NEXT_PUBLIC_MONTAGIO_LIVE_API`. Le routeur enverrait alors les dépôts de photo, les remix et les couples absents du manifeste à un serveur Montagio distant, et passerait ces capacités à `true`. Il faudrait aussi rouvrir les champs de prompt, qui ne lisent encore aucune capacité.
 - **Côté serveur** : un serveur Montagio en mode `local` ou `hosted`, sur un GPU loué, qui porterait :
   - un plafond de dépense, avec les secondes GPU comptées et un arrêt au plafond ;
   - un CORS limité à l'origine de la vitrine ;
