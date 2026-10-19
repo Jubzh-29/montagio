@@ -16,6 +16,7 @@
     "@montagio/comfy-adapter": "*",
     "@montagio/presets": "*",
     "@montagio/registry": "*",
+    "@montagio/sequence": "*",
     "image-size": "^2.0.4",
     "yaml": "^2.9.1"
   }
