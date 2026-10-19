@@ -14,7 +14,7 @@ beforeAll(async () => {
 
 const base = { language: 'en' as const, duration_s: 10, seed: 7, aspect: '16:9' as const };
 
-const files = { input: '/data/photo.png', input2: '/data/outfit.png', end: '/data/end.png', clip: '/data/clip.mp4', audio: '/data/speech.flac', audio_s: 6 };
+const files = { input: '/data/photo.png', input2: '/data/outfit.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6 };
 
 test('one job per extension, in the order of the session, each accepted by ComfyUI v0.41.0 once its files are uploaded', () => {
   const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'outfit-morph' });
@@ -77,8 +77,16 @@ test('the quality path drops the 4-step LoRAs of the edit, the effects and the t
   expect(jobs.map((job) => job.params.fast)).toEqual([false, false, false]);
 });
 
+test('the upscale job sizes the clip by its own aspect and frame count, not by the photo of the other jobs', () => {
+  const clip = { clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81 };
+  const [upscale] = extensionJobs(library, { ...base, aspect: '16:9', input: '/data/photo.png', jobs: ['upscale'], ...clip });
+  expect(upscale!.params).toMatchObject({ width: 1080, height: 1920 });
+  expect(() => extensionJobs(library, { ...base, jobs: ['upscale'], ...clip, clipFrames: 122 })).toThrow(/a clip of 122 frames is longer than the 121 frames/);
+});
+
 test('a job that needs a file not given is refused before anything runs', () => {
   expect(() => extensionJobs(library, { ...base, jobs: ['upscale'] })).toThrow(/--clip/);
+  expect(() => extensionJobs(library, { ...base, jobs: ['upscale'], clip: '/c.mp4' })).toThrow(/the upscale job needs the aspect and the frame count of its clip/);
   expect(() => extensionJobs(library, { ...base, jobs: ['avatar'], input: '/p.png' })).toThrow(/--audio/);
   expect(() => extensionJobs(library, { ...base, jobs: ['transition'], input: '/p.png', hook: 'eyes-in' })).toThrow(/--end/);
   expect(() => extensionJobs(library, { ...base, jobs: ['hook-edit'], input: '/p.png', hook: 'outfit-morph' })).toThrow(/second image/);

@@ -422,13 +422,19 @@ async function runExtensions(
   const input2 = args.input2 ? fromCaller(args.input2) : undefined;
   let end = args.end ? fromCaller(args.end) : undefined;
   const clip = args.clip ? fromCaller(args.clip) : undefined;
+  // The photo sizes the jobs that read it; the clip to upscale is probed on its own, so that
+  // "--extension all" never upscales it to the photo's aspect nor past the model's frame limit.
   let aspect: Aspect = '16:9';
   if (names.some((name) => name !== 'voice' && name !== 'music' && name !== 'upscale')) {
     const { width, height } = imageSize(await readFile(input));
     aspect = pickAspect(width, height);
-  } else if (clip) {
-    const { width, height } = await probe(clip);
-    aspect = pickAspect(width, height);
+  }
+  let clipAspect: Aspect | undefined;
+  let clipFrames: number | undefined;
+  if (clip && names.includes('upscale')) {
+    const { width, height, duration_s, fps } = await probe(clip);
+    clipAspect = pickAspect(width, height);
+    clipFrames = Math.round(duration_s * fps);
   }
   let audio = args.audio ? fromCaller(args.audio) : undefined;
   let audio_s = audio ? (await probeAudio(audio))?.duration_s : undefined;
@@ -443,6 +449,8 @@ async function runExtensions(
     fast: !args.quality,
     look: args.look,
     clip,
+    clipAspect,
+    clipFrames,
     audio: audio ?? (args['dry-run'] ? 'speech.flac' : undefined),
     audio_s: audio_s ?? (args['dry-run'] ? 5 : undefined),
     text: args.text,

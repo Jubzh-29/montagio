@@ -54,8 +54,10 @@ export type ExtensionJobOptions = {
   input2?: string;
   /** The end frame of a transition run on its own (a hook's edit output otherwise). */
   end?: string;
-  /** The clip to upscale. */
+  /** The clip to upscale, with its aspect and frame count (the caller probes it): its own, never the photo's. */
   clip?: string;
+  clipAspect?: Aspect;
+  clipFrames?: number;
   /** The speech of avatar, and its length in seconds (the caller reads it). */
   audio?: string;
   audio_s?: number;
@@ -65,7 +67,7 @@ export type ExtensionJobOptions = {
   /** Music: the length of the film it goes under. */
   duration_s: number;
   seed: number;
-  /** The aspect of the input (upscale target, effect, transition and avatar size). */
+  /** The aspect of the photo (effect, transition and avatar size). */
   aspect: Aspect;
   /** The effect presets to run (every one when absent). */
   effects?: readonly string[];
@@ -172,7 +174,8 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
       }
       case 'upscale': {
         const clip = need(opts.clip, '--clip', name);
-        const job = compileUpscale(model, template, { videoRef: basename(clip), aspect: opts.aspect, seed: opts.seed });
+        if (opts.clipAspect === undefined || opts.clipFrames === undefined) throw new Error('the upscale job needs the aspect and the frame count of its clip');
+        const job = compileUpscale(model, template, { videoRef: basename(clip), aspect: opts.clipAspect, frames: opts.clipFrames, seed: opts.seed });
         return [{ name, tag: name, model, ...job, files: [file('video', clip)] }];
       }
     }
