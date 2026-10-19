@@ -29,4 +29,5 @@ test('bare Node runs the core from outside the repository', () => {
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
-});
+  // One bare node per source file: about 3 s alone, more beside the other test files.
+}, 30_000);

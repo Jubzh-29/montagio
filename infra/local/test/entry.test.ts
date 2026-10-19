@@ -26,7 +26,7 @@ test.runIf(hasBash)('montagio.sh help runs the installer and exits 0', () => {
   const run = spawnSync('bash', [join(repoRoot, 'montagio.sh'), 'help'], { encoding: 'utf8', cwd: tmpdir() });
   expect(run.status).toBe(0);
   expect(run.stdout).toContain('Usage');
-});
+}, 30_000);
 
 test.runIf(hasBash)('montagio.sh refuses a Node.js older than 22.18 and says where to get one', () => {
   const fake = join(fakeDir, 'node');
@@ -36,13 +36,13 @@ test.runIf(hasBash)('montagio.sh refuses a Node.js older than 22.18 and says whe
   expect(run.status).toBe(1);
   expect(run.stderr).toContain('22.18');
   expect(run.stderr).toContain('https://nodejs.org');
-});
+}, 30_000);
 
 test.runIf(hasBash)('montagio.sh passes its exit code and its arguments through', () => {
   const run = spawnSync('bash', [join(repoRoot, 'montagio.sh'), 'install', '--bogus option'], { encoding: 'utf8' });
   expect(run.status).toBe(2);
   expect(run.stderr).toContain('--bogus option');
-});
+}, 30_000);
 
 const powershell = (args: string[], env?: NodeJS.ProcessEnv) =>
   spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', join(repoRoot, 'montagio.ps1'), ...args], {
