@@ -306,8 +306,11 @@ async function main(): Promise<number> {
     const patch = lockPatch(lockText, proposed);
     await writeText(join(outDir, 'models.lock.proposed.yaml'), proposed);
     await writeText(join(outDir, 'models.lock.patch'), patch);
-    console.log(`\nlock patch (${updates.size} entr${updates.size > 1 ? 'ies' : 'y'}): ${relative(callerDir, join(outDir, 'models.lock.patch'))}`);
-    console.log('review it, then on your machine: git apply models.lock.patch');
+    const entries = `${updates.size} entr${updates.size > 1 ? 'ies' : 'y'}`;
+    if (patch) {
+      console.log(`\nlock patch (${entries}): ${relative(callerDir, join(outDir, 'models.lock.patch'))}`);
+      console.log('review it, then on your machine: git apply models.lock.patch');
+    } else console.log(`\nlock patch: empty, the lock already pins these ${entries} (nothing to apply)`);
   }
   console.log(`report: ${relative(callerDir, join(outDir, 'weights-report.json'))}`);
   const failed = outcomes.filter((o) => o.status === 'failed');
