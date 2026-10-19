@@ -136,7 +136,26 @@ export function serviceSpecs(input: {
   ];
 }
 
-function realSpecs(ctx: ServiceContext, state = ctx.state): ServiceSpec[] {
+/** The ComfyUI options that would break the promise: ComfyUI on 127.0.0.1, on the port of the install. */
+const PINNED_COMFY_OPTIONS = ['--listen', '--port'];
+
+/**
+ * MONTAGIO_COMFYUI_ARGS split on spaces. --listen and --port are refused, and so are their
+ * abbreviations, which ComfyUI's argparse accepts (--liste 0.0.0.0 would open it to the network).
+ */
+export function comfyExtraArgs(raw: string | undefined): string[] {
+  const args = (raw ?? '').split(/\s+/).filter(Boolean);
+  for (const arg of args) {
+    const name = arg.split('=')[0]!;
+    if (name.length > 2 && PINNED_COMFY_OPTIONS.some((option) => option.startsWith(name))) {
+      throw new Error(`MONTAGIO_COMFYUI_ARGS cannot set ${name}: Montagio runs ComfyUI on 127.0.0.1 only, on the port of the install (--comfy-port)`);
+    }
+  }
+  return args;
+}
+
+/** Only start reads MONTAGIO_COMFYUI_ARGS: stop and status need the markers and ports, which it does not change. */
+function realSpecs(ctx: ServiceContext, state = ctx.state, extraComfyArgs: string[] = []): ServiceSpec[] {
   return (
     ctx.specs ??
     serviceSpecs({
@@ -146,7 +165,7 @@ function realSpecs(ctx: ServiceContext, state = ctx.state): ServiceSpec[] {
       state,
       nodePath: process.execPath,
       baseEnv: process.env,
-      extraComfyArgs: (process.env.MONTAGIO_COMFYUI_ARGS ?? '').split(/\s+/).filter(Boolean),
+      extraComfyArgs,
     })
   );
 }
@@ -307,7 +326,16 @@ export async function startAll(ctx: ServiceContext, opts: { browser: boolean }):
     ctx.log(`Montagio is not installed in ${ctx.layout.dir}: run the install command first`);
     return 1;
   }
-  const specs = realSpecs(ctx);
+  let extraComfyArgs: string[] = [];
+  if (ctx.state.mode === 'full') {
+    try {
+      extraComfyArgs = comfyExtraArgs(process.env.MONTAGIO_COMFYUI_ARGS);
+    } catch (error) {
+      ctx.log(`error: ${(error as Error).message}`);
+      return 1;
+    }
+  }
+  const specs = realSpecs(ctx, ctx.state, extraComfyArgs);
   mkdirSync(ctx.layout.runDir, { recursive: true });
   mkdirSync(ctx.layout.logsDir, { recursive: true });
 

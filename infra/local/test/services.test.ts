@@ -8,6 +8,7 @@ import { DEFAULT_PORTS } from '../src/checks.ts';
 import { capture } from '../src/exec.ts';
 import { layout, osOf } from '../src/platform.ts';
 import {
+  comfyExtraArgs,
   isOurs,
   missingNodes,
   NEEDED_NODES,
@@ -43,6 +44,16 @@ test('ComfyUI listens on 127.0.0.1 with partner nodes disabled', () => {
   expect(comfy.args.join(' ')).not.toContain('0.0.0.0');
   expect(comfy.health).toBe('http://127.0.0.1:8188/system_stats');
   expect(specsOf({ ...full, gpuIndex: 1 }, {}, ['--lowvram']).find((s) => s.name === 'comfyui')!.args.slice(-3)).toEqual(['--cuda-device', '1', '--lowvram']);
+});
+
+test('MONTAGIO_COMFYUI_ARGS adds arguments but cannot move ComfyUI off 127.0.0.1', () => {
+  expect(comfyExtraArgs(undefined)).toEqual([]);
+  expect(comfyExtraArgs(' --lowvram  --preview-method auto ')).toEqual(['--lowvram', '--preview-method', 'auto']);
+  expect(() => comfyExtraArgs('--listen 0.0.0.0')).toThrow(/--listen/);
+  expect(() => comfyExtraArgs('--lowvram --port=9000')).toThrow(/--port/);
+  // ComfyUI's argparse takes an unambiguous abbreviation of an option.
+  expect(() => comfyExtraArgs('--liste 0.0.0.0')).toThrow(/--liste/);
+  expect(() => comfyExtraArgs('--listen')).toThrow(/127\.0\.0\.1/);
 });
 
 test('the Python services write their logs unbuffered, so a crash keeps its last lines', () => {
@@ -263,6 +274,28 @@ test('start refuses an install that never finished', async () => {
   expect(await startAll({ ...ctx, state: emptyState() }, { browser: false })).toBe(1);
   expect(lines.join('\n')).toContain('install');
 });
+
+test('start refuses a MONTAGIO_COMFYUI_ARGS that would listen beyond 127.0.0.1, and starts nothing', async () => {
+  const { ctx, l, lines } = await fakeContext();
+  vi.stubEnv('MONTAGIO_COMFYUI_ARGS', '--listen 0.0.0.0');
+  try {
+    expect(await startAll(ctx, { browser: false })).toBe(1);
+  } finally {
+    vi.unstubAllEnvs();
+    await stopAll(ctx);
+  }
+  expect(lines.join('\n')).toContain('MONTAGIO_COMFYUI_ARGS');
+  expect(existsSync(join(l.runDir, 'comfyui.pid'))).toBe(false);
+  // The app alone runs no ComfyUI: the variable does not concern it.
+  vi.stubEnv('MONTAGIO_COMFYUI_ARGS', '--listen 0.0.0.0');
+  try {
+    const appOnly = { ...ctx, state: { ...ctx.state, mode: 'app-only' as const }, specs: ctx.specs!.filter((s) => s.name === 'app') };
+    expect(await startAll(appOnly, { browser: false })).toBe(0);
+    await stopAll(appOnly);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+}, 30_000);
 
 test('the default ports are the ones the spec names', () => {
   expect(DEFAULT_PORTS).toEqual({ comfy: 8188, proxy: 8189, app: 3000 });
