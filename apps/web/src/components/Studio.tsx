@@ -16,6 +16,7 @@ import {
 import { refusalMessageKey } from '@/lib/refusals';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
+import { useMotionPaused } from '@/lib/use-motion';
 import { useShowcase } from '@/lib/use-showcase';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
@@ -108,6 +109,7 @@ export function Studio() {
   // follow its capabilities (none in the static showcase).
   const showcase = useShowcase();
   const capabilities = studioCapabilities(IS_SHOWCASE, showcase);
+  const [motionPaused, setMotionPaused] = useMotionPaused();
 
   useEffect(() => {
     Promise.all([
@@ -393,15 +395,24 @@ export function Studio() {
   const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
   const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
   const repoUrl = showcase?.repoUrl ?? null;
+  // The empty monitor plays the move in hand: the preset being remixed, the chosen one, or the last shot added.
+  const moveId = remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
+  const movePreset = presets.find((preset) => preset.id === moveId);
+  const move = movePreset && {
+    id: mode === 'sequence' ? `${shots.length}-${movePreset.id}` : movePreset.id,
+    poses: movePreset.poses,
+    speed: movePreset.speed,
+  };
 
   return (
     <>
       <Header recording={busy} />
-      <main className={styles.studio}>
+      <main className={styles.studio} data-motion={motionPaused ? 'paused' : 'playing'}>
         <section className={styles.stage} aria-label="Monitor">
           <Monitor
             upload={upload}
             generation={monitorState}
+            move={move}
             onFile={onFile}
             onSample={loadSample}
             onCancel={cancel}
@@ -511,6 +522,8 @@ export function Studio() {
             <PresetGallery
               presets={presets}
               selectedId={mode === 'single' ? presetId : null}
+              paused={motionPaused}
+              onPause={setMotionPaused}
               onSelect={onPreset}
             />
           )}

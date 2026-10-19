@@ -92,7 +92,10 @@
   filter: saturate(0.6);
 }
 
+/* Above the viewfinder, whose lines are faint enough to read the text over. */
 .monitorEmpty {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -262,7 +265,12 @@
   line-height: 1.4;
 }
 
-/* Viewfinder glyph: the scene drifts the way the camera moves. */
+/*
+ * Viewfinder glyph: the scene drifts behind the frame marks the way the camera
+ * moves, and the dashed target frame lands on the marks where the shot ends
+ * (src/lib/move-glyph.ts). It loops gently, with a hold at both ends; paused, it
+ * is a storyboard: frame marks where the shot starts, target where it ends.
+ */
 .glyph {
   position: relative;
   display: block;
@@ -270,6 +278,8 @@
   overflow: hidden;
   border-radius: var(--radius-s);
   background: var(--surface-2);
+  --mark: oklch(0.96 0 0 / 0.4);
+  --mark-size: 8px;
 }
 
 .glyphScene {
@@ -279,20 +289,51 @@
     linear-gradient(oklch(0.96 0 0 / 0.06) 1px, transparent 1px),
     linear-gradient(90deg, oklch(0.96 0 0 / 0.06) 1px, transparent 1px);
   background-size: 12% 18%;
-  animation: drift var(--move-duration) var(--ease-out) infinite alternate;
-  animation-play-state: paused;
+  /* A camera move ramps up and settles: ease in and out, not a UI ease-out. */
+  animation: drift var(--move-duration) var(--ease-camera) infinite alternate;
+  will-change: transform;
 }
 
-.preset:hover .glyphScene,
-.preset[aria-pressed='true'] .glyphScene {
-  animation-play-state: running;
+.glyphScene[data-chained='true'] {
+  animation-name: drift-then;
+}
+
+/* The toggle (or reduced motion) stops every loop: the glyphs show their storyboard. */
+.studio[data-motion='paused'] .glyphScene {
+  animation: none;
+}
+
+/* Reduced motion starts paused; pressing Play is an explicit choice, so it wins over the global reset. */
+@media (prefers-reduced-motion: reduce) {
+  .studio[data-motion='playing'] .glyphScene {
+    animation-duration: var(--move-duration) !important;
+    animation-iteration-count: infinite !important;
+  }
 }
 
 @keyframes drift {
-  from {
+  0%,
+  12% {
     transform: translate(0, 0) scale(1);
   }
-  to {
+  88%,
+  100% {
+    transform: translate(var(--tx), var(--ty)) scale(var(--scale));
+  }
+}
+
+/* Two moves one after the other (push then hold, in then out). */
+@keyframes drift-then {
+  0%,
+  8% {
+    transform: translate(0, 0) scale(1);
+  }
+  46%,
+  54% {
+    transform: translate(var(--mid-tx), var(--mid-ty)) scale(var(--mid-scale));
+  }
+  92%,
+  100% {
     transform: translate(var(--tx), var(--ty)) scale(var(--scale));
   }
 }
@@ -315,25 +356,112 @@
   border-radius: 50%;
   transform: translate(-50%, -50%);
   background: var(--ink-faint);
+  transition: background var(--dur) var(--ease-out);
 }
 
 .preset[aria-pressed='true'] .glyphSubject {
   background: var(--ink);
 }
 
+.glyphTarget {
+  position: absolute;
+  border: 1px dashed oklch(0.96 0 0 / 0.42);
+  border-radius: 2px;
+}
+
+.preset[aria-pressed='true'] .glyphTarget {
+  border-color: oklch(0.96 0 0 / 0.75);
+}
+
 .glyphFrame {
   position: absolute;
   inset: 14%;
-  --mark: oklch(0.96 0 0 / 0.4);
   background:
-    linear-gradient(var(--mark), var(--mark)) top left / 8px 1px no-repeat,
-    linear-gradient(var(--mark), var(--mark)) top left / 1px 8px no-repeat,
-    linear-gradient(var(--mark), var(--mark)) top right / 8px 1px no-repeat,
-    linear-gradient(var(--mark), var(--mark)) top right / 1px 8px no-repeat,
-    linear-gradient(var(--mark), var(--mark)) bottom left / 8px 1px no-repeat,
-    linear-gradient(var(--mark), var(--mark)) bottom left / 1px 8px no-repeat,
-    linear-gradient(var(--mark), var(--mark)) bottom right / 8px 1px no-repeat,
-    linear-gradient(var(--mark), var(--mark)) bottom right / 1px 8px no-repeat;
+    linear-gradient(var(--mark), var(--mark)) top left / var(--mark-size) 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top left / 1px var(--mark-size) no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top right / var(--mark-size) 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) top right / 1px var(--mark-size) no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom left / var(--mark-size) 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom left / 1px var(--mark-size) no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom right / var(--mark-size) 1px no-repeat,
+    linear-gradient(var(--mark), var(--mark)) bottom right / 1px var(--mark-size) no-repeat;
+}
+
+/*
+ * The empty monitor plays the chosen move full size: the camera is already
+ * moving, the photo gives it a subject. Quieter than a tile, so the call to
+ * drop a photo reads first.
+ */
+.viewfinder {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+  border-radius: inherit;
+  background: transparent;
+  --mark: oklch(0.96 0 0 / 0.22);
+  --mark-size: 22px;
+}
+
+.viewfinder .glyphScene {
+  background-image:
+    linear-gradient(oklch(0.96 0 0 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.96 0 0 / 0.045) 1px, transparent 1px);
+}
+
+/* The call to drop a photo sits at the centre: no subject behind it, the horizon below it. */
+.viewfinder .glyphHorizon {
+  top: 74%;
+  background: var(--line);
+}
+
+.viewfinder .glyphSubject {
+  display: none;
+}
+
+.viewfinder .glyphTarget {
+  border-color: oklch(0.96 0 0 / 0.2);
+}
+
+/* Section title with a tool on its right (the previews' pause toggle). */
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.motionToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+}
+
+.motionToggle:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+/* Pause: two bars. Play: a triangle. */
+.motionIcon {
+  width: 8px;
+  height: 9px;
+  border-inline: 2.5px solid currentColor;
+}
+
+.motionIcon[data-paused='true'] {
+  border: 0;
+  background: currentColor;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
 }
 
 /* Models */

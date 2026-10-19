@@ -1,69 +1,46 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
 import type { PresetSummary } from '@/lib/api-types';
+import { MoveGlyph } from './MoveGlyph';
 import styles from './studio.module.css';
-
-/** Where the scene drifts inside the viewfinder for each camera pose. */
-const POSE_MOTION: Record<string, { tx: number; ty: number; scale: number }> = {
-  static: { tx: 0, ty: 0, scale: 1 },
-  pan_left: { tx: 14, ty: 0, scale: 1 },
-  pan_right: { tx: -14, ty: 0, scale: 1 },
-  pan_up: { tx: 0, ty: 14, scale: 1 },
-  pan_down: { tx: 0, ty: -14, scale: 1 },
-  zoom_in: { tx: 0, ty: 0, scale: 1.55 },
-  zoom_out: { tx: 0, ty: 0, scale: 0.7 },
-};
-
-function MoveGlyph({ poses, speed }: { poses: string[]; speed: number }) {
-  const motion = poses.reduce(
-    (acc, pose) => {
-      const m = POSE_MOTION[pose] ?? POSE_MOTION.static!;
-      return { tx: acc.tx + m.tx, ty: acc.ty + m.ty, scale: acc.scale * m.scale };
-    },
-    { tx: 0, ty: 0, scale: 1 },
-  );
-  const style = {
-    '--tx': `${motion.tx}%`,
-    '--ty': `${motion.ty}%`,
-    '--scale': motion.scale,
-    '--move-duration': `${(2.6 / Math.max(speed, 0.2)).toFixed(2)}s`,
-  } as CSSProperties;
-  return (
-    <span className={styles.glyph} aria-hidden="true">
-      <span className={styles.glyphScene} style={style}>
-        <span className={styles.glyphHorizon} />
-        <span className={styles.glyphSubject} />
-      </span>
-      <span className={styles.glyphFrame} />
-    </span>
-  );
-}
 
 function PresetTile({
   preset,
   selected,
+  paused,
   onSelect,
 }: {
   preset: PresetSummary;
   selected: boolean;
+  paused: boolean;
   onSelect: () => void;
 }) {
   const { t } = useI18n();
   const [previewReady, setPreviewReady] = useState(false);
+  const video = useRef<HTMLVideoElement>(null);
+
+  // No autoplay attribute: the clip plays only while the previews run.
+  useEffect(() => {
+    const element = video.current;
+    if (!element) return;
+    if (paused) element.pause();
+    else element.play().catch(() => undefined);
+  }, [paused, preset.previewUrl]);
+
   return (
     <button type="button" className={styles.preset} aria-pressed={selected} onClick={onSelect}>
       <span className={styles.presetMedia}>
         <MoveGlyph poses={preset.poses} speed={preset.speed} />
         {preset.previewUrl && (
           <video
+            ref={video}
             className={styles.presetPreview}
             data-ready={previewReady}
             src={preset.previewUrl}
             muted
             loop
-            autoPlay
             playsInline
             preload="metadata"
             aria-hidden="true"
@@ -84,24 +61,41 @@ function PresetTile({
 export function PresetGallery({
   presets,
   selectedId,
+  paused,
+  onPause,
   onSelect,
 }: {
   presets: PresetSummary[];
   selectedId: string | null;
+  /** The looping previews are stopped (the toggle, or reduced motion). */
+  paused: boolean;
+  onPause: (paused: boolean) => void;
   onSelect: (id: string) => void;
 }) {
   const { t } = useI18n();
   return (
     <section className={styles.panelSection} aria-labelledby="presets-heading">
-      <h2 id="presets-heading" className={styles.sectionTitle}>
-        {t('presets')}
-      </h2>
+      <div className={styles.sectionHead}>
+        <h2 id="presets-heading" className={styles.sectionTitle}>
+          {t('presets')}
+        </h2>
+        <button
+          type="button"
+          className={styles.motionToggle}
+          aria-label={paused ? t('motionPlayLabel') : t('motionPauseLabel')}
+          onClick={() => onPause(!paused)}
+        >
+          <span className={styles.motionIcon} data-paused={paused} aria-hidden="true" />
+          {paused ? t('motionPlay') : t('motionPause')}
+        </button>
+      </div>
       <div className={styles.presetGrid}>
         {presets.map((preset) => (
           <PresetTile
             key={preset.id}
             preset={preset}
             selected={preset.id === selectedId}
+            paused={paused}
             onSelect={() => onSelect(preset.id)}
           />
         ))}

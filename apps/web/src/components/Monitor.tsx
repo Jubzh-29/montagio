@@ -4,11 +4,12 @@ import { useState, type DragEvent } from 'react';
 import { useI18n } from '@/i18n';
 import type { JobState, SampleSummary } from '@/lib/api-types';
 import { refusalMessageKey } from '@/lib/refusals';
+import { MoveGlyph } from './MoveGlyph';
 import { SamplePicker } from './SamplePicker';
+import styles from './studio.module.css';
 
 /** What the monitor needs from a generation or a sequence. */
 export type TrackedJob = { id: string; state: JobState; progress: number; outputUrl?: string; error?: string };
-import styles from './studio.module.css';
 
 export type UploadState =
   | { status: 'idle' }
@@ -30,6 +31,7 @@ export function Monitor({
   onCancel,
   onRetry,
   statusLabel,
+  move,
   showcase,
 }: {
   upload: UploadState;
@@ -40,6 +42,8 @@ export function Monitor({
   onRetry: () => void;
   /** Replaces the default running text, e.g. "Shot 2/3 — 40%". */
   statusLabel?: string;
+  /** The chosen camera move: the empty monitor plays it in its viewfinder. */
+  move?: { id: string; poses: string[]; speed: number };
   /**
    * The showcase: sample photos replace the drop zone. Unless it takes uploads (its
    * `uploads` capability, off in the static showcase), a dropped file is answered
@@ -62,6 +66,7 @@ export function Monitor({
   const rendering =
     generation.status === 'submitting' || (record !== undefined && (record.state === 'queued' || record.state === 'running'));
   const percent = record ? Math.round(record.progress * 100) : 0;
+  const result = record?.state === 'succeeded' ? record.outputUrl : undefined;
   const acceptsFiles = !showcase || showcase.uploads;
 
   const onDrop = (event: DragEvent) => {
@@ -100,12 +105,12 @@ export function Monitor({
         />
       )}
 
-      {record?.state === 'succeeded' && record.outputUrl ? (
+      {result ? (
         <video
-          key={record.outputUrl}
+          key={result}
           data-testid="result"
           className={styles.monitorMedia}
-          src={record.outputUrl}
+          src={result}
           autoPlay
           loop
           muted
@@ -115,30 +120,35 @@ export function Monitor({
       ) : localUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- local object URL preview
         <img className={styles.monitorMedia} data-dimmed={rendering} src={localUrl} alt="" />
-      ) : showcase ? (
-        <div className={styles.monitorEmpty}>
-          <p className={styles.monitorEmptyTitle}>{t('showcasePickSample')}</p>
-          <SamplePicker samples={showcase.samples} selectedId={showcase.selectedId} onPick={showcase.onPick} />
-          {showcase.uploads && (
-            <label htmlFor="photo-input" className={styles.buttonSecondary}>
-              {t('choosePhoto')}
-            </label>
-          )}
-          <p className={styles.monitorEmptyHint}>{showcase.note}</p>
-        </div>
       ) : (
-        <div className={styles.monitorEmpty}>
-          <p className={styles.monitorEmptyTitle}>{t('monitorEmpty')}</p>
-          <p className={styles.monitorEmptyHint}>{t('monitorEmptyHint')}</p>
-          <div className={styles.emptyActions}>
-            <label htmlFor="photo-input" className={styles.buttonSecondary}>
-              {t('choosePhoto')}
-            </label>
-            <button type="button" className={styles.buttonLink} onClick={onSample}>
-              {t('useSample')}
-            </button>
-          </div>
-        </div>
+        <>
+          {move && <MoveGlyph variant="monitor" poses={move.poses} speed={move.speed} replay={move.id} />}
+          {showcase ? (
+            <div className={styles.monitorEmpty}>
+              <p className={styles.monitorEmptyTitle}>{t('showcasePickSample')}</p>
+              <SamplePicker samples={showcase.samples} selectedId={showcase.selectedId} onPick={showcase.onPick} />
+              {showcase.uploads && (
+                <label htmlFor="photo-input" className={styles.buttonSecondary}>
+                  {t('choosePhoto')}
+                </label>
+              )}
+              <p className={styles.monitorEmptyHint}>{showcase.note}</p>
+            </div>
+          ) : (
+            <div className={styles.monitorEmpty}>
+              <p className={styles.monitorEmptyTitle}>{t('monitorEmpty')}</p>
+              <p className={styles.monitorEmptyHint}>{t('monitorEmptyHint')}</p>
+              <div className={styles.emptyActions}>
+                <label htmlFor="photo-input" className={styles.buttonSecondary}>
+                  {t('choosePhoto')}
+                </label>
+                <button type="button" className={styles.buttonLink} onClick={onSample}>
+                  {t('useSample')}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {localUrl && !rendering && !showcase && (
