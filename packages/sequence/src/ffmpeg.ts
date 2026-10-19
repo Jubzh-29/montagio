@@ -214,7 +214,7 @@ export const SHOWCASE_COLOUR = 'scale=out_color_matrix=bt709:out_range=tv,format
 /**
  * Put a soundtrack under a film. The film keeps its exact length and every frame, copied
  * without re-encoding; the music is converted to 48 kHz stereo, padded with silence when
- * it is shorter and cut when it is longer, with a fade-out at the end (`fadeOut_s`, 1.5 s
+ * it is shorter and cut when it is longer, with a fade-out at the end (`fadeOut_s`, above 0, 1.5 s
  * by default, at most a quarter of the film), then encoded as AAC. Never `-shortest`,
  * which would cut the film to a short music.
  */
@@ -224,16 +224,21 @@ export async function mixMusic(
   out: string,
   opts: { gainDb?: number; fadeOut_s?: number } = {},
 ): Promise<void> {
+  // Both land in an FFmpeg filter: a NaN or a fade of 0 s (which afade reads as its default) would not fail here.
+  const gainDb = opts.gainDb ?? 0;
+  const fadeOut_s = opts.fadeOut_s ?? 1.5;
+  if (!Number.isFinite(gainDb)) throw new SequenceToolError(`mixMusic: gainDb ${gainDb} is not a number of decibels`);
+  if (!(Number.isFinite(fadeOut_s) && fadeOut_s > 0)) throw new SequenceToolError(`mixMusic: fadeOut_s ${fadeOut_s} is not a number of seconds above 0`);
   const { duration_s } = await probe(film);
   if (!(duration_s > 0)) throw new SequenceToolError(`no duration in ${film}`);
-  const fade = Math.min(opts.fadeOut_s ?? 1.5, duration_s / 4);
+  const fade = Math.min(fadeOut_s, duration_s / 4);
   const audio = [
     '[1:a]aformat=sample_rates=48000:channel_layouts=stereo',
     'apad',
     `atrim=0:${duration_s.toFixed(3)}`,
     'asetpts=PTS-STARTPTS',
     `afade=t=out:st=${(duration_s - fade).toFixed(3)}:d=${fade.toFixed(3)}`,
-    `volume=${opts.gainDb ?? 0}dB[music]`,
+    `volume=${gainDb}dB[music]`,
   ].join(',');
   await writeAtomically(out, (partial) => [
     '-loglevel', 'error', '-y',
