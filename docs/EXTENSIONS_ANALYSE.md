@@ -173,7 +173,7 @@ Rien n'est branché dans l'interface (`apps/web` n'a pas changé). Ce qui existe
 
 Chacune rend `{ workflow, output: { kind, node }, params }` et lève `CompileError` avant tout envoi au GPU.
 
-**Adaptateur** (`@montagio/comfy-adapter`, aussi sur la branche `feat/adapter-outputs`) : `SubmitJob.output` (`video` par défaut, `audio`, `image`) et `outputNode` ; `get(id, want?)` pour un job soumis avant un redémarrage de l'app. La sortie est choisie par son type, jamais par son type MIME.
+**Adaptateur** (`@montagio/comfy-adapter`, aussi sur la branche `feat/adapter-outputs`) : `SubmitJob.output` (`video` par défaut, `audio`, `image`) et `outputNode` ; `get(id, want?)` pour un job soumis avant un redémarrage de l'app. La sortie est choisie par le type que donne le proxy pour l'audio et l'image, et par son type MIME pour la vidéo : comfy-api-proxy 0.1.6 range le MP4 de `SaveVideo` sous le type `image`, comme ComfyUI.
 
 **Montage** (`@montagio/sequence`) : `mixMusic(film, musique, sortie)` garde chaque image et la durée exacte du film ; `exportVertical` garde la musique dans la coupe 9:16 ; `probeAudio` lit la durée d'une parole.
 
@@ -225,6 +225,8 @@ Puis dater `gpu_validated` dans `registry/extensions.yaml` pour chaque extension
 - sortie copiée avec la mention « AI-generated » (MP4 : `tagClip`).
 
 La lecture du drapeau passe par `enabledExtensions(lib.extensions, process.env.MONTAGIO_EXTENSIONS)`. Une extension masquée répond 404 `extension-disabled`.
+
+En mode local, le drapeau ne suffit pas : l'installeur laisse l'avatar de côté (il n'installe pas le node de la voix), et le pod peut avoir sauté ce node (`install_voice_node` avertit sans arrêter). Le serveur masque donc aussi une extension dont un node manque au `/object_info` du ComfyUI (pour l'avatar, `ChatterboxMTLTTS`), lu au démarrage et à chaque reconnexion. Sinon, une fois l'avatar daté en S2, une installation locale par défaut montrerait l'onglet « Avatar » et chaque clic finirait en `workflow-rejected`.
 
 **Routes API** :
 
