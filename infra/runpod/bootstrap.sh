@@ -62,9 +62,11 @@ preflight() {
   fi
 }
 
-# "13.0" from the nvidia-smi banner (the highest CUDA version the driver supports).
+# "13.0" from the nvidia-smi banner (the highest CUDA version the driver supports):
+# R5xx drivers print "CUDA Version: 13.0", R6xx ones "CUDA UMD Version: 13.4".
+# Same pattern as parseCudaBanner in infra/local/src/probe.ts.
 cuda_version() {
-  nvidia-smi | sed -n 's/.*CUDA Version: *\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -1
+  nvidia-smi | sed -En 's/.*CUDA (UMD )?Version: *([0-9]+\.[0-9]+).*/\2/p' | head -1
 }
 
 wait_http() { # url seconds label pidfile logfile
@@ -118,7 +120,12 @@ install_comfyui() {
   local cuda_major torch=$TORCH_VERSION vision=$TORCHVISION_VERSION flavor=$TORCH_CUDA
   cuda_major=$(cuda_version | cut -d. -f1)
   if [ "${cuda_major:-0}" -lt 13 ]; then
-    warn "this host's driver stops at CUDA $(cuda_version): falling back to torch $TORCH_FALLBACK_VERSION+$TORCH_FALLBACK_CUDA"
+    if [ -z "$cuda_major" ]; then
+      # A new banner format would land here: say so instead of blaming the driver.
+      warn "found no CUDA version in nvidia-smi's banner: falling back to torch $TORCH_FALLBACK_VERSION+$TORCH_FALLBACK_CUDA"
+    else
+      warn "this host's driver stops at CUDA $(cuda_version): falling back to torch $TORCH_FALLBACK_VERSION+$TORCH_FALLBACK_CUDA"
+    fi
     warn "ComfyUI $COMFYUI_TAG prefers a CUDA 13.0 build; if it misbehaves, redeploy on a host filtered on CUDA 13.0"
     torch=$TORCH_FALLBACK_VERSION vision=$TORCHVISION_FALLBACK_VERSION flavor=$TORCH_FALLBACK_CUDA
   fi
