@@ -16,7 +16,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { normalizeBasePath } from './build-options.mjs';
+import { normalizeBasePath, normalizeRepoUrl } from './build-options.mjs';
 import { flattenSegmentPrefetches } from './export-fixes.mjs';
 import { ffmpegLicenses } from './ffmpeg-licenses.mjs';
 
@@ -26,13 +26,14 @@ const require = createRequire(import.meta.url);
 
 const { values } = parseArgs({ options: { release: { type: 'boolean', default: false }, 'base-path': { type: 'string' } } });
 let basePath;
+let repoUrl;
 try {
   basePath = normalizeBasePath(values['base-path']);
+  repoUrl = normalizeRepoUrl(process.env.MONTAGIO_REPO_URL);
 } catch (error) {
   console.error(error.message);
   process.exit(2);
 }
-const repoUrl = process.env.MONTAGIO_REPO_URL?.trim() ?? '';
 if (values.release && !repoUrl) {
   console.error('a release build needs MONTAGIO_REPO_URL, the public repository URL (the showcase links to its source code)');
   process.exit(2);

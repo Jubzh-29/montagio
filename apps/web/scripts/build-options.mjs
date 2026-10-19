@@ -16,3 +16,23 @@ export function normalizeBasePath(raw) {
   }
   return `/${trimmed}`;
 }
+
+/**
+ * MONTAGIO_REPO_URL, the public repository the showcase links to (AGPL-3.0 §13):
+ * an absolute https URL without credentials, or '' when it is not set.
+ */
+export function normalizeRepoUrl(raw) {
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed) return '';
+  let url;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    url = null;
+  }
+  if (url?.protocol !== 'https:') {
+    throw new Error(`MONTAGIO_REPO_URL must be an absolute https URL such as https://github.com/<you>/montagio, got "${raw}"`);
+  }
+  if (url.username || url.password) throw new Error('MONTAGIO_REPO_URL must not carry credentials: the showcase publishes it');
+  return trimmed;
+}

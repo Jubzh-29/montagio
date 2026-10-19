@@ -60,7 +60,7 @@ La syntaxe `VARIABLE=valeur commande` est celle de Git Bash. Sous PowerShell, d�
 
 `--release` change deux choses :
 - **Vérification stricte** : `showcase verify --strict` refuse les photos et les clips provisoires, ainsi qu'un clip dont le workflow a changé depuis son rendu.
-- **Lien vers le code source** : `MONTAGIO_REPO_URL` devient obligatoire. La page affiche ce lien, comme l'exige l'AGPL-3.0 (§13), avec « L'installer chez soi ».
+- **Lien vers le code source** : `MONTAGIO_REPO_URL` devient obligatoire. La page affiche ce lien, comme l'exige l'AGPL-3.0 (§13), avec « L'installer chez soi ». Le build refuse une adresse qui n'est pas une URL https absolue, ou qui contient un identifiant ou un jeton.
 
 Sans `--release`, le pied de page affiche « Lien du code source ajouté à la publication ».
 
