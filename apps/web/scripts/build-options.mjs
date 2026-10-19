@@ -1,4 +1,6 @@
 // Options of the showcase build (showcase-build.mjs), kept apart so they can be tested.
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * The URL prefix of a GitHub Pages project site ("/montagio"), or '' at the root
@@ -35,4 +37,20 @@ export function normalizeRepoUrl(raw) {
   }
   if (url.username || url.password) throw new Error('MONTAGIO_REPO_URL must not carry credentials: the showcase publishes it');
   return trimmed;
+}
+
+/**
+ * What `next build` left in `nextDir` (apps/web/.next): 'server' for a production
+ * build that `next start` serves, 'export' for a static export (the showcase), 'none'
+ * when there is no build (`next dev` keeps its state in .next/dev).
+ */
+export function nextBuildKind(nextDir) {
+  if (!existsSync(join(nextDir, 'BUILD_ID'))) return 'none';
+  let output;
+  try {
+    output = JSON.parse(readFileSync(join(nextDir, 'required-server-files.json'), 'utf8')).config?.output;
+  } catch {
+    return 'none';
+  }
+  return output === 'export' ? 'export' : 'server';
 }

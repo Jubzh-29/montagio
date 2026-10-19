@@ -46,6 +46,10 @@ La commande enchaîne cinq étapes :
    Un fichier dont les entrées n'ont pas changé n'est pas refait. Le premier passage prend environ 80 s, les suivants environ 3 s.
 3. **La copie de ffmpeg.wasm** dans `apps/web/public/ffmpeg/`, avec ses licences (`LICENSES.txt`). La page charge ces fichiers depuis sa propre origine, jamais depuis un CDN.
 4. **`next build`** en mode export (`MONTAGIO_SHOWCASE_EXPORT=1`, `NEXT_PUBLIC_MONTAGIO_MODE=showcase`), suivi de deux petits correctifs de l'export de Next 16.4.2 (`scripts/export-fixes.mjs`).
+
+   Ce build passe par `apps/web/.next`, comme un build normal. En mode export, Next 16.4.2 ne se sert de `distDir` que pour renommer `out/` (`node_modules/next/dist/export/utils.js`). Un `distDir` séparé ne protège donc rien. Deux garde-fous existent à la place :
+   - `next build` garde `.next/dev` et `.next/cache` : le cache de `next dev` et des e2e n'est pas touché ;
+   - le script refuse de démarrer si `.next` contient un build de production (`next build` normal, servi par `next start`, comme celui de l'installeur local). Il faut alors construire la vitrine depuis un autre checkout, ou supprimer `apps/web/.next` puis refaire `next build` avant `next start`.
 5. **La fiche du Space** (`apps/web/showcase-space/README.md`) est copiée dans `out/README.md`.
 
 Résultat : `apps/web/out/`, environ 160 Mo. Les clips pèsent environ 1,7 Mo chacun, leurs variantes 9:16 environ 1,9 Mo, et ffmpeg.wasm 31 Mo.
