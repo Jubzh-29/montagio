@@ -1,7 +1,6 @@
 /**
- * Running programs. Never through a shell: every path (the repository sits in
- * "Higgsfield Clone Open Source", user folders can hold spaces) reaches the
- * program as one argument.
+ * Running programs. Never through a shell: every path (a clone or a user
+ * folder can hold spaces) reaches the program as one argument.
  */
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';

@@ -4,7 +4,7 @@ import { delimiter, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-// The real repository path holds spaces ("Higgsfield Clone Open Source"): the launchers run from there.
+// The launchers run from the real checkout, whose path holds spaces on the development machine.
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const hasBash = spawnSync('bash', ['--version'], { encoding: 'utf8' }).stdout?.startsWith('GNU bash') ?? false;
 const onWindows = process.platform === 'win32';
