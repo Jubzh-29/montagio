@@ -29,4 +29,5 @@ test('bare Node runs the core from outside the repository', () => {
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
-});
+  // One Node start per source file: about 2 s on an idle machine, past Vitest's 5 s default on a loaded one.
+}, 30_000);
