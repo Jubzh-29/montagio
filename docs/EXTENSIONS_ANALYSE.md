@@ -1,6 +1,6 @@
 # Analyse des extensions, sans GPU (19/10/2026)
 
-Le 19/10, l'utilisateur a choisi d'ajouter à Montagio quatre extensions (musique, upscale HD, édition d'image, avatar parlant). Le même jour, il les a réorientées vers les « hooks » viraux d'une photo, d'après le rapport `reports/Fonctions virales de Higgsfield.md` (dossier parent du dépôt) : ce qui manque à Montagio, ce sont des effets d'une photo, de trois secondes, nommés et rejouables. Ordre de priorité retenu :
+Le 19/10, l'utilisateur a choisi d'ajouter à Montagio quatre extensions (musique, upscale HD, édition d'image, avatar parlant). Le même jour, il les a réorientées vers les « hooks » viraux d'une photo, d'après le rapport du 19/10 sur les fonctions virales du concurrent (dossier `reports/`, à côté du dépôt) : ce qui manque à Montagio, ce sont des effets d'une photo, de trois secondes, nommés et rejouables. Ordre de priorité retenu :
 1. **Édition d'image** (Qwen-Image-Edit-2511) : la photo modifiée par une instruction, en 4 étapes avec la LoRA Lightning, avec trois « looks » (gonflé, figurine, angle de vue) et une seconde image. Elle fait aussi l'image finale des transitions.
 2. **Pack de 6 effets** : Squish, Cake-ify, Explode, Crash Zoom, Bullet Time et 360 Orbit, des LoRA de Remade-AI sur Wan 2.1 I2V 480p.
 3. **Transitions par images clés** : l'édition fait l'image finale, Wan 2.2 FLF2V anime le passage. Hooks : Eyes In et Outfit Morph en S2, Figurine et Ignite (embrasement) en S3.
