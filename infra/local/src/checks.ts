@@ -162,7 +162,7 @@ export function evaluate(facts: MachineFacts, ctx: Context): Check[] {
   const taken = wanted.filter((name) => facts.busyPorts.includes(ctx.ports[name]) && !ctx.ownPorts.includes(ctx.ports[name]));
   add(
     taken.length === 0
-      ? { id: 'ports', severity: 'ok', message: `ports ${wanted.map((name) => ctx.ports[name]).join(', ')}` }
+      ? { id: 'ports', severity: 'ok', message: `${wanted.length > 1 ? 'ports' : 'port'} ${wanted.map((name) => ctx.ports[name]).join(', ')}` }
       : {
           id: 'ports',
           severity: 'fail',

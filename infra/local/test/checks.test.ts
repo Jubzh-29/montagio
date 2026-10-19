@@ -111,6 +111,8 @@ test('the app alone needs neither Python, nor a GPU, nor a driver, and only its 
   expect(checks.map((check) => check.id)).not.toEqual(expect.arrayContaining(['python']));
   for (const id of ['python', 'gpu', 'driver', 'ram', 'git'] as const) expect(byId(checks, id)).toBeUndefined();
   expect(checks.every((check) => check.severity !== 'fail')).toBe(true);
+  expect(byId(checks, 'ports')?.message).toBe('port 3000');
+  expect(byId(evaluate(facts(), ctx), 'ports')?.message).toBe('ports 8188, 8189, 3000');
   expect(decide(checks, 'app-only')).toEqual({ kind: 'proceed', mode: 'app-only' });
 });
 
