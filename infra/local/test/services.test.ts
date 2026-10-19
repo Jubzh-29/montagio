@@ -232,6 +232,27 @@ test('stop leaves alone a process whose command line is not ours', async () => {
   expect(existsSync(join(l.runDir, 'app.pid'))).toBe(false);
 }, 30_000);
 
+test('start ignores a stale pid file: a dead pid, or a pid that is another program now', async () => {
+  const { ctx, l, lines, pid } = await fakeContext();
+  const other = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  strays.push(other);
+  await new Promise((resolve) => other.once('spawn', resolve));
+  const dead = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
+  await new Promise((resolve) => dead.once('exit', resolve));
+  mkdirSync(l.runDir, { recursive: true });
+  writeFileSync(join(l.runDir, 'app.pid'), String(other.pid));
+  writeFileSync(join(l.runDir, 'proxy.pid'), String(dead.pid));
+  try {
+    expect(await startAll(ctx, { browser: false })).toBe(0);
+    expect(lines.join('\n')).not.toContain('already running');
+    expect(pid('app')).not.toBe(other.pid);
+    expect(pid('proxy')).not.toBe(dead.pid);
+  } finally {
+    await stopAll(ctx);
+  }
+  expect(alive(other.pid!)).toBe(true);
+}, 60_000);
+
 test('isOurs reads a command line that holds non-ASCII characters', async () => {
   // A Windows profile such as C:\Users\Jérôme puts accents in every marker.
   const marker = 'montagio-marker-Jérôme-Ünïcode';

@@ -80,12 +80,15 @@ function harness(
   const calls: Call[] = [];
   const lines: string[] = [];
   const events: string[] = [];
+  /** The programs run and the services stopped or started, in one order. */
+  const timeline: string[] = [];
   /** For each weight fetch-weights is asked for: did its file exist when it was asked? */
   const existedBefore: Record<string, boolean> = {};
   const L = layout(dir, os);
   const stream: Stream = async (cmd, args, o = {}) => {
     const call = { cmd, args, cwd: o.cwd, shell: o.shell, env: o.env };
     calls.push(call);
+    timeline.push([cmd, ...args].join(' '));
     if (opts.failOn?.(call)) return 1;
     // What the real programs leave behind, which the plan checks for.
     if (args.includes('venv')) {
@@ -137,15 +140,16 @@ function harness(
     stream,
     log: (line) => lines.push(line),
     ask: opts.ask ?? null,
-    stopAll: async () => void events.push('stopAll'),
+    stopAll: async () => void (events.push('stopAll'), timeline.push('stopAll')),
     startAll: async () => {
       events.push('startAll');
+      timeline.push('startAll');
       return 0;
     },
     runningPorts: async () => [],
     probe: async () => opts.facts ?? facts(),
   };
-  return { calls, lines, events, existedBefore, deps, L, output: () => lines.join('\n') };
+  return { calls, lines, events, timeline, existedBefore, deps, L, output: () => lines.join('\n') };
 }
 
 const options = (over: Partial<InstallOptions> = {}): InstallOptions => ({
@@ -392,7 +396,11 @@ test('running services are stopped before anything else', async () => {
   const h = harness();
   h.deps.runningPorts = async () => [8188, 8189, 3000];
   await install(repo, options(), h.deps);
-  expect(h.events).toEqual(['stopAll', 'startAll']);
+  // One timeline: the stop comes before npm ci, the clone and every other program.
+  expect(h.timeline.length).toBeGreaterThan(2);
+  expect(h.timeline[0]).toBe('stopAll');
+  expect(h.timeline.at(-1)).toBe('startAll');
+  expect(h.timeline.filter((entry) => entry === 'stopAll')).toHaveLength(1);
 });
 
 test('the report is plain ASCII', () => {
