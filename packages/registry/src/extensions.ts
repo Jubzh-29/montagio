@@ -3,11 +3,11 @@ import { RegistryError } from './errors';
 import { ALLOWED_WEIGHT_LICENSES, EXTENSION_IDS, kebabId, type ExtensionId } from './schema';
 
 /**
- * The extensions (music, upscale, edit, avatar) run models that are not camera
- * presets: their entries live in registry/extensions/, apart from registry/models/,
+ * The extensions (edit, effects, transitions, avatar, music, upscale) run models that are
+ * not camera presets: their entries live in registry/extensions/, apart from registry/models/,
  * so nothing that lists preset models (the Studio, the showcase, compileJob) sees them.
  */
-export const EXTENSION_TASKS = ['t2a', 'v2v-upscale', 'i2i-edit', 'tts', 'ia2v-talk'] as const;
+export const EXTENSION_TASKS = ['t2a', 'v2v-upscale', 'i2i-edit', 'tts', 'ia2v-talk', 'i2v-effect', 'flf2v'] as const;
 export type ExtensionTask = (typeof EXTENSION_TASKS)[number];
 
 /** What a job delivers (the same three kinds as @montagio/comfy-adapter, which the registry does not depend on). */
@@ -28,6 +28,11 @@ export const EXTENSION_BINDING_KEYS = [
   'width',
   'height',
   'frames',
+  'negative',
+  'end_image',
+  'image2',
+  'lora',
+  'lora_strength',
 ] as const;
 export type ExtensionBindingKey = (typeof EXTENSION_BINDING_KEYS)[number];
 
@@ -37,6 +42,8 @@ export const REQUIRED_EXTENSION_BINDINGS: Record<ExtensionTask, ExtensionBinding
   'i2i-edit': ['image', 'prompt', 'seed'],
   tts: ['text', 'language', 'seed', 'cfg'],
   'ia2v-talk': ['image', 'audio', 'prompt', 'seed', 'width', 'height', 'frames'],
+  'i2v-effect': ['image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames', 'lora', 'lora_strength'],
+  flf2v: ['image', 'end_image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames'],
 };
 
 export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
@@ -45,6 +52,8 @@ export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
   'i2i-edit': 'image',
   tts: 'audio',
   'ia2v-talk': 'video',
+  'i2v-effect': 'video',
+  flf2v: 'video',
 };
 
 const binding = z.object({ node: z.string().min(1), field: z.string().min(1) }).strict();
@@ -95,13 +104,15 @@ const ExtensionEntrySchema = z
   .object({
     id: z.enum(EXTENSION_IDS),
     priority: z.number().int().positive(),
+    /** Extensions this one runs on (the transitions make their end frame with the edit). */
+    requires: z.array(z.enum(EXTENSION_IDS)).default([]),
     /** The day a GPU session validated the extension; null until then. */
     gpu_validated: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'gpu_validated must be a date (YYYY-MM-DD) or null').nullable(),
   })
   .strict();
 
 export type ExtensionEntry = z.infer<typeof ExtensionEntrySchema>;
-/** registry/extensions.yaml: the four extensions, each once. */
+/** registry/extensions.yaml: the six extensions, each once. */
 export type ExtensionsConfig = ExtensionEntry[];
 
 export const ExtensionsConfigSchema = z
@@ -117,6 +128,11 @@ export const ExtensionsConfigSchema = z
         ctx.addIssue({ code: 'custom', path: ['extensions'], message: `extension "${id}" must appear once (found ${count})` });
       }
     }
+    config.extensions.forEach((entry, index) => {
+      if (entry.requires.includes(entry.id)) {
+        ctx.addIssue({ code: 'custom', path: ['extensions', index, 'requires'], message: `extension "${entry.id}" cannot require itself` });
+      }
+    });
     const priorities = config.extensions.map((entry) => entry.priority);
     if (new Set(priorities).size !== priorities.length) {
       ctx.addIssue({ code: 'custom', path: ['extensions'], message: 'two extensions share a priority' });
@@ -126,13 +142,23 @@ export const ExtensionsConfigSchema = z
 /**
  * The extensions the app offers, by priority. `flag` is MONTAGIO_EXTENSIONS: unset, empty
  * or "validated" keeps those a GPU session validated (the cut rule decided on 2026-10-19:
- * an extension not validated on GPU by the evening of 25/10 is hidden from the demo);
- * "all" and "none" say what they say; anything else is a comma-separated list of ids.
+ * an extension not validated on GPU by the evening of 25/10 is hidden from the demo), less
+ * those whose requirement is not kept; "all" and "none" say what they say; anything else
+ * is a comma-separated list of ids, which must also name the requirements of each.
  */
 export function enabledExtensions(config: ExtensionsConfig, flag: string | undefined): ExtensionId[] {
   const byPriority = [...config].sort((a, b) => a.priority - b.priority);
   const value = flag?.trim() ?? '';
-  if (value === '' || value === 'validated') return byPriority.filter((entry) => entry.gpu_validated !== null).map((entry) => entry.id);
+  if (value === '' || value === 'validated') {
+    const kept = new Set(byPriority.filter((entry) => entry.gpu_validated !== null).map((entry) => entry.id));
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const entry of byPriority) {
+        if (kept.has(entry.id) && !entry.requires.every((id) => kept.has(id))) changed = kept.delete(entry.id);
+      }
+    }
+    return byPriority.filter((entry) => kept.has(entry.id)).map((entry) => entry.id);
+  }
   if (value === 'all') return byPriority.map((entry) => entry.id);
   if (value === 'none') return [];
   const asked = value
@@ -144,6 +170,12 @@ export function enabledExtensions(config: ExtensionsConfig, flag: string | undef
     throw new RegistryError(
       `MONTAGIO_EXTENSIONS: unknown extension ${unknown.map((id) => JSON.stringify(id)).join(', ')} (expected validated, all, none or a list of ${EXTENSION_IDS.join(', ')})`,
     );
+  }
+  for (const entry of byPriority.filter((e) => asked.includes(e.id))) {
+    const missing = entry.requires.filter((id) => !asked.includes(id));
+    if (missing.length > 0) {
+      throw new RegistryError(`MONTAGIO_EXTENSIONS: ${entry.id} requires ${missing.join(', ')}; add ${missing.length > 1 ? 'them' : 'it'} to the list`);
+    }
   }
   return byPriority.filter((entry) => asked.includes(entry.id)).map((entry) => entry.id);
 }

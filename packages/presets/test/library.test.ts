@@ -57,17 +57,19 @@ test('the real repository library loads', async () => {
   const lib = await loadLibrary(repoRoot());
   expect([...lib.models.keys()].sort()).toEqual(['wan22-i2v-a14b-fun-camera', 'wan22-ti2v-5b', 'z-image-turbo']);
   expect(lib.presets.size).toBeGreaterThanOrEqual(3);
-  expect(lib.extensions?.map((entry) => entry.id)).toEqual(['music', 'upscale', 'edit', 'avatar']);
+  expect(lib.extensions?.map((entry) => entry.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale']);
 });
 
 // Extension models (registry/extensions/) load apart from the preset models.
 
 const EXTENSIONS_YAML = `schema: montagio/extensions@0.1
 extensions:
-  - { id: music, priority: 1, gpu_validated: null }
-  - { id: upscale, priority: 2, gpu_validated: null }
-  - { id: edit, priority: 3, gpu_validated: null }
+  - { id: edit, priority: 1, gpu_validated: null }
+  - { id: effects, priority: 2, gpu_validated: null }
+  - { id: transitions, priority: 3, requires: [edit], gpu_validated: null }
   - { id: avatar, priority: 4, gpu_validated: null }
+  - { id: music, priority: 5, gpu_validated: null }
+  - { id: upscale, priority: 6, gpu_validated: null }
 `;
 
 const extModel = (id: string, extension: string, weights: string[], workflow = 'workflows/ext-music.api.json') => `schema: montagio/extension-model@0.1
@@ -128,7 +130,7 @@ test('loads extension models apart from the preset models', async () => {
   expect([...lib.extensionModels.keys()]).toEqual(['ace-music']);
   expect(lib.extensionTemplates.get('workflows/ext-music.api.json')?.['106']?.class_type).toBe('VAELoader');
   expect(lib.templates.has('workflows/ext-music.api.json')).toBe(false);
-  expect(lib.extensions?.map((entry) => entry.id)).toEqual(['music', 'upscale', 'edit', 'avatar']);
+  expect(lib.extensions?.map((entry) => entry.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale']);
 });
 
 test('a repository without extensions loads as before', async () => {

@@ -80,8 +80,9 @@ test('a workflow of an extension may load only the weights of its own model', as
       '  - id: ace-step15-vae\n    file: ace_1.5_vae.safetensors\n    url: https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files\n' +
       '    license: MIT\n    source: https://huggingface.co/ACE-Step/Ace-Step1.5\n    extension: music\n',
     'registry/extensions.yaml':
-      'schema: montagio/extensions@0.1\nextensions:\n  - { id: music, priority: 1, gpu_validated: null }\n  - { id: upscale, priority: 2, gpu_validated: null }\n' +
-      '  - { id: edit, priority: 3, gpu_validated: null }\n  - { id: avatar, priority: 4, gpu_validated: null }\n',
+      'schema: montagio/extensions@0.1\nextensions:\n  - { id: edit, priority: 1, gpu_validated: null }\n  - { id: effects, priority: 2, gpu_validated: null }\n' +
+      '  - { id: transitions, priority: 3, requires: [edit], gpu_validated: null }\n  - { id: avatar, priority: 4, gpu_validated: null }\n' +
+      '  - { id: music, priority: 5, gpu_validated: null }\n  - { id: upscale, priority: 6, gpu_validated: null }\n',
     'registry/extensions/ace-music.yaml': [
       'schema: montagio/extension-model@0.1',
       'id: ace-music',

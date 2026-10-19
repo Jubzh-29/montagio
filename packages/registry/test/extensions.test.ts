@@ -41,9 +41,9 @@ test('an unknown limit is refused', () => {
   expect(() => parseExtensionModel(replaceOnce(music, 'max_chars: 300', 'max_chars: 300, fps: 16'), 'm.yaml')).toThrow(/limits/);
 });
 
-test('the config needs each of the 4 extensions exactly once', () => {
+test('the config needs each of the 6 extensions exactly once', () => {
   const parsed = parseExtensionsConfig(config, 'extensions.yaml');
-  expect(parsed.map((e) => e.id)).toEqual(['music', 'upscale', 'edit', 'avatar']);
+  expect(parsed.map((e) => e.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale']);
   expect(() => parseExtensionsConfig(replaceOnce(config, '- id: upscale', '- id: music'), 'e.yaml')).toThrow(/music.*once|upscale/);
   const withoutAvatar = config.slice(0, config.indexOf('  - id: avatar'));
   expect(() => parseExtensionsConfig(withoutAvatar, 'e.yaml')).toThrow(/avatar/);
@@ -54,22 +54,41 @@ test('two extensions cannot share a priority', () => {
 });
 
 test('gpu_validated is a date or null', () => {
-  expect(parseExtensionsConfig(config, 'e.yaml').map((e) => e.gpu_validated)).toEqual(['2026-10-22', null, '2026-10-22', null]);
+  expect(parseExtensionsConfig(config, 'e.yaml').map((e) => e.gpu_validated)).toEqual(['2026-10-22', null, '2026-10-22', null, '2026-10-22', null]);
   expect(() => parseExtensionsConfig(replaceOnce(config, 'gpu_validated: 2026-10-22', 'gpu_validated: yes'), 'e.yaml')).toThrow(/gpu_validated/);
+});
+
+test('an extension may require others, never itself', () => {
+  expect(parseExtensionsConfig(config, 'e.yaml').map((e) => e.requires)).toEqual([[], [], ['edit'], [], [], []]);
+  expect(() => parseExtensionsConfig(replaceOnce(config, 'requires: [edit]', 'requires: [karaoke]'), 'e.yaml')).toThrow(/requires/);
+  expect(() => parseExtensionsConfig(replaceOnce(config, 'requires: [edit]', 'requires: [transitions]'), 'e.yaml')).toThrow(/transitions.*itself/);
+});
+
+test('an effect model needs its LoRA bindings', () => {
+  expect(() => parseExtensionModel(replaceOnce(music, 'task: t2a', 'task: i2v-effect'), 'm.yaml')).toThrow(/binding "lora" is required by task "i2v-effect"/);
 });
 
 describe('enabledExtensions', () => {
   const parsed = parseExtensionsConfig(config, 'extensions.yaml');
   test.each([undefined, '', 'validated'])('%j shows the extensions validated on GPU, by priority', (flag) => {
-    expect(enabledExtensions(parsed, flag)).toEqual(['music', 'edit']);
+    expect(enabledExtensions(parsed, flag)).toEqual(['edit', 'transitions', 'music']);
+  });
+  test('a validated extension whose requirement is not validated stays hidden', () => {
+    const editNotValidated = parseExtensionsConfig(replaceOnce(config, 'priority: 1\n    gpu_validated: 2026-10-22', 'priority: 1\n    gpu_validated: null'), 'e.yaml');
+    expect(enabledExtensions(editNotValidated, 'validated')).toEqual(['music']);
   });
   test('all and none', () => {
-    expect(enabledExtensions(parsed, 'all')).toEqual(['music', 'upscale', 'edit', 'avatar']);
+    expect(enabledExtensions(parsed, 'all')).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale']);
     expect(enabledExtensions(parsed, 'none')).toEqual([]);
   });
   test('a list, in priority order whatever its own order', () => {
-    expect(enabledExtensions(parsed, 'edit, music')).toEqual(['music', 'edit']);
+    expect(enabledExtensions(parsed, 'music, edit')).toEqual(['edit', 'music']);
     expect(enabledExtensions(parsed, 'avatar')).toEqual(['avatar']);
+    expect(enabledExtensions(parsed, 'transitions,edit')).toEqual(['edit', 'transitions']);
+  });
+  test('a list that names an extension without its requirement says what to add', () => {
+    expect(() => enabledExtensions(parsed, 'transitions')).toThrow(RegistryError);
+    expect(() => enabledExtensions(parsed, 'transitions')).toThrow(/transitions requires edit/);
   });
   test('an unknown extension in the list is named', () => {
     expect(() => enabledExtensions(parsed, 'music,karaoke')).toThrow(/karaoke/);

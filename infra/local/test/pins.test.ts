@@ -59,9 +59,9 @@ test('the ComfyUI folder of each weight is the one fetch-weights writes it to', 
 test('parseExtensionsConfig reads registry/extensions.yaml as @montagio/registry does', () => {
   const text = readFileSync(join(repoRoot, 'registry', 'extensions.yaml'), 'utf8');
   expect(parseExtensionsConfig(text)).toEqual(
-    registryExtensions(text, 'extensions.yaml').map(({ id, priority, gpu_validated }) => ({ id, priority, gpuValidated: gpu_validated })),
+    registryExtensions(text, 'extensions.yaml').map(({ id, priority, requires, gpu_validated }) => ({ id, priority, requires, gpuValidated: gpu_validated })),
   );
-  expect(readExtensions(repoRoot).map((e) => e.id)).toEqual(['music', 'upscale', 'edit', 'avatar']);
+  expect(readExtensions(repoRoot).map((e) => e.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale']);
 });
 
 test('a repository without registry/extensions.yaml has no extensions', () => {
@@ -72,22 +72,38 @@ describe('selectExtensions agrees with enabledExtensions', () => {
   const text = [
     'schema: montagio/extensions@0.1',
     'extensions:',
-    '  - id: music',
+    '  - id: edit',
     '    priority: 1',
     '    gpu_validated: 2026-10-22',
-    '  - id: upscale',
+    '  - id: effects',
     '    priority: 2',
     '    gpu_validated: null',
-    '  - id: edit',
+    '  - id: transitions',
     '    priority: 3',
+    '    requires: [edit]',
     '    gpu_validated: 2026-10-22',
     '  - id: avatar',
     '    priority: 4',
     '    gpu_validated: null',
+    '  - id: music',
+    '    priority: 5',
+    '    gpu_validated: 2026-10-22',
+    '  - id: upscale',
+    '    priority: 6',
+    '    gpu_validated: null',
     '',
   ].join('\n');
-  test.each([undefined, '', 'validated', 'all', 'none', 'edit, music'])('flag %j', (flag) => {
+  const editNotValidated = text.replace('priority: 1\n    gpu_validated: 2026-10-22', 'priority: 1\n    gpu_validated: null');
+  test.each([undefined, '', 'validated', 'all', 'none', 'edit, music', 'transitions,edit'])('flag %j', (flag) => {
     expect(selectExtensions(parseExtensionsConfig(text), flag)).toEqual(enabledExtensions(registryExtensions(text, 'e.yaml'), flag));
+  });
+  test('a validated extension whose requirement is not validated is left out by both', () => {
+    expect(selectExtensions(parseExtensionsConfig(editNotValidated), 'validated')).toEqual(['music']);
+    expect(enabledExtensions(registryExtensions(editNotValidated, 'e.yaml'), 'validated')).toEqual(['music']);
+  });
+  test('a list without a requirement is refused by both, saying what to add', () => {
+    expect(() => enabledExtensions(registryExtensions(text, 'e.yaml'), 'transitions')).toThrow(/transitions requires edit/);
+    expect(() => selectExtensions(parseExtensionsConfig(text), 'transitions')).toThrow(/transitions requires edit/);
   });
   test('an unknown extension is refused by both', () => {
     expect(() => enabledExtensions(registryExtensions(text, 'e.yaml'), 'music,karaoke')).toThrow(/karaoke/);

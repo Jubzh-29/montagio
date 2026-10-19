@@ -127,8 +127,8 @@ export function parseLockWeights(text: string): LockWeight[] {
   });
 }
 
-/** One extension of registry/extensions.yaml: its id, priority, and the day a GPU session validated it. */
-export type ExtensionPin = { id: string; priority: number; gpuValidated: string | null };
+/** One extension of registry/extensions.yaml: its id, priority, requirements, and the day a GPU session validated it. */
+export type ExtensionPin = { id: string; priority: number; requires: string[]; gpuValidated: string | null };
 
 /**
  * registry/extensions.yaml, kept in block style (`  - id: …` then `    key: value`)
@@ -151,6 +151,12 @@ export function parseExtensionsConfig(text: string): ExtensionPin[] {
   return entries.map((entry) => ({
     id: entry.id ?? '?',
     priority: Number(entry.priority),
+    // an inline list: "[edit]", "[edit, music]"
+    requires: (entry.requires ?? '')
+      .replace(/^\[|\]$/g, '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean),
     gpuValidated: !entry.gpu_validated || entry.gpu_validated === 'null' ? null : entry.gpu_validated,
   }));
 }
@@ -175,7 +181,16 @@ export function readExtensions(repoRoot: string): ExtensionPin[] {
 export function selectExtensions(config: ExtensionPin[], flag: string | null | undefined): string[] {
   const byPriority = [...config].sort((a, b) => a.priority - b.priority);
   const value = flag?.trim() ?? '';
-  if (value === '' || value === 'validated') return byPriority.filter((e) => e.gpuValidated !== null).map((e) => e.id);
+  if (value === '' || value === 'validated') {
+    const kept = new Set(byPriority.filter((e) => e.gpuValidated !== null).map((e) => e.id));
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const e of byPriority) {
+        if (kept.has(e.id) && !e.requires.every((id) => kept.has(id))) changed = kept.delete(e.id);
+      }
+    }
+    return byPriority.filter((e) => kept.has(e.id)).map((e) => e.id);
+  }
   if (value === 'all') return byPriority.map((e) => e.id);
   if (value === 'none') return [];
   const asked = value
@@ -186,6 +201,10 @@ export function selectExtensions(config: ExtensionPin[], flag: string | null | u
   const unknown = asked.filter((id) => !known.includes(id));
   if (unknown.length > 0) {
     throw new Error(`--extensions: unknown extension ${unknown.map((id) => JSON.stringify(id)).join(', ')} (expected validated, all, none or a list of ${known.join(', ')})`);
+  }
+  for (const e of byPriority.filter((entry) => asked.includes(entry.id))) {
+    const missing = e.requires.filter((id) => !asked.includes(id));
+    if (missing.length > 0) throw new Error(`--extensions: ${e.id} requires ${missing.join(', ')}; add ${missing.length > 1 ? 'them' : 'it'} to the list`);
   }
   return known.filter((id) => asked.includes(id));
 }
