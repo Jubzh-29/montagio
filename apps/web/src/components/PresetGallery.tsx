@@ -50,6 +50,7 @@ function PresetTile({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const { t } = useI18n();
   const [previewReady, setPreviewReady] = useState(false);
   return (
     <button type="button" className={styles.preset} aria-pressed={selected} onClick={onSelect}>
@@ -70,6 +71,7 @@ function PresetTile({
             onError={() => setPreviewReady(false)}
           />
         )}
+        {preset.previewPlaceholder && <span className={styles.badge}>{t('showcasePlaceholderBadge')}</span>}
       </span>
       <span className={styles.presetText}>
         <span className={styles.presetName}>{preset.name}</span>

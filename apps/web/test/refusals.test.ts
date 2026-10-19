@@ -17,3 +17,20 @@ test('those messages exist in English and in French', () => {
   }
   expect((en as Record<string, string>).errorFfmpegMissing).toMatch(/FFmpeg/);
 });
+
+test('the showcase explains what it cannot do, in English and in French', () => {
+  const expected = {
+    'showcase-upload': 'errorShowcaseUpload',
+    'showcase-remix': 'errorShowcaseRemix',
+    'not-in-showcase': 'errorNotInShowcase',
+    'model-not-in-showcase': 'errorNotInShowcase',
+    'montage-busy': 'errorMontageBusy',
+    'ffmpeg-unavailable': 'errorFfmpegUnavailable',
+  } as const;
+  for (const [code, key] of Object.entries(expected)) {
+    expect(refusalMessageKey(code), code).toBe(key);
+    for (const dictionary of [en, fr] as Record<string, string>[]) expect(dictionary[key], key).toBeTruthy();
+  }
+  expect((en as Record<string, string>).errorShowcaseUpload).toMatch(/pre-generated/);
+  expect((fr as Record<string, string>).errorShowcaseUpload).toMatch(/pré-générés/);
+});

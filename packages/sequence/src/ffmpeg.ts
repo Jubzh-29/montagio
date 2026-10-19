@@ -1,5 +1,10 @@
 import { execFile } from 'node:child_process';
-import { rename, rm } from 'node:fs/promises';
+import { mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { AI_METADATA, metadataArgs, type VideoTags } from './tags';
+
+export { AI_METADATA };
 
 export class SequenceToolError extends Error {
   override name = 'SequenceToolError';
@@ -18,9 +23,13 @@ const ffmpeg = (): Tool => ({ bin: process.env.MONTAGIO_FFMPEG ?? 'ffmpeg', envV
 const ffprobe = (): Tool => ({ bin: process.env.MONTAGIO_FFPROBE ?? 'ffprobe', envVar: 'MONTAGIO_FFPROBE' });
 
 /** Run a tool with an argument array (never a shell string) and return its stdout. */
-function run(tool: Tool, args: string[]): Promise<string> {
+function run(tool: Tool, args: string[], opts: { failOnStderr?: boolean } = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(tool.bin, args, { maxBuffer: 16 * 1024 * 1024, windowsHide: true }, (error, stdout, stderr) => {
+      if (!error && opts.failOnStderr && String(stderr).trim()) {
+        const tail = String(stderr).trim().split('\n').slice(-3).join(' | ');
+        return reject(new SequenceToolError(`${tool.bin} reported: ${tail}`));
+      }
       if (!error) return resolve(stdout);
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return reject(
@@ -35,35 +44,32 @@ function run(tool: Tool, args: string[]): Promise<string> {
 
 export async function probe(
   media: string,
-): Promise<{ width: number; height: number; duration_s: number; fps: number }> {
+): Promise<{ width: number; height: number; duration_s: number; fps: number; codec: string; pixFmt: string }> {
   const out = await run(ffprobe(), [
     '-v', 'error',
     '-select_streams', 'v:0',
-    '-show_entries', 'stream=width,height,r_frame_rate:format=duration',
+    '-show_entries', 'stream=width,height,r_frame_rate,codec_name,pix_fmt:format=duration',
     '-of', 'json',
     media,
   ]);
   const json = JSON.parse(out) as {
-    streams?: { width?: number; height?: number; r_frame_rate?: string }[];
+    streams?: { width?: number; height?: number; r_frame_rate?: string; codec_name?: string; pix_fmt?: string }[];
     format?: { duration?: string };
   };
   const stream = json.streams?.[0];
   if (!stream?.width || !stream.height) throw new SequenceToolError(`no video stream in ${media}`);
   const [num, den] = (stream.r_frame_rate ?? '0/1').split('/').map(Number);
   const fps = num && den ? num / den : 0;
-  return { width: stream.width, height: stream.height, duration_s: Number(json.format?.duration ?? 0), fps };
+  return {
+    width: stream.width,
+    height: stream.height,
+    duration_s: Number(json.format?.duration ?? 0),
+    fps,
+    codec: stream.codec_name ?? '',
+    pixFmt: stream.pix_fmt ?? '',
+  };
 }
 
-/** The mention every exported video carries (spec §13: C2PA comes after the contest). */
-export const AI_METADATA = {
-  comment: 'AI-generated',
-  description: 'AI-generated video made with Montagio, an open-source camera-move studio running open-weights models.',
-} as const;
-
-/** Drop the source's tags (a pod path, an encoder string) and write the AI mention as standard MP4 tags. */
-function metadataArgs(): string[] {
-  return ['-map_metadata', '-1', ...Object.entries(AI_METADATA).flatMap(([key, value]) => ['-metadata', `${key}=${value}`])];
-}
 
 /** The container-level tags of a media file, as ffprobe reads them. */
 export async function readTags(media: string): Promise<Record<string, string>> {
@@ -83,7 +89,7 @@ export async function tagClip(input: string, out: string): Promise<void> {
       '-loglevel', 'error', '-y',
       '-i', input,
       '-map', '0:v', '-map', '0:a?', '-c', 'copy',
-      ...metadataArgs(),
+      ...metadataArgs(AI_METADATA),
       '-movflags', '+faststart',
       '-f', 'mp4', partial,
     ]);
@@ -122,29 +128,175 @@ export async function concatClips(
     '-map', '[out]',
     '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast',
     '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an',
-    ...metadataArgs(),
+    ...metadataArgs(AI_METADATA),
     out,
   ]);
 }
 
-/** 9:16 cut for Reels/TikTok: the full frame centred over a blurred, cropped copy of itself. */
-export async function exportVertical(input: string, out: string): Promise<void> {
+const VERTICAL_X264 = [
+  '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast',
+  '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an',
+] as const;
+
+/**
+ * 9:16 cut for Reels/TikTok: the full frame centred over a blurred, cropped copy of itself.
+ * The filter works frame by frame, so the cut of a film equals the films of the cuts:
+ * the showcase prepares the cut of each clip and joins them.
+ */
+export async function exportVertical(
+  input: string,
+  out: string,
+  opts: { encoder?: readonly string[]; colour?: string; tags?: VideoTags } = {},
+): Promise<void> {
   const filter = [
     '[0:v]split[bg][fg]',
     '[bg]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=20:2[blurred]',
     '[fg]scale=720:-2[front]',
-    '[blurred][front]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[out]',
+    `[blurred][front]overlay=(W-w)/2:(H-h)/2,setsar=1,${opts.colour ?? 'format=yuv420p'}[out]`,
   ].join(';');
   await run(ffmpeg(), [
     '-loglevel', 'error', '-y',
     '-i', input,
     '-filter_complex', filter,
     '-map', '[out]',
-    '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast',
-    '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an',
-    ...metadataArgs(),
+    ...(opts.encoder ?? VERTICAL_X264),
+    ...metadataArgs(opts.tags ?? AI_METADATA),
     out,
   ]);
+}
+
+/**
+ * The one encoding of every showcase clip, placeholder and 9:16 cut. Identical
+ * settings give identical H.264 headers, so the browser can join clips with
+ * `-c copy`; no B-frames and a keyframe every 16 frames keep each clip a clean
+ * series of closed GOPs.
+ */
+export const SHOWCASE_X264: readonly string[] = [
+  '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'veryfast', '-crf', '18',
+  '-bf', '0', '-g', '16', '-keyint_min', '16', '-sc_threshold', '0',
+  '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
+  '-an', '-movflags', '+faststart',
+];
+
+/**
+ * The colour stage of every showcase encode: limited-range BT.709 4:2:0. A JPEG photo
+ * decodes to full range: without this, a placeholder's headers differ from a render's.
+ */
+export const SHOWCASE_COLOUR = 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p';
+
+/** Run FFmpeg into `<out>.part`, then rename: `out` is never half-written. */
+async function writeAtomically(out: string, args: (partial: string) => string[]): Promise<void> {
+  const partial = `${out}.part`;
+  try {
+    await run(ffmpeg(), args(partial));
+    await rename(partial, out);
+  } finally {
+    await rm(partial, { force: true });
+  }
+}
+
+/** Re-encode a clip in the showcase encoding, fitted (letterboxed) to `width`×`height` at `fps`, with `tags`. */
+export async function normalizeClip(
+  input: string,
+  out: string,
+  opts: { width: number; height: number; fps: number; tags: VideoTags },
+): Promise<void> {
+  const { width: w, height: h, fps } = opts;
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    '-i', input,
+    '-map', '0:v:0',
+    '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},${SHOWCASE_COLOUR}`,
+    ...SHOWCASE_X264,
+    ...metadataArgs(opts.tags),
+    '-f', 'mp4', partial,
+  ]);
+}
+
+/**
+ * A light copy of a clip for a looping gallery tile: `width` pixels wide and a
+ * high CRF, so a dozen tiles cost the visitor a megabyte or two, not twenty.
+ */
+export async function previewClip(input: string, out: string, opts: { width: number; tags: VideoTags }): Promise<void> {
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    '-i', input,
+    '-map', '0:v:0',
+    '-vf', `scale=${opts.width}:-2,setsar=1,format=yuv420p`,
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '30', '-pix_fmt', 'yuv420p', '-an', '-movflags', '+faststart',
+    ...metadataArgs(opts.tags),
+    '-f', 'mp4', partial,
+  ]);
+}
+
+/** zoompan expressions (z, x, y) in terms of `on`, the output frame number. */
+export type ZoompanExpr = { z: string; x: string; y: string };
+
+/**
+ * A stand-in clip made from a still: the photo is scaled to cover twice the
+ * output size, then `zoompan` moves a `width`×`height` window over it.
+ */
+export async function placeholderClip(
+  image: string,
+  out: string,
+  opts: { width: number; height: number; fps: number; frames: number; motion: ZoompanExpr; tags: VideoTags },
+): Promise<void> {
+  const { width: w, height: h, fps, frames, motion } = opts;
+  const filter = [
+    `scale=${2 * w}:${2 * h}:force_original_aspect_ratio=increase`,
+    `crop=${2 * w}:${2 * h}`,
+    `zoompan=z='${motion.z}':x='${motion.x}':y='${motion.y}':d=1:s=${w}x${h}:fps=${fps}`,
+    'setsar=1',
+    SHOWCASE_COLOUR,
+  ].join(',');
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    '-loop', '1', '-i', image,
+    '-vf', filter,
+    '-frames:v', String(frames),
+    ...SHOWCASE_X264,
+    ...metadataArgs(opts.tags),
+    '-f', 'mp4', partial,
+  ]);
+}
+
+/** Join clips of one encoding without re-encoding them (concat demuxer, `-c copy`), with `tags`. */
+export async function concatCopy(clips: string[], out: string, tags: VideoTags): Promise<void> {
+  if (clips.length === 0) throw new SequenceToolError('concatCopy needs at least one clip');
+  const dir = await mkdtemp(join(tmpdir(), 'montagio-concat-'));
+  try {
+    const list = join(dir, 'list.txt');
+    // The concat demuxer reads one quoted path per line; a quote inside is written '\''.
+    await writeFile(list, clips.map((clip) => `file '${resolve(clip).replace(/\\/g, '/').replace(/'/g, "'\\''")}'\n`).join(''));
+    await writeAtomically(out, (partial) => [
+      '-loglevel', 'error', '-y',
+      '-f', 'concat', '-safe', '0', '-i', list,
+      '-c', 'copy',
+      ...metadataArgs(tags),
+      '-movflags', '+faststart',
+      '-f', 'mp4', partial,
+    ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * A fingerprint of a clip's H.264 headers (SPS/PPS, colour description included).
+ * Clips joined with `-c copy` play with the first clip's headers: they must all match.
+ */
+export async function headerHash(media: string): Promise<string> {
+  const out = await run(ffprobe(), [
+    '-v', 'error', '-show_data_hash', 'SHA256', '-select_streams', 'v:0', '-show_entries', 'stream=extradata_hash', '-of', 'csv=p=0', media,
+  ]);
+  const hash = out.trim();
+  if (!hash) throw new SequenceToolError(`no video headers in ${media}`);
+  return hash;
+}
+
+/** Decode a whole file and fail on the first error FFmpeg reports (a truncated or mismatched stream). */
+export async function decodeCheck(media: string): Promise<void> {
+  await run(ffmpeg(), ['-v', 'error', '-xerror', '-i', media, '-f', 'null', '-'], { failOnStderr: true });
 }
 
 const checkedTools = new Map<string, Promise<void>>();

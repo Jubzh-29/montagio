@@ -4,6 +4,8 @@ export type PresetSummary = {
   description: string;
   /** Absent while the preset has no preview file yet. */
   previewUrl?: string;
+  /** Showcase: the preview loops a placeholder clip (camera move simulated by FFmpeg). */
+  previewPlaceholder?: boolean;
   poses: string[];
   speed: number;
   defaultModel: string;
@@ -31,6 +33,10 @@ export type GenerationRecord = {
   outputUrl?: string;
   error?: string;
   remix?: boolean;
+  /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
+  workflowUrl?: string;
+  /** A showcase clip whose camera move FFmpeg simulated, waiting for the GPU session. */
+  placeholder?: boolean;
 };
 
 export type OpenStackReport = {
@@ -51,4 +57,29 @@ export type SequenceSummary = {
   outputUrl?: string;
   verticalUrl?: string;
   error?: string;
+  /** Showcase: at least one shot is a placeholder clip. */
+  placeholder?: boolean;
+  /** Showcase: what the in-browser montage is doing while the film is assembling. */
+  stage?: 'loading-ffmpeg' | 'joining';
+};
+
+/** A sample photo of the showcase, picked instead of an upload. */
+export type SampleSummary = {
+  id: string;
+  title: { en: string; fr: string };
+  aspect: '16:9' | '9:16' | '1:1';
+  imageRef: `samples/${string}`;
+  url: string;
+  placeholder: boolean;
+};
+
+/** What the static showcase offers (GET /api/showcase, answered in the page). */
+export type ShowcaseInfo = {
+  samples: SampleSummary[];
+  model: { id: string; name: string; license: string };
+  /** What a live GPU backend would add; the static showcase has neither. */
+  capabilities: { uploads: boolean; remixRender: boolean };
+  /** Some clips are still placeholders (before the GPU session). */
+  placeholders: boolean;
+  repoUrl: string | null;
 };

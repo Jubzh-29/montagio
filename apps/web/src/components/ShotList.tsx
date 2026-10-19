@@ -10,12 +10,15 @@ export function ShotList({
   max,
   onRemove,
   onPromptChange,
+  promptsDisabled = false,
 }: {
   shots: { presetId: string; prompt: string }[];
   presets: PresetSummary[];
   max: number;
   onRemove: (index: number) => void;
   onPromptChange: (index: number, text: string) => void;
+  /** The showcase renders nothing: a shot's text could not change its pre-generated clip. */
+  promptsDisabled?: boolean;
 }) {
   const { t } = useI18n();
   const nameOf = (id: string) => presets.find((preset) => preset.id === id)?.name ?? id;
@@ -46,6 +49,7 @@ export function ShotList({
                 aria-label={t('shotPrompt', { i: index + 1 })}
                 placeholder={t('shotPromptPlaceholder')}
                 maxLength={300}
+                disabled={promptsDisabled}
                 value={shot.prompt}
                 onChange={(event) => onPromptChange(index, event.target.value)}
               />

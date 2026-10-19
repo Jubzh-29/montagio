@@ -76,7 +76,10 @@
   background: var(--surface-2);
 }
 
+/* The media fills the 16:9 frame whatever its own shape: a portrait clip is pillarboxed, not cropped. */
 .monitorMedia {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -578,6 +581,13 @@
   }
 }
 
+/* On a phone the empty monitor grows with what it holds (the showcase's sample photos and note). */
+@media (max-width: 640px) {
+  .monitor:has(> .monitorEmpty) {
+    aspect-ratio: auto;
+  }
+}
+
 .emptyActions {
   display: flex;
   flex-direction: column;
@@ -708,4 +718,118 @@
 
 .shotPrompt:hover {
   border-color: var(--line-strong);
+}
+
+/* Showcase (the static demo link): sample photos, labels, notes, footer. */
+.samples {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  width: min(100%, 560px);
+  margin-block: var(--space-2);
+}
+
+.sample {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+}
+
+.sample:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.sample[aria-pressed='true'] {
+  border-color: var(--rec);
+  background: var(--rec-soft);
+}
+
+.sampleImage {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-s);
+}
+
+.sampleTitle {
+  font-size: var(--text-s);
+  font-weight: 600;
+}
+
+.badge {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-s);
+  background: oklch(0 0 0 / 0.65);
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.caption {
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+}
+
+.showcaseNote {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  font-size: var(--text-s);
+}
+
+.model[data-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.prompt:disabled,
+.shotPrompt:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: var(--space-5);
+  border-top: 1px solid var(--line);
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.footerLinks {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.footerLinks a {
+  color: var(--ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.footerLinks a:hover {
+  color: var(--ink);
 }

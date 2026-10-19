@@ -1,0 +1,28 @@
+# Montagio showcase manifest: the sample photos of the free demo link, and the
+# clips really rendered for them. Every preset × sample pair without a clip
+# entry gets a placeholder (camera move simulated by FFmpeg, labelled as such).
+# Clip entries are written by `npm run showcase -- ingest`; check with
+# `npm run showcase -- verify [--strict]`. See README.md and docs/VITRINE.md.
+schema: montagio/showcase@0.1
+# The model every rendered clip was made with.
+model: wan22-i2v-a14b-fun-camera
+samples:
+  - id: landscape-a
+    file: samples/landscape-a.jpg
+    aspect: '16:9'
+    title: { en: Placeholder landscape A, fr: Paysage provisoire A }
+    status: placeholder
+    credit: Placeholder made with FFmpeg (lavfi); replaced in GPU session S3 by a Z-Image-Turbo image
+  - id: landscape-b
+    file: samples/landscape-b.jpg
+    aspect: '16:9'
+    title: { en: Placeholder landscape B, fr: Paysage provisoire B }
+    status: placeholder
+    credit: Placeholder made with FFmpeg (lavfi); replaced in GPU session S3 by a Z-Image-Turbo image
+  - id: portrait-a
+    file: samples/portrait-a.jpg
+    aspect: '9:16'
+    title: { en: Placeholder portrait A, fr: Portrait provisoire A }
+    status: placeholder
+    credit: Placeholder made with FFmpeg (lavfi); replaced in GPU session S3 by a Z-Image-Turbo image
+clips: []

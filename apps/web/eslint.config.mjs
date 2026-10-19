@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Showcase build output: ffmpeg.wasm as published, and generated media and data.
+    "public/ffmpeg/**",
+    "public/showcase/**",
   ]),
 ]);
 

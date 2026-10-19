@@ -1,11 +1,21 @@
 export {
   AI_METADATA,
   concatClips,
+  concatCopy,
+  decodeCheck,
   ensureTools,
   exportVertical,
   extractLastFrame,
+  headerHash,
+  normalizeClip,
+  placeholderClip,
+  previewClip,
   probe,
   readTags,
   SequenceToolError,
+  SHOWCASE_COLOUR,
+  SHOWCASE_X264,
   tagClip,
+  type ZoompanExpr,
 } from './ffmpeg';
+export { metadataArgs, PLACEHOLDER_METADATA, type VideoTags } from './tags';

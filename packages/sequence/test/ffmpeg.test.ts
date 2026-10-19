@@ -1,15 +1,24 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   AI_METADATA,
   concatClips,
+  concatCopy,
+  decodeCheck,
   exportVertical,
   extractLastFrame,
+  headerHash,
+  normalizeClip,
+  placeholderClip,
+  PLACEHOLDER_METADATA,
+  previewClip,
   probe,
   readTags,
   SequenceToolError,
+  SHOWCASE_COLOUR,
+  SHOWCASE_X264,
   tagClip,
 } from '../src/index';
 
@@ -19,6 +28,7 @@ const clipB = join(dir, 'b.mp4');
 const squareClip = join(dir, 'square.mp4');
 const clipWithTitle = join(dir, 'titled.mp4');
 const webmClip = join(dir, 'clip.webm');
+const samplePhoto = join(dir, 'sample.png');
 
 // These tests run the real FFmpeg (about 0.5 s each when idle). With other ffmpeg jobs on the machine,
 // one test took 14.6 s and the three fixture encodes about 17 s, past Vitest's 5 s test / 10 s hook
@@ -41,6 +51,8 @@ beforeAll(() => {
     '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=832x480:rate=16', '-t', '1',
     '-c:v', 'libvpx-vp9', '-deadline', 'realtime', '-cpu-used', '8', webmClip,
   ]);
+  // A sample photo at twice the 16:9 480p size, as the showcase keeps them.
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1664x960', '-frames:v', '1', samplePhoto]);
 }, FIXTURES_TIMEOUT_MS);
 
 afterEach(() => {
@@ -108,3 +120,93 @@ test('a missing ffmpeg names MONTAGIO_FFMPEG', async () => {
   expect(error).toBeInstanceOf(SequenceToolError);
   expect(String(error)).toMatch(/MONTAGIO_FFMPEG/);
 });
+
+// --- Showcase helpers: every showcase clip shares one encoding, so the browser can join them with -c copy.
+
+const ZOOM_IN = { z: '1+0.3*on/32', x: 'iw/2-(iw/zoom/2)', y: 'ih/2-(ih/zoom/2)' };
+
+test('normalizeClip fits a square clip to 832x480 at 16 fps with the given tags', async () => {
+  const out = join(dir, 'normalized-square.mp4');
+  await normalizeClip(squareClip, out, { width: 832, height: 480, fps: 16, tags: AI_METADATA });
+  const p = await probe(out);
+  expect(p).toMatchObject({ width: 832, height: 480, fps: 16 });
+  const streams = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name', '-of', 'csv=p=0', out], {
+    encoding: 'utf8',
+  });
+  expect(streams.trim().split(/\s+/)).toEqual(['h264,video']);
+  expect(await readTags(out)).toMatchObject(AI_METADATA);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('placeholderClip writes the asked frames and the placeholder tags', async () => {
+  const out = join(dir, 'placeholder.mp4');
+  await placeholderClip(samplePhoto, out, { width: 832, height: 480, fps: 16, frames: 33, motion: ZOOM_IN, tags: PLACEHOLDER_METADATA });
+  const p = await probe(out);
+  expect(p).toMatchObject({ width: 832, height: 480, fps: 16 });
+  expect(p.duration_s).toBeCloseTo(33 / 16, 1);
+  const tags = await readTags(out);
+  expect(tags).toMatchObject(PLACEHOLDER_METADATA);
+  expect(JSON.stringify(tags)).not.toMatch(/AI-generated/);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('exportVertical takes the showcase encoder and tags', async () => {
+  const out = join(dir, 'vertical-showcase.mp4');
+  await exportVertical(clipA, out, { encoder: SHOWCASE_X264, colour: SHOWCASE_COLOUR, tags: PLACEHOLDER_METADATA });
+  expect(await probe(out)).toMatchObject({ width: 720, height: 1280, fps: 16 });
+  expect(await readTags(out)).toMatchObject(PLACEHOLDER_METADATA);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('concatCopy joins a normalized clip and a placeholder without re-encoding', async () => {
+  const normalized = join(dir, 'concat-normalized.mp4');
+  const placeholder = join(dir, 'concat-placeholder.mp4');
+  const film = join(dir, 'concat-film.mp4');
+  await normalizeClip(clipA, normalized, { width: 832, height: 480, fps: 16, tags: AI_METADATA });
+  await placeholderClip(samplePhoto, placeholder, { width: 832, height: 480, fps: 16, frames: 33, motion: ZOOM_IN, tags: PLACEHOLDER_METADATA });
+  await concatCopy([normalized, placeholder], film, PLACEHOLDER_METADATA);
+  const [a, b, joined] = await Promise.all([probe(normalized), probe(placeholder), probe(film)]);
+  expect(joined.duration_s).toBeGreaterThan(a.duration_s + b.duration_s - 0.1);
+  expect(joined.duration_s).toBeLessThan(a.duration_s + b.duration_s + 0.1);
+  await decodeCheck(film);
+  expect(await readTags(film)).toMatchObject(PLACEHOLDER_METADATA);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('decodeCheck rejects a truncated clip', async () => {
+  // Without +faststart the index (moov) sits at the end: cutting the file loses it.
+  const whole = join(dir, 'no-faststart.mp4');
+  const truncated = join(dir, 'truncated.mp4');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-i', clipA, '-c', 'copy', whole]);
+  const bytes = readFileSync(whole);
+  writeFileSync(truncated, bytes.subarray(0, Math.floor(bytes.length * 0.6)));
+  await expect(decodeCheck(truncated)).rejects.toBeInstanceOf(SequenceToolError);
+  await expect(decodeCheck(whole)).resolves.toBeUndefined();
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('probe names the codec and the pixel format', async () => {
+  expect(await probe(clipA)).toMatchObject({ codec: 'h264', pixFmt: 'yuv420p' });
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('previewClip writes a small looping copy at the asked width with the tags', async () => {
+  const out = join(dir, 'preview.mp4');
+  await previewClip(clipA, out, { width: 320, tags: PLACEHOLDER_METADATA });
+  const p = await probe(out);
+  expect(p).toMatchObject({ width: 320, height: 184, codec: 'h264', pixFmt: 'yuv420p' });
+  expect(p.duration_s).toBeCloseTo(2, 1);
+  expect(await readTags(out)).toMatchObject(PLACEHOLDER_METADATA);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('a placeholder made from a JPEG and a normalized render share their H.264 headers', async () => {
+  // A JPEG decodes to full-range YUV; a render is limited range. Joined with -c copy, the
+  // film keeps the first clip's headers: every showcase clip must carry the same ones.
+  const jpeg = join(dir, 'sample.jpg');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=1664x960', '-frames:v', '1', jpeg]);
+  const placeholder = join(dir, 'headers-placeholder.mp4');
+  const normalized = join(dir, 'headers-normalized.mp4');
+  await placeholderClip(jpeg, placeholder, { width: 832, height: 480, fps: 16, frames: 17, motion: ZOOM_IN, tags: PLACEHOLDER_METADATA });
+  await normalizeClip(clipA, normalized, { width: 832, height: 480, fps: 16, tags: AI_METADATA });
+  expect(await headerHash(placeholder)).toBe(await headerHash(normalized));
+  const vertical = join(dir, 'headers-vertical.mp4');
+  const verticalOfRender = join(dir, 'headers-vertical-render.mp4');
+  await exportVertical(placeholder, vertical, { encoder: SHOWCASE_X264, colour: SHOWCASE_COLOUR, tags: PLACEHOLDER_METADATA });
+  await exportVertical(normalized, verticalOfRender, { encoder: SHOWCASE_X264, colour: SHOWCASE_COLOUR, tags: AI_METADATA });
+  expect(await headerHash(vertical)).toBe(await headerHash(verticalOfRender));
+  expect(await probe(placeholder)).toMatchObject({ pixFmt: 'yuv420p' });
+}, FFMPEG_TEST_TIMEOUT_MS);
