@@ -1,6 +1,6 @@
 import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } from '@montagio/registry';
 import { CompileError, type ApiWorkflow } from './compile';
-import type { Aspect } from './dimensions';
+import { dimensionsFor, type Aspect } from './dimensions';
 
 /**
  * Compilers of the extension jobs (music, upscale, image edit, voice, talking avatar).
@@ -167,4 +167,76 @@ export function compileSpeech(
   const seed = Math.max(1, inputs.seed);
   const workflow = bindExtension(model, template, { text, language: inputs.language, seed, cfg });
   return { workflow, output: { ...model.output }, params: { text, language: inputs.language, seed, cfg } };
+}
+
+/** The prompt of an avatar job without one: S2V tends to move the camera and the body unless told not to. */
+export const AVATAR_DEFAULT_PROMPT = 'a person talking to the camera, medium close-up, static camera';
+
+/** Video frames per second of Wan 2.2 S2V, and the frames each chunk adds (5 s of audio). */
+const S2V_FPS = 16;
+const S2V_CHUNK_FRAMES = 80;
+/** The nodes of the two extension chunks of workflows/wan22-s2v-avatar.api.json: Extend, KSampler, LatentConcat. */
+const S2V_EXTENSIONS = [
+  { extend: '79076', sampler: '79077', concat: '79078' },
+  { extend: '85076', sampler: '85077', concat: '85078' },
+] as const;
+
+export type AvatarInputs = {
+  /** The photo of the person, as the backend's loader names it once uploaded. */
+  imageRef: string;
+  /** The speech (the voice job's FLAC, or any audio), as the loader names it. */
+  audioRef: string;
+  /** The length of the speech in seconds, read by the caller (probeAudio of @montagio/sequence). */
+  audio_s: number;
+  aspect: Aspect;
+  seed: number;
+  /** What the scene looks like; empty gives the talking-head prompt. */
+  prompt?: string;
+};
+
+/**
+ * A photo speaking a speech file (Wan 2.2 S2V), at 480p and 16 fps. Each chunk renders 77
+ * frames and adds 80 to the video (5 s of audio); a longer speech takes up to 3 chunks,
+ * the extensions reading the accumulated latent so their audio window moves on. The unused
+ * chunks are removed, and the decoded frames are cut to the speech: ceil(16 × seconds),
+ * at most 80 × chunks − 3 (the last 0.19 s of exactly 5, 10 or 15 s is lost).
+ */
+export function compileAvatar(
+  model: ExtensionModel,
+  template: ApiWorkflow,
+  inputs: AvatarInputs,
+): ExtensionCompiled<{ width: number; height: number; frames: number; chunks: 1 | 2 | 3; seed: number; prompt: string }> {
+  expectTask(model, 'ia2v-talk');
+  const min = model.limits.min_duration_s ?? 0;
+  const max = model.limits.max_duration_s ?? Infinity;
+  if (!(inputs.audio_s >= min && inputs.audio_s <= max)) {
+    throw new CompileError(`speech of ${inputs.audio_s} s is outside the ${min} to ${max} s model ${model.id} animates`);
+  }
+  const prompt = inputs.prompt?.trim() ? userText(inputs.prompt, 'avatar prompt', model) : AVATAR_DEFAULT_PROMPT;
+  const { width, height } = dimensionsFor(inputs.aspect, '480p');
+  const wanted = Math.ceil(S2V_FPS * inputs.audio_s);
+  const chunks = Math.max(1, Math.ceil(wanted / S2V_CHUNK_FRAMES));
+  if (chunks > S2V_EXTENSIONS.length + 1) throw new CompileError(`speech of ${inputs.audio_s} s needs ${chunks} chunks, model ${model.id} renders 3 at most`);
+  const frames = Math.min(wanted, S2V_CHUNK_FRAMES * chunks - 3);
+  const workflow = bindExtension(model, template, {
+    image: inputs.imageRef,
+    audio: inputs.audioRef,
+    prompt,
+    seed: inputs.seed,
+    width,
+    height,
+    frames,
+  });
+  for (const ids of S2V_EXTENSIONS) {
+    for (const id of Object.values(ids)) if (!workflow[id]) throw new CompileError(`node ${id} of the chunk rule is not in the workflow template of ${model.id}`);
+  }
+  S2V_EXTENSIONS.forEach((ids, i) => {
+    if (i + 2 > chunks) for (const id of Object.values(ids)) delete workflow[id];
+    else workflow[ids.sampler]!.inputs.seed = inputs.seed + i + 1;
+  });
+  // The first-frame fix (LatentCut + LatentConcat) and the decode read the last chunk kept.
+  const last = chunks === 1 ? '3' : S2V_EXTENSIONS[chunks - 2]!.concat;
+  workflow['94']!.inputs.samples = [last, 0];
+  workflow['95']!.inputs.samples2 = [last, 0];
+  return { workflow, output: { ...model.output }, params: { width, height, frames, chunks: chunks as 1 | 2 | 3, seed: inputs.seed, prompt } };
 }

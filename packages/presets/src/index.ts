@@ -14,12 +14,15 @@ export {
 export { loadLibrary, LibraryError, type Library } from './library';
 export { validatePreset, type PresetValidation } from './validate';
 export {
+  AVATAR_DEFAULT_PROMPT,
   bindExtension,
+  compileAvatar,
   compileEdit,
   compileMusic,
   compileSpeech,
   compileUpscale,
   UPSCALE_TARGETS,
+  type AvatarInputs,
   type EditInputs,
   type ExtensionCompiled,
   type MusicInputs,

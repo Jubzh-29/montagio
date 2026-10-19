@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { compileEdit, compileMusic, compileSpeech, compileUpscale, CompileError, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Library } from '../src/index';
+import { AVATAR_DEFAULT_PROMPT, compileAvatar, compileEdit, compileMusic, compileSpeech, compileUpscale, CompileError, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -192,5 +192,70 @@ describe('compileSpeech (Chatterbox Multilingual V3)', () => {
 
   test('the shipped workflow pads no short text with "hmm"', () => {
     expect(voice().template['2']!.inputs.crash_protection_template).toBe('');
+  });
+});
+
+describe('compileAvatar (Wan 2.2 S2V)', () => {
+  const avatar = () => extension('wan22-s2v-avatar');
+  const compile = (inputs: Partial<Parameters<typeof compileAvatar>[2]> = {}) =>
+    compileAvatar(avatar().model, avatar().template, { imageRef: 'start.png', audioRef: 'speech.flac', audio_s: 3, aspect: '16:9', seed: 10, ...inputs });
+  const extensionNodes = (workflow: ApiWorkflow) => Object.keys(workflow).filter((id) => /^(79|85)0\d\d$/.test(id)).sort();
+
+  test('3 s of speech is one chunk of 48 frames', () => {
+    const { workflow, params } = compile({ audio_s: 3 });
+    expect(params).toMatchObject({ chunks: 1, frames: 48 });
+    expect(extensionNodes(workflow)).toEqual([]);
+    expect(workflow['94']!.inputs.samples).toEqual(['3', 0]);
+    expect(workflow['95']!.inputs.samples2).toEqual(['3', 0]);
+    expect(workflow['96']!.inputs.length).toBe(48);
+  });
+
+  test('7 s is two chunks of 112 frames', () => {
+    const { workflow, params } = compile({ audio_s: 7 });
+    expect(params).toMatchObject({ chunks: 2, frames: 112 });
+    expect(extensionNodes(workflow)).toEqual(['79076', '79077', '79078']);
+    expect(workflow['94']!.inputs.samples).toEqual(['79078', 0]);
+    expect(workflow['95']!.inputs.samples2).toEqual(['79078', 0]);
+  });
+
+  test('12.3 s is three chunks of 197 frames, 15 s keeps 237', () => {
+    expect(compile({ audio_s: 12.3 }).params).toMatchObject({ chunks: 3, frames: 197 });
+    const { workflow, params } = compile({ audio_s: 15 });
+    expect(params).toMatchObject({ chunks: 3, frames: 237 });
+    expect(workflow['94']!.inputs.samples).toEqual(['85078', 0]);
+  });
+
+  test('speech over 15 s, or under 1 s, is refused', () => {
+    expect(() => compile({ audio_s: 16 })).toThrow(/15/);
+    expect(() => compile({ audio_s: 0.5 })).toThrow(CompileError);
+  });
+
+  test('every extension gets the accumulated latent, never the previous chunk alone', () => {
+    const { workflow } = compile({ audio_s: 14 });
+    expect(workflow['79076']!.inputs.video_latent).toEqual(['3', 0]);
+    expect(workflow['85076']!.inputs.video_latent).toEqual(['79078', 0]);
+    expect(workflow['85078']!.inputs.samples1).toEqual(['79078', 0]);
+  });
+
+  test('the seeds are seed, seed+1, seed+2', () => {
+    const { workflow } = compile({ audio_s: 14, seed: 100 });
+    expect([workflow['3']!.inputs.seed, workflow['79077']!.inputs.seed, workflow['85077']!.inputs.seed]).toEqual([100, 101, 102]);
+  });
+
+  test('a portrait photo renders at 480x832, a square one at 640x640', () => {
+    expect(compile({ aspect: '9:16' }).workflow['93']!.inputs).toMatchObject({ width: 480, height: 832 });
+    expect(compile({ aspect: '1:1' }).params).toMatchObject({ width: 640, height: 640 });
+  });
+
+  test('the photo, the speech and the prompt are bound; an empty prompt gets the talking-head one', () => {
+    const { workflow } = compile({ imageRef: 'uploads/face.png', audioRef: 'uploads/voice.flac', prompt: '  ' });
+    expect(workflow['52']!.inputs.image).toBe('uploads/face.png');
+    expect(workflow['58']!.inputs.audio).toBe('uploads/voice.flac');
+    expect(workflow['6']!.inputs.text).toBe(AVATAR_DEFAULT_PROMPT);
+    expect(compile({ prompt: 'a chef explains a recipe' }).workflow['6']!.inputs.text).toBe('a chef explains a recipe');
+  });
+
+  test('the output is node 113, video', () => {
+    expect(compile().output).toEqual({ node: '113', kind: 'video' });
   });
 });

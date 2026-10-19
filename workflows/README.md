@@ -58,6 +58,7 @@ The four extensions decided on 2026-10-19 (music, upscale, image edit, talking a
 | `seedvr2-upscale.api.json` | `templates/utility_seedvr2_3b_int8_upscale_video.json` | SeedVR2 3B int8 | node 76, MP4 |
 | `qwen-image-edit-2511.api.json` | `templates/image_qwen_image_edit_2511.json` | Qwen-Image-Edit-2511 fp8mixed | node 9, PNG |
 | `chatterbox-mtl-voice.api.json` | none (no official template: ComfyUI has no local text-to-speech node) | Chatterbox Multilingual V3 | node 3, FLAC |
+| `wan22-s2v-avatar.api.json` | `templates/video_wan2_2_14B_s2v.json` | Wan 2.2 S2V 14B fp8 | node 113, MP4 with the speech |
 
 ### ace-step15-music
 
@@ -90,6 +91,14 @@ The four extensions decided on 2026-10-19 (music, upscale, image edit, talking a
 - No `audio_prompt`: the built-in voice speaks (no cloned voice, and none left in the node's cache). `crash_protection_template` is empty (by default a text under 21 characters is wrapped in "hmm"); the watermark is off (`resemble-perth` is not installed).
 - The compiler writes `cfg_weight` 0 in French (the model card's advice when the voice is of another language) and 0.5 in English, removes square brackets (read as tags), and never sends seed 0 (random to this node).
 
+### wan22-s2v-avatar
+
+- The template's active "4 steps" path, flattened: its two "Video S2V Extend" subgraphs become nodes `79076`–`79078` and `85076`–`85078` (numeric ids for the template's `79:76`…), its bypassed third extension and its 20-step group are gone.
+- Each chunk renders 77 frames and covers 5 s of audio: an extension reads the accumulated latent (`LatentConcat`), whose length sets its audio offset (`comfy_extras/nodes_wan.py:1018`). The compiler keeps 1, 2 or 3 chunks for the speech's length and rewires the first-frame fix (94, 95) to the last chunk kept.
+- `ImageFromBatch` (96) drops the first 4 decoded frames, the alignment of the original Wan code; the template drops one frame per chunk, which leaves the picture 63 to 188 ms behind the speech. GPU session S2 compares.
+- Size of the photo's aspect at 480p (832×480, 480×832 or 640×640) instead of the template's 640×640; 16 fps (S2V's own rate); the speech is muxed by `CreateVideo`.
+- The 4-step LightX2V LoRA (107) is kept and is in the lock: without it, 15 s of speech take 50 to 80 minutes (20 steps, cfg 6). It is a text-to-video LoRA, not trained for S2V; S2 compares it with 20 steps. The negative (7) is Wan's default; at cfg 1 it is not used.
+
 ## Bindings
 
 | Model | image | prompt | negative | seed | width / height / frames | fps | camera_pose / camera_speed |
@@ -106,3 +115,4 @@ Extension models (a binding with several inputs gets the same value in each):
 | `seedvr2-upscale` | video 73.file; width / height 57.resize_type.width / 57.resize_type.height; seed 54.seed | 76 (video) |
 | `qwen-image-edit-2511` | image 41.image; prompt 151.prompt; seed 169.seed | 9 (image) |
 | `chatterbox-mtl-voice` | text 2.text; language 2.language; seed 2.seed; cfg 2.cfg_weight | 3 (audio) |
+| `wan22-s2v-avatar` | image 52.image; audio 58.audio; prompt 6.text; seed 3.seed (+1, +2 on the extension samplers); width / height 93.width / 93.height; frames 96.length | 113 (video) |

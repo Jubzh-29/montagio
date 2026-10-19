@@ -195,3 +195,29 @@ weights:
     source: https://huggingface.co/ResembleAI/chatterbox
     extension: avatar
     folder: tts/chatterbox/resembleai-mtl-v3
+  - id: wan22-s2v-14b-fp8
+    file: wan2.2_s2v_14B_fp8_scaled.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_s2v_14B_fp8_scaled.safetensors
+    sha256: 140e75af5534ac3d91e710d9df756f7032addd64b341ba2c1c70e3e6da9aa216
+    size: 16394832474
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.2-S2V-14B
+    extension: avatar
+  # The same files are in the Apache-2.0 Wan-AI/Wan2.2-S2V-14B repository (fp32); this is Comfy-Org's fp16 conversion.
+  - id: wav2vec2-large-xlsr53-en
+    file: wav2vec2_large_english_fp16.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/audio_encoders/wav2vec2_large_english_fp16.safetensors
+    sha256: f0017a43ea57ef6b3d4866be607844bbd8cada6d30966f7d70044ed0d63d3f9e
+    size: 630997322
+    license: Apache-2.0
+    source: https://huggingface.co/jonatasgrosman/wav2vec2-large-xlsr-53-english
+    extension: avatar
+  # Byte-identical to lightx2v/Wan2.2-Lightning Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V1.1/high_noise_model.safetensors.
+  - id: lightx2v-wan22-t2v-4step-high-v1-1
+    file: wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors
+    sha256: 698321cb86bd30c4af06c9b84e656a1048c8cb54e06d50694536fb5de37fde41
+    size: 1226977424
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Wan2.2-Lightning
+    extension: avatar

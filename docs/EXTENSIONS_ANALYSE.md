@@ -92,6 +92,14 @@ Les quatre workflows partent des templates officiels de [Comfy-Org/workflow_temp
 - **Fixture :** la classe `ChatterboxMTLTTS` est écrite d'après `nodes/mtl_node.py` au commit épinglé (aucun ComfyUI local n'a ce node) ; la S2 la régénère depuis le `/object_info` du pod.
 - **Installeur local :** il laisse l'avatar de côté, avec un message, tant qu'il n'installe pas ce node.
 
+### Avatar parlant : Wan 2.2 S2V, nodes du cœur
+
+- **Choix de l'utilisateur le 19/10**, au lieu d'InfiniteTalk (partie 1 pour la licence de son encodeur, partie 4 pour sa mémoire).
+- Template `templates/video_wan2_2_14B_s2v.json`, chemin actif « 4 étapes ». Nodes : `UNETLoader`, `LoraLoaderModelOnly`, `ModelSamplingSD3` (shift 8), `CLIPLoader`, `CLIPTextEncode`, `VAELoader`, `LoadImage`, `LoadAudio`, `AudioEncoderLoader` et `AudioEncoderEncode` (`comfy_extras/nodes_audio_encoder.py`), `WanSoundImageToVideo` et `WanSoundImageToVideoExtend` (`comfy_extras/nodes_wan.py:956` et `:989`), `KSampler` (4 étapes, cfg 1, uni_pc), `LatentConcat`, `LatentCut`, `VAEDecode`, `ImageFromBatch`, `CreateVideo`, `SaveVideo`. ComfyUI v0.41.0 reconnaît S2V (`comfy/model_detection.py:775`).
+- **Morceaux.** Un passage rend 77 images et couvre 5,0 s d'audio (16 fps). Une extension lit le latent **cumulé** : sa longueur fixe le décalage de l'audio (`nodes_wan.py:1018`). Le template officiel est câblé ainsi ; celui d'InfiniteTalk, lui, rejouerait la même fenêtre audio dès le troisième morceau. Le compilateur garde 1, 2 ou 3 morceaux selon la durée de la parole (15 s au plus).
+- **Ce que l'avatar n'est pas.** La vidéo est conditionnée par l'identité de la photo, elle ne commence pas sur ses pixels ; `ref_motion` (photo en guise de mouvement passé) est un essai de la S2. Sortie en 16 fps.
+- **Chaîne complète.** Job « voix » (texte → FLAC), puis job « avatar » (photo + FLAC → MP4 avec la parole). L'appelant lit la durée du FLAC (`probeAudio`) avant de compiler le second job.
+
 ## 3. Poids
 
 Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`), recoupés par `fetch-weights --lock-from-hf`, dont le patch est vide. Chaque entrée du lock porte `extension:` : l'installeur local ne la télécharge que pour son extension.
@@ -113,8 +121,13 @@ Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`)
 | Voix | `chatterbox-ve` | `ve.safetensors` | 5 695 784 | `f0921cab…` |
 | Voix | `chatterbox-conds` | `conds.pt` (voix intégrée) | 107 374 | `6552d705…` |
 | Voix | `chatterbox-grapheme-mtl` | `grapheme_mtl_merged_expanded_v1.json` (tokenizer, hors LFS) | 69 989 | `69632f47…`, SHA-1 git `d27fb3f2…` |
+| Avatar | `wan22-s2v-14b-fp8` | `wan2.2_s2v_14B_fp8_scaled.safetensors` (quantification Comfy-Org) | 16 394 832 474 | `140e75af…` |
+| Avatar | `wav2vec2-large-xlsr53-en` | `wav2vec2_large_english_fp16.safetensors` (conversion fp16 Comfy-Org) | 630 997 322 | `f0017a43…` |
+| Avatar | `lightx2v-wan22-t2v-4step-high-v1-1` | `wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors` (identique à lightx2v/Wan2.2-Lightning) | 1 226 977 424 | `698321cb…` |
 
-Musique : 10,0 Go. Upscale : 3,96 Go. Édition : 30,2 Go (le bf16, 40,9 Go, n'est pas retenu). Voix : 3,2 Go, dans le dossier `models/tts/chatterbox/resembleai-mtl-v3` que le lock nomme (`folder:`).
+L'avatar réutilise aussi `umt5-xxl-fp8` et `wan21-vae`, déjà au lock pour les presets (même sha256) et donc sans marque `extension`.
+
+Musique : 10,0 Go. Upscale : 3,96 Go. Édition : 30,2 Go (le bf16, 40,9 Go, n'est pas retenu). Avatar : 18,25 Go, plus la voix, 3,2 Go, dans le dossier `models/tts/chatterbox/resembleai-mtl-v3` que le lock nomme (`folder:`).
 
 Le tokenizer de la voix est un petit fichier que Hugging Face garde hors LFS : l'API ne publie que son identifiant git (SHA-1). Son sha256 a été calculé sur le fichier (70 Ko, pas un poids). Le lock porte les deux ; `fetch-weights` compare l'identifiant git avant le téléchargement, puis le sha256 après.
 
@@ -125,6 +138,8 @@ Ce sont des **estimations**, tirées de la taille des poids et des formules de m
 - **Musique.** DiT 4,8 Go, encodeurs 4,9 Go, VAE 0,3 Go ; le décodage d'un morceau de 60 s demande ≈ 5,7 Gio (`comfy/sd.py:729`). Tout résident, le pic est ≈ 16 Go : **tient**. Le LM tourne sans vLLM : ≈ 3 à 10 s à chaud pour 60 s de musique, plus le chargement. Après un rendu Wan 14B, ComfyUI ne décharge que ce qu'il faut (`comfy/model_management.py:893-1039`) ; le rendu Wan suivant recharge ses poids.
 - **Upscale.** Poids 3,2 Gio en int8. Par morceau de 9 latents en 1080p, la loi mesurée par ComfyUI (`comfy/ldm/seedvr/constants.py:3-11`, sur une RTX 5090) donne ≈ 10,3 Gio d'activations, soit un pic de ≈ 18–19 Gio : **tient**. Sans découpage, non (≈ 35 Gio). Le 7B int8 serait à la limite, le 7B fp16 ne tient pas. Temps : ≈ 2 à 4 min pour un clip de 81 images, ≈ 3 à 6 min pour 121. L'int8 est plus rapide avec torch cu130 (le pod) ; sur le repli cu128, le noyau CUDA de comfy-kitchen est coupé (`comfy/quant_ops.py:23-29`).
 - **Édition.** Le modèle fp8mixed fait 19,1 Gio, l'encodeur de texte 8,7 Gio. ComfyUI encode le texte, puis décharge l'encodeur quand le DiT a besoin de place (chargement partiel, `comfy/model_management.py:939`). Avec 1 à 3 Gio d'activations à ≈ 1 Mpx, cela **tient de justesse** : le même DiT en fp8, en texte vers image, occupe 86 % d'une RTX 4090D d'après la doc de ComfyUI. Le bf16 (38 Gio) ne tient pas. Temps : ≈ 100 à 130 s par image en 40 étapes, ≈ 55 à 75 s en 20 étapes, ≈ 15 à 25 s avec la LoRA 4 étapes (hors lock). Prévoir 32 Go de RAM au moins, 64 Go de préférence.
+- **Voix.** Chatterbox V3 : ≈ 2,5 à 3,5 Go, ≈ 7 à 12 s à chaud pour 15 s de parole, plus 10 à 30 s de chargement. Le node passe par la gestion mémoire de ComfyUI : le job vidéo qui suit peut l'évincer de la VRAM.
+- **Avatar.** Wan 2.2 S2V en fp8 : 16,4 Go de poids résidents (l'injecteur audio est dans ce fichier), plus ≈ 2,5 Go d'activations à 832×480 et cfg 1 : **tient** (≈ 20,5 Go). À cfg 6 (20 étapes, sans LoRA), ≈ 23 Go : à la limite. Temps avec la LoRA 4 étapes : ≈ 3 à 6 min pour 5 s, ≈ 7 à 11 min pour 15 s, chargement compris ; sans elle, ≈ 50 à 80 min pour 15 s. InfiniteTalk, écarté, aurait demandé 21,5 Go résidents (UNet fp8 et patch de 5,1 Go) avant les activations : il ne tenait pas sans déchargement partiel, et il fallait 6 morceaux pour 15 s (13 à 24 min estimées).
 
 ## 5. Contrat backend et drapeau de coupe
 

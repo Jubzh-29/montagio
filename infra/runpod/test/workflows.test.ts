@@ -15,7 +15,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { compileEdit, compileJob, compileMusic, compileSpeech, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
+import { compileAvatar, compileEdit, compileJob, compileMusic, compileSpeech, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -148,6 +148,20 @@ test('the voice job is accepted', () => {
   for (const language of ['en', 'fr'] as const) {
     const { workflow } = compileSpeech(model, library.extensionTemplates.get(model.workflow)!, { text: 'Hello there.', language, seed: 3 });
     expect({ language, problems: checkWorkflow(workflow, info) }).toEqual({ language, problems: [] });
+  }
+});
+
+test('the avatar job compiled for 1, 2 and 3 chunks is accepted', () => {
+  const model = library.extensionModels.get('wan22-s2v-avatar')!;
+  for (const audio_s of [3, 7, 15]) {
+    const { workflow } = compileAvatar(model, library.extensionTemplates.get(model.workflow)!, {
+      imageRef: 'start.png',
+      audioRef: 'speech.flac',
+      audio_s,
+      aspect: '16:9',
+      seed: 3,
+    });
+    expect({ audio_s, problems: checkWorkflow(workflow, info) }).toEqual({ audio_s, problems: [] });
   }
 });
 

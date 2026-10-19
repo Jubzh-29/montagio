@@ -59,3 +59,15 @@ nodes:
   # (Apache-2.0, vendored chatterbox code MIT), pinned at commit 4597af8f and patched by
   # infra/runpod/bootstrap.sh; ComfyUI v0.41.0 has no local text-to-speech node.
   - { class_type: ChatterboxMTLTTS, source: wildminder/ComfyUI-Chatterbox@4597af8f, license: Apache-2.0 }
+  # Extension "avatar" (2026-10-19), the video: core of ComfyUI v0.41.0, comfy_extras/nodes_audio.py (LoadAudio),
+  # comfy_extras/nodes_audio_encoder.py, comfy_extras/nodes_wan.py (Wan 2.2 S2V), comfy_extras/nodes_latent.py,
+  # comfy_extras/nodes_images.py (ImageFromBatch) and nodes.py (LoraLoaderModelOnly: the 4-step LightX2V LoRA).
+  - { class_type: LoadAudio, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: AudioEncoderLoader, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: AudioEncoderEncode, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: WanSoundImageToVideo, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: WanSoundImageToVideoExtend, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: LatentConcat, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: LatentCut, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ImageFromBatch, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: LoraLoaderModelOnly, source: comfyui-core, license: GPL-3.0 }
