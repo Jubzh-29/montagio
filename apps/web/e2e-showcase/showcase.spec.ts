@@ -26,20 +26,26 @@ const probe = (file: string) =>
     }),
   ) as { streams: { width: number; height: number }[]; format: { duration: string; tags?: { comment?: string } } };
 
-test('the showcase plays the pre-generated clip of a sample and a preset', async ({ page }) => {
+const result = (page: Page) => page.locator('video[data-testid=result]');
+
+/** The showcase opens on a clip already playing: the first sample photo with the first preset. */
+const arrival = (page: Page) => expect(result(page)).toHaveAttribute('src', /\/showcase\/clips\/crash-push--landscape-a\.mp4$/);
+
+test('the showcase opens on a clip, then plays the pre-generated clip of another preset', async ({ page }) => {
   const foreign = watchRequests(page);
   await page.goto('/');
+  await arrival(page);
+  // What the showcase is stays in sight under the clip.
   await expect(page.getByText(/clips pre-generated with Montagio on open weights/)).toBeVisible();
-  await page.getByRole('button', { name: /Placeholder landscape A/ }).click();
-  await page.getByRole('button', { name: 'Crash Push' }).click();
-  await page.getByRole('button', { name: /^Show clip/ }).click();
-  await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /\/showcase\/clips\/crash-push--landscape-a\.mp4$/);
   await expect(page.getByTestId('result-caption')).toHaveText(/Placeholder|Pre-generated with Montagio/);
+  await page.getByRole('button', { name: 'Pan Left' }).click();
+  await page.getByRole('button', { name: /^Show clip/ }).click();
+  await expect(result(page)).toHaveAttribute('src', /\/showcase\/clips\/pan-left--landscape-a\.mp4$/);
 
   const download = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Open in ComfyUI' }).click();
   const workflow = await download;
-  expect(workflow.suggestedFilename()).toBe('montagio-crash-push.json');
+  expect(workflow.suggestedFilename()).toBe('montagio-pan-left.json');
   expect(readFileSync(await workflow.path(), 'utf8')).toContain('"class_type"');
   await expect(page.getByRole('link', { name: 'Source code (AGPL-3.0)' })).toHaveAttribute('href', 'https://example.invalid/montagio');
   expect(foreign()).toEqual([]);
@@ -47,7 +53,7 @@ test('the showcase plays the pre-generated clip of a sample and a preset', async
 
 test('a dropped photo is explained, never uploaded', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: /Placeholder landscape A/ })).toBeVisible();
+  await arrival(page);
   const dataTransfer = await page.evaluateHandle(() => {
     const transfer = new DataTransfer();
     transfer.items.add(new File(['not really a png'], 'my-photo.png', { type: 'image/png' }));
@@ -62,7 +68,8 @@ test('a dropped photo is explained, never uploaded', async ({ page }) => {
 test('the remix is checked for real but not rendered', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Crash Push' }).click();
-  await page.getByRole('button', { name: 'Remix preset' }).click();
+  // Once the arrival clip shows, the result has its own "Remix preset": take the gallery's.
+  await page.locator('aside').getByRole('button', { name: 'Remix preset', exact: true }).click();
   const editor = page.locator('#remix-yaml');
   await expect(editor).toHaveValue(/id: crash-push/);
   await page.getByRole('button', { name: 'Check preset' }).click();
@@ -77,12 +84,13 @@ test('the remix is checked for real but not rendered', async ({ page }) => {
 test('a three-shot film is assembled by FFmpeg in the browser', async ({ page }) => {
   const foreign = watchRequests(page);
   await page.goto('/');
+  // The arrival clip has already picked the first sample photo.
+  await arrival(page);
   await page.getByRole('button', { name: 'Sequence', exact: true }).click();
   await expect(page.getByText(/every shot starts from the sample photo/)).toBeVisible();
-  await page.getByRole('button', { name: /Placeholder landscape A/ }).click();
   for (const name of ['Crash Push', 'Pan Left', 'Slow Push']) await page.getByRole('button', { name }).click();
   await page.getByRole('button', { name: /^Assemble film/ }).click();
-  await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /^blob:/, { timeout: 90_000 });
+  await expect(result(page)).toHaveAttribute('src', /^blob:/, { timeout: 90_000 });
   const caption = (await page.getByTestId('result-caption').textContent()) ?? '';
 
   const filmDownload = page.waitForEvent('download');
@@ -100,10 +108,12 @@ test('a three-shot film is assembled by FFmpeg in the browser', async ({ page })
 
 test('a portrait clip fits the monitor instead of being cropped', async ({ page }) => {
   await page.goto('/');
+  await arrival(page);
+  await page.getByRole('button', { name: 'Other sample photo' }).click();
   await page.getByRole('button', { name: /Placeholder portrait A/ }).click();
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await page.getByRole('button', { name: /^Show clip/ }).click();
-  const video = page.locator('video[data-testid=result]');
+  const video = result(page);
   await expect(video).toHaveAttribute('src', /pan-left--portrait-a.mp4$/);
   const [frame, media] = await Promise.all([page.getByTestId('monitor').boundingBox(), video.boundingBox()]);
   expect(media!.height).toBeLessThanOrEqual(frame!.height + 1);
@@ -149,8 +159,8 @@ test('a missing data.json shows the generic error, not a blank page', async ({ p
 test('when FFmpeg cannot load, the film says so and single clips still play', async ({ page }) => {
   await page.route('**/ffmpeg/ffmpeg-core.js', (route) => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('/');
+  await arrival(page);
   await page.getByRole('button', { name: 'Sequence', exact: true }).click();
-  await page.getByRole('button', { name: /Placeholder landscape A/ }).click();
   for (const name of ['Crash Push', 'Pan Left']) await page.getByRole('button', { name }).click();
   await page.getByRole('button', { name: /^Assemble film/ }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'FFmpeg could not start in this browser' })).toBeVisible({ timeout: 30_000 });
@@ -158,5 +168,5 @@ test('when FFmpeg cannot load, the film says so and single clips still play', as
   await page.getByRole('button', { name: 'Single shot', exact: true }).click();
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await page.getByRole('button', { name: /^Show clip/ }).click();
-  await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /crash-push--landscape-a\.mp4$/);
+  await expect(result(page)).toHaveAttribute('src', /crash-push--landscape-a\.mp4$/);
 });

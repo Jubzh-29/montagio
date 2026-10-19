@@ -52,6 +52,24 @@ export type GlyphMotion = {
   target: { left: number; top: number; width: number; height: number };
 };
 
+/**
+ * The same move drawn over the user's photo: the photo is the frame where the
+ * shot starts, and the target is where it ends, in percent of the photo. A pull
+ * back ends on a frame wider than the photo (`widens`): its target lies outside.
+ */
+export function photoTarget(poses: string[], speed: number): { left: number; top: number; width: number; height: number; widens: boolean } {
+  const { end, target } = glyphMotion(poses, speed);
+  const from = (0.5 - FRAME_HALF) * 100;
+  const size = FRAME_HALF * 200;
+  return {
+    left: ((target.left - from) / size) * 100,
+    top: ((target.top - from) / size) * 100,
+    width: (target.width / size) * 100,
+    height: (target.height / size) * 100,
+    widens: end.scale < 1,
+  };
+}
+
 export function glyphMotion(poses: string[], speed: number): GlyphMotion {
   const steps = poses.map((pose) => POSES[pose] ?? IDENTITY);
   const end = steps.reduce(compose, IDENTITY);

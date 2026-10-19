@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, type DragEvent } from 'react';
+import { useState, type CSSProperties, type DragEvent, type RefObject } from 'react';
 import { useI18n } from '@/i18n';
 import type { JobState, SampleSummary } from '@/lib/api-types';
+import { photoTarget } from '@/lib/move-glyph';
 import { refusalMessageKey } from '@/lib/refusals';
 import { MoveGlyph } from './MoveGlyph';
 import { SamplePicker } from './SamplePicker';
@@ -32,6 +33,9 @@ export function Monitor({
   onRetry,
   statusLabel,
   move,
+  announcement,
+  statusRef,
+  autoPlayResult = true,
   showcase,
 }: {
   upload: UploadState;
@@ -44,6 +48,12 @@ export function Monitor({
   statusLabel?: string;
   /** The chosen camera move: the empty monitor plays it in its viewfinder. */
   move?: { id: string; poses: string[]; speed: number };
+  /** Stage changes for screen readers ("Rendering", "Clip ready"), never the running percentage. */
+  announcement: string;
+  /** The render status line: the Studio moves the focus there when the visitor starts a render. */
+  statusRef?: RefObject<HTMLDivElement | null>;
+  /** Off for a clip the visitor did not ask for while the previews are paused (reduced motion). */
+  autoPlayResult?: boolean;
   /**
    * The showcase: sample photos replace the drop zone. Unless it takes uploads (its
    * `uploads` capability, off in the static showcase), a dropped file is answered
@@ -52,7 +62,6 @@ export function Monitor({
   showcase?: {
     samples: SampleSummary[];
     selectedId: string | null;
-    note: string;
     onPick: (sample: SampleSummary) => void;
     uploads: boolean;
     onOtherSample: () => void;
@@ -61,6 +70,8 @@ export function Monitor({
 }) {
   const { t } = useI18n();
   const [dragging, setDragging] = useState(false);
+  // The photo's own shape, so the target frame sits on the picture and not on its pillarbox.
+  const [photoAspect, setPhotoAspect] = useState(16 / 9);
   const localUrl = upload.status === 'idle' ? undefined : upload.localUrl;
   const record = generation.status === 'tracking' ? generation.record : undefined;
   const rendering =
@@ -111,7 +122,7 @@ export function Monitor({
           data-testid="result"
           className={styles.monitorMedia}
           src={result}
-          autoPlay
+          autoPlay={autoPlayResult}
           loop
           muted
           playsInline
@@ -119,7 +130,13 @@ export function Monitor({
         />
       ) : localUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- local object URL preview
-        <img className={styles.monitorMedia} data-dimmed={rendering} src={localUrl} alt="" />
+        <img
+          className={styles.monitorMedia}
+          data-dimmed={rendering}
+          src={localUrl}
+          alt=""
+          onLoad={(event) => setPhotoAspect(event.currentTarget.naturalWidth / event.currentTarget.naturalHeight || 16 / 9)}
+        />
       ) : (
         <>
           {move && <MoveGlyph variant="monitor" poses={move.poses} speed={move.speed} replay={move.id} />}
@@ -132,7 +149,6 @@ export function Monitor({
                   {t('choosePhoto')}
                 </label>
               )}
-              <p className={styles.monitorEmptyHint}>{showcase.note}</p>
             </div>
           ) : (
             <div className={styles.monitorEmpty}>
@@ -151,6 +167,8 @@ export function Monitor({
         </>
       )}
 
+      {localUrl && !result && !rendering && move && <PhotoPlan move={move} aspect={photoAspect} />}
+
       {localUrl && !rendering && !showcase && (
         <label htmlFor="photo-input" className={`${styles.buttonGhost} ${styles.replace}`}>
           {upload.status === 'uploading' ? t('uploading') : t('replacePhoto')}
@@ -164,7 +182,7 @@ export function Monitor({
 
       {rendering && (
         <div className={styles.renderOverlay}>
-          <div className={styles.renderStatus} aria-live="polite">
+          <div className={styles.renderStatus} ref={statusRef} tabIndex={-1}>
             <span className={styles.recDot} aria-hidden="true" />
             {generation.status === 'submitting' || record?.state === 'queued'
               ? statusLabel ?? t('queued')
@@ -209,12 +227,46 @@ export function Monitor({
       {upload.status === 'error' && (
         <div className={styles.monitorNotice} role="alert" data-tone="error">
           <p>{upload.message}</p>
-          {acceptsFiles && (
-            <label htmlFor="photo-input" className={styles.buttonSecondary}>
-              {t('chooseAnother')}
-            </label>
-          )}
         </div>
+      )}
+
+      {/* One quiet live region: it speaks when a render starts and when it is ready, not on every poll. */}
+      <p className="visually-hidden" role="status">
+        {announcement}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The chosen move over the user's photo, as on a shot plan: the dashed frame is
+ * where the shot ends. A pull back ends wider than the photo: its corners point out.
+ */
+function PhotoPlan({ move, aspect }: { move: { id: string; poses: string[]; speed: number }; aspect: number }) {
+  const { left, top, width, height, widens } = photoTarget(move.poses, move.speed);
+  // Played once when the move changes: the frame travels from the whole photo to where the shot ends.
+  const from = {
+    '--from-x': `${((50 - (left + width / 2)) / width) * 100}%`,
+    '--from-y': `${((50 - (top + height / 2)) / height) * 100}%`,
+    '--from-sx': 100 / width,
+    '--from-sy': 100 / height,
+  };
+  return (
+    <div className={styles.photoPlan} style={{ '--aspect': aspect } as CSSProperties} aria-hidden="true">
+      {widens ? (
+        <span key={move.id} className={styles.planWiden}>
+          {(['tl', 'tr', 'bl', 'br'] as const).map((corner) => (
+            <span key={corner} className={styles.planArrow} data-corner={corner}>
+              {{ tl: '↖', tr: '↗', bl: '↙', br: '↘' }[corner]}
+            </span>
+          ))}
+        </span>
+      ) : (
+        <span
+          key={move.id}
+          className={styles.planTarget}
+          style={{ left: `${left}%`, top: `${top}%`, width: `${width}%`, height: `${height}%`, ...from } as CSSProperties}
+        />
       )}
     </div>
   );

@@ -44,6 +44,8 @@
 /* Monitor: a viewfinder, crop marks in the corners. */
 .monitor {
   position: relative;
+  /* cqw sizes the plan drawn over the photo (.photoPlan). */
+  container-type: inline-size;
   display: grid;
   place-items: center;
   aspect-ratio: 16 / 9;
@@ -121,6 +123,94 @@
   font-size: var(--text-s);
 }
 
+/* The chosen move over the user's photo, as on a shot plan: a box the photo's own shape, centred. */
+.photoPlan {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(100cqw, 56.25cqw * var(--aspect));
+  height: min(56.25cqw, 100cqw / var(--aspect));
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* White dashes with a dark edge: legible on a bright photo as on a dark one. */
+.planTarget,
+.planWiden {
+  position: absolute;
+  border: 1.5px dashed oklch(0.98 0 0 / 0.9);
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px oklch(0 0 0 / 0.3),
+    inset 0 0 0 1px oklch(0 0 0 / 0.3);
+}
+
+/* What leaves the shot is shaded, as in a crop preview: a pan shades the side it leaves, a push the edges. */
+.planTarget {
+  box-shadow:
+    0 0 0 1px oklch(0 0 0 / 0.3),
+    inset 0 0 0 1px oklch(0 0 0 / 0.3),
+    0 0 0 100vmax oklch(0 0 0 / 0.4);
+  animation: plan-in 900ms var(--ease-camera) both;
+}
+
+@keyframes plan-in {
+  from {
+    transform: translate(var(--from-x), var(--from-y)) scale(var(--from-sx), var(--from-sy));
+    opacity: 0.5;
+  }
+}
+
+/* A pull back ends wider than the photo: the frame is the photo, its corners point out. */
+.planWiden {
+  inset: 0;
+}
+
+.planArrow {
+  position: absolute;
+  color: oklch(0.98 0 0);
+  font-size: var(--text-l);
+  line-height: 1;
+  text-shadow: 0 0 3px oklch(0 0 0 / 0.8);
+  animation: plan-out 900ms var(--ease-camera) both;
+}
+
+.planArrow[data-corner='tl'] {
+  top: var(--space-2);
+  left: var(--space-2);
+  --dx: 12px;
+  --dy: 12px;
+}
+
+.planArrow[data-corner='tr'] {
+  top: var(--space-2);
+  right: var(--space-2);
+  --dx: -12px;
+  --dy: 12px;
+}
+
+.planArrow[data-corner='bl'] {
+  bottom: var(--space-2);
+  left: var(--space-2);
+  --dx: 12px;
+  --dy: -12px;
+}
+
+.planArrow[data-corner='br'] {
+  bottom: var(--space-2);
+  right: var(--space-2);
+  --dx: -12px;
+  --dy: -12px;
+}
+
+@keyframes plan-out {
+  from {
+    transform: translate(var(--dx), var(--dy));
+    opacity: 0;
+  }
+}
+
 .replace {
   position: absolute;
   top: var(--space-5);
@@ -148,6 +238,13 @@
 
 .renderStatus button {
   margin-left: auto;
+  font-family: var(--font-sans);
+}
+
+/* The Studio moves the focus here when a render starts. */
+.renderStatus:focus-visible {
+  outline-offset: 4px;
+  border-radius: var(--radius-s);
 }
 
 .recDot {
@@ -231,6 +328,42 @@
   gap: var(--space-2);
 }
 
+/* The slate: the take about to be shot, in the monitor's mono, its parts set off by middle dots. */
+.slate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.slate span + span::before {
+  content: '·';
+  margin-right: var(--space-2);
+  color: var(--ink-faint);
+}
+
+.slate span:first-child {
+  color: var(--ink);
+}
+
+/* What the showcase is: under the monitor, in sight whatever the monitor shows. */
+.stageNote {
+  max-width: 72ch;
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+  text-wrap: pretty;
+}
+
+/* "Open in ComfyUI" downloads a file: say which. */
+.fileTag {
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
 /* Presets */
 .presetGrid {
   display: grid;
@@ -279,6 +412,11 @@
 
 .presetPreview[data-ready='true'] {
   opacity: 1;
+}
+
+/* Paused, every preview would be a first frame of the same photo: the glyph's storyboard tells the moves apart. */
+.studio[data-motion='paused'] .presetPreview {
+  opacity: 0;
 }
 
 /* Loading: the gallery and the models keep their shape while the catalogue arrives. */
@@ -584,7 +722,7 @@
 .prompt {
   width: 100%;
   padding: var(--space-3);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-input);
   border-radius: var(--radius-m);
   background: var(--surface);
   resize: vertical;
@@ -596,7 +734,7 @@
 }
 
 .prompt:hover {
-  border-color: var(--line-strong);
+  border-color: var(--ink-faint);
 }
 
 .remixLabel {
@@ -608,7 +746,7 @@
   width: 100%;
   min-height: 18rem;
   padding: var(--space-3);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-input);
   border-radius: var(--radius-m);
   background: var(--surface);
   color: var(--ink);
@@ -623,7 +761,7 @@
 }
 
 .remixText:hover {
-  border-color: var(--line-strong);
+  border-color: var(--ink-faint);
 }
 
 .remixActions {
@@ -950,7 +1088,7 @@
   grid-column: 1 / -1;
   width: 100%;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-input);
   border-radius: var(--radius-s);
   background: var(--bg);
   font-size: var(--text-s);
@@ -962,7 +1100,7 @@
 }
 
 .shotPrompt:hover {
-  border-color: var(--line-strong);
+  border-color: var(--ink-faint);
 }
 
 /* A free slot of the film: dashed, numbered, waiting for a move. */

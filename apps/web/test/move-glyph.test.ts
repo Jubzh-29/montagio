@@ -1,4 +1,4 @@
-import { glyphMotion, GLYPH_EXTENT, FRAME_HALF } from '@/lib/move-glyph';
+import { glyphMotion, photoTarget, GLYPH_EXTENT, FRAME_HALF } from '@/lib/move-glyph';
 
 /** The camera moves of the library presets (presets/*.yaml). */
 const LIBRARY: [string, string[], number][] = [
@@ -95,4 +95,25 @@ test('the speed sets the duration, within a range that stays readable', () => {
 
 test('an unknown pose is a static shot', () => {
   expect(glyphMotion(['orbit'], 1).end).toEqual({ tx: 0, ty: 0, scale: 1 });
+});
+
+test('over the photo, a push in ends on a smaller frame at its centre', () => {
+  const target = photoTarget(['zoom_in'], 1);
+  expect(target.width).toBeCloseTo(100 / 1.55);
+  expect(target.left + target.width / 2).toBeCloseTo(50);
+  expect(target.widens).toBe(false);
+});
+
+test('over the photo, a pan left ends on a frame moved left, a tilt up on one moved up', () => {
+  const pan = photoTarget(['pan_left'], 1);
+  expect(pan.width).toBeCloseTo(100);
+  expect(pan.left).toBeLessThan(0);
+  expect(pan.top).toBeCloseTo(0);
+  expect(photoTarget(['pan_up'], 1).top).toBeLessThan(0);
+});
+
+test('over the photo, a pull back ends on a frame wider than the photo', () => {
+  const pull = photoTarget(['zoom_out'], 1);
+  expect(pull.widens).toBe(true);
+  expect(pull.width).toBeGreaterThan(100);
 });

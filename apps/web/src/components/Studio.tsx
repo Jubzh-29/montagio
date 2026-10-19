@@ -11,6 +11,7 @@ import {
   type PresetSummary,
   type SampleSummary,
   type SequenceSummary,
+  type ShowcaseInfo,
   type UploadResult,
 } from '@/lib/api-types';
 import { refusalMessageKey } from '@/lib/refusals';
@@ -31,6 +32,8 @@ const POLL_MS = 1000;
 const MAX_POLL_FAILURES = 4;
 const MAX_SHOTS = 3;
 const ASSEMBLY_ESTIMATE_S = 5;
+/** Every library preset renders 5 s at 480p (presets/*.yaml, defaults). */
+const CLIP_SECONDS = 5;
 
 type Mode = 'single' | 'sequence';
 
@@ -112,25 +115,13 @@ export function Studio() {
   const capabilities = studioCapabilities(IS_SHOWCASE, showcase);
   const [motionPaused, setMotionPaused] = useMotionPaused();
 
-  useEffect(() => {
-    Promise.all([
-      apiFetch('/api/presets').then((res) => jsonOrThrow<PresetSummary[]>(res)),
-      apiFetch('/api/models').then((res) => jsonOrThrow<ModelSummary[]>(res)),
-    ])
-      .then(([presetList, modelList]) => {
-        setPresets(presetList);
-        setModels(modelList.filter((model) => model.kind === 'video'));
-        setCatalog('ready');
-        setPresetId((current) => current ?? presetList[0]?.id ?? null);
-        setModelId((current) => current ?? presetList[0]?.defaultModel ?? null);
-      })
-      .catch(() => {
-        setCatalog('failed');
-        setJob({ status: 'error', message: t('errorGeneric') });
-      });
-    // t only changes with the language; the catalog is fetched once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // The showcase opens on a clip already playing: the first sample photo with the first preset, as if
+  // "Show clip" had been pressed, unless the visitor picked something while the catalogue loaded.
+  const touched = useRef(false);
+  const [arrivalId, setArrivalId] = useState<string | null>(null);
+  const followJob = useRef(false);
+  const statusRef = useRef<HTMLDivElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => () => {
     if (localUrlRef.current) URL.revokeObjectURL(localUrlRef.current);
@@ -191,6 +182,7 @@ export function Studio() {
     async (file: File) => {
       // Swapping the photo mid-render would orphan a running job.
       if (busyRef.current) return;
+      touched.current = true;
       // Only the most recent upload may update the state: a slow earlier
       // upload must not replace a newer photo.
       const token = ++uploadToken.current;
@@ -226,6 +218,7 @@ export function Studio() {
 
   /** Showcase: a sample photo stands in for an upload; nothing is sent anywhere. */
   const pickSample = (sample: SampleSummary) => {
+    touched.current = true;
     if (busyRef.current) return;
     setJob({ status: 'idle' });
     setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef });
@@ -333,8 +326,43 @@ export function Studio() {
     }
   };
 
+  // The catalogue, fetched once; in the showcase it also starts the arrival clip.
+  useEffect(() => {
+    Promise.all([
+      apiFetch('/api/presets').then((res) => jsonOrThrow<PresetSummary[]>(res)),
+      apiFetch('/api/models').then((res) => jsonOrThrow<ModelSummary[]>(res)),
+      IS_SHOWCASE
+        ? apiFetch('/api/showcase')
+            .then((res) => (res.ok ? (res.json() as Promise<ShowcaseInfo>) : null))
+            .catch(() => null)
+        : null,
+    ])
+      .then(([presetList, modelList, info]) => {
+        setPresets(presetList);
+        setModels(modelList.filter((model) => model.kind === 'video'));
+        setCatalog('ready');
+        setPresetId((current) => current ?? presetList[0]?.id ?? null);
+        setModelId((current) => current ?? presetList[0]?.defaultModel ?? null);
+        const sample = info?.samples[0];
+        const first = presetList[0];
+        if (sample && first && !touched.current) {
+          setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef });
+          void submit('generation', { presetId: first.id, modelId: first.defaultModel, imageRef: sample.imageRef }).then(
+            (record) => record && setArrivalId(record.id),
+          );
+        }
+      })
+      .catch(() => {
+        setCatalog('failed');
+        setJob({ status: 'error', message: t('errorGeneric') });
+      });
+    // t only changes with the language; the catalog is fetched once (submit is called after the first render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const generate = () => {
     if (submitting.current || !canGenerate || upload.status !== 'ready') return;
+    followJob.current = true;
     const userPrompt = prompt.trim() || undefined;
     if (remix) {
       const { text, baseId } = remix;
@@ -366,6 +394,19 @@ export function Studio() {
       });
     }
   };
+
+  // A render the visitor started (followJob, set by generate): the focus follows it, to the render
+  // status (on a phone that scrolls the monitor back into view), then to the result's first action.
+  const viewState = view?.state;
+  useEffect(() => {
+    if (!followJob.current) return;
+    if (job.status === 'submitting') {
+      statusRef.current?.focus();
+    } else if (job.status !== 'tracking' || (viewState && TERMINAL_STATES.has(viewState))) {
+      followJob.current = false;
+      if (viewState === 'succeeded') actionsRef.current?.querySelector<HTMLElement>('a, button')?.focus();
+    }
+  }, [job.status, viewState]);
 
   const cancel = async () => {
     if (!tracked) return;
@@ -404,6 +445,19 @@ export function Studio() {
     nextShot: shots.length < MAX_SHOTS ? shots.length + 1 : null,
   };
   const repoUrl = showcase?.repoUrl ?? null;
+  const showcaseNote = showcase
+    ? showcaseNoteKeys(showcase.placeholders)
+        .map((key) => t(key, { model: showcase.model.name, license: showcase.model.license }))
+        .join(' ')
+    : '';
+  // Screen readers hear a render start and end, not every percentage.
+  const announcement = busy
+    ? tracked?.kind === 'sequence' && tracked.record.state === 'assembling'
+      ? t('assembling')
+      : t('announceRendering')
+    : view?.state === 'succeeded'
+      ? t(tracked?.kind === 'sequence' ? 'announceFilmReady' : 'announceClipReady')
+      : '';
   // The empty monitor plays the move in hand: the preset being remixed, the chosen one, or the last shot added.
   const moveId = remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
   const movePreset = presets.find((preset) => preset.id === moveId);
@@ -412,6 +466,13 @@ export function Studio() {
     poses: movePreset.poses,
     speed: movePreset.speed,
   };
+  // The slate under the monitor: the take about to be shot, even once a photo hides the viewfinder.
+  const slateMove = remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  const slate = slateMove && [
+    slateMove,
+    selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
+    t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
+  ].filter(Boolean);
 
   return (
     <>
@@ -425,6 +486,9 @@ export function Studio() {
             upload={upload}
             generation={monitorState}
             move={move}
+            announcement={announcement}
+            statusRef={statusRef}
+            autoPlayResult={!(motionPaused && view?.id === arrivalId)}
             onFile={onFile}
             onSample={loadSample}
             onCancel={cancel}
@@ -435,11 +499,6 @@ export function Studio() {
                 ? {
                     samples: showcase?.samples ?? [],
                     selectedId: selectedSample,
-                    note: showcase
-                      ? showcaseNoteKeys(showcase.placeholders)
-                          .map((key) => t(key, { model: showcase.model.name, license: showcase.model.license }))
-                          .join(' ')
-                      : '',
                     onPick: pickSample,
                     uploads: capabilities.uploads,
                     onOtherSample: () => {
@@ -452,6 +511,13 @@ export function Studio() {
                 : undefined
             }
           />
+          {slate && (
+            <p className={styles.slate}>
+              {slate.map((part, index) => (
+                <span key={index}>{part}</span>
+              ))}
+            </p>
+          )}
           {IS_SHOWCASE && succeeded && (
             <p className={styles.caption} data-testid="result-caption">
               {succeeded.placeholder
@@ -460,7 +526,7 @@ export function Studio() {
             </p>
           )}
           {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
-            <div className={styles.actions}>
+            <div className={styles.actions} ref={actionsRef}>
               {tracked.record.outputUrl && (
                 <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.presetId}.mp4`}>
                   {t('download')}
@@ -472,6 +538,7 @@ export function Studio() {
                 download={`montagio-${tracked.record.presetId}.json`}
               >
                 {t('openInComfy')}
+                <span className={styles.fileTag}>.json</span>
               </a>
               <button
                 type="button"
@@ -483,7 +550,7 @@ export function Studio() {
             </div>
           )}
           {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
-            <div className={styles.actions}>
+            <div className={styles.actions} ref={actionsRef}>
               {tracked.record.outputUrl && (
                 <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download="montagio-film.mp4">
                   {t('downloadFilm')}
@@ -496,6 +563,8 @@ export function Studio() {
               )}
             </div>
           )}
+          {/* What the showcase is, in sight whatever the monitor shows. */}
+          {showcaseNote && <p className={styles.stageNote}>{showcaseNote}</p>}
         </section>
 
         <aside className={styles.panel}>
@@ -508,6 +577,7 @@ export function Studio() {
                 aria-pressed={mode === value}
                 disabled={busy || remix !== null}
                 onClick={() => {
+                  touched.current = true;
                   setMode(value);
                   // The film is joined by FFmpeg in the browser: start fetching it now.
                   if (IS_SHOWCASE && value === 'sequence') void apiFetch('/api/showcase/preload', { method: 'POST' }).catch(() => undefined);
