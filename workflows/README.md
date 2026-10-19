@@ -56,6 +56,7 @@ The four extensions decided on 2026-10-19 (music, upscale, image edit, talking a
 |---|---|---|---|
 | `ace-step15-music.api.json` | `templates/audio_ace_step_1_5_split.json` | ACE-Step 1.5 turbo (2B) | node 107, FLAC |
 | `seedvr2-upscale.api.json` | `templates/utility_seedvr2_3b_int8_upscale_video.json` | SeedVR2 3B int8 | node 76, MP4 |
+| `qwen-image-edit-2511.api.json` | `templates/image_qwen_image_edit_2511.json` | Qwen-Image-Edit-2511 fp8mixed | node 9, PNG |
 
 ### ace-step15-music
 
@@ -73,6 +74,14 @@ The four extensions decided on 2026-10-19 (music, upscale, image edit, talking a
 - `SeedVR2PostProcessing` corrects colours with `lab` (the node's default) instead of the template's `none`; GPU session S2 compares `none`, `lab` and `wavelet`.
 - `CreateVideo` takes the frame rate, the audio and the bit depth of the source clip (node 74), so a 16 fps clip stays 16 fps. `SaveVideo` writes `montagio/upscale`, MP4 in H.264. The seed is 0, one step, cfg 1, euler/simple, as in the template.
 
+### qwen-image-edit-2511
+
+- The template's subgraph is flattened with its inner ids. Its "Lightning" group (4-step LoRA, switches, primitives) is left out: the template ships it switched off, and the LoRA stays out of the lock until GPU session S2 has compared it. The 40-step path is kept: `ModelSamplingAuraFlow` shift 3.1, `CFGNorm` 1, 40 steps, cfg 4, euler/simple.
+- `FluxKontextMultiReferenceLatentMethod` (147, 148) says `index_timestep_zero` on both encoders: the node has no default and would otherwise take `offset`, which is wrong for 2511.
+- The negative encoder (149) keeps an empty prompt and the same image, as in the template; only the positive one (151) is bound.
+- `FluxKontextImageScale` (160) is kept: it center-crops the photo to one of 17 sizes of about 1 megapixel (16:9 gives 1392×752), which is also the size of the edited PNG. Replacing it with `ImageScaleToTotalPixels` (no crop) is a GPU session S2 comparison.
+- The text encoder file is the template's, but the lock downloads it from `Comfy-Org/Qwen-Image_ComfyUI` (Apache-2.0 card) instead of `Comfy-Org/HunyuanVideo_1.5_repackaged` (territory-restricted card): same file, same sha256. `SaveImage` writes `montagio/edit`.
+
 ## Bindings
 
 | Model | image | prompt | negative | seed | width / height / frames | fps | camera_pose / camera_speed |
@@ -87,3 +96,4 @@ Extension models (a binding with several inputs gets the same value in each):
 |---|---|---|
 | `ace-step15-music` | prompt 94.tags; duration_s 98.seconds + 94.duration; seed 3.seed + 94.seed; bpm 94.bpm | 107 (audio) |
 | `seedvr2-upscale` | video 73.file; width / height 57.resize_type.width / 57.resize_type.height; seed 54.seed | 76 (video) |
+| `qwen-image-edit-2511` | image 41.image; prompt 151.prompt; seed 169.seed | 9 (image) |

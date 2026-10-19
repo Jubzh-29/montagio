@@ -1,0 +1,20 @@
+# Image edit (extension "edit"): the start photo of a shot changed by an instruction
+# ("make it night", "remove the car") before it is animated. The edited PNG is about
+# 1 megapixel, at one of the 17 sizes of FluxKontextImageScale (16:9 gives 1392x752).
+schema: montagio/extension-model@0.1
+id: qwen-image-edit-2511
+name: Qwen-Image-Edit-2511 (photo edit)
+extension: edit
+task: i2i-edit
+license: Apache-2.0
+weights: [qwen-image-edit-2511-fp8mixed, qwen25-vl-7b-fp8, qwen-image-vae]
+workflow: workflows/qwen-image-edit-2511.api.json
+bindings:
+  image: { node: "41", field: image }
+  # the positive encoder; the negative one (149) keeps an empty prompt, as in the template
+  prompt: { node: "151", field: prompt }
+  seed: { node: "169", field: seed }
+output: { node: "9", kind: image }
+limits: { max_chars: 500 }
+# GPU seconds per image on an RTX 4090 at 40 steps (estimate: about 2 min; S2 measures it)
+estimate_s: 120

@@ -47,3 +47,11 @@ nodes:
   - { class_type: SeedVR2Conditioning, source: comfyui-core, license: GPL-3.0 }
   - { class_type: SeedVR2TemporalMerge, source: comfyui-core, license: GPL-3.0 }
   - { class_type: SeedVR2PostProcessing, source: comfyui-core, license: GPL-3.0 }
+  # Extension "edit" (2026-10-19), core of ComfyUI v0.41.0: comfy_extras/nodes_flux.py (FluxKontextImageScale,
+  # FluxKontextMultiReferenceLatentMethod), comfy_extras/nodes_cfg.py (CFGNorm), comfy_extras/nodes_qwen.py
+  # (TextEncodeQwenImageEditPlus) and nodes.py (VAEEncode).
+  - { class_type: FluxKontextImageScale, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: FluxKontextMultiReferenceLatentMethod, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: CFGNorm, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: TextEncodeQwenImageEditPlus, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: VAEEncode, source: comfyui-core, license: GPL-3.0 }

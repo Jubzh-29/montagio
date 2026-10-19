@@ -15,7 +15,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { compileJob, compileMusic, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
+import { compileEdit, compileJob, compileMusic, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -135,6 +135,12 @@ test('the upscale job compiled for each aspect is accepted', () => {
     const { workflow } = compileUpscale(model, library.extensionTemplates.get(model.workflow)!, { videoRef: 'clip.mp4', aspect, seed: 3 });
     expect({ aspect, problems: checkWorkflow(workflow, info) }).toEqual({ aspect, problems: [] });
   }
+});
+
+test('the edit job is accepted', () => {
+  const model = library.extensionModels.get('qwen-image-edit-2511')!;
+  const { workflow } = compileEdit(model, library.extensionTemplates.get(model.workflow)!, { imageRef: 'start.png', instruction: 'make it night', seed: 3 });
+  expect(checkWorkflow(workflow, info)).toEqual([]);
 });
 
 test('every class of the fixture comes from the core of ComfyUI or from the Montagio pack', () => {

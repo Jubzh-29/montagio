@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { compileMusic, compileUpscale, CompileError, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Library } from '../src/index';
+import { compileEdit, compileMusic, compileUpscale, CompileError, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -112,5 +112,45 @@ describe('compileUpscale (SeedVR2 3B)', () => {
   test('the shipped workflow cuts the clip in chunks of 33 frames with an overlap of 3', () => {
     const chunk = upscale().template['99']!.inputs;
     expect(chunk).toMatchObject({ chunking_mode: 'manual', 'chunking_mode.frames_per_chunk': 33, temporal_overlap: 3 });
+  });
+});
+
+describe('compileEdit (Qwen-Image-Edit-2511)', () => {
+  const edit = () => extension('qwen-image-edit-2511');
+  const compile = (inputs: Partial<Parameters<typeof compileEdit>[2]> = {}) =>
+    compileEdit(edit().model, edit().template, { imageRef: 'start.png', instruction: 'make it night', seed: 4, ...inputs });
+
+  test('the instruction goes to the positive encoder only', () => {
+    const { workflow, params } = compile({ instruction: '  remove the car  ' });
+    expect(workflow['151']!.inputs.prompt).toBe('remove the car');
+    expect(workflow['149']!.inputs.prompt).toBe('');
+    expect(params.instruction).toBe('remove the car');
+  });
+
+  test('an empty or blank instruction is refused', () => {
+    expect(() => compile({ instruction: '' })).toThrow(CompileError);
+    expect(() => compile({ instruction: ' \n ' })).toThrow(CompileError);
+  });
+
+  test('an instruction over 500 characters is refused', () => {
+    expect(() => compile({ instruction: 'a'.repeat(501) })).toThrow(/500/);
+  });
+
+  test('the image is bound to LoadImage and the seed to the sampler', () => {
+    const { workflow } = compile({ imageRef: 'uploads/photo.png', seed: 12 });
+    expect(workflow['41']!.inputs.image).toBe('uploads/photo.png');
+    expect(workflow['169']!.inputs.seed).toBe(12);
+  });
+
+  test('the output is node 9, image', () => {
+    expect(compile().output).toEqual({ node: '9', kind: 'image' });
+  });
+
+  test('both reference methods of the shipped workflow are index_timestep_zero, the method of 2511', () => {
+    const { template } = edit();
+    expect([template['147']!.inputs.reference_latents_method, template['148']!.inputs.reference_latents_method]).toEqual([
+      'index_timestep_zero',
+      'index_timestep_zero',
+    ]);
   });
 });

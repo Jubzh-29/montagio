@@ -70,6 +70,13 @@ Les quatre workflows partent des templates officiels de [Comfy-Org/workflow_temp
 - Découpage temporel câblé en mode `manual` : morceaux de 33 images, recouvrement de 3. Sans lui, 81 images en 1080p demandent ≈ 35 Gio ; le mode `auto` dépend de la VRAM libre, donc des coutures qui bougent d'un rendu à l'autre.
 - Contrôle hors ligne : `checkWorkflow` ne connaissait pas le type « MatchType » de l'API V3 que déclare `ResizeImageMaskNode` ; il l'accepte désormais, comme ComfyUI (`comfy_execution/validation.py:220-223`).
 
+### Édition d'image : Qwen-Image-Edit-2511, nodes du cœur
+
+- Template `templates/image_qwen_image_edit_2511.json`, sans node partenaire. Le groupe « Lightning » (LoRA 4 étapes), livré éteint, est retiré.
+- Nodes : `LoadImage`, `FluxKontextImageScale` (`comfy_extras/nodes_flux.py:127`), `UNETLoader`, `ModelSamplingAuraFlow` (shift 3,1), `CFGNorm` (`comfy_extras/nodes_cfg.py:51`), `CLIPLoader` (type `qwen_image`), `VAELoader`, deux `TextEncodeQwenImageEditPlus` (`comfy_extras/nodes_qwen.py:54`), deux `FluxKontextMultiReferenceLatentMethod`, `VAEEncode`, `KSampler` (40 étapes, cfg 4), `VAEDecode`, `SaveImage`. ComfyUI v0.41.0 reconnaît 2511 comme un Qwen-Image et passe en mode de référence `index_timestep_zero` (`comfy/model_detection.py:1002-1008`).
+- L'encodeur « Plus » est celui du template et du pipeline de référence (multi-images). Le node de méthode de référence n'a pas de valeur par défaut : sans valeur écrite, il prend `offset`, faux pour 2511. Le workflow l'écrit sur les deux encodeurs, et un test le garde.
+- Taille de sortie : `FluxKontextImageScale` recadre au centre sur l'une de 17 tailles d'≈ 1 Mpx (16:9 → 1392×752, 4 % de la hauteur coupés). Le PNG édité a cette taille ; il garde l'aspect 16:9, 9:16 ou 1:1 que lit `pickAspect`. `ImageScaleToTotalPixels` (sans recadrage) est un essai de la S2.
+
 ## 3. Poids
 
 Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`), recoupés par `fetch-weights --lock-from-hf`, dont le patch est vide. Chaque entrée du lock porte `extension:` : l'installeur local ne la télécharge que pour son extension.
@@ -82,8 +89,11 @@ Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`)
 | Musique | `ace-step15-vae` | `ace_1.5_vae.safetensors` | 337 431 732 | `6de92e3a…` |
 | Upscale | `seedvr2-3b-int8` | `seedvr2_3b_int8_convrot.safetensors` (conversion Comfy-Org des `.pth` fp32 de ByteDance) | 3 458 259 704 | `c3dec8bc…` |
 | Upscale | `seedvr2-vae` | `seedvr2_ema_vae_fp16.safetensors` | 501 324 814 | `20678548…` |
+| Édition | `qwen-image-edit-2511-fp8mixed` | `qwen_image_edit_2511_fp8mixed.safetensors` (quantification Comfy-Org) | 20 533 762 817 | `c9fdc158…` |
+| Édition | `qwen25-vl-7b-fp8` | `qwen_2.5_vl_7b_fp8_scaled.safetensors`, chez `Comfy-Org/Qwen-Image_ComfyUI` | 9 384 670 680 | `cb5636d8…` |
+| Édition | `qwen-image-vae` | `qwen_image_vae.safetensors` | 253 806 246 | `a70580f0…` |
 
-Musique : 10,0 Go. Upscale : 3,96 Go.
+Musique : 10,0 Go. Upscale : 3,96 Go. Édition : 30,2 Go (le bf16, 40,9 Go, n'est pas retenu).
 
 ## 4. VRAM et temps sur une RTX 4090 (24 Go)
 
@@ -91,6 +101,7 @@ Ce sont des **estimations**, tirées de la taille des poids et des formules de m
 
 - **Musique.** DiT 4,8 Go, encodeurs 4,9 Go, VAE 0,3 Go ; le décodage d'un morceau de 60 s demande ≈ 5,7 Gio (`comfy/sd.py:729`). Tout résident, le pic est ≈ 16 Go : **tient**. Le LM tourne sans vLLM : ≈ 3 à 10 s à chaud pour 60 s de musique, plus le chargement. Après un rendu Wan 14B, ComfyUI ne décharge que ce qu'il faut (`comfy/model_management.py:893-1039`) ; le rendu Wan suivant recharge ses poids.
 - **Upscale.** Poids 3,2 Gio en int8. Par morceau de 9 latents en 1080p, la loi mesurée par ComfyUI (`comfy/ldm/seedvr/constants.py:3-11`, sur une RTX 5090) donne ≈ 10,3 Gio d'activations, soit un pic de ≈ 18–19 Gio : **tient**. Sans découpage, non (≈ 35 Gio). Le 7B int8 serait à la limite, le 7B fp16 ne tient pas. Temps : ≈ 2 à 4 min pour un clip de 81 images, ≈ 3 à 6 min pour 121. L'int8 est plus rapide avec torch cu130 (le pod) ; sur le repli cu128, le noyau CUDA de comfy-kitchen est coupé (`comfy/quant_ops.py:23-29`).
+- **Édition.** Le modèle fp8mixed fait 19,1 Gio, l'encodeur de texte 8,7 Gio. ComfyUI encode le texte, puis décharge l'encodeur quand le DiT a besoin de place (chargement partiel, `comfy/model_management.py:939`). Avec 1 à 3 Gio d'activations à ≈ 1 Mpx, cela **tient de justesse** : le même DiT en fp8, en texte vers image, occupe 86 % d'une RTX 4090D d'après la doc de ComfyUI. Le bf16 (38 Gio) ne tient pas. Temps : ≈ 100 à 130 s par image en 40 étapes, ≈ 55 à 75 s en 20 étapes, ≈ 15 à 25 s avec la LoRA 4 étapes (hors lock). Prévoir 32 Go de RAM au moins, 64 Go de préférence.
 
 ## 5. Contrat backend et drapeau de coupe
 

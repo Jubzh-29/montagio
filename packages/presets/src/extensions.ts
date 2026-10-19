@@ -125,3 +125,19 @@ export function compileUpscale(
   const workflow = bindExtension(model, template, { video: inputs.videoRef, width, height, seed: inputs.seed });
   return { workflow, output: { ...model.output }, params: { width, height, seed: inputs.seed } };
 }
+
+export type EditInputs = {
+  /** The photo to change, as the backend's loader names it once uploaded. */
+  imageRef: string;
+  /** What to change, in words ("make it night"). */
+  instruction: string;
+  seed: number;
+};
+
+/** The start photo changed by an instruction (Qwen-Image-Edit-2511); the negative encoder keeps its empty prompt. */
+export function compileEdit(model: ExtensionModel, template: ApiWorkflow, inputs: EditInputs): ExtensionCompiled<{ instruction: string; seed: number }> {
+  expectTask(model, 'i2i-edit');
+  const instruction = userText(inputs.instruction, 'edit instruction', model);
+  const workflow = bindExtension(model, template, { image: inputs.imageRef, prompt: instruction, seed: inputs.seed });
+  return { workflow, output: { ...model.output }, params: { instruction, seed: inputs.seed } };
+}
