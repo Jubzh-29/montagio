@@ -25,7 +25,7 @@ function fresh(over: Partial<PlanInput> = {}): PlanInput {
     state: emptyState(),
     lock,
     weightStat: () => null,
-    comfy: { head: null, exists: false, tmpExists: false },
+    comfy: { head: null, exists: false, tmpExists: false, marked: false },
     packTarget: null,
     artifacts: { comfyPython: false, proxyExe: false, appBuild: false },
     repo: { head: 'abc123', lockHash: 'h1', nodeModules: false },
@@ -54,7 +54,7 @@ function installed(over: Partial<PlanInput> = {}): PlanInput {
   return fresh({
     state: installedState(),
     weightStat: (w) => ({ size: w.size, mtimeMs: 1 }),
-    comfy: { head: versions.comfyuiCommit, exists: true, tmpExists: false },
+    comfy: { head: versions.comfyuiCommit, exists: true, tmpExists: false, marked: false },
     packTarget: win32.join(repoRoot, 'comfy-nodes'),
     artifacts: { comfyPython: true, proxyExe: true, appBuild: true },
     repo: { head: 'abc123', lockHash: 'h1', nodeModules: true },
@@ -103,19 +103,30 @@ test('a new sha256 in the lock, or another mtime, fetches that weight alone', ()
 });
 
 test('a ComfyUI of ours at another commit is updated in place', () => {
-  const comfy = step(buildPlan(installed({ comfy: { head: 'f'.repeat(40), exists: true, tmpExists: false } })), 'comfyui');
+  const comfy = step(buildPlan(installed({ comfy: { head: 'f'.repeat(40), exists: true, tmpExists: false, marked: false } })), 'comfyui');
   expect(comfy.run).toBe(true);
   expect(comfy.detail.join('\n')).toMatch(/fetch --depth 1 origin tag v0\.41\.0[\s\S]*checkout --detach 98cc0bf8/);
 });
 
 test('a ComfyUI folder Montagio did not install is refused', () => {
-  expect(() => buildPlan(fresh({ comfy: { head: 'f'.repeat(40), exists: true, tmpExists: false } }))).toThrow(
+  expect(() => buildPlan(fresh({ comfy: { head: 'f'.repeat(40), exists: true, tmpExists: false, marked: false } }))).toThrow(
     /ComfyUI exists and was not installed by Montagio: choose another --dir/,
   );
 });
 
+test('a real custom_nodes/montagio folder is refused by the plan, as the run refuses it', () => {
+  // readLink gives the link's own path when it is a folder, not a link.
+  expect(() => buildPlan(installed({ packTarget: L.packLink }))).toThrow(/is a folder, not a link to .*comfy-nodes: move it away/);
+  expect(() => buildPlan(installed({ packTarget: L.packLink.toUpperCase() }))).toThrow(/is a folder/);
+});
+
+test('a ComfyUI that carries the Montagio marker is ours, even when the state is lost', () => {
+  const marked = fresh({ comfy: { head: versions.comfyuiCommit, exists: true, tmpExists: false, marked: true } });
+  expect(step(buildPlan(marked), 'comfyui').run).toBe(false);
+});
+
 test('a clone left half done is removed first, then cloned again', () => {
-  const comfy = step(buildPlan(fresh({ comfy: { head: null, exists: false, tmpExists: true } })), 'comfyui');
+  const comfy = step(buildPlan(fresh({ comfy: { head: null, exists: false, tmpExists: true, marked: false } })), 'comfyui');
   expect(comfy.detail[0]).toContain(`remove ${L.comfyTmp}`);
   expect(comfy.detail.join('\n')).toContain(`git clone --depth 1 --branch v0.41.0 ${versions.comfyuiRepo} ${L.comfyTmp}`);
 });
@@ -123,6 +134,13 @@ test('a clone left half done is removed first, then cloned again', () => {
 test('the app alone has no ComfyUI, proxy, pack or weights step', () => {
   const ids = buildPlan(fresh({ mode: 'app-only', python: null, torch: null })).map((s) => s.id);
   for (const id of ['comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights'] as const) expect(ids).not.toContain(id);
+});
+
+test('the app alone says whether it renders through a saved proxy URL or runs the demo', () => {
+  const appOnly = (proxyUrl: string | null) =>
+    step(buildPlan(fresh({ mode: 'app-only', python: null, torch: null, state: { ...emptyState(), proxyUrl } })), 'start').detail.join('\n');
+  expect(appOnly('http://127.0.0.1:9189')).toContain('comfy-api-proxy at http://127.0.0.1:9189 (--demo forgets it)');
+  expect(appOnly(null)).toContain('demo mode');
 });
 
 test('the weights step lists each file with its size and folder', () => {

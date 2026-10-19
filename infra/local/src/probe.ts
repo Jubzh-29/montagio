@@ -1,5 +1,5 @@
 /** What the machine has: GPU, driver, tools, Pythons, free space, RAM, ports. Read-only. */
-import { existsSync, statfsSync } from 'node:fs';
+import { existsSync, statfsSync, statSync } from 'node:fs';
 import { connect } from 'node:net';
 import { totalmem } from 'node:os';
 import { dirname } from 'node:path';
@@ -22,6 +22,8 @@ export type MachineFacts = {
   driverCuda: [number, number] | null;
   pythons: PythonInfo[];
   freeBytes: { installDir: number; repo: number };
+  /** The install folder and the repository are on one drive: their free bytes are the same bytes. */
+  sameVolume: boolean;
   ramBytes: number;
   /** Ports among the wanted ones that something already answers on. */
   busyPorts: number[];
@@ -57,12 +59,21 @@ export function pythonCandidates(os: Os): string[][] {
   return os === 'windows' ? [...minors.map((v) => ['py', `-${v}`]), ['python']] : [...minors.map((v) => [`python${v}`]), ['python3']];
 }
 
-/** Free bytes for a path that may not exist yet: measured on its nearest existing parent. */
-export function freeBytesAt(path: string): number {
+/** A path that may not exist yet is measured on its nearest existing parent. */
+function nearestExisting(path: string): string {
   let dir = path;
   while (!existsSync(dir) && dirname(dir) !== dir) dir = dirname(dir);
-  const stats = statfsSync(dir);
+  return dir;
+}
+
+export function freeBytesAt(path: string): number {
+  const stats = statfsSync(nearestExisting(path));
   return Number(stats.bavail) * Number(stats.bsize);
+}
+
+/** Same device number: the same filesystem (on Windows, the volume serial number). */
+export function sameVolume(a: string, b: string): boolean {
+  return statSync(nearestExisting(a)).dev === statSync(nearestExisting(b)).dev;
 }
 
 /** Something answers on 127.0.0.1:port. */
@@ -123,6 +134,7 @@ export async function probe(input: {
     driverCuda: banner && banner.code === 0 ? parseCudaBanner(banner.stdout) : null,
     pythons,
     freeBytes: { installDir: freeBytesAt(input.installDir), repo: freeBytesAt(input.repoRoot) },
+    sameVolume: sameVolume(input.installDir, input.repoRoot),
     ramBytes: totalmem(),
     busyPorts,
   };

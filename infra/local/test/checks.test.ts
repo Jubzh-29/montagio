@@ -21,6 +21,7 @@ function facts(over: Partial<MachineFacts> = {}): MachineFacts {
     driverCuda: [13, 0],
     pythons: [{ command: ['py', '-3.12'], version: [3, 12, 10], hasVenv: true }],
     freeBytes: { installDir: 500 * GiB, repo: 500 * GiB },
+    sameVolume: false,
     ramBytes: 64 * GiB,
     busyPorts: [],
     ...over,
@@ -102,6 +103,18 @@ test('a busy port that is not ours fails and names the option', () => {
   expect(byId(evaluate(facts({ busyPorts: [3000] }), ctx), 'ports')?.fix).toContain('--app-port');
 });
 
+test('two services on one port fail and name the option to change', () => {
+  // A port saved by an earlier install plus a new option can collide.
+  const check = byId(evaluate(facts(), { ...ctx, ports: { comfy: 8288, proxy: 8288, app: 3000 } }), 'ports')!;
+  expect(check.severity).toBe('fail');
+  expect(check.message).toContain('8288');
+  expect(check.message).toContain('ComfyUI');
+  expect(check.message).toContain('comfy-api-proxy');
+  expect(check.fix).toContain('--proxy-port');
+  // The app alone runs one service: the other ports do not matter.
+  expect(byId(evaluate(facts(), { ...ctx, mode: 'app-only', ports: { comfy: 3000, proxy: 3000, app: 3000 } }), 'ports')?.severity).toBe('ok');
+});
+
 test('the app alone needs neither Python, nor a GPU, nor a driver, and only its own port', () => {
   const checks = evaluate(facts({ gpus: [], driverCuda: null, pythons: [], git: false, ramBytes: 8 * GiB, busyPorts: [8188, 8189] }), {
     ...ctx,
@@ -123,6 +136,23 @@ test('too little disk fails with both sizes, and little RAM warns', () => {
   expect(disk.message).toContain('90.0 GiB');
   expect(disk.fix).toContain('--dir');
   expect(byId(evaluate(facts({ ramBytes: 16 * GiB }), ctx), 'ram')?.severity).toBe('warn');
+});
+
+test('the install folder and the repository on one drive need room for both', () => {
+  // ctx needs 90 GiB for the install folder and 3 GiB beside the repository: 92 GiB free is enough for either, not both.
+  const oneDrive = facts({ freeBytes: { installDir: 92 * GiB, repo: 92 * GiB }, sameVolume: true });
+  const disk = byId(evaluate(oneDrive, ctx), 'disk')!;
+  expect(disk.severity).toBe('fail');
+  expect(disk.message).toContain('92.0 GiB');
+  expect(disk.message).toContain('93.0 GiB');
+  expect(byId(evaluate({ ...oneDrive, sameVolume: false }, ctx), 'disk')?.severity).toBe('ok');
+  expect(byId(evaluate({ ...oneDrive, freeBytes: { installDir: 93 * GiB, repo: 93 * GiB } }, ctx), 'disk')?.severity).toBe('ok');
+});
+
+test('a 32 GB machine does not warn about RAM, though the system reports a little less', () => {
+  // totalmem() on a 32 GB laptop: the firmware and the integrated GPU keep a few hundred MiB.
+  expect(byId(evaluate(facts({ ramBytes: 31.8 * GiB }), ctx), 'ram')?.severity).toBe('ok');
+  expect(byId(evaluate(facts({ ramBytes: 24 * GiB }), ctx), 'ram')?.severity).toBe('warn');
 });
 
 test('each failure gives the fix of its system', () => {

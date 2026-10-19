@@ -11,7 +11,8 @@ export const DEFAULT_PORTS: Ports = { comfy: 8188, proxy: 8189, app: 3000 };
 export const MIN_VRAM_MIB = 22 * 1024;
 export const MIN_NODE: [number, number] = [22, 18];
 export const PYTHON_RANGE = { min: [3, 10] as [number, number], max: [3, 13] as [number, number] };
-export const RAM_WARN_BYTES = 32 * 1024 ** 3;
+/** 30 GiB: a 32 GB machine reports about 31.8 GiB (the firmware and an integrated GPU keep some), 24 GB stays under. */
+export const RAM_WARN_BYTES = 30 * 1024 ** 3;
 
 export type CheckId = 'os' | 'node' | 'git' | 'python' | 'ffmpeg' | 'gpu' | 'driver' | 'disk' | 'ram' | 'ports';
 export type Check = { id: CheckId; severity: 'ok' | 'warn' | 'fail'; message: string; fix?: string };
@@ -142,8 +143,14 @@ export function evaluate(facts: MachineFacts, ctx: Context): Check[] {
   }
 
   const short: string[] = [];
-  if (facts.freeBytes.installDir < ctx.need.installDir) short.push(`${gib(facts.freeBytes.installDir)} free for the install folder, ${gib(ctx.need.installDir)} needed`);
-  if (facts.freeBytes.repo < ctx.need.repo) short.push(`${gib(facts.freeBytes.repo)} free beside the repository, ${gib(ctx.need.repo)} needed`);
+  if (facts.sameVolume) {
+    // One drive holds both: each need keeps its own margin, 2 GiB more than either alone.
+    const both = ctx.need.installDir + ctx.need.repo;
+    if (facts.freeBytes.installDir < both) short.push(`${gib(facts.freeBytes.installDir)} free on the drive of the install folder and the repository, ${gib(both)} needed for both`);
+  } else {
+    if (facts.freeBytes.installDir < ctx.need.installDir) short.push(`${gib(facts.freeBytes.installDir)} free for the install folder, ${gib(ctx.need.installDir)} needed`);
+    if (facts.freeBytes.repo < ctx.need.repo) short.push(`${gib(facts.freeBytes.repo)} free beside the repository, ${gib(ctx.need.repo)} needed`);
+  }
   add(
     short.length === 0
       ? { id: 'disk', severity: 'ok', message: `${gib(facts.freeBytes.installDir)} free for the install folder` }
@@ -154,20 +161,27 @@ export function evaluate(facts: MachineFacts, ctx: Context): Check[] {
     add(
       facts.ramBytes >= RAM_WARN_BYTES
         ? { id: 'ram', severity: 'ok', message: `${gib(facts.ramBytes)} of RAM` }
-        : { id: 'ram', severity: 'warn', message: `${gib(facts.ramBytes)} of RAM: 32 GiB or more is recommended, ComfyUI swaps the 14B models through RAM` },
+        : { id: 'ram', severity: 'warn', message: `${gib(facts.ramBytes)} of RAM: 32 GB or more is recommended, ComfyUI swaps the 14B models through RAM` },
     );
   }
 
   const wanted: (keyof Ports)[] = full ? ['comfy', 'proxy', 'app'] : ['app'];
-  const taken = wanted.filter((name) => facts.busyPorts.includes(ctx.ports[name]) && !ctx.ownPorts.includes(ctx.ports[name]));
+  // A port saved by an earlier install and a new option can give one port to two services.
+  const firstOn = (name: keyof Ports) => wanted.find((other) => ctx.ports[other] === ctx.ports[name])!;
+  const shared = wanted.filter((name) => firstOn(name) !== name);
+  const taken = wanted.filter((name) => !shared.includes(name) && facts.busyPorts.includes(ctx.ports[name]) && !ctx.ownPorts.includes(ctx.ports[name]));
+  const moves = [...shared, ...taken].map((name) => `${PORT_OPTIONS[name].option} <port>`).join(', ');
   add(
-    taken.length === 0
+    shared.length === 0 && taken.length === 0
       ? { id: 'ports', severity: 'ok', message: `${wanted.length > 1 ? 'ports' : 'port'} ${wanted.map((name) => ctx.ports[name]).join(', ')}` }
       : {
           id: 'ports',
           severity: 'fail',
-          message: taken.map((name) => `port ${ctx.ports[name]} (${PORT_OPTIONS[name].label}) is already in use`).join('; '),
-          fix: `stop the program that uses it, or pick another port with ${taken.map((name) => `${PORT_OPTIONS[name].option} <port>`).join(', ')}`,
+          message: [
+            ...shared.map((name) => `port ${ctx.ports[name]} is given to both ${PORT_OPTIONS[firstOn(name)].label} and ${PORT_OPTIONS[name].label}`),
+            ...taken.map((name) => `port ${ctx.ports[name]} (${PORT_OPTIONS[name].label}) is already in use`),
+          ].join('; '),
+          fix: taken.length > 0 ? `stop the program that uses it, or pick another port with ${moves}` : `pick another port with ${moves}`,
         },
   );
 

@@ -38,9 +38,12 @@ export type PlanInput = {
   state: InstallState;
   lock: LockWeight[];
   weightStat: (weight: LockWeight) => FileStat | null;
-  /** head: the commit of layout.comfyDir (null if absent or unreadable); tmpExists: an interrupted clone is left. */
-  comfy: { head: string | null; exists: boolean; tmpExists: boolean };
-  /** Where custom_nodes/montagio points today, null if it does not exist. */
+  /**
+   * head: the commit of layout.comfyDir (null if absent or unreadable); tmpExists: an interrupted clone is left;
+   * marked: it holds the marker a Montagio clone leaves, which still says it is ours when the state is lost.
+   */
+  comfy: { head: string | null; exists: boolean; tmpExists: boolean; marked: boolean };
+  /** Where custom_nodes/montagio points today: null if it does not exist, its own path if it is a real folder. */
   packTarget: string | null;
   /** What the stamps stand for is still there: the venv Python, the proxy launcher, the app build (BUILD_ID). */
   artifacts: { comfyPython: boolean; proxyExe: boolean; appBuild: boolean };
@@ -138,7 +141,7 @@ export function buildPlan(input: PlanInput): Step[] {
   });
 
   if (full) {
-    const ours = Boolean(state.stamps.comfyui);
+    const ours = Boolean(state.stamps.comfyui) || input.comfy.marked;
     if (input.comfy.exists && !ours) {
       throw new Error(`${L.comfyDir} exists and was not installed by Montagio: choose another --dir`);
     }
@@ -206,6 +209,10 @@ export function buildPlan(input: PlanInput): Step[] {
     });
 
     const packDir = path.join(input.repoRoot, 'comfy-nodes');
+    // The run never replaces a real folder: the dry run says so too, instead of a [run].
+    if (samePath(input.packTarget, L.packLink, os)) {
+      throw new Error(`${L.packLink} is a folder, not a link to ${packDir}: move it away, then run the same command again`);
+    }
     const linked = samePath(input.packTarget, packDir, os);
     add({
       id: 'node-pack',
@@ -268,7 +275,10 @@ export function buildPlan(input: PlanInput): Step[] {
     why: input.start ? 'then open the browser' : '--no-start',
     detail: full
       ? [`ComfyUI on 127.0.0.1:${state.ports.comfy}`, `comfy-api-proxy on 127.0.0.1:${state.ports.proxy}`, `the app on http://127.0.0.1:${state.ports.app}`]
-      : [`the app on http://127.0.0.1:${state.ports.app}`],
+      : [
+          `the app on http://127.0.0.1:${state.ports.app}`,
+          state.proxyUrl ? `rendering through the comfy-api-proxy at ${state.proxyUrl} (--demo forgets it)` : 'demo mode: pre-rendered clips',
+        ],
   });
 
   return steps;

@@ -8,6 +8,7 @@ import { DEFAULT_PORTS } from '../src/checks.ts';
 import { capture } from '../src/exec.ts';
 import { layout, osOf } from '../src/platform.ts';
 import {
+  comfyExtraArgs,
   isOurs,
   missingNodes,
   NEEDED_NODES,
@@ -45,6 +46,16 @@ test('ComfyUI listens on 127.0.0.1 with partner nodes disabled', () => {
   expect(specsOf({ ...full, gpuIndex: 1 }, {}, ['--lowvram']).find((s) => s.name === 'comfyui')!.args.slice(-3)).toEqual(['--cuda-device', '1', '--lowvram']);
 });
 
+test('MONTAGIO_COMFYUI_ARGS adds arguments but cannot move ComfyUI off 127.0.0.1', () => {
+  expect(comfyExtraArgs(undefined)).toEqual([]);
+  expect(comfyExtraArgs(' --lowvram  --preview-method auto ')).toEqual(['--lowvram', '--preview-method', 'auto']);
+  expect(() => comfyExtraArgs('--listen 0.0.0.0')).toThrow(/--listen/);
+  expect(() => comfyExtraArgs('--lowvram --port=9000')).toThrow(/--port/);
+  // ComfyUI's argparse takes an unambiguous abbreviation of an option.
+  expect(() => comfyExtraArgs('--liste 0.0.0.0')).toThrow(/--liste/);
+  expect(() => comfyExtraArgs('--listen')).toThrow(/127\.0\.0\.1/);
+});
+
 test('the Python services write their logs unbuffered, so a crash keeps its last lines', () => {
   const specs = specsOf(full);
   for (const name of ['comfyui', 'proxy']) expect(specs.find((s) => s.name === name)!.env.PYTHONUNBUFFERED).toBe('1');
@@ -69,6 +80,25 @@ test('the app runs the local backend, without any Comfy key', () => {
   expect(app.env).toMatchObject({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: 'http://127.0.0.1:8189', NEXT_TELEMETRY_DISABLED: '1', MONTAGIO_ROOT: '/repo dir', PATH: '/bin' });
   expect(app.env.COMFY_API_KEY).toBeUndefined();
   expect(specsOf(full).map((s) => s.name)).toEqual(['comfyui', 'proxy', 'app']);
+});
+
+test('on Windows, no Comfy key or stale base URL reaches the services, whatever the case of their names', () => {
+  const W = layout('C:\\S R', 'windows');
+  const specs = serviceSpecs({
+    os: 'windows',
+    layout: W,
+    repoRoot: 'C:\\repo dir',
+    state: full,
+    nodePath: 'C:\\node.exe',
+    baseEnv: { Comfy_Api_Key: 'secret', comfy_base_url: 'http://stale:1', Path: 'C:\\bin' },
+    extraComfyArgs: [],
+  });
+  for (const spec of specs) {
+    const names = Object.keys(spec.env).map((name) => name.toUpperCase());
+    expect(names).not.toContain('COMFY_API_KEY');
+    expect(names.filter((name) => name === 'COMFY_BASE_URL').length).toBeLessThanOrEqual(1);
+  }
+  expect(specs.find((s) => s.name === 'app')!.env.COMFY_BASE_URL).toBe('http://127.0.0.1:8189');
 });
 
 test('the app alone runs the demo, or a remote proxy', () => {
@@ -133,12 +163,12 @@ function alive(pid: number): boolean {
   }
 }
 
-async function fakeContext(opts: { partner?: boolean; dying?: 'proxy' } = {}) {
+async function fakeContext(opts: { partner?: boolean; dying?: 'proxy'; brokenInfo?: boolean } = {}) {
   const dir = join(base, 'install dir');
   const l = layout(dir, os);
   const ports = { comfy: await freePort(), proxy: await freePort(), app: await freePort() };
   const info = join(base, 'object info.json');
-  writeFileSync(info, JSON.stringify(opts.partner ? { ...fixture, PartnerThing: { api_node: true } } : fixture));
+  writeFileSync(info, opts.brokenInfo ? '{"cut short' : JSON.stringify(opts.partner ? { ...fixture, PartnerThing: { api_node: true } } : fixture));
   const spec = (name: ServiceSpec['name'], port: number, args: string[] = []): ServiceSpec => ({
     name,
     cmd: process.execPath,
@@ -202,6 +232,27 @@ test('stop leaves alone a process whose command line is not ours', async () => {
   expect(existsSync(join(l.runDir, 'app.pid'))).toBe(false);
 }, 30_000);
 
+test('start ignores a stale pid file: a dead pid, or a pid that is another program now', async () => {
+  const { ctx, l, lines, pid } = await fakeContext();
+  const other = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  strays.push(other);
+  await new Promise((resolve) => other.once('spawn', resolve));
+  const dead = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
+  await new Promise((resolve) => dead.once('exit', resolve));
+  mkdirSync(l.runDir, { recursive: true });
+  writeFileSync(join(l.runDir, 'app.pid'), String(other.pid));
+  writeFileSync(join(l.runDir, 'proxy.pid'), String(dead.pid));
+  try {
+    expect(await startAll(ctx, { browser: false })).toBe(0);
+    expect(lines.join('\n')).not.toContain('already running');
+    expect(pid('app')).not.toBe(other.pid);
+    expect(pid('proxy')).not.toBe(dead.pid);
+  } finally {
+    await stopAll(ctx);
+  }
+  expect(alive(other.pid!)).toBe(true);
+}, 60_000);
+
 test('isOurs reads a command line that holds non-ASCII characters', async () => {
   // A Windows profile such as C:\Users\Jérôme puts accents in every marker.
   const marker = 'montagio-marker-Jérôme-Ünïcode';
@@ -258,11 +309,44 @@ test('a partner node loaded in ComfyUI stops everything', async () => {
   expect(existsSync(join(l.runDir, 'comfyui.pid'))).toBe(false);
 }, 30_000);
 
+test('an unreadable /object_info stops what had started and says so', async () => {
+  const { ctx, l, lines } = await fakeContext({ brokenInfo: true });
+  try {
+    expect(await startAll(ctx, { browser: false })).toBe(1);
+    expect(lines.join('\n')).toContain('/object_info');
+    expect(existsSync(join(l.runDir, 'comfyui.pid'))).toBe(false);
+  } finally {
+    await stopAll(ctx);
+  }
+}, 30_000);
+
 test('start refuses an install that never finished', async () => {
   const { ctx, lines } = await fakeContext();
   expect(await startAll({ ...ctx, state: emptyState() }, { browser: false })).toBe(1);
   expect(lines.join('\n')).toContain('install');
 });
+
+test('start refuses a MONTAGIO_COMFYUI_ARGS that would listen beyond 127.0.0.1, and starts nothing', async () => {
+  const { ctx, l, lines } = await fakeContext();
+  vi.stubEnv('MONTAGIO_COMFYUI_ARGS', '--listen 0.0.0.0');
+  try {
+    expect(await startAll(ctx, { browser: false })).toBe(1);
+  } finally {
+    vi.unstubAllEnvs();
+    await stopAll(ctx);
+  }
+  expect(lines.join('\n')).toContain('MONTAGIO_COMFYUI_ARGS');
+  expect(existsSync(join(l.runDir, 'comfyui.pid'))).toBe(false);
+  // The app alone runs no ComfyUI: the variable does not concern it.
+  vi.stubEnv('MONTAGIO_COMFYUI_ARGS', '--listen 0.0.0.0');
+  try {
+    const appOnly = { ...ctx, state: { ...ctx.state, mode: 'app-only' as const }, specs: ctx.specs!.filter((s) => s.name === 'app') };
+    expect(await startAll(appOnly, { browser: false })).toBe(0);
+    await stopAll(appOnly);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+}, 30_000);
 
 test('the default ports are the ones the spec names', () => {
   expect(DEFAULT_PORTS).toEqual({ comfy: 8188, proxy: 8189, app: 3000 });

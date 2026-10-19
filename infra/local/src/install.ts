@@ -5,7 +5,20 @@
  * again picks up from there.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  renameSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { decide, evaluate, pickGpu, pickPython, pickTorch, type Check, type Decision, type Mode, type Ports } from './checks.ts';
 import { npmInvocation, nextBin, tsxCli, type Capture, type Stream } from './exec.ts';
@@ -25,7 +38,7 @@ import {
   type Step,
   type StepId,
 } from './plan.ts';
-import { layout, osOf, type Os } from './platform.ts';
+import { layout, osOf, withoutVars, type Os } from './platform.ts';
 import type { probe as probeMachine } from './probe.ts';
 import { readState, recordWeights, writeState, type InstallState } from './state.ts';
 
@@ -34,7 +47,9 @@ export type InstallOptions = {
   mode: Mode;
   ignoreVram: boolean;
   ports: Partial<Ports>;
+  /** null keeps the saved one; demo forgets it. */
   proxyUrl: string | null;
+  demo: boolean;
   dryRun: boolean;
   start: boolean;
   browser: boolean;
@@ -85,6 +100,16 @@ export function renderReport(checks: Check[], decision: Decision, steps: Step[],
   return lines.join('\n');
 }
 
+/** The file that says a ComfyUI folder is Montagio's, should install-state.json be lost. */
+export const OWNER_MARKER = '.montagio';
+
+/** Marks a Montagio clone as ours. git is told to ignore the marker: an update refuses a non-empty `git status`. */
+export function markOwned(clone: string): void {
+  writeFileSync(join(clone, OWNER_MARKER), 'This ComfyUI was installed by Montagio: its install command updates it.\n');
+  mkdirSync(join(clone, '.git', 'info'), { recursive: true });
+  appendFileSync(join(clone, '.git', 'info', 'exclude'), `\n/${OWNER_MARKER}\n`);
+}
+
 function sha256(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
@@ -120,13 +145,17 @@ function venvPython(venv: string): string | null {
 export async function install(repoRoot: string, opts: InstallOptions, deps: InstallDeps): Promise<number> {
   const os = deps.os ?? osOf(process.platform);
   const L = layout(opts.dir, os ?? 'linux');
-  const env: NodeJS.ProcessEnv = { ...(deps.env ?? process.env), NEXT_TELEMETRY_DISABLED: '1', CUDA_DEVICE_ORDER: 'PCI_BUS_ID' };
-  delete env.COMFY_API_KEY;
+  const env: NodeJS.ProcessEnv = {
+    ...withoutVars(deps.env ?? process.env, ['COMFY_API_KEY'], os ?? 'linux'),
+    NEXT_TELEMETRY_DISABLED: '1',
+    CUDA_DEVICE_ORDER: 'PCI_BUS_ID',
+  };
   const execPath = deps.execPath ?? process.execPath;
   const versions = readVersions(repoRoot);
   const lock = readLock(repoRoot);
   let state: InstallState = readState(L.statePath);
   const ports: Ports = { ...state.ports, ...opts.ports };
+  const proxyUrl = opts.demo ? null : (opts.proxyUrl ?? state.proxyUrl);
   const own = await deps.runningPorts();
   const facts = await deps.probe({ os, repoRoot, installDir: opts.dir, ports: [ports.comfy, ports.proxy, ports.app], capture: deps.capture });
 
@@ -142,7 +171,12 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     return statOrNull(join(L.modelsDir, w.folder, `${w.file}.part`))?.size ?? 0;
   };
   const comfyExists = existsSync(L.comfyDir);
-  const comfy = { exists: comfyExists, tmpExists: existsSync(L.comfyTmp), head: comfyExists ? await gitHead(L.comfyDir) : null };
+  const comfy = {
+    exists: comfyExists,
+    tmpExists: existsSync(L.comfyTmp),
+    head: comfyExists ? await gitHead(L.comfyDir) : null,
+    marked: comfyExists && existsSync(join(L.comfyDir, OWNER_MARKER)),
+  };
   const repo = {
     head: await gitHead(repoRoot),
     lockHash: sha256(join(repoRoot, 'package-lock.json')),
@@ -160,7 +194,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
       versions,
       torch,
       python,
-      state: { ...state, ports },
+      state: { ...state, ports, proxyUrl },
       lock,
       weightStat,
       comfy,
@@ -221,7 +255,12 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     comfyui: async () => {
       if (comfy.exists) {
         const status = await deps.capture('git', ['-C', L.comfyDir, 'status', '--porcelain']);
-        if (status.code !== 0 || status.stdout.trim()) throw new Error(`${L.comfyDir} has local changes: move them away, then run the same command again`);
+        if (status.code !== 0) {
+          // A dubious-ownership refusal or a broken .git is not a local change: say what git said.
+          const why = status.stderr.trim() || (status.code === null ? 'git did not run' : `exit code ${status.code}`);
+          throw new Error(`git status failed in ${L.comfyDir}: ${why}`);
+        }
+        if (status.stdout.trim()) throw new Error(`${L.comfyDir} has local changes: move them away, then run the same command again`);
         await run('git', ['-C', L.comfyDir, 'fetch', '--depth', '1', 'origin', 'tag', versions.comfyuiTag]);
         await run('git', ['-C', L.comfyDir, 'checkout', '--detach', versions.comfyuiCommit]);
       } else {
@@ -230,6 +269,8 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
         await run('git', ['clone', '--depth', '1', '--branch', versions.comfyuiTag, versions.comfyuiRepo, L.comfyTmp]);
         const head = await gitHead(L.comfyTmp);
         if (head !== versions.comfyuiCommit) throw new Error(`the clone is at ${head}, expected ${versions.comfyuiCommit} (${versions.comfyuiTag})`);
+        // Before the rename: a Ctrl+C between the rename and the stamp leaves a folder that still says it is ours.
+        markOwned(L.comfyTmp);
         renameSync(L.comfyTmp, L.comfyDir);
       }
       const head = await gitHead(L.comfyDir);
@@ -310,7 +351,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
         mode: plan.mode,
         ports,
         gpuIndex: plan.mode === 'full' ? (pickGpu(facts.gpus)?.index ?? null) : null,
-        proxyUrl: opts.proxyUrl ?? state.proxyUrl,
+        proxyUrl,
       }),
     start: () => deps.startAll({ browser: opts.browser }),
   };

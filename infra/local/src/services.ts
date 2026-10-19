@@ -12,7 +12,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, write
 import { join } from 'node:path';
 import type { Ports } from './checks.ts';
 import { nextBin, type Capture } from './exec.ts';
-import type { Layout, Os } from './platform.ts';
+import { withoutVars, type Layout, type Os } from './platform.ts';
 import { portBusy } from './probe.ts';
 import type { InstallState } from './state.ts';
 
@@ -81,12 +81,10 @@ export function serviceSpecs(input: {
 }): ServiceSpec[] {
   const { layout: L, state } = input;
   const ports: Ports = state.ports;
-  const env: NodeJS.ProcessEnv = { ...input.baseEnv };
-  delete env.COMFY_API_KEY;
+  const env: NodeJS.ProcessEnv = withoutVars(input.baseEnv, ['COMFY_API_KEY'], input.os);
   const local = (port: number, path: string) => `http://127.0.0.1:${port}${path}`;
 
-  const appEnv: NodeJS.ProcessEnv = { ...env, NEXT_TELEMETRY_DISABLED: '1', MONTAGIO_ROOT: input.repoRoot };
-  delete appEnv.COMFY_BASE_URL;
+  const appEnv: NodeJS.ProcessEnv = { ...withoutVars(env, ['COMFY_BASE_URL'], input.os), NEXT_TELEMETRY_DISABLED: '1', MONTAGIO_ROOT: input.repoRoot };
   if (state.mode === 'full') Object.assign(appEnv, { MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: local(ports.proxy, '') });
   else if (state.proxyUrl) Object.assign(appEnv, { MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: state.proxyUrl });
   else appEnv.MONTAGIO_BACKEND = 'demo';
@@ -136,7 +134,26 @@ export function serviceSpecs(input: {
   ];
 }
 
-function realSpecs(ctx: ServiceContext, state = ctx.state): ServiceSpec[] {
+/** The ComfyUI options that would break the promise: ComfyUI on 127.0.0.1, on the port of the install. */
+const PINNED_COMFY_OPTIONS = ['--listen', '--port'];
+
+/**
+ * MONTAGIO_COMFYUI_ARGS split on spaces. --listen and --port are refused, and so are their
+ * abbreviations, which ComfyUI's argparse accepts (--liste 0.0.0.0 would open it to the network).
+ */
+export function comfyExtraArgs(raw: string | undefined): string[] {
+  const args = (raw ?? '').split(/\s+/).filter(Boolean);
+  for (const arg of args) {
+    const name = arg.split('=')[0]!;
+    if (name.length > 2 && PINNED_COMFY_OPTIONS.some((option) => option.startsWith(name))) {
+      throw new Error(`MONTAGIO_COMFYUI_ARGS cannot set ${name}: Montagio runs ComfyUI on 127.0.0.1 only, on the port of the install (--comfy-port)`);
+    }
+  }
+  return args;
+}
+
+/** Only start reads MONTAGIO_COMFYUI_ARGS: stop and status need the markers and ports, which it does not change. */
+function realSpecs(ctx: ServiceContext, state = ctx.state, extraComfyArgs: string[] = []): ServiceSpec[] {
   return (
     ctx.specs ??
     serviceSpecs({
@@ -146,7 +163,7 @@ function realSpecs(ctx: ServiceContext, state = ctx.state): ServiceSpec[] {
       state,
       nodePath: process.execPath,
       baseEnv: process.env,
-      extraComfyArgs: (process.env.MONTAGIO_COMFYUI_ARGS ?? '').split(/\s+/).filter(Boolean),
+      extraComfyArgs,
     })
   );
 }
@@ -307,7 +324,16 @@ export async function startAll(ctx: ServiceContext, opts: { browser: boolean }):
     ctx.log(`Montagio is not installed in ${ctx.layout.dir}: run the install command first`);
     return 1;
   }
-  const specs = realSpecs(ctx);
+  let extraComfyArgs: string[] = [];
+  if (ctx.state.mode === 'full') {
+    try {
+      extraComfyArgs = comfyExtraArgs(process.env.MONTAGIO_COMFYUI_ARGS);
+    } catch (error) {
+      ctx.log(`error: ${(error as Error).message}`);
+      return 1;
+    }
+  }
+  const specs = realSpecs(ctx, ctx.state, extraComfyArgs);
   mkdirSync(ctx.layout.runDir, { recursive: true });
   mkdirSync(ctx.layout.logsDir, { recursive: true });
 
@@ -372,7 +398,18 @@ export async function startAll(ctx: ServiceContext, opts: { browser: boolean }):
     }
 
     if (spec.name === 'comfyui') {
-      const info = (await (await fetch(`http://127.0.0.1:${spec.port}/object_info`)).json()) as ObjectInfo;
+      // The partner-node check needs this answer: without it, what started is stopped again.
+      let info: ObjectInfo;
+      try {
+        const res = await fetch(`http://127.0.0.1:${spec.port}/object_info`, { signal: AbortSignal.timeout(60_000) });
+        if (!res.ok) {
+          await res.body?.cancel();
+          throw new Error(`HTTP ${res.status}`);
+        }
+        info = (await res.json()) as ObjectInfo;
+      } catch (error) {
+        return fail(`ComfyUI answers, but its /object_info cannot be read (${(error as Error).message}) (full log: ${log})`);
+      }
       const partners = partnerNodes(info);
       ctx.log(`${Object.keys(info).length} node classes loaded, ${partners.length} partner node(s)`);
       if (partners.length > 0) {

@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Capture, Stream } from '../src/exec.ts';
-import { install, renderReport, type InstallDeps, type InstallOptions } from '../src/install.ts';
+import { capture as realCapture, type Capture, type Captured, type Stream } from '../src/exec.ts';
+import { install, markOwned, renderReport, type InstallDeps, type InstallOptions } from '../src/install.ts';
 import { parseVersionsEnv } from '../src/pins.ts';
 import { layout, osOf } from '../src/platform.ts';
 import type { MachineFacts } from '../src/probe.ts';
@@ -65,6 +65,7 @@ function facts(over: Partial<MachineFacts> = {}): MachineFacts {
     driverCuda: [13, 0],
     pythons: [{ command: ['py', '-3.12'], version: [3, 12, 10], hasVenv: true }],
     freeBytes: { installDir: 500 * GiB, repo: 500 * GiB },
+    sameVolume: false,
     ramBytes: 64 * GiB,
     busyPorts: [],
     ...over,
@@ -73,16 +74,21 @@ function facts(over: Partial<MachineFacts> = {}): MachineFacts {
 
 type Call = { cmd: string; args: string[]; cwd?: string; shell?: boolean; env?: NodeJS.ProcessEnv };
 
-function harness(opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean; ask?: InstallDeps['ask'] } = {}) {
+function harness(
+  opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean; ask?: InstallDeps['ask']; comfyHead?: string; gitStatus?: Captured } = {},
+) {
   const calls: Call[] = [];
   const lines: string[] = [];
   const events: string[] = [];
+  /** The programs run and the services stopped or started, in one order. */
+  const timeline: string[] = [];
   /** For each weight fetch-weights is asked for: did its file exist when it was asked? */
   const existedBefore: Record<string, boolean> = {};
   const L = layout(dir, os);
   const stream: Stream = async (cmd, args, o = {}) => {
     const call = { cmd, args, cwd: o.cwd, shell: o.shell, env: o.env };
     calls.push(call);
+    timeline.push([cmd, ...args].join(' '));
     if (opts.failOn?.(call)) return 1;
     // What the real programs leave behind, which the plan checks for.
     if (args.includes('venv')) {
@@ -122,9 +128,10 @@ function harness(opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean;
     if (cmd === 'git' && args[0] === '-C' && args[2] === 'rev-parse') {
       const where = args[1]!;
       if (where === repo) return { code: 0, stdout: 'abc123\n', stderr: '' };
-      return existsSync(join(where, '.git')) ? { code: 0, stdout: `${COMMIT}\n`, stderr: '' } : { code: 128, stdout: '', stderr: 'not a git repository' };
+      if (!existsSync(join(where, '.git'))) return { code: 128, stdout: '', stderr: 'not a git repository' };
+      return { code: 0, stdout: `${where === L.comfyDir && opts.comfyHead ? opts.comfyHead : COMMIT}\n`, stderr: '' };
     }
-    if (cmd === 'git' && args[2] === 'status') return { code: 0, stdout: '', stderr: '' };
+    if (cmd === 'git' && args[2] === 'status') return opts.gitStatus ?? { code: 0, stdout: '', stderr: '' };
     return { code: null, stdout: '', stderr: '' };
   };
   const deps: InstallDeps = {
@@ -133,15 +140,16 @@ function harness(opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean;
     stream,
     log: (line) => lines.push(line),
     ask: opts.ask ?? null,
-    stopAll: async () => void events.push('stopAll'),
+    stopAll: async () => void (events.push('stopAll'), timeline.push('stopAll')),
     startAll: async () => {
       events.push('startAll');
+      timeline.push('startAll');
       return 0;
     },
     runningPorts: async () => [],
     probe: async () => opts.facts ?? facts(),
   };
-  return { calls, lines, events, existedBefore, deps, L, output: () => lines.join('\n') };
+  return { calls, lines, events, timeline, existedBefore, deps, L, output: () => lines.join('\n') };
 }
 
 const options = (over: Partial<InstallOptions> = {}): InstallOptions => ({
@@ -150,6 +158,7 @@ const options = (over: Partial<InstallOptions> = {}): InstallOptions => ({
   ignoreVram: false,
   ports: {},
   proxyUrl: null,
+  demo: false,
   dryRun: false,
   start: true,
   browser: false,
@@ -170,6 +179,16 @@ test('dry run executes nothing and writes nothing', async () => {
   }
   expect(out).toContain(`git clone --depth 1 --branch v0.41.0 https://github.com/Comfy-Org/ComfyUI.git ${h.L.comfyTmp}`);
   expect(out).toContain('nothing was changed');
+});
+
+test('the dry run refuses a real custom_nodes/montagio folder, as the real run does', async () => {
+  await install(repo, options({ start: false }), harness().deps);
+  const h = harness();
+  unlinkSync(h.L.packLink);
+  mkdirSync(h.L.packLink);
+  expect(await install(repo, options({ dryRun: true }), h.deps)).toBe(2);
+  expect(h.output()).toContain(`${h.L.packLink} is a folder, not a link`);
+  expect(h.output()).not.toContain('[run]');
 });
 
 test('a 4 GB GPU: the dry run points to --app-only and exits 2', async () => {
@@ -232,6 +251,25 @@ test('a rerun after an interruption resumes without manual cleanup', async () =>
   expect(calls.some((c) => c.includes(' -r '))).toBe(true);
 });
 
+test('a lost install-state.json does not make Montagio refuse its own ComfyUI', async () => {
+  // Also what a Ctrl+C between the rename of ComfyUI.tmp and its stamp leaves.
+  await install(repo, options({ start: false }), harness().deps);
+  const h = harness();
+  rmSync(h.L.statePath);
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+  expect(h.output()).not.toContain('was not installed by Montagio');
+  expect(described(h.calls).some((c) => c.includes('git clone'))).toBe(false);
+});
+
+test('the ownership marker leaves git status clean, so the next update is not refused', async () => {
+  const clone = join(base, 'real clone');
+  mkdirSync(clone);
+  expect((await realCapture('git', ['-C', clone, 'init', '-q'])).code).toBe(0);
+  markOwned(clone);
+  expect(existsSync(join(clone, '.montagio'))).toBe(true);
+  expect(await realCapture('git', ['-C', clone, 'status', '--porcelain'])).toMatchObject({ code: 0, stdout: '' });
+});
+
 test('a clone cut short is removed and cloned again', async () => {
   const h = harness();
   mkdirSync(h.L.comfyTmp, { recursive: true });
@@ -239,6 +277,18 @@ test('a clone cut short is removed and cloned again', async () => {
   expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
   expect(existsSync(h.L.comfyTmp)).toBe(false);
   expect(existsSync(join(h.L.comfyDir, 'half-cloned.txt'))).toBe(false);
+});
+
+test('a git status that fails before an update is reported with its error, not as local changes', async () => {
+  await install(repo, options({ start: false }), harness().deps);
+  const dubious = { code: 128, stdout: '', stderr: "fatal: detected dubious ownership in repository at 'C:/S/ComfyUI'\n" };
+  const h = harness({ comfyHead: 'f'.repeat(40), gitStatus: dubious });
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(1);
+  expect(h.output()).toContain('detected dubious ownership');
+  expect(h.output()).not.toContain('has local changes');
+  const changed = harness({ comfyHead: 'f'.repeat(40), gitStatus: { code: 0, stdout: ' M comfy/sd.py\n', stderr: '' } });
+  expect(await install(repo, options({ start: false }), changed.deps)).toBe(1);
+  expect(changed.output()).toContain('has local changes');
 });
 
 test('paths with spaces reach every command as single arguments', async () => {
@@ -322,11 +372,35 @@ test('a port option is kept for the next runs', async () => {
   expect(readState(h.L.statePath).ports.comfy).toBe(8288);
 });
 
+test('a saved --proxy-url is kept by the next runs, and --demo forgets it', async () => {
+  const h = harness();
+  const appOnly = (over: Partial<InstallOptions>) => install(repo, options({ mode: 'app-only', start: false, ...over }), harness().deps);
+  await appOnly({ proxyUrl: 'http://127.0.0.1:9189' });
+  expect(readState(h.L.statePath).proxyUrl).toBe('http://127.0.0.1:9189');
+  await appOnly({});
+  expect(readState(h.L.statePath).proxyUrl).toBe('http://127.0.0.1:9189');
+  expect(await appOnly({ demo: true })).toBe(0);
+  expect(readState(h.L.statePath).proxyUrl).toBeNull();
+});
+
+test('no Comfy key reaches the programs install runs, whatever the case of its name on Windows', async () => {
+  const h = harness();
+  h.deps.env = { PATH: process.env.PATH, COMFY_API_KEY: 'secret', Comfy_Api_Key: 'secret' };
+  await install(repo, options({ start: false }), h.deps);
+  const names = new Set(h.calls.flatMap((c) => Object.keys(c.env ?? {})).filter((name) => name.toUpperCase() === 'COMFY_API_KEY'));
+  // On Linux, Comfy_Api_Key is another variable than COMFY_API_KEY.
+  expect([...names]).toEqual(os === 'windows' ? [] : ['Comfy_Api_Key']);
+});
+
 test('running services are stopped before anything else', async () => {
   const h = harness();
   h.deps.runningPorts = async () => [8188, 8189, 3000];
   await install(repo, options(), h.deps);
-  expect(h.events).toEqual(['stopAll', 'startAll']);
+  // One timeline: the stop comes before npm ci, the clone and every other program.
+  expect(h.timeline.length).toBeGreaterThan(2);
+  expect(h.timeline[0]).toBe('stopAll');
+  expect(h.timeline.at(-1)).toBe('startAll');
+  expect(h.timeline.filter((entry) => entry === 'stopAll')).toHaveLength(1);
 });
 
 test('the report is plain ASCII', () => {

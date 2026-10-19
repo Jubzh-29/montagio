@@ -3,7 +3,7 @@ import { createServer, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Capture, Captured } from '../src/exec.ts';
-import { freeBytesAt, parseCudaBanner, parseNvidiaSmiCsv, parsePythonVersion, portBusy, probe, pythonCandidates } from '../src/probe.ts';
+import { freeBytesAt, parseCudaBanner, parseNvidiaSmiCsv, parsePythonVersion, portBusy, probe, pythonCandidates, sameVolume } from '../src/probe.ts';
 
 test('parseNvidiaSmiCsv reads every GPU and skips unreadable lines', () => {
   const csv = '0, NVIDIA GeForce RTX 3050 Laptop GPU, 4096 MiB, 616.92\n1, NVIDIA GeForce RTX 4090, 24564 MiB, 580.65\nNo devices were found\n';
@@ -38,6 +38,17 @@ test('freeBytesAt measures the nearest existing folder and creates nothing', asy
     const target = join(base, 'absent', 'deeper');
     expect(freeBytesAt(target)).toBeGreaterThan(0);
     expect((await import('node:fs')).existsSync(join(base, 'absent'))).toBe(false);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('sameVolume sees two folders of one drive, one of them not created yet', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'montagio-volume-'));
+  try {
+    expect(sameVolume(join(base, 'absent', 'Montagio'), base)).toBe(true);
+    const facts = await probe({ os: 'linux', repoRoot: base, installDir: join(base, 'absent'), ports: [], capture: async () => ({ code: null, stdout: '', stderr: '' }), env: {} });
+    expect(facts.sameVolume).toBe(true);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }

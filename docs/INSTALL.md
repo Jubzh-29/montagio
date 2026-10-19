@@ -120,23 +120,26 @@ Without a 24 GB GPU, `install --app-only` installs the app alone: no ComfyUI, no
   ./montagio.sh install --app-only --proxy-url http://127.0.0.1:9189
   ```
 
+  The URL is kept: the next `install --app-only` uses it again. `install --app-only --demo` forgets it and goes back to demo mode.
+
 ## Options and environment
 
 | Option | Meaning |
 |---|---|
 | `--dry-run` | check and print the plan, change nothing |
 | `--app-only` | the app alone (see above) |
-| `--proxy-url URL` | with `--app-only`: a remote comfy-api-proxy |
+| `--proxy-url URL` | with `--app-only`: a remote comfy-api-proxy, kept for the next runs |
+| `--demo` | with `--app-only`: forget a saved `--proxy-url`, run the demo mode |
 | `--ignore-vram` | install on a GPU under 24 GB anyway |
 | `--dir DIR` | install folder |
 | `--comfy-port N`, `--proxy-port N`, `--app-port N` | ports (defaults 8188, 8189, 3000), kept for the next runs |
 | `--no-start` | install without starting |
-| `--no-browser` | do not open the browser |
+| `--no-browser` | `install` and `start`: do not open the browser |
 
 | Variable | Meaning |
 |---|---|
 | `MONTAGIO_HOME` | install folder |
-| `MONTAGIO_COMFYUI_ARGS` | extra ComfyUI arguments, separated by spaces, for example `--lowvram` |
+| `MONTAGIO_COMFYUI_ARGS` | extra ComfyUI arguments, separated by spaces, for example `--lowvram`; `--listen` and `--port` are refused, ComfyUI stays on 127.0.0.1 and the install's port |
 | `HF_TOKEN` | a Hugging Face token; not needed for the files of the lock |
 | `MONTAGIO_FFMPEG`, `MONTAGIO_FFPROBE` | FFmpeg and ffprobe outside the `PATH` |
 

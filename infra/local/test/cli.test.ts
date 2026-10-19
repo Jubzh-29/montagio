@@ -17,6 +17,7 @@ test('install options are read', () => {
       start: false,
       browser: false,
       proxyUrl: null,
+      demo: false,
       ports: { comfy: 8288 },
     },
   });
@@ -33,10 +34,29 @@ test('an unknown option, an unknown command or a bad port is refused', () => {
   expect(() => parseArgs(['install', '--app-port', 'abc'])).toThrow(/--app-port/);
 });
 
+test('start, stop and status refuse the options only install reads', () => {
+  // start --dry-run used to start everything, start --app-port to start on the saved port.
+  expect(() => parseArgs(['start', '--dry-run'])).toThrow(/--dry-run only goes with install/);
+  expect(() => parseArgs(['start', '--app-port', '3300'])).toThrow(/--app-port only goes with install/);
+  for (const command of ['stop', 'status']) {
+    expect(() => parseArgs([command, '--app-only'])).toThrow(/--app-only/);
+    expect(() => parseArgs([command, '--no-browser'])).toThrow(/--no-browser only goes with install or start/);
+  }
+  expect(parseArgs(['start', '--dir', 'D:\\S', '--no-browser']).options).toMatchObject({ dir: 'D:\\S', browser: false });
+  expect(parseArgs(['status', '--dir', 'D:\\S']).command).toBe('status');
+});
+
 test('--proxy-url needs --app-only and an http(s) URL', () => {
   expect(() => parseArgs(['install', '--proxy-url', 'http://127.0.0.1:8189'])).toThrow(/--app-only/);
   expect(() => parseArgs(['install', '--app-only', '--proxy-url', 'ftp://x'])).toThrow(/http/);
   expect(parseArgs(['install', '--app-only', '--proxy-url', 'http://127.0.0.1:9189']).options).toMatchObject({ appOnly: true, proxyUrl: 'http://127.0.0.1:9189' });
+});
+
+test('--demo goes with --app-only, never with --proxy-url', () => {
+  expect(parseArgs(['install', '--app-only', '--demo']).options).toMatchObject({ appOnly: true, demo: true, proxyUrl: null });
+  expect(() => parseArgs(['install', '--demo'])).toThrow(/--app-only/);
+  expect(() => parseArgs(['install', '--app-only', '--demo', '--proxy-url', 'http://127.0.0.1:9189'])).toThrow(/--demo/);
+  expect(() => parseArgs(['start', '--demo'])).toThrow(/only goes with install/);
 });
 
 test('status, start and stop work on a folder where nothing is installed', async () => {
