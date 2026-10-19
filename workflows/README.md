@@ -50,7 +50,7 @@ A preset with two moves needs the Montagio Camera Embedding node (`comfy-nodes/`
 
 ## Extension workflows
 
-The four extensions decided on 2026-10-19 (music, upscale, image edit, talking avatar) run their own workflows, described by `registry/extensions/*.yaml` and compiled by `packages/presets/src/extensions.ts`. They come from the same templates repository and commit, with the same rules; the choices behind them are in `docs/EXTENSIONS_ANALYSE.md`.
+The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe transitions, talking avatar, music, upscale) run their own workflows, described by `registry/extensions/*.yaml` and compiled by `packages/presets/src/{extensions,effects,transitions}.ts`. They come from the same templates repository and commit, with the same rules; the choices behind them are in `docs/EXTENSIONS_ANALYSE.md`.
 
 | Workflow | Template | Model | Output |
 |---|---|---|---|
@@ -59,6 +59,8 @@ The four extensions decided on 2026-10-19 (music, upscale, image edit, talking a
 | `qwen-image-edit-2511.api.json` | `templates/image_qwen_image_edit_2511.json` | Qwen-Image-Edit-2511 fp8mixed | node 9, PNG |
 | `chatterbox-mtl-voice.api.json` | none (no official template: ComfyUI has no local text-to-speech node) | Chatterbox Multilingual V3 | node 3, FLAC |
 | `wan22-s2v-avatar.api.json` | `templates/video_wan2_2_14B_s2v.json` | Wan 2.2 S2V 14B fp8 | node 113, MP4 with the speech |
+| `wan21-i2v-effect.api.json` | `templates/image_to_video_wan.json` | Wan 2.1 I2V 14B 480p fp8, an effect LoRA | node 56, MP4 |
+| `wan22-flf2v-transition.api.json` | `templates/video_wan2_2_14B_flf2v.json` | Wan 2.2 I2V A14B fp8 (high and low noise) | node 61, MP4 |
 
 ### ace-step15-music
 
@@ -78,7 +80,7 @@ The four extensions decided on 2026-10-19 (music, upscale, image edit, talking a
 
 ### qwen-image-edit-2511
 
-- The template's subgraph is flattened with its inner ids. Its "Lightning" group (4-step LoRA, switches, primitives) is left out: the template ships it switched off, and the LoRA stays out of the lock until GPU session S2 has compared it. The 40-step path is kept: `ModelSamplingAuraFlow` shift 3.1, `CFGNorm` 1, 40 steps, cfg 4, euler/simple.
+- The template's subgraph is flattened with its inner ids. Its "Lightning" group becomes a `LoraLoaderModelOnly` (171, the 4-step LoRA of lightx2v) between the model and `ModelSamplingAuraFlow`, after a second one for a look (170: INFL8 by default, ACTION or fal's Multiple-Angles); a second `LoadImage` (42, `start2.png`) feeds `image2` of both encoders. `compileEdit` removes and rewires the nodes a job does not use, and sets the template's two settings: 4 steps at cfg 1 with Lightning (its default), 40 steps at cfg 4 without. The rest of the path: `ModelSamplingAuraFlow` shift 3.1, `CFGNorm` 1, euler/simple.
 - `FluxKontextMultiReferenceLatentMethod` (147, 148) says `index_timestep_zero` on both encoders: the node has no default and would otherwise take `offset`, which is wrong for 2511.
 - The negative encoder (149) keeps an empty prompt and the same image, as in the template; only the positive one (151) is bound.
 - `FluxKontextImageScale` (160) is kept: it center-crops the photo to one of 17 sizes of about 1 megapixel (16:9 gives 1392×752), which is also the size of the edited PNG. Replacing it with `ImageScaleToTotalPixels` (no crop) is a GPU session S2 comparison.
@@ -99,6 +101,17 @@ The four extensions decided on 2026-10-19 (music, upscale, image edit, talking a
 - Size of the photo's aspect at 480p (832×480, 480×832 or 640×640) instead of the template's 640×640; 16 fps (S2V's own rate); the speech is muxed by `CreateVideo`.
 - The 4-step LightX2V LoRA (107) is kept and is in the lock: without it, 15 s of speech take 50 to 80 minutes (20 steps, cfg 6). It is a text-to-video LoRA, not trained for S2V; S2 compares it with 20 steps. The negative (7) is Wan's default; at cfg 1 it is not used.
 
+### wan21-i2v-effect
+
+- Converted from `image_to_video_wan` (core nodes only) with its node ids. Two `LoraLoaderModelOnly` go between the model and `ModelSamplingSD3`: the effect LoRA (200, Squish by default; `compileEffect` writes the preset's) and the 4-step LoRA of lightx2v (201), which `compileEffect` removes for the 20-step path.
+- `wan2.1_i2v_480p_14B_fp8_scaled` instead of the template's fp16 (32.8 GB). Shift 5 instead of 8, as the effect cards advise (flow shift 5); 4 steps at cfg 1 (euler) with lightx2v, 20 steps at cfg 6 (uni_pc, the template's) without. Size of the photo's aspect at 480p, 81 frames at 16 fps, instead of the template's 512×512 and 33 frames. The negative (7) is Wan's default; an effect preset may replace it. `SaveVideo` writes `montagio/effect`.
+
+### wan22-flf2v-transition
+
+- The template's 4-step group (LoRAs 91 and 92 on the high- and low-noise experts, shift 5, two `KSamplerAdvanced` split at step 2, cfg 1), switched on, with its node ids; the template ships it bypassed, behind the 20-step path. `compileTransition` takes that 20-step path when asked (LoRAs removed, shift 8, cfg 4, split at step 10).
+- The template's 4-step group loads the end image into the start input and the reverse: fixed (68 is the start, 62 the end).
+- Size of the photo's aspect at 480p instead of 640×640; 16 fps; `SaveVideo` writes `montagio/transition`.
+
 ## Bindings
 
 | Model | image | prompt | negative | seed | width / height / frames | fps | camera_pose / camera_speed |
@@ -113,6 +126,8 @@ Extension models (a binding with several inputs gets the same value in each):
 |---|---|---|
 | `ace-step15-music` | prompt 94.tags; duration_s 98.seconds + 94.duration; seed 3.seed + 94.seed; bpm 94.bpm | 107 (audio) |
 | `seedvr2-upscale` | video 73.file; width / height 57.resize_type.width / 57.resize_type.height; seed 54.seed | 76 (video) |
-| `qwen-image-edit-2511` | image 41.image; prompt 151.prompt; seed 169.seed | 9 (image) |
+| `qwen-image-edit-2511` | image 41.image; image2 42.image; prompt 151.prompt; seed 169.seed | 9 (image) |
 | `chatterbox-mtl-voice` | text 2.text; language 2.language; seed 2.seed; cfg 2.cfg_weight | 3 (audio) |
 | `wan22-s2v-avatar` | image 52.image; audio 58.audio; prompt 6.text; seed 3.seed (+1, +2 on the extension samplers); width / height 93.width / 93.height; frames 96.length | 113 (video) |
+| `wan21-i2v-effects` | image 52.image; prompt 6.text; negative 7.text; seed 3.seed; width / height / frames 50.width / height / length; lora 200.lora_name; lora_strength 200.strength_model | 56 (video) |
+| `wan22-flf2v-transition` | image 68.image; end_image 62.image; prompt 6.text; negative 7.text; seed 57.noise_seed; width / height / frames 67.width / height / length | 61 (video) |

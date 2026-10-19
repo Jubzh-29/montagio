@@ -135,7 +135,7 @@ Without a 24 GB GPU, `install --app-only` installs the app alone: no ComfyUI, no
 | `--comfy-port N`, `--proxy-port N`, `--app-port N` | ports (defaults 8188, 8189, 3000), kept for the next runs |
 | `--no-start` | install without starting |
 | `--no-browser` | `install` and `start`: do not open the browser |
-| `--extensions LIST` | `install`: the extensions whose weights to fetch too: `validated` (default: those a GPU session validated, none yet), `all`, `none`, or a list such as `music,edit` (see below) |
+| `--extensions LIST` | `install`: the extensions whose weights to fetch too: `validated` (default: those a GPU session validated, none yet), `all`, `none`, or a list such as `edit,transitions`, which must name what each one requires (see below) |
 
 | Variable | Meaning |
 |---|---|
@@ -147,14 +147,16 @@ Without a 24 GB GPU, `install --app-only` installs the app alone: no ComfyUI, no
 
 ### Extensions
 
-Four extensions run models of their own, beyond the camera presets: film music (ACE-Step 1.5), HD upscale (SeedVR2), photo edit (Qwen-Image-Edit-2511) and the talking avatar (Wan 2.2 S2V and a Chatterbox voice). Their weights are in the lock, marked with their extension, and the installer fetches them only for the extensions asked for. By default that is the ones a GPU session validated, listed with a date in `registry/extensions.yaml`; none is dated yet, so a default install is unchanged. Extra disk space, all Apache-2.0 or MIT:
+Six extensions run models of their own, beyond the camera presets, in their order of priority: photo edit (Qwen-Image-Edit-2511, 4 steps with a Lightning LoRA, three looks and a second image), a pack of six one-photo effects (Wan 2.1 I2V 480p with effect LoRAs), keyframe transitions (Wan 2.2 FLF2V; the edit makes their end frame, so `transitions` requires `edit`), the talking avatar (Wan 2.2 S2V and a Chatterbox voice), film music (ACE-Step 1.5) and HD upscale (SeedVR2). Their weights are in the lock, marked with their extension, and the installer fetches them only for the extensions asked for. By default that is the ones a GPU session validated, listed with a date in `registry/extensions.yaml`, without those whose requirement is not validated; none is dated yet, so a default install is unchanged. Extra disk space, all Apache-2.0 or MIT (the effect LoRAs declare it in their card metadata only):
 
 | Extension | Weights |
 |---|---|
+| `edit` | 31.9 GB |
+| `effects` | 20.6 GB |
+| `transitions` | 31.0 GB |
+| `avatar` | 21.5 GB |
 | `music` | 10.0 GB |
 | `upscale` | 4.0 GB |
-| `edit` | 30.2 GB |
-| `avatar` | 21.5 GB |
 
 The avatar is left out by this installer for now: its voice runs on a custom node (pinned and patched) that only the GPU session's `infra/runpod/bootstrap.sh` installs. Details: [EXTENSIONS_ANALYSE.md](EXTENSIONS_ANALYSE.md) (in French).
 
