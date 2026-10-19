@@ -2,13 +2,31 @@ export {
   ALLOWED_WEIGHT_LICENSES,
   BINDING_KEYS,
   CAPABILITIES,
+  EXTENSION_IDS,
   LockEntrySchema,
   LockSchema,
   ModelSchema,
   REQUIRED_BINDINGS,
   type BindingKey,
   type Capability,
+  type ExtensionId,
   type LockEntry,
   type ModelEntry,
 } from './schema';
-export { parseLock, parseModel, RegistryError } from './parse';
+export { parseExtensionModel, parseExtensionsConfig, parseLock, parseModel, RegistryError } from './parse';
+export {
+  enabledExtensions,
+  EXTENSION_BINDING_KEYS,
+  EXTENSION_TASKS,
+  ExtensionModelSchema,
+  ExtensionsConfigSchema,
+  OUTPUT_KINDS,
+  REQUIRED_EXTENSION_BINDINGS,
+  TASK_OUTPUT,
+  type ExtensionBindingKey,
+  type ExtensionEntry,
+  type ExtensionModel,
+  type ExtensionsConfig,
+  type ExtensionTask,
+  type OutputKind,
+} from './extensions';

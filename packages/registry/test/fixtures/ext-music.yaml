@@ -1,0 +1,16 @@
+schema: montagio/extension-model@0.1
+id: ace-step15-music
+name: ACE-Step 1.5 music
+extension: music
+task: t2a
+license: MIT
+weights: [ace-step15-turbo, qwen3-embedding-06b-ace15, ace-step15-lm-17b, ace-step15-vae]
+workflow: workflows/ace-step15-music.api.json
+bindings:
+  prompt: { node: "94", field: tags }
+  duration_s: [{ node: "98", field: seconds }, { node: "94", field: duration }]
+  seed: [{ node: "3", field: seed }, { node: "94", field: seed }]
+  bpm: { node: "94", field: bpm }
+output: { node: "107", kind: audio }
+limits: { min_duration_s: 10, max_duration_s: 60, max_chars: 300 }
+estimate_s: 20
