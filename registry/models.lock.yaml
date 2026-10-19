@@ -146,6 +146,46 @@ weights:
     license: Apache-2.0
     source: https://huggingface.co/Qwen/Qwen-Image
     extension: edit
+  # 4-step LoRA of Qwen-Image-Edit-2511 (lightx2v): 4 steps at cfg 1 instead of 40 at cfg 4.
+  - id: qwen-edit-2511-lightning-4step
+    file: Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors
+    url: https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors
+    sha256: 22226e8d05d354bb356627d428809f5afd7819399b077238a2b70a82883a904f
+    size: 849608296
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning
+    extension: edit
+    folder: loras
+  # Edit look "inflate" (prompt: inflate the <subject>).
+  - id: systms-infl8-qwen-edit-2511
+    file: SYSTMS_INFL8_LoRA_Qwen_Image_Edit_2511.safetensors
+    url: https://huggingface.co/systms/SYSTMS-INFL8-LoRA-Qwen-Image-Edit-2511/resolve/main/SYSTMS_INFL8_LoRA_Qwen_Image_Edit_2511.safetensors
+    sha256: 48cff1497edf7610c904a18d94e996f97466c8c3784de4e790a31f9d45f33998
+    size: 295146200
+    license: Apache-2.0
+    source: https://huggingface.co/systms/SYSTMS-INFL8-LoRA-Qwen-Image-Edit-2511
+    extension: edit
+    folder: loras
+  # Edit look "action figure" (prompt: action the <thing>); the end frame of the figurine hook.
+  - id: systms-action-qwen-edit-2511
+    file: QWEN_EDIT_ACTION_V1.safetensors
+    url: https://huggingface.co/systms/SYSTMS-ACTION-LoRA-Qwen-Image-Edit-2511/resolve/main/QWEN_EDIT_ACTION_V1.safetensors
+    sha256: 52287ccc0544b0fa611df7ee15c96f1320548b7eec5feed759f7ffbf7adeae3a
+    size: 295146192
+    license: Apache-2.0
+    source: https://huggingface.co/systms/SYSTMS-ACTION-LoRA-Qwen-Image-Edit-2511
+    extension: edit
+    folder: loras
+  # Edit look "angles" (prompt: <sks> <azimuth> <elevation> <distance>); trained on synthetic renders by fal.
+  - id: fal-multiple-angles-qwen-edit-2511
+    file: qwen-image-edit-2511-multiple-angles-lora.safetensors
+    url: https://huggingface.co/fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA/resolve/main/qwen-image-edit-2511-multiple-angles-lora.safetensors
+    sha256: 42426ded4e25fd22879d9e198b857556445ef4ca56e8da3246d0345155bb6765
+    size: 295140688
+    license: Apache-2.0
+    source: https://huggingface.co/fal/Qwen-Image-Edit-2511-Multiple-Angles-LoRA
+    extension: edit
+    folder: loras
   # The voice of the avatar: a pack folder that the Chatterbox node reads by name.
   - id: chatterbox-t3-mtl-v3
     file: t3_mtl23ls_v3.safetensors

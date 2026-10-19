@@ -1238,7 +1238,8 @@
     "image": [
      [
       "example.png",
-      "start.png"
+      "start.png",
+      "start2.png"
      ],
      {
       "image_upload": true
@@ -1297,6 +1298,10 @@
     ],
     "lora_name": [
      [
+      "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+      "qwen-image-edit-2511-multiple-angles-lora.safetensors",
+      "QWEN_EDIT_ACTION_V1.safetensors",
+      "SYSTMS_INFL8_LoRA_Qwen_Image_Edit_2511.safetensors",
       "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
      ]
     ],

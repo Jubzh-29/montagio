@@ -95,7 +95,7 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
       }
       case 'edit': {
         const photo = need(opts.input, '--input', name);
-        const job = compileEdit(model, template, { imageRef: basename(photo), instruction: text('edit'), seed: opts.seed });
+        const job = compileEdit(model, template, { imageRef: basename(photo), instruction: text('edit'), seed: opts.seed }, library.lock);
         return { name, model, ...job, files: [file('image', photo)] };
       }
       case 'voice': {

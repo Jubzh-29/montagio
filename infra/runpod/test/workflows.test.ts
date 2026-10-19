@@ -137,9 +137,16 @@ test('the upscale job compiled for each aspect is accepted', () => {
   }
 });
 
-test('the edit job is accepted', () => {
+test.each([
+  ['Lightning', {}],
+  ['40 steps', { fast: false }],
+  ['a look', { look: 'action' as const }],
+  ['a look, 40 steps', { look: 'infl8' as const, fast: false }],
+  ['two images', { image2Ref: 'start2.png' }],
+])('the edit job is accepted: %s', (_, variant) => {
   const model = library.extensionModels.get('qwen-image-edit-2511')!;
-  const { workflow } = compileEdit(model, library.extensionTemplates.get(model.workflow)!, { imageRef: 'start.png', instruction: 'make it night', seed: 3 });
+  const inputs = { imageRef: 'start.png', instruction: 'make it night', seed: 3, ...variant };
+  const { workflow } = compileEdit(model, library.extensionTemplates.get(model.workflow)!, inputs, library.lock);
   expect(checkWorkflow(workflow, info)).toEqual([]);
 });
 

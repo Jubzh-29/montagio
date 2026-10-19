@@ -1,4 +1,4 @@
-import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } from '@montagio/registry';
+import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, LockEntry, OutputKind } from '@montagio/registry';
 import { CompileError, type ApiWorkflow } from './compile';
 import { dimensionsFor, type Aspect } from './dimensions';
 
@@ -41,6 +41,33 @@ export function bindExtension(
     throw new CompileError(`bindings not found in the workflow template of ${model.id}: ${details}`);
   }
   return workflow;
+}
+
+/** Every node in `ids` must be in the template: a compiler keeps, removes or rewires them by id. */
+export function requireNodes(model: ExtensionModel, template: ApiWorkflow, ids: readonly string[]): void {
+  const missing = ids.filter((id) => !template[id]);
+  if (missing.length > 0) throw new CompileError(`the workflow template of ${model.id} has no node ${missing.join(', ')}`);
+}
+
+/** Remove node `id`, a pass-through on its `input` (a LoRA on `model`): what read its output reads that input. */
+export function bypassNode(workflow: ApiWorkflow, id: string, input = 'model'): void {
+  const upstream = workflow[id]!.inputs[input];
+  for (const node of Object.values(workflow)) {
+    for (const [field, value] of Object.entries(node.inputs)) {
+      if (Array.isArray(value) && value[0] === id) node.inputs[field] = upstream;
+    }
+  }
+  delete workflow[id];
+}
+
+/** Remove node `id` and every optional input that reads it. */
+export function dropNode(workflow: ApiWorkflow, id: string): void {
+  delete workflow[id];
+  for (const node of Object.values(workflow)) {
+    for (const [field, value] of Object.entries(node.inputs)) {
+      if (Array.isArray(value) && value[0] === id) delete node.inputs[field];
+    }
+  }
 }
 
 function expectTask(model: ExtensionModel, task: ExtensionTask): void {
@@ -126,20 +153,65 @@ export function compileUpscale(
   return { workflow, output: { ...model.output }, params: { width, height, seed: inputs.seed } };
 }
 
+/** The looks of the edit: a LoRA of Qwen-Image-Edit-2511 (its lock entry) and the strength it runs at. */
+export const EDIT_LOOKS = {
+  /** systms INFL8: "inflate the <subject>". */
+  infl8: { lock: 'systms-infl8-qwen-edit-2511', strength: 1 },
+  /** systms ACTION: "action the <thing>", an action figure; the end frame of the figurine hook. */
+  action: { lock: 'systms-action-qwen-edit-2511', strength: 1 },
+  /** fal Multiple-Angles: "<sks> <azimuth> <elevation> <distance>"; its card advises 0.8 to 1, from 0.9. */
+  angles: { lock: 'fal-multiple-angles-qwen-edit-2511', strength: 0.9 },
+} as const satisfies Record<string, { lock: string; strength: number }>;
+export type EditLook = keyof typeof EDIT_LOOKS;
+
+/** Nodes of workflows/qwen-image-edit-2511.api.json that compileEdit keeps, removes or rewires. */
+const EDIT_NODES = { look: '170', lightning: '171', image2: '42', sampler: '169' } as const;
+/** With the 4-step Lightning LoRA, and without it (the template's values). */
+const EDIT_SAMPLING = { fast: { steps: 4, cfg: 1 }, quality: { steps: 40, cfg: 4 } } as const;
+
 export type EditInputs = {
   /** The photo to change, as the backend's loader names it once uploaded. */
   imageRef: string;
   /** What to change, in words ("make it night"). */
   instruction: string;
   seed: number;
+  /** The 4-step Lightning LoRA (default), or 40 steps without it. */
+  fast?: boolean;
+  look?: EditLook;
+  /** A second image the instruction refers to ("wearing the outfit of image 2"). */
+  image2Ref?: string;
 };
 
-/** The start photo changed by an instruction (Qwen-Image-Edit-2511); the negative encoder keeps its empty prompt. */
-export function compileEdit(model: ExtensionModel, template: ApiWorkflow, inputs: EditInputs): ExtensionCompiled<{ instruction: string; seed: number }> {
+/**
+ * The start photo changed by an instruction (Qwen-Image-Edit-2511); the negative encoder keeps
+ * its empty prompt. The LoRA and image nodes a job does not use are removed, never loaded at
+ * strength 0; `lock` gives the file of a look.
+ */
+export function compileEdit(
+  model: ExtensionModel,
+  template: ApiWorkflow,
+  inputs: EditInputs,
+  lock: ReadonlyMap<string, LockEntry>,
+): ExtensionCompiled<{ instruction: string; seed: number; fast: boolean; look: EditLook | null }> {
   expectTask(model, 'i2i-edit');
-  const instruction = userText(inputs.instruction, 'edit instruction', model);
-  const workflow = bindExtension(model, template, { image: inputs.imageRef, prompt: instruction, seed: inputs.seed });
-  return { workflow, output: { ...model.output }, params: { instruction, seed: inputs.seed } };
+  requireNodes(model, template, Object.values(EDIT_NODES));
+  const typed = userText(inputs.instruction, 'edit instruction', model);
+  const look = inputs.look ?? null;
+  // the Multiple-Angles LoRA reads its trigger first
+  const instruction = look === 'angles' && !typed.startsWith('<sks>') ? `<sks> ${typed}` : typed;
+  const fast = inputs.fast ?? true;
+  const workflow = bindExtension(model, template, { image: inputs.imageRef, image2: inputs.image2Ref, prompt: instruction, seed: inputs.seed });
+  if (look) {
+    const entry = lock.get(EDIT_LOOKS[look].lock);
+    if (!entry) throw new CompileError(`the ${look} look needs lock entry ${EDIT_LOOKS[look].lock}`);
+    Object.assign(workflow[EDIT_NODES.look]!.inputs, { lora_name: entry.file, strength_model: EDIT_LOOKS[look].strength });
+  } else {
+    bypassNode(workflow, EDIT_NODES.look);
+  }
+  if (!fast) bypassNode(workflow, EDIT_NODES.lightning);
+  Object.assign(workflow[EDIT_NODES.sampler]!.inputs, fast ? EDIT_SAMPLING.fast : EDIT_SAMPLING.quality);
+  if (!inputs.image2Ref) dropNode(workflow, EDIT_NODES.image2);
+  return { workflow, output: { ...model.output }, params: { instruction, seed: inputs.seed, fast, look } };
 }
 
 export type SpeechInputs = {

@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { AVATAR_DEFAULT_PROMPT, compileAvatar, compileEdit, compileMusic, compileSpeech, compileUpscale, CompileError, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Library } from '../src/index';
+import { AVATAR_DEFAULT_PROMPT, compileAvatar, compileEdit, compileMusic, compileSpeech, compileUpscale, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -118,7 +118,64 @@ describe('compileUpscale (SeedVR2 3B)', () => {
 describe('compileEdit (Qwen-Image-Edit-2511)', () => {
   const edit = () => extension('qwen-image-edit-2511');
   const compile = (inputs: Partial<Parameters<typeof compileEdit>[2]> = {}) =>
-    compileEdit(edit().model, edit().template, { imageRef: 'start.png', instruction: 'make it night', seed: 4, ...inputs });
+    compileEdit(edit().model, edit().template, { imageRef: 'start.png', instruction: 'make it night', seed: 4, ...inputs }, lib.lock);
+
+  test('by default the Lightning LoRA runs 4 steps at cfg 1, with no look and no second image', () => {
+    const { workflow, params } = compile();
+    expect(workflow['171']!.inputs.model).toEqual(['161', 0]);
+    expect(workflow['145']!.inputs.model).toEqual(['171', 0]);
+    expect(workflow['169']!.inputs).toMatchObject({ steps: 4, cfg: 1 });
+    expect(workflow['170']).toBeUndefined();
+    expect(workflow['42']).toBeUndefined();
+    expect(workflow['151']!.inputs.image2).toBeUndefined();
+    expect(workflow['149']!.inputs.image2).toBeUndefined();
+    expect(params).toMatchObject({ fast: true, look: null });
+  });
+
+  test('fast: false drops the Lightning LoRA and runs 40 steps at cfg 4', () => {
+    const { workflow } = compile({ fast: false });
+    expect(workflow['171']).toBeUndefined();
+    expect(workflow['145']!.inputs.model).toEqual(['161', 0]);
+    expect(workflow['169']!.inputs).toMatchObject({ steps: 40, cfg: 4 });
+  });
+
+  test('a look loads its LoRA file from the lock, before the Lightning LoRA', () => {
+    const { workflow, params } = compile({ look: 'action' });
+    expect(workflow['170']!.inputs).toMatchObject({ lora_name: lib.lock.get('systms-action-qwen-edit-2511')!.file, strength_model: 1, model: ['161', 0] });
+    expect(workflow['171']!.inputs.model).toEqual(['170', 0]);
+    expect(params.look).toBe('action');
+  });
+
+  test('a look without the Lightning LoRA feeds the model sampling directly', () => {
+    expect(compile({ look: 'infl8', fast: false }).workflow['145']!.inputs.model).toEqual(['170', 0]);
+  });
+
+  test('the angles look starts the instruction with <sks> and runs at strength 0.9', () => {
+    expect(compile({ look: 'angles', instruction: 'front view eye-level shot medium shot' }).workflow['151']!.inputs.prompt).toBe('<sks> front view eye-level shot medium shot');
+    const { workflow } = compile({ look: 'angles', instruction: '<sks> back view high-angle shot close-up' });
+    expect(workflow['151']!.inputs.prompt).toBe('<sks> back view high-angle shot close-up');
+    expect(workflow['170']!.inputs.strength_model).toBe(0.9);
+  });
+
+  test('a second image goes to both encoders', () => {
+    const { workflow } = compile({ image2Ref: 'uploads/outfit.png' });
+    expect(workflow['42']!.inputs.image).toBe('uploads/outfit.png');
+    expect(workflow['151']!.inputs.image2).toEqual(['42', 0]);
+    expect(workflow['149']!.inputs.image2).toEqual(['42', 0]);
+  });
+
+  test('every look is a lock weight of the edit extension that the edit model loads', () => {
+    for (const look of Object.values(EDIT_LOOKS)) {
+      expect(lib.lock.get(look.lock)?.extension).toBe('edit');
+      expect(edit().model.weights).toContain(look.lock);
+    }
+  });
+
+  test('a template without the Lightning node is a CompileError', () => {
+    const template = structuredClone(edit().template);
+    delete template['171'];
+    expect(() => compileEdit(edit().model, template, { imageRef: 'start.png', instruction: 'make it night', seed: 4 }, lib.lock)).toThrow(/171/);
+  });
 
   test('the instruction goes to the positive encoder only', () => {
     const { workflow, params } = compile({ instruction: '  remove the car  ' });
