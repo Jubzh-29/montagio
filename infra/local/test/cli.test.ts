@@ -33,6 +33,18 @@ test('an unknown option, an unknown command or a bad port is refused', () => {
   expect(() => parseArgs(['install', '--app-port', 'abc'])).toThrow(/--app-port/);
 });
 
+test('start, stop and status refuse the options only install reads', () => {
+  // start --dry-run used to start everything, start --app-port to start on the saved port.
+  expect(() => parseArgs(['start', '--dry-run'])).toThrow(/--dry-run only goes with install/);
+  expect(() => parseArgs(['start', '--app-port', '3300'])).toThrow(/--app-port only goes with install/);
+  for (const command of ['stop', 'status']) {
+    expect(() => parseArgs([command, '--app-only'])).toThrow(/--app-only/);
+    expect(() => parseArgs([command, '--no-browser'])).toThrow(/--no-browser only goes with install or start/);
+  }
+  expect(parseArgs(['start', '--dir', 'D:\\S', '--no-browser']).options).toMatchObject({ dir: 'D:\\S', browser: false });
+  expect(parseArgs(['status', '--dir', 'D:\\S']).command).toBe('status');
+});
+
 test('--proxy-url needs --app-only and an http(s) URL', () => {
   expect(() => parseArgs(['install', '--proxy-url', 'http://127.0.0.1:8189'])).toThrow(/--app-only/);
   expect(() => parseArgs(['install', '--app-only', '--proxy-url', 'ftp://x'])).toThrow(/http/);

@@ -34,11 +34,11 @@ Options:
   --proxy-url URL    with --app-only: the comfy-api-proxy of a remote GPU (for example an SSH tunnel)
   --ignore-vram      install even on a GPU under 24 GB (renders may run out of memory)
   --dir DIR          install folder (default: %LOCALAPPDATA%\\Montagio or ~/.local/share/montagio, or MONTAGIO_HOME)
-  --comfy-port N     ComfyUI port (default 8188)
-  --proxy-port N     comfy-api-proxy port (default 8189)
-  --app-port N       app port (default 3000)
+  --comfy-port N     install: ComfyUI port (default 8188), kept for the next runs
+  --proxy-port N     install: comfy-api-proxy port (default 8189)
+  --app-port N       install: app port (default 3000)
   --no-start         install: do not start Montagio at the end
-  --no-browser       do not open the browser
+  --no-browser       install, start: do not open the browser
 
 Environment:
   MONTAGIO_COMFYUI_ARGS   extra ComfyUI arguments, for example "--lowvram"
@@ -61,6 +61,13 @@ export type CliOptions = {
 
 const COMMANDS: Command[] = ['install', 'start', 'stop', 'status', 'help'];
 const PORT_FLAGS = { comfy: 'comfy-port', proxy: 'proxy-port', app: 'app-port' } as const;
+/** The options each command reads: another one is refused, not ignored (start --dry-run would start). */
+const COMMAND_OPTIONS: Record<Exclude<Command, 'help'>, string[]> = {
+  install: ['dry-run', 'app-only', 'ignore-vram', 'no-start', 'no-browser', 'dir', 'proxy-url', 'comfy-port', 'proxy-port', 'app-port'],
+  start: ['dir', 'no-browser'],
+  stop: ['dir'],
+  status: ['dir'],
+};
 
 export function parseArgs(argv: string[]): { command: Command; options: CliOptions } {
   let parsed: ReturnType<typeof parseNodeArgs<{ options: Record<string, { type: 'string' | 'boolean' }>; allowPositionals: true; strict: true }>>;
@@ -90,6 +97,13 @@ export function parseArgs(argv: string[]): { command: Command; options: CliOptio
   const [name = 'help', ...extra] = parsed.positionals;
   if (!COMMANDS.includes(name as Command)) throw new Error(`unknown command "${name}" (expected ${COMMANDS.join(', ')})`);
   if (extra.length > 0) throw new Error(`unexpected argument "${extra[0]}"`);
+  if (name !== 'help' && !values.help) {
+    for (const flag of Object.keys(values)) {
+      if (flag === 'help' || COMMAND_OPTIONS[name as keyof typeof COMMAND_OPTIONS].includes(flag)) continue;
+      const commands = Object.entries(COMMAND_OPTIONS).filter(([, flags]) => flags.includes(flag)).map(([command]) => command);
+      throw new Error(`--${flag} only goes with ${commands.join(' or ')}`);
+    }
+  }
 
   const ports: Partial<Ports> = {};
   for (const [key, flag] of Object.entries(PORT_FLAGS) as [keyof Ports, string][]) {
