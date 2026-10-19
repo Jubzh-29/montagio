@@ -166,6 +166,25 @@ describe('checkWorkflow: input names, required inputs and links', () => {
     expect(checkWorkflow(workflow, info)).toEqual([]);
   });
 
+  test('a V3 MatchType on either side of a link is accepted, as ComfyUI does (comfy_execution/validation.py:220-223)', () => {
+    // ResizeImageMaskNode takes IMAGE or MASK and gives back the type it received
+    const withMatch = {
+      ...info,
+      ResizeImageMaskNode: {
+        input: { required: { input: ['COMFY_MATCHTYPE_V3', { template: { template_id: 'input_type', allowed_types: 'IMAGE,MASK' } }] } },
+        output: ['COMFY_MATCHTYPE_V3'],
+      },
+      LoadImage: { input: { required: {} }, output: ['IMAGE', 'MASK'] },
+      SaveImage: { input: { required: { images: ['IMAGE', {}] } }, output: [] },
+    };
+    const workflow = {
+      '1': { class_type: 'LoadImage', inputs: {} },
+      '2': { class_type: 'ResizeImageMaskNode', inputs: { input: ['1', 0] } },
+      '3': { class_type: 'SaveImage', inputs: { images: ['2', 0] } },
+    };
+    expect(checkWorkflow(workflow, withMatch)).toEqual([]);
+  });
+
   test('skip still skips combo checks only', () => {
     const workflow = valid();
     (workflow['1'].inputs as Record<string, unknown>).unet_name = 'later.safetensors';

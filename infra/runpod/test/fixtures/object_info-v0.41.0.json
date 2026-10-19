@@ -1,9 +1,109 @@
 {
+ "AudioEncoderEncode": {
+  "input": {
+   "required": {
+    "audio_encoder": [
+     "AUDIO_ENCODER",
+     {}
+    ],
+    "audio": [
+     "AUDIO",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "audio_encoder",
+    "audio"
+   ]
+  },
+  "output": [
+   "AUDIO_ENCODER_OUTPUT"
+  ],
+  "output_name": [
+   "AUDIO_ENCODER_OUTPUT"
+  ],
+  "python_module": "comfy_extras.nodes_audio_encoder"
+ },
+ "AudioEncoderLoader": {
+  "input": {
+   "required": {
+    "audio_encoder_name": [
+     "COMBO",
+     {
+      "multiselect": false,
+      "options": [
+       "wav2vec2_large_english_fp16.safetensors"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "audio_encoder_name"
+   ]
+  },
+  "output": [
+   "AUDIO_ENCODER"
+  ],
+  "output_name": [
+   "AUDIO_ENCODER"
+  ],
+  "python_module": "comfy_extras.nodes_audio_encoder"
+ },
+ "CFGNorm": {
+  "input": {
+   "required": {
+    "model": [
+     "MODEL",
+     {}
+    ],
+    "strength": [
+     "FLOAT",
+     {
+      "default": 1.0,
+      "min": 0.0,
+      "max": 100.0,
+      "step": 0.01
+     }
+    ]
+   },
+   "optional": {
+    "pre_cfg": [
+     "BOOLEAN",
+     {
+      "default": false
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model",
+    "strength"
+   ],
+   "optional": [
+    "pre_cfg"
+   ]
+  },
+  "output": [
+   "MODEL"
+  ],
+  "output_name": [
+   "patched_model"
+  ],
+  "python_module": "comfy_extras.nodes_cfg"
+ },
  "CLIPLoader": {
   "input": {
    "required": {
     "clip_name": [
      [
+      "qwen_0.6b_ace15.safetensors",
+      "qwen_1.7b_ace15.safetensors",
+      "qwen_2.5_vl_7b_fp8_scaled.safetensors",
       "qwen_3_4b.safetensors",
       "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
      ]
@@ -205,6 +305,110 @@
   ],
   "python_module": "comfy_extras.nodes_video"
  },
+ "DualCLIPLoader": {
+  "input": {
+   "required": {
+    "clip_name1": [
+     [
+      "qwen_0.6b_ace15.safetensors",
+      "qwen_1.7b_ace15.safetensors",
+      "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "qwen_3_4b.safetensors",
+      "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+     ]
+    ],
+    "clip_name2": [
+     [
+      "qwen_0.6b_ace15.safetensors",
+      "qwen_1.7b_ace15.safetensors",
+      "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "qwen_3_4b.safetensors",
+      "umt5_xxl_fp8_e4m3fn_scaled.safetensors"
+     ]
+    ],
+    "type": [
+     [
+      "sdxl",
+      "sd3",
+      "flux",
+      "hunyuan_video",
+      "hidream",
+      "hunyuan_image",
+      "hunyuan_video_15",
+      "kandinsky5",
+      "kandinsky5_image",
+      "ltxv",
+      "newbie",
+      "ace"
+     ]
+    ]
+   },
+   "optional": {
+    "device": [
+     [
+      "default",
+      "cpu"
+     ],
+     {
+      "advanced": true
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "clip_name1",
+    "clip_name2",
+    "type"
+   ],
+   "optional": [
+    "device"
+   ]
+  },
+  "output": [
+   "CLIP"
+  ],
+  "output_name": [
+   "CLIP"
+  ],
+  "python_module": "nodes"
+ },
+ "EmptyAceStep1.5LatentAudio": {
+  "input": {
+   "required": {
+    "seconds": [
+     "FLOAT",
+     {
+      "default": 120.0,
+      "min": 1.0,
+      "max": 1000.0,
+      "step": 0.01
+     }
+    ],
+    "batch_size": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1,
+      "max": 4096
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "seconds",
+    "batch_size"
+   ]
+  },
+  "output": [
+   "LATENT"
+  ],
+  "output_name": [
+   "LATENT"
+  ],
+  "python_module": "comfy_extras.nodes_ace"
+ },
  "EmptySD3LatentImage": {
   "input": {
    "required": {
@@ -250,6 +454,134 @@
    "LATENT"
   ],
   "python_module": "comfy_extras.nodes_sd3"
+ },
+ "FluxKontextImageScale": {
+  "input": {
+   "required": {
+    "image": [
+     "IMAGE",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "image"
+   ]
+  },
+  "output": [
+   "IMAGE"
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "python_module": "comfy_extras.nodes_flux"
+ },
+ "FluxKontextMultiReferenceLatentMethod": {
+  "input": {
+   "required": {
+    "conditioning": [
+     "CONDITIONING",
+     {}
+    ],
+    "reference_latents_method": [
+     "COMBO",
+     {
+      "advanced": true,
+      "multiselect": false,
+      "options": [
+       "offset",
+       "index",
+       "uxo/uno",
+       "index_timestep_zero"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "conditioning",
+    "reference_latents_method"
+   ]
+  },
+  "output": [
+   "CONDITIONING"
+  ],
+  "output_name": [
+   "CONDITIONING"
+  ],
+  "python_module": "comfy_extras.nodes_flux"
+ },
+ "GetVideoComponents": {
+  "input": {
+   "required": {
+    "video": [
+     "VIDEO",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "video"
+   ]
+  },
+  "output": [
+   "IMAGE",
+   "AUDIO",
+   "FLOAT",
+   "COMBO",
+   "COMBO"
+  ],
+  "output_name": [
+   "images",
+   "audio",
+   "fps",
+   "bit_depth",
+   "color_space"
+  ],
+  "python_module": "comfy_extras.nodes_video"
+ },
+ "ImageFromBatch": {
+  "input": {
+   "required": {
+    "image": [
+     "IMAGE",
+     {}
+    ],
+    "batch_index": [
+     "INT",
+     {
+      "default": 0,
+      "min": -16384,
+      "max": 16384
+     }
+    ],
+    "length": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1,
+      "max": 4096
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "image",
+    "batch_index",
+    "length"
+   ]
+  },
+  "output": [
+   "IMAGE"
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "python_module": "comfy_extras.nodes_images"
  },
  "KSampler": {
   "input": {
@@ -561,6 +893,130 @@
   ],
   "python_module": "nodes"
  },
+ "LatentConcat": {
+  "input": {
+   "required": {
+    "samples1": [
+     "LATENT",
+     {}
+    ],
+    "samples2": [
+     "LATENT",
+     {}
+    ],
+    "dim": [
+     "COMBO",
+     {
+      "multiselect": false,
+      "options": [
+       "x",
+       "-x",
+       "y",
+       "-y",
+       "t",
+       "-t"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "samples1",
+    "samples2",
+    "dim"
+   ]
+  },
+  "output": [
+   "LATENT"
+  ],
+  "output_name": [
+   "LATENT"
+  ],
+  "python_module": "comfy_extras.nodes_latent"
+ },
+ "LatentCut": {
+  "input": {
+   "required": {
+    "samples": [
+     "LATENT",
+     {}
+    ],
+    "dim": [
+     "COMBO",
+     {
+      "multiselect": false,
+      "options": [
+       "x",
+       "y",
+       "t"
+      ]
+     }
+    ],
+    "index": [
+     "INT",
+     {
+      "default": 0,
+      "min": -16384,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "amount": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1,
+      "max": 16384,
+      "step": 1
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "samples",
+    "dim",
+    "index",
+    "amount"
+   ]
+  },
+  "output": [
+   "LATENT"
+  ],
+  "output_name": [
+   "LATENT"
+  ],
+  "python_module": "comfy_extras.nodes_latent"
+ },
+ "LoadAudio": {
+  "input": {
+   "required": {
+    "audio": [
+     "COMBO",
+     {
+      "multiselect": false,
+      "options": [
+       "speech.flac"
+      ],
+      "audio_upload": true
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "audio"
+   ]
+  },
+  "output": [
+   "AUDIO"
+  ],
+  "output_name": [
+   "AUDIO"
+  ],
+  "python_module": "comfy_extras.nodes_audio"
+ },
  "LoadImage": {
   "input": {
    "required": {
@@ -587,6 +1043,71 @@
   "output_name": [
    "IMAGE",
    "MASK"
+  ],
+  "python_module": "nodes"
+ },
+ "LoadVideo": {
+  "input": {
+   "required": {
+    "file": [
+     "COMBO",
+     {
+      "multiselect": false,
+      "options": [
+       "clip.mp4"
+      ],
+      "video_upload": true
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "file"
+   ]
+  },
+  "output": [
+   "VIDEO"
+  ],
+  "output_name": [
+   "VIDEO"
+  ],
+  "python_module": "comfy_extras.nodes_video"
+ },
+ "LoraLoaderModelOnly": {
+  "input": {
+   "required": {
+    "model": [
+     "MODEL"
+    ],
+    "lora_name": [
+     [
+      "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
+     ]
+    ],
+    "strength_model": [
+     "FLOAT",
+     {
+      "default": 1.0,
+      "min": -100.0,
+      "max": 100.0,
+      "step": 0.01
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model",
+    "lora_name",
+    "strength_model"
+   ]
+  },
+  "output": [
+   "MODEL"
+  ],
+  "output_name": [
+   "MODEL"
   ],
   "python_module": "nodes"
  },
@@ -666,6 +1187,322 @@
    "MODEL"
   ],
   "python_module": "comfy_extras.nodes_model_advanced"
+ },
+ "ResizeImageMaskNode": {
+  "input": {
+   "required": {
+    "input": [
+     "COMFY_MATCHTYPE_V3",
+     {
+      "template": {
+       "template_id": "input_type",
+       "allowed_types": "IMAGE,MASK"
+      }
+     }
+    ],
+    "resize_type": [
+     "COMFY_DYNAMICCOMBO_V3",
+     {
+      "options": [
+       {
+        "key": "scale dimensions",
+        "inputs": {
+         "required": {
+          "width": [
+           "INT",
+           {
+            "default": 512,
+            "min": 0,
+            "max": 16384,
+            "step": 1
+           }
+          ],
+          "height": [
+           "INT",
+           {
+            "default": 512,
+            "min": 0,
+            "max": 16384,
+            "step": 1
+           }
+          ],
+          "crop": [
+           "COMBO",
+           {
+            "default": "center",
+            "multiselect": false,
+            "options": [
+             "disabled",
+             "center"
+            ]
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "scale by multiplier",
+        "inputs": {
+         "required": {
+          "multiplier": [
+           "FLOAT",
+           {
+            "default": 1.0,
+            "min": 0.01,
+            "max": 8.0,
+            "step": 0.01
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "scale longer dimension",
+        "inputs": {
+         "required": {
+          "longer_size": [
+           "INT",
+           {
+            "default": 512,
+            "min": 0,
+            "max": 16384,
+            "step": 1
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "scale shorter dimension",
+        "inputs": {
+         "required": {
+          "shorter_size": [
+           "INT",
+           {
+            "default": 512,
+            "min": 0,
+            "max": 16384,
+            "step": 1
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "scale width",
+        "inputs": {
+         "required": {
+          "width": [
+           "INT",
+           {
+            "default": 512,
+            "min": 0,
+            "max": 16384,
+            "step": 1
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "scale height",
+        "inputs": {
+         "required": {
+          "height": [
+           "INT",
+           {
+            "default": 512,
+            "min": 0,
+            "max": 16384,
+            "step": 1
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "scale total pixels",
+        "inputs": {
+         "required": {
+          "megapixels": [
+           "FLOAT",
+           {
+            "default": 1.0,
+            "min": 0.01,
+            "max": 16.0,
+            "step": 0.01
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "match size",
+        "inputs": {
+         "required": {
+          "match": [
+           "IMAGE,MASK",
+           {}
+          ],
+          "crop": [
+           "COMBO",
+           {
+            "default": "center",
+            "multiselect": false,
+            "options": [
+             "disabled",
+             "center"
+            ]
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "scale to multiple",
+        "inputs": {
+         "required": {
+          "multiple": [
+           "INT",
+           {
+            "default": 8,
+            "min": 1,
+            "max": 16384,
+            "step": 1
+           }
+          ]
+         }
+        }
+       }
+      ]
+     }
+    ],
+    "scale_method": [
+     "COMBO",
+     {
+      "default": "area",
+      "multiselect": false,
+      "options": [
+       "nearest-exact",
+       "bilinear",
+       "area",
+       "bicubic",
+       "lanczos"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "input",
+    "resize_type",
+    "scale_method"
+   ]
+  },
+  "output": [
+   "COMFY_MATCHTYPE_V3"
+  ],
+  "output_name": [
+   "resized"
+  ],
+  "python_module": "comfy_extras.nodes_post_processing"
+ },
+ "SaveAudioAdvanced": {
+  "input": {
+   "required": {
+    "audio": [
+     "AUDIO",
+     {}
+    ],
+    "filename_prefix": [
+     "STRING",
+     {
+      "default": "audio/ComfyUI",
+      "multiline": false
+     }
+    ],
+    "format": [
+     "COMFY_DYNAMICCOMBO_V3",
+     {
+      "options": [
+       {
+        "key": "flac",
+        "inputs": {
+         "required": {}
+        }
+       },
+       {
+        "key": "mp3",
+        "inputs": {
+         "required": {
+          "quality": [
+           "COMBO",
+           {
+            "default": "V0",
+            "multiselect": false,
+            "options": [
+             "V0",
+             "128k",
+             "320k"
+            ]
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "opus",
+        "inputs": {
+         "required": {
+          "quality": [
+           "COMBO",
+           {
+            "default": "128k",
+            "multiselect": false,
+            "options": [
+             "64k",
+             "96k",
+             "128k",
+             "192k",
+             "320k"
+            ]
+           }
+          ]
+         }
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "hidden": {
+    "prompt": [
+     "PROMPT"
+    ],
+    "extra_pnginfo": [
+     "EXTRA_PNGINFO"
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "audio",
+    "filename_prefix",
+    "format"
+   ],
+   "hidden": [
+    "prompt",
+    "extra_pnginfo"
+   ]
+  },
+  "output": [
+   "AUDIO"
+  ],
+  "output_name": [
+   "audio"
+  ],
+  "python_module": "comfy_extras.nodes_audio"
  },
  "SaveImage": {
   "input": {
@@ -1195,6 +2032,195 @@
   ],
   "python_module": "comfy_extras.nodes_video"
  },
+ "SeedVR2Conditioning": {
+  "input": {
+   "required": {
+    "model": [
+     "MODEL",
+     {}
+    ],
+    "vae_conditioning": [
+     "LATENT",
+     {
+      "display_name": "latent"
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model",
+    "vae_conditioning"
+   ]
+  },
+  "output": [
+   "CONDITIONING",
+   "CONDITIONING"
+  ],
+  "output_name": [
+   "positive",
+   "negative"
+  ],
+  "python_module": "comfy_extras.nodes_seedvr"
+ },
+ "SeedVR2PostProcessing": {
+  "input": {
+   "required": {
+    "images": [
+     "IMAGE",
+     {}
+    ],
+    "original_resized_images": [
+     "IMAGE",
+     {}
+    ],
+    "color_correction_method": [
+     "COMBO",
+     {
+      "default": "lab",
+      "multiselect": false,
+      "options": [
+       "lab",
+       "wavelet",
+       "adain",
+       "none"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "images",
+    "original_resized_images",
+    "color_correction_method"
+   ]
+  },
+  "output": [
+   "IMAGE"
+  ],
+  "output_name": [
+   "images"
+  ],
+  "python_module": "comfy_extras.nodes_seedvr"
+ },
+ "SeedVR2Preprocess": {
+  "input": {
+   "required": {
+    "resized_images": [
+     "IMAGE",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "resized_images"
+   ]
+  },
+  "output": [
+   "IMAGE"
+  ],
+  "output_name": [
+   "images"
+  ],
+  "python_module": "comfy_extras.nodes_seedvr"
+ },
+ "SeedVR2TemporalChunk": {
+  "input": {
+   "required": {
+    "latent": [
+     "LATENT",
+     {}
+    ],
+    "temporal_overlap": [
+     "INT",
+     {
+      "default": 0,
+      "min": 0,
+      "max": 16384
+     }
+    ],
+    "chunking_mode": [
+     "COMFY_DYNAMICCOMBO_V3",
+     {
+      "options": [
+       {
+        "key": "auto",
+        "inputs": {
+         "required": {}
+        }
+       },
+       {
+        "key": "manual",
+        "inputs": {
+         "required": {
+          "frames_per_chunk": [
+           "INT",
+           {
+            "default": 21,
+            "min": 1,
+            "max": 16384,
+            "step": 4
+           }
+          ]
+         }
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "latent",
+    "temporal_overlap",
+    "chunking_mode"
+   ]
+  },
+  "output": [
+   "LATENT",
+   "INT"
+  ],
+  "output_name": [
+   "latents",
+   "temporal_overlap"
+  ],
+  "python_module": "comfy_extras.nodes_seedvr"
+ },
+ "SeedVR2TemporalMerge": {
+  "input": {
+   "required": {
+    "latents": [
+     "LATENT",
+     {}
+    ],
+    "temporal_overlap": [
+     "INT",
+     {
+      "default": 0,
+      "forceInput": true,
+      "min": 0,
+      "max": 16384
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "latents",
+    "temporal_overlap"
+   ]
+  },
+  "output": [
+   "LATENT"
+  ],
+  "output_name": [
+   "latent"
+  ],
+  "python_module": "comfy_extras.nodes_seedvr"
+ },
  "MontagioCameraEmbedding": {
   "input": {
    "required": {
@@ -1356,13 +2382,317 @@
   ],
   "python_module": "custom_nodes.montagio"
  },
+ "TextEncodeAceStepAudio1.5": {
+  "input": {
+   "required": {
+    "clip": [
+     "CLIP",
+     {}
+    ],
+    "tags": [
+     "STRING",
+     {
+      "multiline": true,
+      "dynamicPrompts": true
+     }
+    ],
+    "lyrics": [
+     "STRING",
+     {
+      "multiline": true,
+      "dynamicPrompts": true
+     }
+    ],
+    "seed": [
+     "INT",
+     {
+      "default": 0,
+      "min": 0,
+      "max": 18446744073709551615,
+      "control_after_generate": true
+     }
+    ],
+    "bpm": [
+     "INT",
+     {
+      "default": 120,
+      "min": 10,
+      "max": 300
+     }
+    ],
+    "duration": [
+     "FLOAT",
+     {
+      "default": 120.0,
+      "min": 0.0,
+      "max": 2000.0,
+      "step": 0.1
+     }
+    ],
+    "timesignature": [
+     "COMBO",
+     {
+      "multiselect": false,
+      "options": [
+       "2",
+       "3",
+       "4",
+       "6"
+      ]
+     }
+    ],
+    "language": [
+     "COMBO",
+     {
+      "default": "en",
+      "multiselect": false,
+      "options": [
+       "ar",
+       "az",
+       "bg",
+       "bn",
+       "ca",
+       "cs",
+       "da",
+       "de",
+       "el",
+       "en",
+       "es",
+       "fa",
+       "fi",
+       "fr",
+       "he",
+       "hi",
+       "hr",
+       "ht",
+       "hu",
+       "id",
+       "is",
+       "it",
+       "ja",
+       "ko",
+       "la",
+       "lt",
+       "ms",
+       "ne",
+       "nl",
+       "no",
+       "pa",
+       "pl",
+       "pt",
+       "ro",
+       "ru",
+       "sa",
+       "sk",
+       "sr",
+       "sv",
+       "sw",
+       "ta",
+       "te",
+       "th",
+       "tl",
+       "tr",
+       "uk",
+       "ur",
+       "vi",
+       "yue",
+       "zh",
+       "unknown"
+      ]
+     }
+    ],
+    "keyscale": [
+     "COMBO",
+     {
+      "multiselect": false,
+      "options": [
+       "C major",
+       "C# major",
+       "Db major",
+       "D major",
+       "D# major",
+       "Eb major",
+       "E major",
+       "F major",
+       "F# major",
+       "Gb major",
+       "G major",
+       "G# major",
+       "Ab major",
+       "A major",
+       "A# major",
+       "Bb major",
+       "B major",
+       "C minor",
+       "C# minor",
+       "Db minor",
+       "D minor",
+       "D# minor",
+       "Eb minor",
+       "E minor",
+       "F minor",
+       "F# minor",
+       "Gb minor",
+       "G minor",
+       "G# minor",
+       "Ab minor",
+       "A minor",
+       "A# minor",
+       "Bb minor",
+       "B minor"
+      ]
+     }
+    ],
+    "generate_audio_codes": [
+     "BOOLEAN",
+     {
+      "advanced": true,
+      "default": true
+     }
+    ],
+    "cfg_scale": [
+     "FLOAT",
+     {
+      "advanced": true,
+      "default": 2.0,
+      "min": 0.0,
+      "max": 100.0,
+      "step": 0.1
+     }
+    ],
+    "temperature": [
+     "FLOAT",
+     {
+      "advanced": true,
+      "default": 0.85,
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.01
+     }
+    ],
+    "top_p": [
+     "FLOAT",
+     {
+      "advanced": true,
+      "default": 0.9,
+      "min": 0.0,
+      "max": 2000.0,
+      "step": 0.01
+     }
+    ],
+    "top_k": [
+     "INT",
+     {
+      "advanced": true,
+      "default": 0,
+      "min": 0,
+      "max": 100
+     }
+    ],
+    "min_p": [
+     "FLOAT",
+     {
+      "advanced": true,
+      "default": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.001
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "clip",
+    "tags",
+    "lyrics",
+    "seed",
+    "bpm",
+    "duration",
+    "timesignature",
+    "language",
+    "keyscale",
+    "generate_audio_codes",
+    "cfg_scale",
+    "temperature",
+    "top_p",
+    "top_k",
+    "min_p"
+   ]
+  },
+  "output": [
+   "CONDITIONING"
+  ],
+  "output_name": [
+   "CONDITIONING"
+  ],
+  "python_module": "comfy_extras.nodes_ace"
+ },
+ "TextEncodeQwenImageEditPlus": {
+  "input": {
+   "required": {
+    "clip": [
+     "CLIP",
+     {}
+    ],
+    "prompt": [
+     "STRING",
+     {
+      "multiline": true,
+      "dynamicPrompts": true
+     }
+    ]
+   },
+   "optional": {
+    "vae": [
+     "VAE",
+     {}
+    ],
+    "image1": [
+     "IMAGE",
+     {}
+    ],
+    "image2": [
+     "IMAGE",
+     {}
+    ],
+    "image3": [
+     "IMAGE",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "clip",
+    "prompt"
+   ],
+   "optional": [
+    "vae",
+    "image1",
+    "image2",
+    "image3"
+   ]
+  },
+  "output": [
+   "CONDITIONING"
+  ],
+  "output_name": [
+   "CONDITIONING"
+  ],
+  "python_module": "comfy_extras.nodes_qwen"
+ },
  "UNETLoader": {
   "input": {
    "required": {
     "unet_name": [
      [
+      "acestep_v1.5_turbo.safetensors",
+      "qwen_image_edit_2511_fp8mixed.safetensors",
+      "seedvr2_3b_int8_convrot.safetensors",
       "wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors",
       "wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors",
+      "wan2.2_s2v_14B_fp8_scaled.safetensors",
       "wan2.2_ti2v_5B_fp16.safetensors",
       "z_image_turbo_bf16.safetensors"
      ]
@@ -1421,15 +2751,207 @@
   ],
   "python_module": "nodes"
  },
+ "VAEDecodeAudio": {
+  "input": {
+   "required": {
+    "samples": [
+     "LATENT",
+     {}
+    ],
+    "vae": [
+     "VAE",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "samples",
+    "vae"
+   ]
+  },
+  "output": [
+   "AUDIO"
+  ],
+  "output_name": [
+   "AUDIO"
+  ],
+  "python_module": "comfy_extras.nodes_audio"
+ },
+ "VAEDecodeTiled": {
+  "input": {
+   "required": {
+    "samples": [
+     "LATENT"
+    ],
+    "vae": [
+     "VAE"
+    ],
+    "tile_size": [
+     "INT",
+     {
+      "default": 512,
+      "min": 64,
+      "max": 4096,
+      "step": 32,
+      "advanced": true
+     }
+    ],
+    "overlap": [
+     "INT",
+     {
+      "default": 64,
+      "min": 0,
+      "max": 4096,
+      "step": 32,
+      "advanced": true
+     }
+    ],
+    "temporal_size": [
+     "INT",
+     {
+      "default": 64,
+      "min": 8,
+      "max": 4096,
+      "step": 4,
+      "advanced": true
+     }
+    ],
+    "temporal_overlap": [
+     "INT",
+     {
+      "default": 8,
+      "min": 4,
+      "max": 4096,
+      "step": 4,
+      "advanced": true
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "samples",
+    "vae",
+    "tile_size",
+    "overlap",
+    "temporal_size",
+    "temporal_overlap"
+   ]
+  },
+  "output": [
+   "IMAGE"
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "python_module": "nodes"
+ },
+ "VAEEncode": {
+  "input": {
+   "required": {
+    "pixels": [
+     "IMAGE"
+    ],
+    "vae": [
+     "VAE"
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "pixels",
+    "vae"
+   ]
+  },
+  "output": [
+   "LATENT"
+  ],
+  "output_name": [
+   "LATENT"
+  ],
+  "python_module": "nodes"
+ },
+ "VAEEncodeTiled": {
+  "input": {
+   "required": {
+    "pixels": [
+     "IMAGE"
+    ],
+    "vae": [
+     "VAE"
+    ],
+    "tile_size": [
+     "INT",
+     {
+      "default": 512,
+      "min": 64,
+      "max": 4096,
+      "step": 64,
+      "advanced": true
+     }
+    ],
+    "overlap": [
+     "INT",
+     {
+      "default": 64,
+      "min": 0,
+      "max": 4096,
+      "step": 32,
+      "advanced": true
+     }
+    ],
+    "temporal_size": [
+     "INT",
+     {
+      "default": 64,
+      "min": 8,
+      "max": 4096,
+      "step": 4,
+      "advanced": true
+     }
+    ],
+    "temporal_overlap": [
+     "INT",
+     {
+      "default": 8,
+      "min": 4,
+      "max": 4096,
+      "step": 4,
+      "advanced": true
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "pixels",
+    "vae",
+    "tile_size",
+    "overlap",
+    "temporal_size",
+    "temporal_overlap"
+   ]
+  },
+  "output": [
+   "LATENT"
+  ],
+  "output_name": [
+   "LATENT"
+  ],
+  "python_module": "nodes"
+ },
  "VAELoader": {
   "input": {
    "required": {
     "vae_name": [
      [
+      "ace_1.5_vae.safetensors",
       "ae.safetensors",
+      "qwen_image_vae.safetensors",
+      "seedvr2_ema_vae_fp16.safetensors",
       "wan2.2_vae.safetensors",
-      "wan_2.1_vae.safetensors",
-      "pixel_space"
+      "wan_2.1_vae.safetensors"
      ]
     ]
    }
@@ -1727,6 +3249,175 @@
     "clip_vision_output",
     "start_image",
     "camera_conditions"
+   ]
+  },
+  "output": [
+   "CONDITIONING",
+   "CONDITIONING",
+   "LATENT"
+  ],
+  "output_name": [
+   "positive",
+   "negative",
+   "latent"
+  ],
+  "python_module": "comfy_extras.nodes_wan"
+ },
+ "WanSoundImageToVideo": {
+  "input": {
+   "required": {
+    "positive": [
+     "CONDITIONING",
+     {}
+    ],
+    "negative": [
+     "CONDITIONING",
+     {}
+    ],
+    "vae": [
+     "VAE",
+     {}
+    ],
+    "width": [
+     "INT",
+     {
+      "default": 832,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "height": [
+     "INT",
+     {
+      "default": 480,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "length": [
+     "INT",
+     {
+      "default": 77,
+      "min": 1,
+      "max": 16384,
+      "step": 4
+     }
+    ],
+    "batch_size": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1,
+      "max": 4096
+     }
+    ]
+   },
+   "optional": {
+    "audio_encoder_output": [
+     "AUDIO_ENCODER_OUTPUT",
+     {}
+    ],
+    "ref_image": [
+     "IMAGE",
+     {}
+    ],
+    "control_video": [
+     "IMAGE",
+     {}
+    ],
+    "ref_motion": [
+     "IMAGE",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "positive",
+    "negative",
+    "vae",
+    "width",
+    "height",
+    "length",
+    "batch_size"
+   ],
+   "optional": [
+    "audio_encoder_output",
+    "ref_image",
+    "control_video",
+    "ref_motion"
+   ]
+  },
+  "output": [
+   "CONDITIONING",
+   "CONDITIONING",
+   "LATENT"
+  ],
+  "output_name": [
+   "positive",
+   "negative",
+   "latent"
+  ],
+  "python_module": "comfy_extras.nodes_wan"
+ },
+ "WanSoundImageToVideoExtend": {
+  "input": {
+   "required": {
+    "positive": [
+     "CONDITIONING",
+     {}
+    ],
+    "negative": [
+     "CONDITIONING",
+     {}
+    ],
+    "vae": [
+     "VAE",
+     {}
+    ],
+    "length": [
+     "INT",
+     {
+      "default": 77,
+      "min": 1,
+      "max": 16384,
+      "step": 4
+     }
+    ],
+    "video_latent": [
+     "LATENT",
+     {}
+    ]
+   },
+   "optional": {
+    "audio_encoder_output": [
+     "AUDIO_ENCODER_OUTPUT",
+     {}
+    ],
+    "ref_image": [
+     "IMAGE",
+     {}
+    ],
+    "control_video": [
+     "IMAGE",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "positive",
+    "negative",
+    "vae",
+    "length",
+    "video_latent"
+   ],
+   "optional": [
+    "audio_encoder_output",
+    "ref_image",
+    "control_video"
    ]
   },
   "output": [

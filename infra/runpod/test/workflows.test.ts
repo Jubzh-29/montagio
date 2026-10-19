@@ -8,6 +8,10 @@
  * MontagioCameraEmbedding, tooltips removed. The weight lists of the loaders are the files of
  * registry/models.lock.yaml; LoadImage lists start.png. When a workflow gains a class, take
  * that class from the /object_info of the GPU session, not from memory.
+ * The classes of the extension workflows come from the same ComfyUI on 2026-10-19, once
+ * kornia (a requirement of ComfyUI that the CPU install lacked) was in its venv: without it,
+ * nodes_latent and nodes_post_processing do not load. LoadVideo lists clip.mp4 and LoadAudio
+ * speech.flac, the placeholders of those workflows.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
