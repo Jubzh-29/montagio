@@ -38,6 +38,18 @@ export class PrepareError extends Error {
   }
 }
 
+/**
+ * What the page needs to check a remixed camera preset (validatePreset): the preset models,
+ * their templates, and the lock without the extension weights, which no camera preset loads.
+ */
+export function remixLibrary(library: Library): ShowcaseData['library'] {
+  return {
+    models: [...library.models],
+    templates: [...library.templates],
+    lock: [...library.lock].filter(([, entry]) => !entry.extension),
+  };
+}
+
 const hash = (...parts: unknown[]) => createHash('sha256').update(JSON.stringify([CACHE_VERSION, ...parts])).digest('hex');
 
 async function exists(path: string): Promise<boolean> {
@@ -172,7 +184,7 @@ export async function prepareShowcase(
       license: model.license,
       estimate_s: model.estimate_s,
     })),
-    library: { models: [...library.models], templates: [...library.templates], lock: [...library.lock] },
+    library: remixLibrary(library),
     samples: manifest.samples.map((sample) => ({
       id: sample.id,
       title: sample.title,
