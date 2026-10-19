@@ -442,3 +442,61 @@ test('a source folder that happens to be named out is still scanned', async () =
     [join('apps', 'other', 'out', 'y.ts'), join('apps', 'web', 'src', 'out', 'x.ts'), join('packages', 'p', 'src', 'out', 'z.ts')].sort(),
   );
 });
+
+// Weight sources (allowed-sources.yaml): the repository a lock URL is fetched from, and the one its license is read from.
+
+const withExtraWeight = (url: string, source: string, license = 'Apache-2.0') => {
+  const clean = (path: string) => readFileSync(join(fixture('clean'), path), 'utf8');
+  return scratchRepo({
+    'presets/crash-push.yaml': clean('presets/crash-push.yaml'),
+    'registry/models/wan-fun-camera.yaml': clean('registry/models/wan-fun-camera.yaml'),
+    'workflows/wan22-fun-camera.api.json': clean('workflows/wan22-fun-camera.api.json'),
+    'registry/models.lock.yaml':
+      clean('registry/models.lock.yaml') +
+      `  - id: extra-lora\n    file: extra_lora.safetensors\n    url: ${url}\n    license: ${license}\n    source: ${source}\n`,
+  });
+};
+const sourceViolations = (r: Awaited<ReturnType<typeof checkOpenStack>>) => r.violations.filter((v) => v.rule === 'weight-source');
+
+test('a weight fetched from a refused repository fails, with the reason', async () => {
+  const r = await checkOpenStack(
+    withExtraWeight(
+      'https://huggingface.co/Kijai/WanVideo_comfy/resolve/main/Lightx2v/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors',
+      'https://huggingface.co/lightx2v/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v',
+    ),
+  );
+  expect(sourceViolations(r)).toEqual([
+    expect.objectContaining({ file: join('registry', 'models.lock.yaml'), detail: expect.stringMatching(/extra-lora.*Kijai\/WanVideo_comfy.*CC BY-NC-SA/) }),
+  ]);
+});
+
+test('a weight fetched from a repository the list does not know fails', async () => {
+  const r = await checkOpenStack(withExtraWeight('https://huggingface.co/some-org/some-lora/resolve/main/x.safetensors', 'https://huggingface.co/some-org/some-lora'));
+  expect(sourceViolations(r).map((v) => v.detail)).toEqual([
+    expect.stringMatching(/extra-lora is fetched from some-org\/some-lora, an unknown source repo/),
+    expect.stringMatching(/extra-lora names some-org\/some-lora as its source, an unknown source repo/),
+  ]);
+});
+
+test('a lock license that differs from the license of its source fails', async () => {
+  const r = await checkOpenStack(
+    withExtraWeight('https://huggingface.co/ResembleAI/chatterbox/resolve/main/ve.safetensors', 'https://huggingface.co/ResembleAI/chatterbox', 'Apache-2.0'),
+  );
+  expect(sourceViolations(r).map((v) => v.detail)).toEqual([expect.stringMatching(/extra-lora: license Apache-2.0 differs from its source ResembleAI\/chatterbox \(MIT\)/)]);
+});
+
+test('a mirror named as the source fails', async () => {
+  const r = await checkOpenStack(
+    withExtraWeight(
+      'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/x.safetensors',
+      'https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged',
+    ),
+  );
+  expect(sourceViolations(r).map((v) => v.detail)).toEqual([expect.stringMatching(/extra-lora names the mirror Comfy-Org\/Wan_2.2_ComfyUI_Repackaged as its source/)]);
+});
+
+test('the refused repositories include the two license traps of the official templates', () => {
+  const text = readFileSync(join(toolDir, 'allowed-sources.yaml'), 'utf8');
+  expect(text).toMatch(/- repo: Kijai\/WanVideo_comfy\n\s+reason: .*CC BY-NC-SA/);
+  expect(text).toMatch(/- repo: Comfy-Org\/HunyuanVideo_1\.5_repackaged\n\s+reason: .*Tencent/);
+});
