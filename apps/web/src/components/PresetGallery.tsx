@@ -1,69 +1,69 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
 import type { PresetSummary } from '@/lib/api-types';
+import { MoveGlyph } from './MoveGlyph';
 import styles from './studio.module.css';
 
-/** Where the scene drifts inside the viewfinder for each camera pose. */
-const POSE_MOTION: Record<string, { tx: number; ty: number; scale: number }> = {
-  static: { tx: 0, ty: 0, scale: 1 },
-  pan_left: { tx: 14, ty: 0, scale: 1 },
-  pan_right: { tx: -14, ty: 0, scale: 1 },
-  pan_up: { tx: 0, ty: 14, scale: 1 },
-  pan_down: { tx: 0, ty: -14, scale: 1 },
-  zoom_in: { tx: 0, ty: 0, scale: 1.55 },
-  zoom_out: { tx: 0, ty: 0, scale: 0.7 },
-};
-
-function MoveGlyph({ poses, speed }: { poses: string[]; speed: number }) {
-  const motion = poses.reduce(
-    (acc, pose) => {
-      const m = POSE_MOTION[pose] ?? POSE_MOTION.static!;
-      return { tx: acc.tx + m.tx, ty: acc.ty + m.ty, scale: acc.scale * m.scale };
-    },
-    { tx: 0, ty: 0, scale: 1 },
-  );
-  const style = {
-    '--tx': `${motion.tx}%`,
-    '--ty': `${motion.ty}%`,
-    '--scale': motion.scale,
-    '--move-duration': `${(2.6 / Math.max(speed, 0.2)).toFixed(2)}s`,
-  } as CSSProperties;
-  return (
-    <span className={styles.glyph} aria-hidden="true">
-      <span className={styles.glyphScene} style={style}>
-        <span className={styles.glyphHorizon} />
-        <span className={styles.glyphSubject} />
-      </span>
-      <span className={styles.glyphFrame} />
-    </span>
-  );
-}
+/** In a sequence a tile adds a shot: the shots it already is, and the number the next one would take (null when full). */
+export type SequenceTiles = { shotsOf: (presetId: string) => number[]; nextShot: number | null };
 
 function PresetTile({
   preset,
   selected,
+  paused,
+  sequence,
   onSelect,
 }: {
   preset: PresetSummary;
   selected: boolean;
+  paused: boolean;
+  sequence?: SequenceTiles;
   onSelect: () => void;
 }) {
   const { t } = useI18n();
   const [previewReady, setPreviewReady] = useState(false);
+  const video = useRef<HTMLVideoElement>(null);
+
+  // No autoplay attribute: the clip plays only while the previews run.
+  useEffect(() => {
+    const element = video.current;
+    if (!element) return;
+    if (paused) element.pause();
+    else element.play().catch(() => undefined);
+  }, [paused, preset.previewUrl]);
+
+  const shots = sequence?.shotsOf(preset.id) ?? [];
   return (
-    <button type="button" className={styles.preset} aria-pressed={selected} onClick={onSelect}>
+    <button
+      type="button"
+      className={styles.preset}
+      // A single shot selects one move; a sequence adds shots, nothing stays pressed.
+      aria-pressed={sequence ? undefined : selected}
+      data-full={sequence?.nextShot === null}
+      onClick={onSelect}
+    >
       <span className={styles.presetMedia}>
+        {sequence && (
+          <span className={styles.shotMarks} aria-hidden="true">
+            {shots.map((n) => (
+              <span key={n} className={styles.shotMark}>
+                {n}
+              </span>
+            ))}
+            {sequence.nextShot !== null && <span className={styles.shotAdd}>+</span>}
+          </span>
+        )}
         <MoveGlyph poses={preset.poses} speed={preset.speed} />
         {preset.previewUrl && (
           <video
+            ref={video}
             className={styles.presetPreview}
             data-ready={previewReady}
             src={preset.previewUrl}
             muted
             loop
-            autoPlay
             playsInline
             preload="metadata"
             aria-hidden="true"
@@ -77,31 +77,66 @@ function PresetTile({
         <span className={styles.presetName}>{preset.name}</span>
         <span className={styles.presetDescription}>{preset.description}</span>
       </span>
+      {sequence && (
+        <span className="visually-hidden">
+          {shots.length > 0 && t('inShots', { list: shots.join(', ') })}{' '}
+          {sequence.nextShot === null ? t('shotsFull') : t('addAsShot', { i: sequence.nextShot })}
+        </span>
+      )}
     </button>
   );
 }
 
+/** Tiles drawn while the catalogue loads: the gallery keeps its shape instead of jumping in. */
+const SKELETON_TILES = 6;
+
 export function PresetGallery({
   presets,
+  catalog = 'ready',
   selectedId,
+  paused,
+  onPause,
+  sequence,
   onSelect,
 }: {
   presets: PresetSummary[];
+  catalog?: 'loading' | 'ready' | 'failed';
   selectedId: string | null;
+  /** The looping previews are stopped (the toggle, or reduced motion). */
+  paused: boolean;
+  onPause: (paused: boolean) => void;
+  /** Sequence mode: tiles add shots. */
+  sequence?: SequenceTiles;
   onSelect: (id: string) => void;
 }) {
   const { t } = useI18n();
   return (
     <section className={styles.panelSection} aria-labelledby="presets-heading">
-      <h2 id="presets-heading" className={styles.sectionTitle}>
-        {t('presets')}
-      </h2>
-      <div className={styles.presetGrid}>
+      <div className={styles.sectionHead}>
+        <h2 id="presets-heading" className={styles.sectionTitle}>
+          {t('presets')}
+        </h2>
+        <button
+          type="button"
+          className={styles.toolButton}
+          aria-label={paused ? t('motionPlayLabel') : t('motionPauseLabel')}
+          onClick={() => onPause(!paused)}
+        >
+          <span className={styles.motionIcon} data-paused={paused} aria-hidden="true" />
+          {paused ? t('motionPlay') : t('motionPause')}
+        </button>
+      </div>
+      {catalog === 'failed' && <p className={styles.hint}>{t('catalogFailed')}</p>}
+      <div className={styles.presetGrid} aria-busy={catalog === 'loading'}>
+        {catalog === 'loading' &&
+          Array.from({ length: SKELETON_TILES }, (_, i) => <span key={i} className={styles.presetSkeleton} aria-hidden="true" />)}
         {presets.map((preset) => (
           <PresetTile
             key={preset.id}
             preset={preset}
             selected={preset.id === selectedId}
+            paused={paused}
+            sequence={sequence}
             onSelect={() => onSelect(preset.id)}
           />
         ))}

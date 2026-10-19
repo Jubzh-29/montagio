@@ -12,12 +12,13 @@ import styles from './openstack.module.css';
 export function OpenStack() {
   const { t, lang } = useI18n();
   const [report, setReport] = useState<OpenStackReport | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     apiFetch('/api/open-stack')
       .then((res) => jsonOrThrow<OpenStackReport>(res))
       .then(setReport)
-      .catch(() => setReport(null));
+      .catch(() => setFailed(true));
   }, []);
 
   return (
@@ -26,29 +27,34 @@ export function OpenStack() {
       <main className={styles.page}>
         <h1 className={styles.title}>{t('openStackTitle')}</h1>
         <p className={styles.intro}>{t('openStackIntro')}</p>
-        {report && (
-          <p className={styles.checked} data-ok={report.ok}>
+        {report ? (
+          <p className={styles.checked} data-state={report.ok ? 'ok' : 'failed'}>
             {report.ok ? t('badge') : t('badgeFailed')} ·{' '}
             {t('verifiedAt', { date: new Date(report.checkedAt).toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US') })}
           </p>
+        ) : (
+          <p className={styles.checked} data-state={failed ? 'failed' : 'checking'} role={failed ? 'alert' : undefined}>
+            {failed ? t('openStackUnavailable') : t('badgeChecking')}
+          </p>
         )}
 
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th scope="col">{t('modelCol')}</th>
-              <th scope="col">{t('licenseCol')}</th>
-              <th scope="col">{t('weightsCol')}</th>
+        {/* On a phone the rows become blocks (CSS); the explicit roles keep them a table for screen readers. */}
+        <table className={styles.table} role="table">
+          <thead role="rowgroup">
+            <tr role="row">
+              <th scope="col" role="columnheader">{t('modelCol')}</th>
+              <th scope="col" role="columnheader">{t('licenseCol')}</th>
+              <th scope="col" role="columnheader">{t('weightsCol')}</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {report?.models.map((model) => (
-              <tr key={model.id} data-testid="model-row">
-                <th scope="row" className={styles.mono}>
+              <tr key={model.id} data-testid="model-row" role="row">
+                <th scope="row" role="rowheader" className={styles.mono}>
                   {model.id}
                 </th>
-                <td className={styles.license}>{model.license}</td>
-                <td>
+                <td role="cell" className={styles.license}>{model.license}</td>
+                <td role="cell">
                   <ul className={styles.weights}>
                     {model.weights.map((weight) => (
                       <li key={weight.id}>

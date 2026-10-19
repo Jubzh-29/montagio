@@ -22,41 +22,46 @@ export function ShotList({
 }) {
   const { t } = useI18n();
   const nameOf = (id: string) => presets.find((preset) => preset.id === id)?.name ?? id;
+  // The slots still free, drawn empty: the film's shape (two shots, a third optional) reads before any click.
+  const free = Array.from({ length: max - shots.length }, (_, i) => shots.length + i + 1);
   return (
     <section className={styles.panelSection} aria-labelledby="shots-heading">
       <h2 id="shots-heading" className={styles.sectionTitle}>
         {t('shots')} · {shots.length}/{max}
       </h2>
-      {shots.length === 0 ? (
-        <p className={styles.hint}>{t('sequenceHint')}</p>
-      ) : (
-        <ol className={styles.shotList}>
-          {shots.map((shot, index) => (
-            <li key={`${shot.presetId}-${index}`} className={styles.shot}>
-              <span className={styles.shotNumber}>{index + 1}</span>
-              <span className={styles.shotName}>{nameOf(shot.presetId)}</span>
-              <button
-                type="button"
-                className={styles.shotRemove}
-                aria-label={t('removeShot', { i: index + 1 })}
-                onClick={() => onRemove(index)}
-              >
-                ×
-              </button>
-              <input
-                type="text"
-                className={styles.shotPrompt}
-                aria-label={t('shotPrompt', { i: index + 1 })}
-                placeholder={t('shotPromptPlaceholder')}
-                maxLength={300}
-                disabled={promptsDisabled}
-                value={shot.prompt}
-                onChange={(event) => onPromptChange(index, event.target.value)}
-              />
-            </li>
-          ))}
-        </ol>
-      )}
+      <p className={styles.hint}>{shots.length === max ? t('shotsFull') : t('sequenceHint')}</p>
+      <ol className={styles.shotList}>
+        {shots.map((shot, index) => (
+          <li key={`${shot.presetId}-${index}`} className={styles.shot}>
+            <span className={styles.shotNumber}>{index + 1}</span>
+            <span className={styles.shotName}>{nameOf(shot.presetId)}</span>
+            <button
+              type="button"
+              className={styles.shotRemove}
+              aria-label={t('removeShot', { i: index + 1 })}
+              onClick={() => onRemove(index)}
+            >
+              ×
+            </button>
+            <input
+              type="text"
+              className={styles.shotPrompt}
+              aria-label={t('shotPrompt', { i: index + 1 })}
+              placeholder={t('shotPromptPlaceholder')}
+              maxLength={300}
+              disabled={promptsDisabled}
+              value={shot.prompt}
+              onChange={(event) => onPromptChange(index, event.target.value)}
+            />
+          </li>
+        ))}
+        {free.map((n) => (
+          <li key={`free-${n}`} className={styles.shotSlot} aria-hidden="true">
+            <span className={styles.shotNumber}>{n}</span>
+            <span>{n <= 2 ? t('shotSlot') : t('shotSlotOptional')}</span>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

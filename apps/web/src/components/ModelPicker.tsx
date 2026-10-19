@@ -9,8 +9,10 @@ export function ModelPicker({
   selectedId,
   onSelect,
   onlyId,
+  loading = false,
 }: {
   models: ModelSummary[];
+  loading?: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
   /** The showcase has clips of one model: the others stay visible, marked "local only". */
@@ -20,7 +22,8 @@ export function ModelPicker({
   return (
     <fieldset className={styles.panelSection}>
       <legend className={styles.sectionTitle}>{t('model')}</legend>
-      <div className={styles.models}>
+      <div className={styles.models} aria-busy={loading}>
+        {loading && [0, 1].map((i) => <span key={i} className={styles.modelSkeleton} aria-hidden="true" />)}
         {models.map((model) => {
           const localOnly = onlyId !== undefined && model.id !== onlyId;
           return (
