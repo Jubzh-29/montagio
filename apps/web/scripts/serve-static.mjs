@@ -4,6 +4,8 @@
 // optional path prefix (a GitHub Pages project site lives under /<repo>/).
 //
 //   node scripts/serve-static.mjs <dir> <port> [--prefix montagio]
+//
+// It listens on 127.0.0.1 only.
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -98,6 +100,15 @@ export function createStaticServer(dir, { prefix = '' } = {}) {
   });
 }
 
+/** Serve `dir` on `port` of the loopback interface only: a test tool, not reachable from the network. */
+export function listenStatic(dir, port, opts = {}) {
+  const server = createStaticServer(dir, opts);
+  return new Promise((resolvePromise, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', () => resolvePromise(server));
+  });
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const [dir, port, ...rest] = process.argv.slice(2);
   if (!dir || !port) {
@@ -107,7 +118,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const at = rest.indexOf('--prefix');
   // "montagio" or "/montagio" (Git Bash rewrites an argument that starts with "/").
   const prefix = normalizeBasePath(at === -1 ? '' : rest[at + 1]);
-  createStaticServer(dir, { prefix }).listen(Number(port), () => {
-    console.log(`serving ${resolve(dir)} on http://localhost:${port}${prefix}/`);
-  });
+  await listenStatic(dir, Number(port), { prefix });
+  console.log(`serving ${resolve(dir)} on http://127.0.0.1:${port}${prefix}/`);
 }

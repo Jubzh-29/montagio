@@ -46,6 +46,10 @@ La commande enchaîne cinq étapes :
    Un fichier dont les entrées n'ont pas changé n'est pas refait. Le premier passage prend environ 80 s, les suivants environ 3 s.
 3. **La copie de ffmpeg.wasm** dans `apps/web/public/ffmpeg/`, avec ses licences (`LICENSES.txt`). La page charge ces fichiers depuis sa propre origine, jamais depuis un CDN.
 4. **`next build`** en mode export (`MONTAGIO_SHOWCASE_EXPORT=1`, `NEXT_PUBLIC_MONTAGIO_MODE=showcase`), suivi de deux petits correctifs de l'export de Next 16.4.2 (`scripts/export-fixes.mjs`).
+
+   Ce build passe par `apps/web/.next`, comme un build normal. En mode export, Next 16.4.2 ne se sert de `distDir` que pour renommer `out/` (`node_modules/next/dist/export/utils.js`). Un `distDir` séparé ne protège donc rien. Deux garde-fous existent à la place :
+   - `next build` garde `.next/dev` et `.next/cache` : le cache de `next dev` et des e2e n'est pas touché ;
+   - le script refuse de démarrer si `.next` contient un build de production (`next build` normal, servi par `next start`, comme celui de l'installeur local). Il faut alors construire la vitrine depuis un autre checkout, ou supprimer `apps/web/.next` puis refaire `next build` avant `next start`.
 5. **La fiche du Space** (`apps/web/showcase-space/README.md`) est copiée dans `out/README.md`.
 
 Résultat : `apps/web/out/`, environ 160 Mo. Les clips pèsent environ 1,7 Mo chacun, leurs variantes 9:16 environ 1,9 Mo, et ffmpeg.wasm 31 Mo.
@@ -60,7 +64,7 @@ La syntaxe `VARIABLE=valeur commande` est celle de Git Bash. Sous PowerShell, d�
 
 `--release` change deux choses :
 - **Vérification stricte** : `showcase verify --strict` refuse les photos et les clips provisoires, ainsi qu'un clip dont le workflow a changé depuis son rendu.
-- **Lien vers le code source** : `MONTAGIO_REPO_URL` devient obligatoire. La page affiche ce lien, comme l'exige l'AGPL-3.0 (§13), avec « L'installer chez soi ».
+- **Lien vers le code source** : `MONTAGIO_REPO_URL` devient obligatoire. La page affiche ce lien, comme l'exige l'AGPL-3.0 (§13), avec « L'installer chez soi ». Le build refuse une adresse qui n'est pas une URL https absolue, ou qui contient un identifiant ou un jeton.
 
 Sans `--release`, le pied de page affiche « Lien du code source ajouté à la publication ».
 
@@ -70,7 +74,7 @@ Sans `--release`, le pied de page affiche « Lien du code source ajouté à la p
 node apps/web/scripts/serve-static.mjs apps/web/out 3101
 ```
 
-Ouvrir ensuite http://localhost:3101/ et dérouler les vérifications de la partie 4.
+Ouvrir ensuite http://127.0.0.1:3101/ (le serveur de test n'écoute que sur la machine) et dérouler les vérifications de la partie 4.
 
 ## 3. Déployer sur Hugging Face, pas à pas
 
@@ -170,7 +174,7 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
    ```
 
    `ingest` :
-   - garde les rendus réussis, faits sur le bon modèle, à partir de la bonne photo et avec la caméra du preset ;
+   - garde les rendus réussis, faits sur le bon modèle, à partir de la bonne photo, avec la caméra du preset, et à sa taille et sa durée pour ce format. Un rendu `--resolution 720p` est donc écarté (ligne `skipped:`), au lieu d'être réduit en silence ;
    - les réencode dans l'encodage commun de la vitrine, avec la mention « AI-generated » ;
    - écrit leurs entrées dans le manifeste : seed, sha256, empreintes de la photo et du workflow, date.
 
@@ -210,7 +214,13 @@ Ce que la vitrine ne contrôle pas : **l'hébergeur** (Hugging Face, ou GitHub e
 ## 8. Plus tard : une vraie génération sur GPU loué (non construite)
 
 La décision viendra après la S2 (21–22/10). Le point d'extension est prévu :
-- **Côté page** : l'interface lit les capacités du routeur (`/api/showcase` : `uploads`, `remixRender`) plutôt que le nom du mode. Une génération réelle ajouterait une variable de build, par exemple `NEXT_PUBLIC_MONTAGIO_LIVE_API`. Le routeur enverrait alors les dépôts de photo, les remix et les couples absents du manifeste à un serveur Montagio distant, et passerait ces capacités à `true`.
+- **Côté page** : pour ce qu'un serveur GPU ajouterait, l'interface lit les capacités du routeur (`/api/showcase`) plutôt que le nom du mode (`studioCapabilities`, dans `apps/web/src/lib/showcase-ui.ts`) :
+  - `uploads` : choisir ou déposer sa propre photo, à côté des photos d'exemple ;
+  - `remixRender` : le bouton qui lance le rendu d'un remix (sans lui, la page explique pourquoi).
+
+  Tant que le routeur n'a pas répondu, les deux restent coupées. Le reste dépend du mode de build (`IS_SHOWCASE`) : les photos d'exemple, les textes propres à la vitrine, les champs de prompt désactivés (les clips sont pré-générés), le préchargement de ffmpeg.wasm, le modèle unique et le pied de page.
+
+  Une génération réelle ajouterait une variable de build, par exemple `NEXT_PUBLIC_MONTAGIO_LIVE_API`. Le routeur enverrait alors les dépôts de photo, les remix et les couples absents du manifeste à un serveur Montagio distant, et passerait ces capacités à `true`. Il faudrait aussi rouvrir les champs de prompt, qui ne lisent encore aucune capacité.
 - **Côté serveur** : un serveur Montagio en mode `local` ou `hosted`, sur un GPU loué, qui porterait :
   - un plafond de dépense, avec les secondes GPU comptées et un arrêt au plafond ;
   - un CORS limité à l'origine de la vitrine ;

@@ -14,7 +14,7 @@ function watchRequests(page: Page): () => string[] {
     if (response.status() >= 400) failed.push(`${response.status()} ${response.url()}`);
   });
   return () => [
-    ...urls.filter((url) => !url.startsWith('http://localhost:3101/') && !url.startsWith('blob:') && !url.startsWith('data:')),
+    ...urls.filter((url) => !url.startsWith('http://127.0.0.1:3101/') && !url.startsWith('blob:') && !url.startsWith('data:')),
     ...failed,
   ];
 }

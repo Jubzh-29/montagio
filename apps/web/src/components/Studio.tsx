@@ -15,7 +15,7 @@ import {
 } from '@/lib/api-types';
 import { refusalMessageKey } from '@/lib/refusals';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
-import { primaryLabelKey, showcaseNoteKeys } from '@/lib/showcase-ui';
+import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { useShowcase } from '@/lib/use-showcase';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
@@ -104,8 +104,10 @@ export function Studio() {
   const remixTextRef = useRef<HTMLTextAreaElement>(null);
   const remixToggleRef = useRef<HTMLButtonElement>(null);
   const remixFocus = useRef<'editor' | 'toggle' | null>(null);
-  // The static showcase: sample photos instead of uploads, pre-generated clips, no remix render.
+  // The showcase: sample photos and pre-generated clips. Uploads and remix renders
+  // follow its capabilities (none in the static showcase).
   const showcase = useShowcase();
+  const capabilities = studioCapabilities(IS_SHOWCASE, showcase);
 
   useEffect(() => {
     Promise.all([
@@ -387,7 +389,7 @@ export function Studio() {
   const selectedModel = models.find((model) => model.id === modelId);
   const estimate = selectedModel?.estimate_s['480p'] ?? 0;
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
-  const primaryLabel = primaryLabelKey(mode, remix !== null, IS_SHOWCASE);
+  const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
   const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
   const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
   const repoUrl = showcase?.repoUrl ?? null;
@@ -416,6 +418,7 @@ export function Studio() {
                           .join(' ')
                       : '',
                     onPick: pickSample,
+                    uploads: capabilities.uploads,
                     onOtherSample: () => {
                       if (busyRef.current) return;
                       setJob({ status: 'idle' });

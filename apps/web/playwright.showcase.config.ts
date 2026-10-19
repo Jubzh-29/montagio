@@ -11,11 +11,11 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
-  use: { baseURL: `http://localhost:${PORT}`, trace: 'retain-on-failure', acceptDownloads: true },
+  use: { baseURL: `http://127.0.0.1:${PORT}`, trace: 'retain-on-failure', acceptDownloads: true },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: `node scripts/showcase-build.mjs && node scripts/serve-static.mjs out ${PORT}`,
-    url: `http://localhost:${PORT}/showcase/data.json`,
+    url: `http://127.0.0.1:${PORT}/showcase/data.json`,
     reuseExistingServer: false,
     // check-open-stack, showcase prepare (FFmpeg, cached after the first run) and next build.
     timeout: 900_000,

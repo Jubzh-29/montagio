@@ -24,8 +24,6 @@ const SOURCE_EXTENSIONS = /\.(ts|tsx|js|mjs|cjs|py)$/;
 const SKIPPED_DIRS = new Set([
   'node_modules',
   '.next',
-  // a Next static export (apps/web/out): bundled output, not source
-  'out',
   'dist',
   'test-results',
   'playwright-report',
@@ -35,11 +33,15 @@ const SKIPPED_DIRS = new Set([
   'venv',
 ]);
 
+/** The web app's static export (the showcase build): bundled output, not source. Other folders named `out` are scanned. */
+const WEB_EXPORT_DIR = join('apps', 'web', 'out');
+
 async function readYaml<T>(path: string): Promise<T> {
   return parseYaml(await readFile(path, 'utf8')) as T;
 }
 
-async function listFiles(dir: string): Promise<string[]> {
+/** The files under `dir`, without the build-output folders and the `skipped` paths. */
+async function listFiles(dir: string, skipped: ReadonlySet<string> = new Set()): Promise<string[]> {
   let entries;
   try {
     entries = await readdir(dir, { withFileTypes: true });
@@ -50,7 +52,7 @@ async function listFiles(dir: string): Promise<string[]> {
   for (const entry of entries) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (!SKIPPED_DIRS.has(entry.name)) files.push(...(await listFiles(path)));
+      if (!SKIPPED_DIRS.has(entry.name) && !skipped.has(path)) files.push(...(await listFiles(path, skipped)));
     } else {
       files.push(path);
     }
@@ -395,8 +397,9 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
     join(configDir, 'forbidden-patterns.yaml'),
   );
   const patterns = forbidden.patterns.map(({ pattern, reason }) => ({ regex: new RegExp(pattern), reason }));
+  const notSource = new Set([join(root, WEB_EXPORT_DIR)]);
   for (const dir of await sourceDirs(root)) {
-    for (const path of await listFiles(dir)) {
+    for (const path of await listFiles(dir, notSource)) {
       if (!SOURCE_EXTENSIONS.test(path)) continue;
       const text = await readFile(path, 'utf8');
       for (const { regex, reason } of patterns) {

@@ -6,7 +6,8 @@
 // 2. `showcase prepare` writes public/showcase (clips, placeholders, 9:16 cuts,
 //    workflows, data.json) — strict in a release;
 // 3. ffmpeg.wasm is copied to public/ffmpeg (served from the showcase's own origin);
-// 4. `next build` exports the pages (MONTAGIO_SHOWCASE_EXPORT=1);
+// 4. `next build` exports the pages (MONTAGIO_SHOWCASE_EXPORT=1); it builds in apps/web/.next,
+//    so the script refuses to start over a production build there;
 // 5. Next 16.4.2 export fixes (export-fixes.mjs), then the Hugging Face Space card is copied to out/README.md.
 //
 // A release needs MONTAGIO_REPO_URL, the public repository (source link, AGPL-3.0 §13).
@@ -16,7 +17,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { normalizeBasePath } from './build-options.mjs';
+import { nextBuildKind, normalizeBasePath, normalizeRepoUrl } from './build-options.mjs';
 import { flattenSegmentPrefetches } from './export-fixes.mjs';
 import { ffmpegLicenses } from './ffmpeg-licenses.mjs';
 
@@ -26,15 +27,25 @@ const require = createRequire(import.meta.url);
 
 const { values } = parseArgs({ options: { release: { type: 'boolean', default: false }, 'base-path': { type: 'string' } } });
 let basePath;
+let repoUrl;
 try {
   basePath = normalizeBasePath(values['base-path']);
+  repoUrl = normalizeRepoUrl(process.env.MONTAGIO_REPO_URL);
 } catch (error) {
   console.error(error.message);
   process.exit(2);
 }
-const repoUrl = process.env.MONTAGIO_REPO_URL?.trim() ?? '';
 if (values.release && !repoUrl) {
   console.error('a release build needs MONTAGIO_REPO_URL, the public repository URL (the showcase links to its source code)');
+  process.exit(2);
+}
+// Next 16.4.2 builds a static export in .next as well (a distDir would only rename out/):
+// never replace the production build that next start serves, e.g. the local installer's.
+if (nextBuildKind(join(web, '.next')) === 'server') {
+  console.error(
+    'apps/web/.next holds a production build (next build, served by next start): the showcase build would replace it. ' +
+      'Build the showcase from another checkout, or delete apps/web/.next first (then run next build again before next start).',
+  );
   process.exit(2);
 }
 

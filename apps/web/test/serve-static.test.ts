@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { request, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createStaticServer } from '../scripts/serve-static.mjs';
+import { createStaticServer, listenStatic } from '../scripts/serve-static.mjs';
 
 let dir = '';
 let server: Server | null = null;
@@ -92,4 +92,11 @@ test('serves under a prefix', async () => {
   expect(res.status).toBe(200);
   expect(await res.text()).toContain('root');
   expect((await fetch(`${base}/`)).status).toBe(404);
+});
+
+test('the command-line server listens on the loopback interface only', async () => {
+  server = (await listenStatic(dir, 0)) as Server;
+  const address = server.address() as AddressInfo;
+  expect(address.address).toBe('127.0.0.1');
+  expect((await fetch(`http://127.0.0.1:${address.port}/`)).status).toBe(200);
 });

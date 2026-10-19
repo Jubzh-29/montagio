@@ -21,7 +21,18 @@ const CAMERA: Record<string, object> = {
   'pan-left': { mode: 'parametric', pose: 'Pan Left', pose_2: null, combine: null, speed: 1 },
 };
 
-type Run = { preset: string; run?: number; seed?: number; raw?: string; model?: string; imageSha?: string; camera?: object; status?: string };
+type Run = {
+  preset: string;
+  run?: number;
+  seed?: number;
+  raw?: string;
+  model?: string;
+  imageSha?: string;
+  camera?: object;
+  status?: string;
+  /** What smoke.ts compiled: the preset's 832x480, 81 frames at 16 fps unless overridden. */
+  size?: { width: number; height: number; frames: number; fps: number };
+};
 
 /** Write a smoke.ts results folder: one record per run, its clip under clips/. */
 function writeSmoke(runs: Run[]): void {
@@ -38,10 +49,7 @@ function writeSmoke(runs: Run[]): void {
       status: r.status ?? 'succeeded',
       error: null,
       camera: r.camera ?? CAMERA[r.preset],
-      width: 832,
-      height: 480,
-      frames: 81,
-      fps: 16,
+      ...(r.size ?? { width: 832, height: 480, frames: 81, fps: 16 }),
       duration_s: 5,
       seed: r.seed ?? 42,
       outputs: [output],
@@ -124,6 +132,21 @@ test('skips a run made from another image, another model or a camera sweep', asy
     expect.stringMatching(/^crash-push run 1: made from another image/),
     expect.stringMatching(/^crash-push run 1: rendered on wan22-ti2v-5b, the showcase shows wan22-i2v-a14b-fun-camera/),
     expect.stringMatching(/^crash-push run 1: its camera .* is not the preset's/),
+  ]);
+  expect((await loadManifest(root)).clips).toEqual([]);
+}, FFMPEG_TIMEOUT_MS);
+
+test('skips a run rendered at another size or length than the preset makes for the sample', async () => {
+  writeSmoke([
+    // smoke.ts --resolution 720p
+    { preset: 'crash-push', size: { width: 1280, height: 720, frames: 81, fps: 16 } },
+    { preset: 'pan-left', size: { width: 832, height: 480, frames: 49, fps: 16 } },
+  ]);
+  const result = await ingestSmoke(root, smoke, 'landscape-a', {});
+  expect(result.added).toEqual([]);
+  expect(result.skipped).toEqual([
+    'crash-push run 1: rendered at 1280x720, 81 frames at 16 fps; the preset makes 832x480, 81 frames at 16 fps for landscape-a',
+    'pan-left run 1: rendered at 832x480, 49 frames at 16 fps; the preset makes 832x480, 81 frames at 16 fps for landscape-a',
   ]);
   expect((await loadManifest(root)).clips).toEqual([]);
 }, FFMPEG_TIMEOUT_MS);

@@ -56,6 +56,7 @@
   "errorFfmpegMissing": "FFmpeg n'est pas installé sur le serveur. Installez-le (ou indiquez son chemin dans MONTAGIO_FFMPEG), puis réessayez.",
   "errorWorkflowRejected": "ComfyUI a refusé ce workflow. Le détail est dans le journal du serveur.",
   "errorBackendUnavailable": "Le serveur ComfyUI est injoignable. Vérifiez qu'il tourne, puis réessayez.",
+  "errorFfmpegFailed": "FFmpeg n'a pas pu assembler les plans en un film. Réessayez.",
   "modeSingle": "Plan unique",
   "modeSequence": "Séquence",
   "modeLabel": "Mode",
