@@ -21,6 +21,7 @@ function facts(over: Partial<MachineFacts> = {}): MachineFacts {
     driverCuda: [13, 0],
     pythons: [{ command: ['py', '-3.12'], version: [3, 12, 10], hasVenv: true }],
     freeBytes: { installDir: 500 * GiB, repo: 500 * GiB },
+    sameVolume: false,
     ramBytes: 64 * GiB,
     busyPorts: [],
     ...over,
@@ -135,6 +136,17 @@ test('too little disk fails with both sizes, and little RAM warns', () => {
   expect(disk.message).toContain('90.0 GiB');
   expect(disk.fix).toContain('--dir');
   expect(byId(evaluate(facts({ ramBytes: 16 * GiB }), ctx), 'ram')?.severity).toBe('warn');
+});
+
+test('the install folder and the repository on one drive need room for both', () => {
+  // ctx needs 90 GiB for the install folder and 3 GiB beside the repository: 92 GiB free is enough for either, not both.
+  const oneDrive = facts({ freeBytes: { installDir: 92 * GiB, repo: 92 * GiB }, sameVolume: true });
+  const disk = byId(evaluate(oneDrive, ctx), 'disk')!;
+  expect(disk.severity).toBe('fail');
+  expect(disk.message).toContain('92.0 GiB');
+  expect(disk.message).toContain('93.0 GiB');
+  expect(byId(evaluate({ ...oneDrive, sameVolume: false }, ctx), 'disk')?.severity).toBe('ok');
+  expect(byId(evaluate({ ...oneDrive, freeBytes: { installDir: 93 * GiB, repo: 93 * GiB } }, ctx), 'disk')?.severity).toBe('ok');
 });
 
 test('a 32 GB machine does not warn about RAM, though the system reports a little less', () => {

@@ -143,8 +143,14 @@ export function evaluate(facts: MachineFacts, ctx: Context): Check[] {
   }
 
   const short: string[] = [];
-  if (facts.freeBytes.installDir < ctx.need.installDir) short.push(`${gib(facts.freeBytes.installDir)} free for the install folder, ${gib(ctx.need.installDir)} needed`);
-  if (facts.freeBytes.repo < ctx.need.repo) short.push(`${gib(facts.freeBytes.repo)} free beside the repository, ${gib(ctx.need.repo)} needed`);
+  if (facts.sameVolume) {
+    // One drive holds both: each need keeps its own margin, 2 GiB more than either alone.
+    const both = ctx.need.installDir + ctx.need.repo;
+    if (facts.freeBytes.installDir < both) short.push(`${gib(facts.freeBytes.installDir)} free on the drive of the install folder and the repository, ${gib(both)} needed for both`);
+  } else {
+    if (facts.freeBytes.installDir < ctx.need.installDir) short.push(`${gib(facts.freeBytes.installDir)} free for the install folder, ${gib(ctx.need.installDir)} needed`);
+    if (facts.freeBytes.repo < ctx.need.repo) short.push(`${gib(facts.freeBytes.repo)} free beside the repository, ${gib(ctx.need.repo)} needed`);
+  }
   add(
     short.length === 0
       ? { id: 'disk', severity: 'ok', message: `${gib(facts.freeBytes.installDir)} free for the install folder` }

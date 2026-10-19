@@ -65,6 +65,7 @@ function facts(over: Partial<MachineFacts> = {}): MachineFacts {
     driverCuda: [13, 0],
     pythons: [{ command: ['py', '-3.12'], version: [3, 12, 10], hasVenv: true }],
     freeBytes: { installDir: 500 * GiB, repo: 500 * GiB },
+    sameVolume: false,
     ramBytes: 64 * GiB,
     busyPorts: [],
     ...over,
