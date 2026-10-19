@@ -13,4 +13,12 @@ export {
 } from './compile';
 export { loadLibrary, LibraryError, type Library } from './library';
 export { validatePreset, type PresetValidation } from './validate';
-export { bindExtension, compileMusic, type ExtensionCompiled, type MusicInputs } from './extensions';
+export {
+  bindExtension,
+  compileMusic,
+  compileUpscale,
+  UPSCALE_TARGETS,
+  type ExtensionCompiled,
+  type MusicInputs,
+  type UpscaleInputs,
+} from './extensions';

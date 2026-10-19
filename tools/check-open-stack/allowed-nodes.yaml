@@ -34,3 +34,16 @@ nodes:
   - { class_type: EmptyAceStep1.5LatentAudio, source: comfyui-core, license: GPL-3.0 }
   - { class_type: VAEDecodeAudio, source: comfyui-core, license: GPL-3.0 }
   - { class_type: SaveAudioAdvanced, source: comfyui-core, license: GPL-3.0 }
+  # Extension "upscale" (2026-10-19), core of ComfyUI v0.41.0: comfy_extras/nodes_video.py (LoadVideo,
+  # GetVideoComponents), comfy_extras/nodes_post_processing.py (ResizeImageMaskNode), nodes.py (VAEEncodeTiled,
+  # VAEDecodeTiled) and comfy_extras/nodes_seedvr.py (the five SeedVR2 nodes).
+  - { class_type: LoadVideo, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: GetVideoComponents, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ResizeImageMaskNode, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: VAEEncodeTiled, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: VAEDecodeTiled, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SeedVR2Preprocess, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SeedVR2TemporalChunk, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SeedVR2Conditioning, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SeedVR2TemporalMerge, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SeedVR2PostProcessing, source: comfyui-core, license: GPL-3.0 }

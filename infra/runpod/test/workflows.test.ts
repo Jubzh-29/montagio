@@ -15,7 +15,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { compileJob, compileMusic, loadLibrary, type Aspect, type Library } from '@montagio/presets';
+import { compileJob, compileMusic, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -126,6 +126,14 @@ test('the music job compiled for 5, 10 and 60 s is accepted', () => {
   for (const duration_s of [5, 10, 60]) {
     const { workflow } = compileMusic(model, library.extensionTemplates.get(model.workflow)!, { prompt: 'calm piano', duration_s, seed: 3 });
     expect({ duration_s, problems: checkWorkflow(workflow, info) }).toEqual({ duration_s, problems: [] });
+  }
+});
+
+test('the upscale job compiled for each aspect is accepted', () => {
+  const model = library.extensionModels.get('seedvr2-upscale')!;
+  for (const aspect of ASPECTS) {
+    const { workflow } = compileUpscale(model, library.extensionTemplates.get(model.workflow)!, { videoRef: 'clip.mp4', aspect, seed: 3 });
+    expect({ aspect, problems: checkWorkflow(workflow, info) }).toEqual({ aspect, problems: [] });
   }
 });
 

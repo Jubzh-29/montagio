@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { compileMusic, CompileError, loadLibrary, type ApiWorkflow, type Library } from '../src/index';
+import { compileMusic, compileUpscale, CompileError, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -77,5 +77,40 @@ describe('compileMusic (ACE-Step 1.5)', () => {
   test('a model of another task is refused', () => {
     const { model, template } = music();
     expect(() => compileMusic({ ...model, task: 'i2i-edit' }, template, { prompt: 'x', duration_s: 12, seed: 1 })).toThrow(/t2a/);
+  });
+});
+
+describe('compileUpscale (SeedVR2 3B)', () => {
+  const upscale = () => extension('seedvr2-upscale');
+  const compile = (inputs: Partial<Parameters<typeof compileUpscale>[2]> = {}) =>
+    compileUpscale(upscale().model, upscale().template, { videoRef: 'clip.mp4', aspect: '16:9', seed: 5, ...inputs });
+
+  test('a 16:9 clip goes to 1920x1080, a 9:16 one to 1080x1920, a square one to 1080x1080', () => {
+    for (const [aspect, width, height] of [['16:9', 1920, 1080], ['9:16', 1080, 1920], ['1:1', 1080, 1080]] as const) {
+      const { workflow, params } = compile({ aspect });
+      expect({ aspect, width: workflow['57']!.inputs['resize_type.width'], height: workflow['57']!.inputs['resize_type.height'] }).toEqual({ aspect, width, height });
+      expect(params).toMatchObject({ width, height });
+    }
+    expect(UPSCALE_TARGETS['9:16']).toEqual({ width: 1080, height: 1920 });
+  });
+
+  test('the clip is bound to LoadVideo.file and the seed to the sampler', () => {
+    const { workflow } = compile({ videoRef: 'uploads/abc.mp4', seed: 99 });
+    expect(workflow['73']!.inputs.file).toBe('uploads/abc.mp4');
+    expect(workflow['54']!.inputs.seed).toBe(99);
+  });
+
+  test('a clip over 121 frames is refused', () => {
+    expect(() => compile({ frames: 122 })).toThrow(/121/);
+    expect(() => compile({ frames: 121 })).not.toThrow();
+  });
+
+  test('the output is node 76, video', () => {
+    expect(compile().output).toEqual({ node: '76', kind: 'video' });
+  });
+
+  test('the shipped workflow cuts the clip in chunks of 33 frames with an overlap of 3', () => {
+    const chunk = upscale().template['99']!.inputs;
+    expect(chunk).toMatchObject({ chunking_mode: 'manual', 'chunking_mode.frames_per_chunk': 33, temporal_overlap: 3 });
   });
 });

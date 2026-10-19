@@ -55,6 +55,7 @@ The four extensions decided on 2026-10-19 (music, upscale, image edit, talking a
 | Workflow | Template | Model | Output |
 |---|---|---|---|
 | `ace-step15-music.api.json` | `templates/audio_ace_step_1_5_split.json` | ACE-Step 1.5 turbo (2B) | node 107, FLAC |
+| `seedvr2-upscale.api.json` | `templates/utility_seedvr2_3b_int8_upscale_video.json` | SeedVR2 3B int8 | node 76, MP4 |
 
 ### ace-step15-music
 
@@ -63,6 +64,14 @@ The four extensions decided on 2026-10-19 (music, upscale, image edit, talking a
 - The template's two frontend primitives ("Song Duration", "seed") are gone: their values go to the inputs they fed, which is why `duration_s` and `seed` are each bound to two inputs.
 - `lyrics` is `[Instrumental]`, as ACE-Step's documentation says for a track without vocals; the compiler also ends the description with "instrumental". `timesignature` 4, `language` en and `keyscale` E minor are the template's.
 - Unchanged: shift 3 (`ModelSamplingAuraFlow`), 8 steps, cfg 1, euler/simple, negative = `ConditioningZeroOut` of the positive.
+
+### seedvr2-upscale
+
+- The template's subgraph is flattened with its inner ids; its notes, the trim nodes (79, 81) and the "Split Latent" switches (102, 103, 105) are gone.
+- `ResizeImageMaskNode` 57: `scale by multiplier` 2 becomes `scale dimensions` to the 1080p size of the clip's aspect (bound), crop `center`, lanczos. SeedVR2 has no size input: it restores at the size it receives.
+- The temporal chunking is wired in, in `manual` mode: chunks of 33 frames, overlap 3 (a real crossfade). Unchunked, 81 frames at 1080p need about 35 GiB; `auto` mode would cut by the free VRAM of the moment, so its seams would move from run to run.
+- `SeedVR2PostProcessing` corrects colours with `lab` (the node's default) instead of the template's `none`; GPU session S2 compares `none`, `lab` and `wavelet`.
+- `CreateVideo` takes the frame rate, the audio and the bit depth of the source clip (node 74), so a 16 fps clip stays 16 fps. `SaveVideo` writes `montagio/upscale`, MP4 in H.264. The seed is 0, one step, cfg 1, euler/simple, as in the template.
 
 ## Bindings
 
@@ -77,3 +86,4 @@ Extension models (a binding with several inputs gets the same value in each):
 | Model | Bindings | Output |
 |---|---|---|
 | `ace-step15-music` | prompt 94.tags; duration_s 98.seconds + 94.duration; seed 3.seed + 94.seed; bpm 94.bpm | 107 (audio) |
+| `seedvr2-upscale` | video 73.file; width / height 57.resize_type.width / 57.resize_type.height; seed 54.seed | 76 (video) |

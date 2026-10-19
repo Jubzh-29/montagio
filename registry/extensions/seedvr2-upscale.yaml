@@ -1,0 +1,21 @@
+# HD upscale (extension "upscale"): a finished clip (480p or 720p) to 1080p with SeedVR2,
+# a one-step video restoration model. The target size is set by the resize before it
+# (scale dimensions, crop center); the frame rate and the frame count of the clip are kept.
+schema: montagio/extension-model@0.1
+id: seedvr2-upscale
+name: SeedVR2 3B (1080p upscale)
+extension: upscale
+task: v2v-upscale
+license: Apache-2.0
+weights: [seedvr2-3b-int8, seedvr2-vae]
+workflow: workflows/seedvr2-upscale.api.json
+bindings:
+  video: { node: "73", field: file }
+  width: { node: "57", field: resize_type.width }
+  height: { node: "57", field: resize_type.height }
+  seed: { node: "54", field: seed }
+output: { node: "76", kind: video }
+# 121 frames = 5 s at 24 fps, the longest Wan clip; chunks of 33 frames keep 1080p under 24 GB
+limits: { max_input_frames: 121 }
+# GPU seconds for an 81-frame clip on an RTX 4090 (estimate: 2 to 4 min; S2 measures it)
+estimate_s: 240

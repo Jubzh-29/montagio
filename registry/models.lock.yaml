@@ -104,3 +104,19 @@ weights:
     license: MIT
     source: https://huggingface.co/ACE-Step/Ace-Step1.5
     extension: music
+  - id: seedvr2-3b-int8
+    file: seedvr2_3b_int8_convrot.safetensors
+    url: https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/diffusion_models/seedvr2_3b_int8_convrot.safetensors
+    sha256: c3dec8bcc5916843a8a858572970597462e1f2dc598d6dfd818f6cd40f53a157
+    size: 3458259704
+    license: Apache-2.0
+    source: https://huggingface.co/ByteDance-Seed/SeedVR2-3B
+    extension: upscale
+  - id: seedvr2-vae
+    file: seedvr2_ema_vae_fp16.safetensors
+    url: https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/vae/seedvr2_ema_vae_fp16.safetensors
+    sha256: 20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1
+    size: 501324814
+    license: Apache-2.0
+    source: https://huggingface.co/ByteDance-Seed/SeedVR2-3B
+    extension: upscale

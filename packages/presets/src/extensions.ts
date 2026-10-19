@@ -1,5 +1,6 @@
 import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } from '@montagio/registry';
 import { CompileError, type ApiWorkflow } from './compile';
+import type { Aspect } from './dimensions';
 
 /**
  * Compilers of the extension jobs (music, upscale, image edit, voice, talking avatar).
@@ -90,4 +91,37 @@ export function compileMusic(
   if (!Number.isInteger(bpm) || bpm < 10 || bpm > 300) throw new CompileError(`bpm ${bpm} is not a whole number from 10 to 300`);
   const workflow = bindExtension(model, template, { prompt, duration_s, seed: inputs.seed, bpm });
   return { workflow, output: { ...model.output }, params: { prompt, duration_s, seed: inputs.seed, bpm } };
+}
+
+/** The 1080p size of each aspect: a clip is never stretched to another shape. */
+export const UPSCALE_TARGETS: Record<Aspect, { width: number; height: number }> = {
+  '16:9': { width: 1920, height: 1080 },
+  '9:16': { width: 1080, height: 1920 },
+  '1:1': { width: 1080, height: 1080 },
+};
+
+export type UpscaleInputs = {
+  /** The clip, as the backend's loader names it once uploaded. */
+  videoRef: string;
+  /** The aspect of the clip, which picks its 1080p size. */
+  aspect: Aspect;
+  seed: number;
+  /** The clip's frame count, when known: over the model's `max_input_frames` it is refused. */
+  frames?: number;
+};
+
+/** A finished clip to 1080p (SeedVR2): same aspect, frame rate and frame count, resized then restored. */
+export function compileUpscale(
+  model: ExtensionModel,
+  template: ApiWorkflow,
+  inputs: UpscaleInputs,
+): ExtensionCompiled<{ width: number; height: number; seed: number }> {
+  expectTask(model, 'v2v-upscale');
+  const max = model.limits.max_input_frames;
+  if (inputs.frames !== undefined && max !== undefined && inputs.frames > max) {
+    throw new CompileError(`a clip of ${inputs.frames} frames is longer than the ${max} frames model ${model.id} upscales`);
+  }
+  const { width, height } = UPSCALE_TARGETS[inputs.aspect];
+  const workflow = bindExtension(model, template, { video: inputs.videoRef, width, height, seed: inputs.seed });
+  return { workflow, output: { ...model.output }, params: { width, height, seed: inputs.seed } };
 }
