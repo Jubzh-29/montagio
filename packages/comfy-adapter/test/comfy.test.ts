@@ -365,3 +365,107 @@ test('a BackendError is recognised across copies of the adapter (separate route 
   expect(isBackendError(new Error('backend-error'))).toBe(false);
   expect(isBackendError({ code: 'workflow-rejected' })).toBe(false);
 });
+
+// Jobs whose output is not a video: the music, voice and image-edit workflows.
+
+/** An output of `node`, served from `bytes`. */
+function outputOf(node: string, name: string, type: string, contentType: string, bytes: Buffer): FakeJobState['outputs'][number] {
+  const assetId = `out-${randomUUID()}`;
+  fake.assets.set(assetId, { bytes, contentType, filePath: name });
+  return { node_id: node, name, type, content_type: contentType, assetId };
+}
+
+const outputJob = (output: SubmitJob['output'], outputNode?: string): SubmitJob => ({
+  workflow: { '107': { class_type: 'SaveAudioAdvanced', inputs: { filename_prefix: 'montagio/music', format: 'flac' } } },
+  presetId: 'extension',
+  idempotencyKey: randomUUID(),
+  output,
+  ...(outputNode ? { outputNode } : {}),
+});
+
+test('an audio job downloads its FLAC output, whatever its content type', async () => {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(outputJob('audio', '107'));
+  const flac = Buffer.from('fLaC fake stream');
+  fake.setJob(id, { status: 'succeeded', outputs: [outputOf('107', 'music_00001.flac', 'audio', 'application/octet-stream', flac)] });
+  const done = await b.get(id);
+  expect(done).toEqual({ id, state: 'succeeded', progress: 1, outputPath: join(outputsDir, `${id}.flac`) });
+  expect(readFileSync(done.outputPath!).equals(flac)).toBe(true);
+});
+
+test('an image job downloads its PNG output', async () => {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(outputJob('image'));
+  const png = Buffer.from('png bytes');
+  fake.setJob(id, { status: 'succeeded', outputs: [outputOf('9', 'edit_00001_.png', 'image', 'image/png', png)] });
+  const done = await b.get(id);
+  expect(done.outputPath).toBe(join(outputsDir, `${id}.png`));
+  expect(readFileSync(done.outputPath!).equals(png)).toBe(true);
+});
+
+test('the output of outputNode wins over another output of the same type', async () => {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(outputJob('image', '9'));
+  const preview = Buffer.from('preview');
+  const edit = Buffer.from('the edited photo');
+  fake.setJob(id, {
+    status: 'succeeded',
+    outputs: [outputOf('5', 'preview_00001_.png', 'image', 'image/png', preview), outputOf('9', 'edit_00001_.png', 'image', 'image/png', edit)],
+  });
+  expect(readFileSync((await b.get(id)).outputPath!).equals(edit)).toBe(true);
+});
+
+test('an audio job without an audio output fails with no-output', async () => {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(outputJob('audio'));
+  fake.setJob(id, { status: 'succeeded', outputs: [output('Montagio_00001.mp4', 'video', 'video/mp4')] });
+  expect(await b.get(id)).toMatchObject({ state: 'failed', error: 'no-output' });
+  expect(readdirSync(outputsDir)).toEqual([]);
+});
+
+test('after a restart, get with the job output kind delivers the audio', async () => {
+  const { backendJobId: id } = await backend().submit(outputJob('audio', '107'));
+  fake.setJob(id, { status: 'succeeded', outputs: [outputOf('107', 'music_00001.flac', 'audio', 'application/octet-stream', Buffer.from('fLaC'))] });
+  expect((await backend().get(id, { output: 'audio', outputNode: '107' })).outputPath).toBe(join(outputsDir, `${id}.flac`));
+});
+
+test('after a restart without a hint, a job is read as a video job, as before', async () => {
+  const { backendJobId: id } = await backend().submit(outputJob('audio'));
+  fake.setJob(id, { status: 'succeeded', outputs: [outputOf('107', 'music_00001.flac', 'audio', 'application/octet-stream', Buffer.from('fLaC'))] });
+  expect(await backend().get(id)).toMatchObject({ state: 'failed', error: 'no-output' });
+});
+
+test('an output with an unknown audio extension is saved as .bin', async () => {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(outputJob('audio'));
+  fake.setJob(id, { status: 'succeeded', outputs: [outputOf('107', 'music_00001.xyz', 'audio', 'audio/x-unknown', Buffer.from('?'))] });
+  expect((await b.get(id)).outputPath).toBe(join(outputsDir, `${id}.bin`));
+});
+
+test('the fake proxy gives a SaveAudioAdvanced workflow an audio output (autoRun)', async () => {
+  await fake.close();
+  fake = await startFakeProxy({ autoRun: { clip } });
+  const b = backend();
+  const { backendJobId: id } = await b.submit(outputJob('audio', '107'));
+  for (let i = 0; i < 3; i++) await b.get(id);
+  const job = fake.jobs.get(id)!;
+  expect(job.outputs).toEqual([expect.objectContaining({ node_id: '107', type: 'audio', content_type: 'application/octet-stream' })]);
+  expect(job.outputs[0]!.name).toMatch(/\.flac$/);
+  expect(readdirSync(outputsDir)).toEqual([`${id}.flac`]);
+});
+
+test('the fake proxy gives a SaveImage workflow an image output (autoRun)', async () => {
+  await fake.close();
+  fake = await startFakeProxy({ autoRun: { clip } });
+  const b = backend();
+  const submitted: SubmitJob = {
+    workflow: { '9': { class_type: 'SaveImage', inputs: { filename_prefix: 'montagio/edit' } } },
+    presetId: 'edit',
+    idempotencyKey: randomUUID(),
+    output: 'image',
+  };
+  const { backendJobId: id } = await b.submit(submitted);
+  for (let i = 0; i < 3; i++) await b.get(id);
+  expect(fake.jobs.get(id)!.outputs).toEqual([expect.objectContaining({ node_id: '9', type: 'image', content_type: 'image/png' })]);
+  expect(readdirSync(outputsDir)).toEqual([`${id}.png`]);
+});

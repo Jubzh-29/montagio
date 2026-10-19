@@ -10,14 +10,26 @@ import {
   type Output,
   type WorkflowGraph,
 } from '@comfyorg/sdk';
-import { IDEMPOTENCY_WINDOW_MS, type BackendJob, type GenerationBackend, type SubmitJob } from './backend';
+import {
+  IDEMPOTENCY_WINDOW_MS,
+  type BackendJob,
+  type GenerationBackend,
+  type OutputKind,
+  type OutputWanted,
+  type SubmitJob,
+} from './backend';
 import { BackendError } from './errors';
 import { assertLocalBaseUrl, guardFetch } from './target';
 
 /** Ids the proxy hands back become file names and URL segments: nothing else gets through. */
 const JOB_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const ERROR_CODE = /^[a-z0-9_.-]{1,64}$/i;
-const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.mov', '.mkv', '.gif']);
+/** The extensions an output keeps, by kind; any other becomes ".bin". */
+const EXTENSIONS: Record<OutputKind, Set<string>> = {
+  video: new Set(['.mp4', '.webm', '.mov', '.mkv', '.gif']),
+  image: new Set(['.png', '.jpg', '.jpeg', '.webp']),
+  audio: new Set(['.flac', '.mp3', '.wav', '.opus', '.ogg', '.m4a']),
+};
 /**
  * A clip is a few megabytes: a download still running after this is stuck (a tunnel
  * gone silent). The SDK sets no deadline of its own on a download.
@@ -49,6 +61,17 @@ function buildClient(base: string, build: () => Comfy): Comfy {
 const describe = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /**
+ * The result of a finished job: an output of `kind`, from `node` first when it is given.
+ * The type the proxy reports wins over the content type, which is a guess from the file
+ * name (a FLAC can come back as application/octet-stream); a generic output of that
+ * content type is the fallback.
+ */
+function pickOutput(outputs: Output[], kind: OutputKind, node?: string): Output | undefined {
+  const among = (list: Output[]) => list.find((o) => o.type === kind) ?? list.find((o) => o.contentType.startsWith(`${kind}/`));
+  return (node ? among(outputs.filter((o) => o.nodeId === node)) : undefined) ?? among(outputs);
+}
+
+/**
  * Backend "local": the open-weights workflows run on a ComfyUI reached through
  * comfy-api-proxy, with @comfyorg/sdk. It keeps no job state of its own: `get`
  * reads the job back from the proxy by id, so a restarted app finds a render that
@@ -61,6 +84,8 @@ export class ComfyBackend implements GenerationBackend {
   private readonly submissions = new Map<string, { at: number; pending: Promise<{ backendJobId: string }> }>();
   /** Downloads in flight, by job id: once a clip is on disk, the file is the record. */
   private readonly downloads = new Map<string, Promise<string>>();
+  /** The output each job submitted here delivers; a restarted app passes it to `get` instead. */
+  private readonly wanted = new Map<string, OutputWanted>();
 
   constructor(
     private readonly opts: {
@@ -108,10 +133,11 @@ export class ComfyBackend implements GenerationBackend {
     if (!isJobId(submitted.id)) {
       throw new BackendError('backend-error', false, `the proxy returned an unusable job id ${JSON.stringify(submitted.id)}`);
     }
+    this.wanted.set(submitted.id, { output: job.output ?? 'video', ...(job.outputNode ? { outputNode: job.outputNode } : {}) });
     return { backendJobId: submitted.id };
   }
 
-  async get(id: string): Promise<BackendJob> {
+  async get(id: string, want?: OutputWanted): Promise<BackendJob> {
     if (!isJobId(id)) return lost(id);
     let job: Job;
     try {
@@ -137,11 +163,12 @@ export class ComfyBackend implements GenerationBackend {
       case 'expired':
         return { id, state: 'failed', progress, error: 'expired' };
       case 'succeeded': {
-        const outputs = job.outputs;
-        const video = outputs.find((o) => o.type === 'video') ?? outputs.find((o) => o.contentType.startsWith('video/'));
-        if (!video) return { id, state: 'failed', progress: 1, error: 'no-output' };
+        const wanted = want ?? this.wanted.get(id) ?? {};
+        const kind = wanted.output ?? 'video';
+        const result = pickOutput(job.outputs, kind, wanted.outputNode);
+        if (!result) return { id, state: 'failed', progress: 1, error: 'no-output' };
         try {
-          return { id, state: 'succeeded', progress: 1, outputPath: await this.download(id, video) };
+          return { id, state: 'succeeded', progress: 1, outputPath: await this.download(id, result, kind) };
         } catch (error) {
           // The proxy no longer has the clip: waiting will not bring it back.
           if (error instanceof NotFound) return { id, state: 'failed', progress: 1, error: 'no-output' };
@@ -155,11 +182,11 @@ export class ComfyBackend implements GenerationBackend {
     }
   }
 
-  /** Download the clip once, however many polls ask at the same time; a file already on disk is reused. */
-  private download(id: string, output: Output): Promise<string> {
+  /** Download the output once, however many polls ask at the same time; a file already on disk is reused. */
+  private download(id: string, output: Output, kind: OutputKind): Promise<string> {
     const inFlight = this.downloads.get(id);
     if (inFlight) return inFlight;
-    const pending = this.downloadOnce(id, output);
+    const pending = this.downloadOnce(id, output, kind);
     this.downloads.set(id, pending);
     const settle = () => {
       if (this.downloads.get(id) === pending) this.downloads.delete(id);
@@ -168,10 +195,10 @@ export class ComfyBackend implements GenerationBackend {
     return pending;
   }
 
-  private async downloadOnce(id: string, output: Output): Promise<string> {
+  private async downloadOnce(id: string, output: Output, kind: OutputKind): Promise<string> {
     // The output name only lends its extension, from a short list: it never becomes a path.
     const extension = extname(output.name).toLowerCase();
-    const target = join(this.opts.outputsDir, `${id}${VIDEO_EXTENSIONS.has(extension) ? extension : '.bin'}`);
+    const target = join(this.opts.outputsDir, `${id}${EXTENSIONS[kind].has(extension) ? extension : '.bin'}`);
     try {
       await access(target);
       return target;
