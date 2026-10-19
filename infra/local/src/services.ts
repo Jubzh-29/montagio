@@ -107,7 +107,8 @@ export function serviceSpecs(input: {
 
   const gpu = state.gpuIndex && state.gpuIndex > 0 ? ['--cuda-device', String(state.gpuIndex)] : [];
   // Python buffers a redirected output: unbuffered, a crash still leaves its last lines in the log.
-  const pyEnv: NodeJS.ProcessEnv = { ...env, PYTHONUNBUFFERED: '1' };
+  // CUDA numbers GPUs fastest first unless told otherwise; nvidia-smi and gpuIndex follow the PCI bus.
+  const pyEnv: NodeJS.ProcessEnv = { ...env, PYTHONUNBUFFERED: '1', CUDA_DEVICE_ORDER: 'PCI_BUS_ID' };
   return [
     {
       name: 'comfyui',
@@ -161,23 +162,40 @@ function alive(pid: number): boolean {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** True only when the command line of `pid` holds `marker` (case-insensitive on Windows). */
-export async function isOurs(pid: number, marker: string, os: Os, capture: Capture): Promise<boolean> {
-  if (!alive(pid)) return false;
+/** The command line of a live process, or null when the system will not say (another user's or an elevated process). */
+async function commandLine(pid: number, os: Os, capture: Capture): Promise<string | null> {
   if (os === 'linux') {
     try {
-      return readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').join(' ').includes(marker);
+      return readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').join(' ').trim() || null;
     } catch {
-      return false;
+      return null;
     }
   }
+  // UTF-8 out: Windows PowerShell writes to a pipe in the console's code page, which turns the
+  // accents of a profile name (C:\Users\Jérôme) into '?' and the marker would never match.
   const answer = await capture('powershell.exe', [
     '-NoProfile',
     '-NonInteractive',
     '-Command',
-    `(Get-CimInstance Win32_Process -Filter 'ProcessId=${Math.trunc(pid)}').CommandLine`,
+    `[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false; (Get-CimInstance Win32_Process -Filter 'ProcessId=${Math.trunc(pid)}').CommandLine`,
   ]);
-  return answer.code === 0 && answer.stdout.toLowerCase().includes(marker.toLowerCase());
+  return answer.code === 0 ? answer.stdout.trim() || null : null;
+}
+
+/** 'unknown': the process lives but its command line cannot be read, so it is neither stopped nor forgotten. */
+type Owner = 'ours' | 'other' | 'unknown' | 'gone';
+
+async function ownerOf(pid: number, marker: string, os: Os, capture: Capture): Promise<Owner> {
+  if (!alive(pid)) return 'gone';
+  const line = await commandLine(pid, os, capture);
+  if (line === null) return 'unknown';
+  const found = os === 'windows' ? line.toLowerCase().includes(marker.toLowerCase()) : line.includes(marker);
+  return found ? 'ours' : 'other';
+}
+
+/** True only when the command line of `pid` holds `marker` (case-insensitive on Windows). */
+export async function isOurs(pid: number, marker: string, os: Os, capture: Capture): Promise<boolean> {
+  return (await ownerOf(pid, marker, os, capture)) === 'ours';
 }
 
 export async function waitHttp(url: string, timeoutMs: number, isAlive: () => boolean): Promise<void> {
@@ -249,10 +267,18 @@ export async function stopAll(ctx: ServiceContext): Promise<void> {
       rmSync(path, { force: true });
       continue;
     }
-    if (await isOurs(pid, spec.marker, ctx.os, ctx.capture)) {
+    const owner = await ownerOf(pid, spec.marker, ctx.os, ctx.capture);
+    if (owner === 'unknown') {
+      ctx.log(
+        `${name}: cannot read the command line of pid ${pid} (started from an elevated terminal?): left running; ` +
+          'run stop from the same kind of terminal, or end it in the Task Manager',
+      );
+      continue;
+    }
+    if (owner === 'ours') {
       ctx.log(`stopping ${name} (pid ${pid})`);
       await killTree(pid, ctx.os, ctx.capture);
-    } else if (alive(pid)) {
+    } else if (owner === 'other') {
       ctx.log(`${name}: pid ${pid} is another program now (stale pid file), left alone`);
     }
     rmSync(path, { force: true });
@@ -289,8 +315,10 @@ export async function startAll(ctx: ServiceContext, opts: { browser: boolean }):
   const ours = new Map<ServiceName, number>();
   for (const spec of specs) {
     const pid = readPid(pidFile(ctx, spec.name));
-    if (pid && (await isOurs(pid, spec.marker, ctx.os, ctx.capture))) ours.set(spec.name, pid);
-    else rmSync(pidFile(ctx, spec.name), { force: true });
+    const owner = pid ? await ownerOf(pid, spec.marker, ctx.os, ctx.capture) : 'gone';
+    if (owner === 'ours') ours.set(spec.name, pid!);
+    // An unreadable owner keeps its pid file: the port check below refuses the start.
+    else if (owner !== 'unknown') rmSync(pidFile(ctx, spec.name), { force: true });
   }
   for (const spec of specs) {
     if (!ours.has(spec.name) && (await portBusy(spec.port))) {
@@ -371,7 +399,8 @@ export async function status(ctx: ServiceContext): Promise<string> {
   for (const spec of realSpecs(ctx, { ...ctx.state, mode: 'full' })) {
     if (ctx.state.mode !== 'full' && spec.name !== 'app') continue;
     const pid = readPid(pidFile(ctx, spec.name));
-    const state = pid && (await isOurs(pid, spec.marker, ctx.os, ctx.capture)) ? `running (pid ${pid})` : 'stopped';
+    const owner = pid ? await ownerOf(pid, spec.marker, ctx.os, ctx.capture) : 'gone';
+    const state = owner === 'ours' ? `running (pid ${pid})` : owner === 'unknown' ? `unknown (pid ${pid})` : 'stopped';
     lines.push(`${spec.name.padEnd(8)} ${state.padEnd(20)} http://127.0.0.1:${spec.port}`);
   }
   lines.push(`logs: ${ctx.layout.logsDir}`);

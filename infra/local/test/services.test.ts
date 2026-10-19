@@ -50,6 +50,11 @@ test('the Python services write their logs unbuffered, so a crash keeps its last
   for (const name of ['comfyui', 'proxy']) expect(specs.find((s) => s.name === name)!.env.PYTHONUNBUFFERED).toBe('1');
 });
 
+test('CUDA numbers the GPUs as nvidia-smi does, so --cuda-device picks the card the checks chose', () => {
+  // CUDA's default order is fastest first; nvidia-smi's (and pickGpu's) is the PCI bus.
+  expect(specsOf({ ...full, gpuIndex: 1 }).find((s) => s.name === 'comfyui')!.env.CUDA_DEVICE_ORDER).toBe('PCI_BUS_ID');
+});
+
 test('the proxy and the app follow the install ports', () => {
   const specs = specsOf({ ...full, ports: { comfy: 8288, proxy: 8289, app: 3300 } });
   const proxy = specs.find((s) => s.name === 'proxy')!;
@@ -195,6 +200,28 @@ test('stop leaves alone a process whose command line is not ours', async () => {
   await stopAll(ctx);
   expect(alive(other.pid!)).toBe(true);
   expect(existsSync(join(l.runDir, 'app.pid'))).toBe(false);
+}, 30_000);
+
+test('isOurs reads a command line that holds non-ASCII characters', async () => {
+  // A Windows profile such as C:\Users\Jérôme puts accents in every marker.
+  const marker = 'montagio-marker-Jérôme-Ünïcode';
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)', marker], { stdio: 'ignore' });
+  strays.push(child);
+  await new Promise((resolve) => child.once('spawn', resolve));
+  expect(await isOurs(child.pid!, marker, os, capture)).toBe(true);
+}, 30_000);
+
+test.runIf(os === 'windows')('stop keeps the pid file of a process whose command line it cannot read', async () => {
+  const { ctx, l, lines } = await fakeContext();
+  const other = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  strays.push(other);
+  mkdirSync(l.runDir, { recursive: true });
+  writeFileSync(join(l.runDir, 'app.pid'), String(other.pid));
+  // What Get-CimInstance gives for a process started from an elevated terminal: no command line.
+  await stopAll({ ...ctx, capture: async () => ({ code: 0, stdout: '\r\n', stderr: '' }) });
+  expect(alive(other.pid!)).toBe(true);
+  expect(existsSync(join(l.runDir, 'app.pid'))).toBe(true);
+  expect(lines.join('\n')).toContain('cannot read');
 }, 30_000);
 
 test('start refuses a port held by a foreign process, and starts nothing', async () => {

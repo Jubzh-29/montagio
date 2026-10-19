@@ -65,7 +65,7 @@ function facts(over: Partial<MachineFacts> = {}): MachineFacts {
   };
 }
 
-type Call = { cmd: string; args: string[]; cwd?: string; shell?: boolean };
+type Call = { cmd: string; args: string[]; cwd?: string; shell?: boolean; env?: NodeJS.ProcessEnv };
 
 function harness(opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean; ask?: InstallDeps['ask'] } = {}) {
   const calls: Call[] = [];
@@ -73,7 +73,7 @@ function harness(opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean;
   const events: string[] = [];
   const L = layout(dir, os);
   const stream: Stream = async (cmd, args, o = {}) => {
-    const call = { cmd, args, cwd: o.cwd, shell: o.shell };
+    const call = { cmd, args, cwd: o.cwd, shell: o.shell, env: o.env };
     calls.push(call);
     if (opts.failOn?.(call)) return 1;
     if (cmd === 'git' && args[0] === 'clone') {
@@ -242,6 +242,20 @@ test('the torch command and its constraints pin the exact build', async () => {
   const torch = described(h.calls).find((c) => c.includes('--index-url'))!;
   expect(torch).toContain('--index-url https://download.pytorch.org/whl/cu130 torch==2.14.1 torchvision==0.29.1');
   expect(readFileSync(join(h.L.cacheDir, 'torch-constraints.txt'), 'utf8')).toBe('torch==2.14.1\ntorchvision==0.29.1\n');
+});
+
+test('the CUDA check looks at the GPU the checks chose, numbered as nvidia-smi numbers it', async () => {
+  const two = facts({
+    gpus: [
+      { index: 0, name: 'NVIDIA GeForce RTX 3060', vramMiB: 12288, driver: '580.65' },
+      { index: 1, name: 'NVIDIA GeForce RTX 4090', vramMiB: 24564, driver: '580.65' },
+    ],
+  });
+  const h = harness({ facts: two });
+  await install(repo, options({ start: false }), h.deps);
+  const check = h.calls.find((c) => c.args[0] === '-I')!;
+  expect(check.env).toMatchObject({ CUDA_DEVICE_ORDER: 'PCI_BUS_ID', CUDA_VISIBLE_DEVICES: '1' });
+  expect(readState(h.L.statePath).gpuIndex).toBe(1);
 });
 
 test('a port option is kept for the next runs', async () => {

@@ -119,7 +119,7 @@ function venvPython(venv: string): string | null {
 export async function install(repoRoot: string, opts: InstallOptions, deps: InstallDeps): Promise<number> {
   const os = deps.os ?? osOf(process.platform);
   const L = layout(opts.dir, os ?? 'linux');
-  const env: NodeJS.ProcessEnv = { ...(deps.env ?? process.env), NEXT_TELEMETRY_DISABLED: '1' };
+  const env: NodeJS.ProcessEnv = { ...(deps.env ?? process.env), NEXT_TELEMETRY_DISABLED: '1', CUDA_DEVICE_ORDER: 'PCI_BUS_ID' };
   delete env.COMFY_API_KEY;
   const execPath = deps.execPath ?? process.execPath;
   const versions = readVersions(repoRoot);
@@ -193,8 +193,8 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     writeState(L.statePath, state);
   };
   const stamp = (id: keyof InstallState['stamps'], value: string) => save({ ...state, stamps: { ...state.stamps, [id]: value } });
-  const run = async (cmd: string, args: string[], o: { cwd?: string; shell?: boolean } = {}) => {
-    const code = await deps.stream(cmd, args, { cwd: o.cwd, env, shell: o.shell });
+  const run = async (cmd: string, args: string[], o: { cwd?: string; shell?: boolean; env?: NodeJS.ProcessEnv } = {}) => {
+    const code = await deps.stream(cmd, args, { cwd: o.cwd, env: o.env ?? env, shell: o.shell });
     if (code !== 0) throw new Error(`${basename(cmd)} ${args.slice(0, 3).join(' ')} ... exited with code ${code}`);
   };
   const { torch, python } = plan;
@@ -238,7 +238,8 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
       mkdirSync(L.cacheDir, { recursive: true });
       writeFileSync(constraints, `torch==${torch.torch}\ntorchvision==${torch.torchvision}\n`);
       await run(L.comfyPython, ['-m', 'pip', 'install', '-r', join(L.comfyDir, 'requirements.txt'), '-c', constraints]);
-      await run(L.comfyPython, ['-I', '-c', CUDA_CHECK]);
+      // The GPU the checks chose, numbered as nvidia-smi numbers it.
+      await run(L.comfyPython, ['-I', '-c', CUDA_CHECK], { env: { ...env, CUDA_VISIBLE_DEVICES: String(pickGpu(facts.gpus)?.index ?? 0) } });
       stamp('comfyEnv', envStamp(versions.comfyuiCommit, torch, python.version));
     },
     proxy: async () => {
