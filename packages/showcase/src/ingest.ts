@@ -15,6 +15,10 @@ type SmokeRecord = {
   run: number;
   status: string;
   camera: { mode: string; pose: string | null; pose_2: string | null; combine: string | null; speed: number | null };
+  width: number;
+  height: number;
+  frames: number;
+  fps: number;
   seed: number;
   outputs: string[];
   image?: string;
@@ -37,6 +41,10 @@ const cameraOf = (params: CompiledParams) => ({
   combine: params.cameraCombine,
   speed: params.cameraSpeed,
 });
+
+/** A render's size and length, as smoke.ts records them and as a preset compiles them. */
+const format = (v: { width: number; height: number; frames: number; fps: number }) =>
+  `${v.width}x${v.height}, ${v.frames} frames at ${v.fps} fps`;
 
 const sameCamera = (a: SmokeRecord['camera'] | undefined, b: ReturnType<typeof cameraOf>) =>
   !!a && a.mode === b.mode && a.pose === b.pose && a.pose_2 === b.pose_2 && a.combine === b.combine && a.speed === b.speed;
@@ -92,11 +100,13 @@ export async function ingestSmoke(
     } else if (record.model !== manifest.model) {
       skipped.push(`${label}: rendered on ${record.model}, the showcase shows ${manifest.model}`);
     } else {
-      const expected = cameraOf(
-        compileJob(preset, model, template, { imageRef: posix.basename(sample.file), seed: record.seed, aspect: sample.aspect }).params,
-      );
+      const { params } = compileJob(preset, model, template, { imageRef: posix.basename(sample.file), seed: record.seed, aspect: sample.aspect });
+      const expected = cameraOf(params);
       if (!sameCamera(record.camera, expected)) {
         skipped.push(`${label}: its camera ${JSON.stringify(record.camera)} is not the preset's ${JSON.stringify(expected)}`);
+      } else if (format(record) !== format(params)) {
+        // A --resolution 720p render, say: normalizing would shrink it, and its workflow would not be the showcase's.
+        skipped.push(`${label}: rendered at ${format(record)}; the preset makes ${format(params)} for ${sample.id}`);
       } else if (!record.outputs?.[0]) {
         skipped.push(`${label}: no output file`);
       } else {

@@ -170,7 +170,7 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
    ```
 
    `ingest` :
-   - garde les rendus réussis, faits sur le bon modèle, à partir de la bonne photo et avec la caméra du preset ;
+   - garde les rendus réussis, faits sur le bon modèle, à partir de la bonne photo, avec la caméra du preset, et à sa taille et sa durée pour ce format. Un rendu `--resolution 720p` est donc écarté (ligne `skipped:`), au lieu d'être réduit en silence ;
    - les réencode dans l'encodage commun de la vitrine, avec la mention « AI-generated » ;
    - écrit leurs entrées dans le manifeste : seed, sha256, empreintes de la photo et du workflow, date.
 
