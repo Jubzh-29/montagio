@@ -151,7 +151,9 @@ export function compileUpscale(
   if (inputs.frames !== undefined && max !== undefined && inputs.frames > max) {
     throw new CompileError(`a clip of ${inputs.frames} frames is longer than the ${max} frames model ${model.id} upscales`);
   }
-  const { width, height } = UPSCALE_TARGETS[inputs.aspect];
+  const target = Object.hasOwn(UPSCALE_TARGETS, inputs.aspect) ? UPSCALE_TARGETS[inputs.aspect] : undefined;
+  if (!target) throw new CompileError(`aspect "${inputs.aspect}" has no 1080p size: 16:9, 9:16 or 1:1`);
+  const { width, height } = target;
   const workflow = bindExtension(model, template, { video: inputs.videoRef, width, height, seed: inputs.seed });
   return { workflow, output: { ...model.output }, params: { width, height, seed: inputs.seed } };
 }
@@ -236,6 +238,7 @@ export function compileSpeech(
   inputs: SpeechInputs,
 ): ExtensionCompiled<{ text: string; language: 'en' | 'fr'; seed: number; cfg: number }> {
   expectTask(model, 'tts');
+  if (inputs.language !== 'en' && inputs.language !== 'fr') throw new CompileError(`language "${inputs.language}" is not spoken here: en or fr`);
   const text = userText(inputs.text.replace(/[[\]]/g, ''), 'text to speak', model);
   const cfg = inputs.language === 'fr' ? 0 : 0.5;
   const seed = Math.max(1, inputs.seed);

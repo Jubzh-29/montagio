@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { AVATAR_DEFAULT_PROMPT, compileAvatar, compileEdit, compileMusic, compileSpeech, compileUpscale, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Library } from '../src/index';
+import { AVATAR_DEFAULT_PROMPT, compileAvatar, compileEdit, compileMusic, compileSpeech, compileUpscale, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -103,6 +103,11 @@ describe('compileUpscale (SeedVR2 3B)', () => {
   test('a clip over 121 frames is refused', () => {
     expect(() => compile({ frames: 122 })).toThrow(/121/);
     expect(() => compile({ frames: 121 })).not.toThrow();
+  });
+
+  test('an aspect without a 1080p size is a CompileError, as from an untyped caller', () => {
+    expect(() => compile({ aspect: '4:3' as Aspect })).toThrow(CompileError);
+    expect(() => compile({ aspect: '4:3' as Aspect })).toThrow(/aspect "4:3".*16:9, 9:16 or 1:1/);
   });
 
   test('the output is node 76, video', () => {
@@ -220,6 +225,11 @@ describe('compileSpeech (Chatterbox Multilingual V3)', () => {
   test('French speech gets cfg_weight 0, English 0.5', () => {
     expect(compile({ language: 'fr' }).workflow['2']!.inputs).toMatchObject({ language: 'fr', cfg_weight: 0 });
     expect(compile({ language: 'en' }).workflow['2']!.inputs).toMatchObject({ language: 'en', cfg_weight: 0.5 });
+  });
+
+  test('a language other than en or fr is a CompileError, as from an untyped caller', () => {
+    expect(() => compile({ language: 'de' as 'en' })).toThrow(CompileError);
+    expect(() => compile({ language: 'de' as 'en' })).toThrow(/language "de".*en or fr/);
   });
 
   test('square brackets are removed from the text', () => {
