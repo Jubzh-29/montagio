@@ -70,3 +70,37 @@ weights:
     size: 335304388
     license: Apache-2.0
     source: https://huggingface.co/black-forest-labs/FLUX.1-schnell
+  # Extensions (2026-10-19): weights fetched only for their extension (`extension:`);
+  # licenses read at the source in docs/EXTENSIONS_ANALYSE.md.
+  - id: ace-step15-turbo
+    file: acestep_v1.5_turbo.safetensors
+    url: https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/diffusion_models/acestep_v1.5_turbo.safetensors
+    sha256: 3f6e0797fad420a39bd33979eb6e840e30989e34a3794e843d23b60ec6e422d7
+    size: 4787825604
+    license: MIT
+    source: https://huggingface.co/ACE-Step/Ace-Step1.5
+    extension: music
+  - id: qwen3-embedding-06b-ace15
+    file: qwen_0.6b_ace15.safetensors
+    url: https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/text_encoders/qwen_0.6b_ace15.safetensors
+    sha256: fd4590c82153b8ddb67e15a2e7aaa8afa8b83a858c8a9b82a4831063156aa7a7
+    size: 1191588248
+    license: Apache-2.0
+    source: https://huggingface.co/Qwen/Qwen3-Embedding-0.6B
+    extension: music
+  - id: ace-step15-lm-17b
+    file: qwen_1.7b_ace15.safetensors
+    url: https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/text_encoders/qwen_1.7b_ace15.safetensors
+    sha256: ed63e9247d1f55f3ace04fa11e95b085fc82d459c82c5626f0b2e37b91ebd710
+    size: 3708523360
+    license: MIT
+    source: https://huggingface.co/ACE-Step/Ace-Step1.5
+    extension: music
+  - id: ace-step15-vae
+    file: ace_1.5_vae.safetensors
+    url: https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files/resolve/main/split_files/vae/ace_1.5_vae.safetensors
+    sha256: 6de92e3a862acd287e08b024ac90f0783a8635451b728721a33ff03565bcb2bb
+    size: 337431732
+    license: MIT
+    source: https://huggingface.co/ACE-Step/Ace-Step1.5
+    extension: music

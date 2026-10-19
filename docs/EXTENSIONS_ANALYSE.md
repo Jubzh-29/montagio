@@ -52,15 +52,34 @@ Les fichiers téléchargés viennent de miroirs Comfy-Org, sauf la voix (dépôt
 
 ## 2. Nodes et templates
 
-*Complétée par les tâches de chaque extension.*
+Les quatre workflows partent des templates officiels de [Comfy-Org/workflow_templates](https://github.com/Comfy-Org/workflow_templates) au commit `59a3b48b` (MIT), le même que les workflows des presets. La conversion suit les règles de [workflows/README.md](../workflows/README.md), qui note aussi chaque écart au template. Chaque workflow est accepté par le contrôle hors ligne (`infra/runpod/test/workflows.test.ts`), sur une fixture tirée du vrai `/object_info` de ComfyUI v0.41.0.
+
+### Musique : ACE-Step 1.5, nodes du cœur
+
+- Template `templates/audio_ace_step_1_5_split.json` (DiT turbo 2B, encodeur 0,6B, LM 1,7B). C'est le seul template ACE-Step 1.5 sans node partenaire ni restriction de distribution qui reste léger : `split_llm` passe par `GeminiNodeV2` (API Google, exclu), et `xl_base` n'est proposé qu'en local.
+- Nodes : `UNETLoader`, `ModelSamplingAuraFlow` (shift 3), `DualCLIPLoader` (type `ace`, les deux fichiers sont nécessaires : un `CLIPLoader` seul prend l'encodeur 0,6B pour un autre modèle, `comfy/sd.py:2009`), `TextEncodeAceStepAudio1.5` (`comfy_extras/nodes_ace.py:31`), `EmptyAceStep1.5LatentAudio` (`nodes_ace.py:87`), `ConditioningZeroOut`, `KSampler` (8 étapes, cfg 1), `VAEDecodeAudio`, `SaveAudioAdvanced` (`comfy_extras/nodes_audio.py:290`). ComfyUI v0.41.0 reconnaît le DiT (`comfy/model_detection.py:1054`, classe `ACEStep15`, `comfy/supported_models.py:2299`).
+- La durée sert deux fois : longueur du latent (25 images par seconde) et nombre de codes que le LM produit (`ceil(durée) × 5`). La seed sert au LM et au KSampler. Le compilateur écrit donc chaque valeur dans deux entrées.
+- Morceau sans voix : `lyrics` = `[Instrumental]`, comme le dit la documentation d'ACE-Step ; le compilateur termine aussi la description par « instrumental ». Que la musique reste vraiment sans voix est un point de la S2.
+- La sortie est un FLAC 48 kHz stéréo. comfy-api-proxy 0.1.6 la rapporte avec le type `audio`, et son `content_type` peut valoir `application/octet-stream` (Python n'a pas de type MIME pour `.flac`) : l'adaptateur choisit la sortie par son type (tâche 1).
 
 ## 3. Poids
 
-*Complétée par les tâches de chaque extension.*
+Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`), recoupés par `fetch-weights --lock-from-hf`, dont le patch est vide. Chaque entrée du lock porte `extension:` : l'installeur local ne la télécharge que pour son extension.
+
+| Extension | Entrée du lock | Fichier | Taille | sha256 |
+|---|---|---|---|---|
+| Musique | `ace-step15-turbo` | `acestep_v1.5_turbo.safetensors` (identique à l'original d'ACE-Step) | 4 787 825 604 | `3f6e0797…` |
+| Musique | `qwen3-embedding-06b-ace15` | `qwen_0.6b_ace15.safetensors` | 1 191 588 248 | `fd4590c8…` |
+| Musique | `ace-step15-lm-17b` | `qwen_1.7b_ace15.safetensors` | 3 708 523 360 | `ed63e924…` |
+| Musique | `ace-step15-vae` | `ace_1.5_vae.safetensors` | 337 431 732 | `6de92e3a…` |
+
+Musique : 10,0 Go.
 
 ## 4. VRAM et temps sur une RTX 4090 (24 Go)
 
-*Complétée par les tâches de chaque extension.*
+Ce sont des **estimations**, tirées de la taille des poids et des formules de mémoire du code de ComfyUI v0.41.0. La S2 les mesure.
+
+- **Musique.** DiT 4,8 Go, encodeurs 4,9 Go, VAE 0,3 Go ; le décodage d'un morceau de 60 s demande ≈ 5,7 Gio (`comfy/sd.py:729`). Tout résident, le pic est ≈ 16 Go : **tient**. Le LM tourne sans vLLM : ≈ 3 à 10 s à chaud pour 60 s de musique, plus le chargement. Après un rendu Wan 14B, ComfyUI ne décharge que ce qu'il faut (`comfy/model_management.py:893-1039`) ; le rendu Wan suivant recharge ses poids.
 
 ## 5. Contrat backend et drapeau de coupe
 

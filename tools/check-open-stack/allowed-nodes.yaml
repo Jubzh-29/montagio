@@ -27,3 +27,10 @@ nodes:
   # Montagio's own node pack (comfy-nodes/, GPL-3.0-only): WanCameraEmbedding with a second move;
   # the compiler uses it only for presets that combine two moves.
   - { class_type: MontagioCameraEmbedding, source: montagio-nodes, license: GPL-3.0 }
+  # Extension "music" (2026-10-19), from the core of ComfyUI v0.41.0 (python_module of /object_info):
+  # nodes.py (DualCLIPLoader, type "ace"), comfy_extras/nodes_ace.py and comfy_extras/nodes_audio.py.
+  - { class_type: DualCLIPLoader, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: TextEncodeAceStepAudio1.5, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: EmptyAceStep1.5LatentAudio, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: VAEDecodeAudio, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SaveAudioAdvanced, source: comfyui-core, license: GPL-3.0 }

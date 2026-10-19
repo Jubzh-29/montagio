@@ -15,7 +15,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { compileJob, loadLibrary, type Aspect, type Library } from '@montagio/presets';
+import { compileJob, compileMusic, loadLibrary, type Aspect, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -80,6 +80,52 @@ test('a combined preset needs Montagio Camera Embedding, which a stock ComfyUI d
 test('the shipped workflows load no LoRA', () => {
   for (const [path, workflow] of library.templates) {
     expect({ path, loras: Object.values(workflow).filter((node) => /lora/i.test(node.class_type)) }).toEqual({ path, loras: [] });
+  }
+});
+
+// The extension workflows (registry/extensions/), checked like the preset ones.
+
+/** Whether `field` is an input its node's class declares; "resize_type.width" is an input of the option a dynamic combo selected. */
+function declares(classType: string, field: string): boolean {
+  const spec = info[classType]?.input;
+  const declared: Record<string, unknown> = { ...spec?.required, ...spec?.optional };
+  const [head, ...rest] = field.split('.');
+  if (rest.length === 0) return head! in declared;
+  const combo = declared[head!] as [string, { options?: { inputs?: { required?: object; optional?: object } }[] }] | undefined;
+  return Boolean(combo?.[0] === 'COMFY_DYNAMICCOMBO_V3' && combo[1].options?.some((o) => rest[0]! in { ...o.inputs?.required, ...o.inputs?.optional }));
+}
+
+test('every extension template is accepted by ComfyUI v0.41.0', () => {
+  expect(library.extensionModels.size).toBeGreaterThan(0);
+  for (const model of library.extensionModels.values()) {
+    const template = library.extensionTemplates.get(model.workflow)!;
+    expect({ model: model.id, problems: checkWorkflow(template, info) }).toEqual({ model: model.id, problems: [] });
+  }
+});
+
+test('every extension binding, and its output node, names what its node declares', () => {
+  for (const model of library.extensionModels.values()) {
+    const workflow = library.extensionTemplates.get(model.workflow)!;
+    for (const [key, binding] of Object.entries(model.bindings)) {
+      for (const target of Array.isArray(binding) ? binding : [binding]) {
+        const node = workflow[target.node];
+        expect({ model: model.id, key, ...target, declared: Boolean(node && declares(node.class_type, target.field)) }).toEqual({
+          model: model.id,
+          key,
+          ...target,
+          declared: true,
+        });
+      }
+    }
+    expect({ model: model.id, output: workflow[model.output.node]?.class_type }).toEqual({ model: model.id, output: expect.stringMatching(/^Save/) });
+  }
+});
+
+test('the music job compiled for 5, 10 and 60 s is accepted', () => {
+  const model = library.extensionModels.get('ace-step15-music')!;
+  for (const duration_s of [5, 10, 60]) {
+    const { workflow } = compileMusic(model, library.extensionTemplates.get(model.workflow)!, { prompt: 'calm piano', duration_s, seed: 3 });
+    expect({ duration_s, problems: checkWorkflow(workflow, info) }).toEqual({ duration_s, problems: [] });
   }
 });
 

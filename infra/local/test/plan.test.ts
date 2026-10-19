@@ -1,13 +1,14 @@
 import { win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readLock, readVersions } from '../src/pins.ts';
+import { readLock, readVersions, weightsFor } from '../src/pins.ts';
 import { buildPlan, buildStamp, diskNeed, envStamp, proxyStamp, weightsToClear, weightsToFetch, type PlanInput, type Step } from '../src/plan.ts';
 import { layout } from '../src/platform.ts';
 import { emptyState, type InstallState } from '../src/state.ts';
 
 const realRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const versions = readVersions(realRoot);
-const lock = readLock(realRoot);
+// The weights a default install fetches: the camera presets', not those of the extensions (none validated yet).
+const lock = weightsFor(readLock(realRoot), []);
 const repoRoot = 'C:\\Users\\a b\\repo dir';
 const L = layout('C:\\Users\\a b\\Install Dir', 'windows');
 const python = { command: ['py', '-3.12'], version: [3, 12, 10] as [number, number, number], hasVenv: true };
