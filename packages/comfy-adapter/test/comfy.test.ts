@@ -415,6 +415,30 @@ test('the output of outputNode wins over another output of the same type', async
   expect(readFileSync((await b.get(id)).outputPath!).equals(edit)).toBe(true);
 });
 
+// comfy-api-proxy 0.1.6 types an output by ComfyUI's UI key, and SaveVideo files its MP4 under "images".
+test('an image job skips an MP4 that the proxy types image', async () => {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(outputJob('image'));
+  const png = Buffer.from('the edited photo');
+  fake.setJob(id, {
+    status: 'succeeded',
+    outputs: [outputOf('83', 'Montagio_00001.mp4', 'image', 'video/mp4', Buffer.from('mp4')), outputOf('9', 'edit_00001_.png', 'image', 'image/png', png)],
+  });
+  const done = await b.get(id);
+  expect(done.outputPath).toBe(join(outputsDir, `${id}.png`));
+  expect(readFileSync(done.outputPath!).equals(png)).toBe(true);
+});
+
+test('a video job finds its MP4 that the proxy types image', async () => {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(outputJob('video'));
+  const mp4 = Buffer.from('mp4 bytes');
+  fake.setJob(id, { status: 'succeeded', outputs: [outputOf('83', 'Montagio_00001.mp4', 'image', 'video/mp4', mp4)] });
+  const done = await b.get(id);
+  expect(done.outputPath).toBe(join(outputsDir, `${id}.mp4`));
+  expect(readFileSync(done.outputPath!).equals(mp4)).toBe(true);
+});
+
 test('an audio job without an audio output fails with no-output', async () => {
   const b = backend();
   const { backendJobId: id } = await b.submit(outputJob('audio'));
@@ -468,4 +492,19 @@ test('the fake proxy gives a SaveImage workflow an image output (autoRun)', asyn
   for (let i = 0; i < 3; i++) await b.get(id);
   expect(fake.jobs.get(id)!.outputs).toEqual([expect.objectContaining({ node_id: '9', type: 'image', content_type: 'image/png' })]);
   expect(readdirSync(outputsDir)).toEqual([`${id}.png`]);
+});
+
+test('the fake proxy types a SaveVideo output image, as comfy-api-proxy 0.1.6 does (autoRun)', async () => {
+  await fake.close();
+  fake = await startFakeProxy({ autoRun: { clip } });
+  const b = backend();
+  const submitted: SubmitJob = {
+    workflow: { '83': { class_type: 'SaveVideo', inputs: { filename_prefix: 'montagio/clip', format: 'mp4', codec: 'h264' } } },
+    presetId: 'crash-push',
+    idempotencyKey: randomUUID(),
+  };
+  const { backendJobId: id } = await b.submit(submitted);
+  for (let i = 0; i < 3; i++) await b.get(id);
+  expect(fake.jobs.get(id)!.outputs).toEqual([expect.objectContaining({ node_id: '83', type: 'image', content_type: 'video/mp4' })]);
+  expect(readdirSync(outputsDir)).toEqual([`${id}.mp4`]);
 });
