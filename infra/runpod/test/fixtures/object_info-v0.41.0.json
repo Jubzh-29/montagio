@@ -202,6 +202,83 @@
   ],
   "python_module": "nodes"
  },
+ "CLIPVisionEncode": {
+  "input": {
+   "required": {
+    "clip_vision": [
+     "CLIP_VISION"
+    ],
+    "image": [
+     "IMAGE"
+    ],
+    "crop": [
+     [
+      "center",
+      "none"
+     ]
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "clip_vision",
+    "image",
+    "crop"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "CLIP_VISION_OUTPUT"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "CLIP_VISION_OUTPUT"
+  ],
+  "name": "CLIPVisionEncode",
+  "display_name": "CLIP Vision Encode",
+  "description": "",
+  "python_module": "nodes",
+  "category": "model/conditioning",
+  "output_node": false,
+  "has_intermediate_output": false,
+  "search_aliases": []
+ },
+ "CLIPVisionLoader": {
+  "input": {
+   "required": {
+    "clip_name": [
+     [
+      "clip_vision_h.safetensors"
+     ]
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "clip_name"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "CLIP_VISION"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "CLIP_VISION"
+  ],
+  "name": "CLIPVisionLoader",
+  "display_name": "Load CLIP Vision",
+  "description": "",
+  "python_module": "nodes",
+  "category": "model/loaders",
+  "output_node": false,
+  "has_intermediate_output": false,
+  "search_aliases": []
+ },
  "ChatterboxMTLTTS": {
   "input": {
    "required": {
@@ -1237,6 +1314,7 @@
    "required": {
     "image": [
      [
+      "end.png",
       "example.png",
       "start.png",
       "start2.png"
@@ -1298,10 +1376,19 @@
     ],
     "lora_name": [
      [
-      "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
-      "qwen-image-edit-2511-multiple-angles-lora.safetensors",
+      "360_Orbit.safetensors",
       "QWEN_EDIT_ACTION_V1.safetensors",
+      "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
       "SYSTMS_INFL8_LoRA_Qwen_Image_Edit_2511.safetensors",
+      "Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors",
+      "cakeify_16_epochs.safetensors",
+      "crash_zoom_in.safetensors",
+      "explode_30_epochs.safetensors",
+      "matrix_shot.safetensors",
+      "qwen-image-edit-2511-multiple-angles-lora.safetensors",
+      "squish_18.safetensors",
+      "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+      "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
       "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
      ]
     ],
@@ -2910,8 +2997,11 @@
       "acestep_v1.5_turbo.safetensors",
       "qwen_image_edit_2511_fp8mixed.safetensors",
       "seedvr2_3b_int8_convrot.safetensors",
+      "wan2.1_i2v_480p_14B_fp8_scaled.safetensors",
       "wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors",
       "wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors",
+      "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors",
+      "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
       "wan2.2_s2v_14B_fp8_scaled.safetensors",
       "wan2.2_ti2v_5B_fp16.safetensors",
       "z_image_turbo_bf16.safetensors"
@@ -3482,6 +3572,251 @@
    "latent"
   ],
   "python_module": "comfy_extras.nodes_wan"
+ },
+ "WanFirstLastFrameToVideo": {
+  "input": {
+   "required": {
+    "positive": [
+     "CONDITIONING",
+     {}
+    ],
+    "negative": [
+     "CONDITIONING",
+     {}
+    ],
+    "vae": [
+     "VAE",
+     {}
+    ],
+    "width": [
+     "INT",
+     {
+      "default": 832,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "height": [
+     "INT",
+     {
+      "default": 480,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "length": [
+     "INT",
+     {
+      "default": 81,
+      "min": 1,
+      "max": 16384,
+      "step": 4
+     }
+    ],
+    "batch_size": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1,
+      "max": 4096
+     }
+    ]
+   },
+   "optional": {
+    "clip_vision_start_image": [
+     "CLIP_VISION_OUTPUT",
+     {}
+    ],
+    "clip_vision_end_image": [
+     "CLIP_VISION_OUTPUT",
+     {}
+    ],
+    "start_image": [
+     "IMAGE",
+     {}
+    ],
+    "end_image": [
+     "IMAGE",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "positive",
+    "negative",
+    "vae",
+    "width",
+    "height",
+    "length",
+    "batch_size"
+   ],
+   "optional": [
+    "clip_vision_start_image",
+    "clip_vision_end_image",
+    "start_image",
+    "end_image"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "CONDITIONING",
+   "CONDITIONING",
+   "LATENT"
+  ],
+  "output_is_list": [
+   false,
+   false,
+   false
+  ],
+  "output_name": [
+   "positive",
+   "negative",
+   "latent"
+  ],
+  "output_tooltips": [
+   null,
+   null,
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "WanFirstLastFrameToVideo",
+  "display_name": null,
+  "description": "",
+  "python_module": "comfy_extras.nodes_wan",
+  "category": "model/conditioning/wan",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "WanImageToVideo": {
+  "input": {
+   "required": {
+    "positive": [
+     "CONDITIONING",
+     {}
+    ],
+    "negative": [
+     "CONDITIONING",
+     {}
+    ],
+    "vae": [
+     "VAE",
+     {}
+    ],
+    "width": [
+     "INT",
+     {
+      "default": 832,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "height": [
+     "INT",
+     {
+      "default": 480,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "length": [
+     "INT",
+     {
+      "default": 81,
+      "min": 1,
+      "max": 16384,
+      "step": 4
+     }
+    ],
+    "batch_size": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1,
+      "max": 4096
+     }
+    ]
+   },
+   "optional": {
+    "clip_vision_output": [
+     "CLIP_VISION_OUTPUT",
+     {}
+    ],
+    "start_image": [
+     "IMAGE",
+     {}
+    ],
+    "ref_pad_image": [
+     "IMAGE",
+     {
+      "tooltip": "Fills the padding frames of the image conditioning with this image instead of gray, anchoring identity without pinning frames (SVI-style anti-drift padding, used by models such as ID-V2V)."
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "positive",
+    "negative",
+    "vae",
+    "width",
+    "height",
+    "length",
+    "batch_size"
+   ],
+   "optional": [
+    "clip_vision_output",
+    "start_image",
+    "ref_pad_image"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "CONDITIONING",
+   "CONDITIONING",
+   "LATENT"
+  ],
+  "output_is_list": [
+   false,
+   false,
+   false
+  ],
+  "output_name": [
+   "positive",
+   "negative",
+   "latent"
+  ],
+  "output_tooltips": [
+   null,
+   null,
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "WanImageToVideo",
+  "display_name": null,
+  "description": "",
+  "python_module": "comfy_extras.nodes_wan",
+  "category": "model/conditioning/wan",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
  },
  "WanSoundImageToVideo": {
   "input": {

@@ -71,3 +71,8 @@ nodes:
   - { class_type: LatentCut, source: comfyui-core, license: GPL-3.0 }
   - { class_type: ImageFromBatch, source: comfyui-core, license: GPL-3.0 }
   - { class_type: LoraLoaderModelOnly, source: comfyui-core, license: GPL-3.0 }
+  # Effects pack (workflows/wan21-i2v-effect.api.json, Wan 2.1 I2V): nodes.py (CLIPVisionLoader, CLIPVisionEncode)
+  # and comfy_extras/nodes_wan.py (WanImageToVideo).
+  - { class_type: CLIPVisionLoader, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: CLIPVisionEncode, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: WanImageToVideo, source: comfyui-core, license: GPL-3.0 }

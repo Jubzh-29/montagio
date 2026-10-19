@@ -261,3 +261,90 @@ weights:
     license: Apache-2.0
     source: https://huggingface.co/lightx2v/Wan2.2-Lightning
     extension: avatar
+  # The effects pack: Wan 2.1 I2V 480p, the base the Remade-AI effect LoRAs were trained on.
+  - id: wan21-i2v-480p-14b-fp8
+    file: wan2.1_i2v_480p_14B_fp8_scaled.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_i2v_480p_14B_fp8_scaled.safetensors
+    sha256: b2de21b99b2e72cb0ff15253b07e926f26e7cf1b7e229efc32f94ad1f1ed9395
+    size: 16401356938
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P
+    extension: effects
+  # The vision tower of OpenCLIP ViT-H-14 (LAION-2B, MIT), as Wan 2.1 I2V reads the start image.
+  - id: clip-vision-h
+    file: clip_vision_h.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors
+    sha256: 64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161
+    size: 1264219396
+    license: MIT
+    source: https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K
+    extension: effects
+  # The original lightx2v 4-step LoRA (Apache-2.0 with LICENSE.txt), not the Kijai extraction the templates fetch.
+  - id: lightx2v-wan21-i2v-480p-4step
+    file: Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors
+    url: https://huggingface.co/lightx2v/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v/resolve/main/loras/Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors
+    sha256: 8833bd4fd7c8eabebf0bc8ee5cfaf47f4f310ce116928a02c1adf8941dd4b0f1
+    size: 739472104
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Wan2.1-I2V-14B-480P-StepDistill-CfgDistill-Lightx2v
+    extension: effects
+  # Effect Squish: license declared in the card metadata only, no LICENSE file; trigger "sq41sh squish effect".
+  - id: remade-squish
+    file: squish_18.safetensors
+    url: https://huggingface.co/Remade-AI/Squish/resolve/main/squish_18.safetensors
+    sha256: c2195da8077b02674775929e94b43caa30dc069ed74b1818a2e2adf8fe559cf7
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/Squish
+    extension: effects
+    folder: loras
+  # Effect Cakeify: license declared in the card metadata only, no LICENSE file; trigger "c4k3 cakeify it".
+  - id: remade-cakeify
+    file: cakeify_16_epochs.safetensors
+    url: https://huggingface.co/Remade-AI/Cakeify/resolve/main/cakeify_16_epochs.safetensors
+    sha256: 4078cd32c45ad6f0206b87bd8de7e25700bd8419b9c0e0267bb828aec7eb6bf1
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/Cakeify
+    extension: effects
+    folder: loras
+  # Effect Explode: license declared in the card metadata only, no LICENSE file; trigger "3xp105ion huge explosion".
+  - id: remade-explode
+    file: explode_30_epochs.safetensors
+    url: https://huggingface.co/Remade-AI/Explode/resolve/main/explode_30_epochs.safetensors
+    sha256: 040dfee5d106acd4e027b6a493b2f228cef2adf090c23fb2040ff6ce016eccc5
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/Explode
+    extension: effects
+    folder: loras
+  # Effect Crash zoom in: license declared in the card metadata only, no LICENSE file; trigger "cr34sh crash zoom in effect".
+  - id: remade-crash-zoom-in
+    file: crash_zoom_in.safetensors
+    url: https://huggingface.co/Remade-AI/Crash-zoom-in/resolve/main/crash_zoom_in.safetensors
+    sha256: bcc26f0e2ae5f1d2fbe08e8278c2a89c7ef0c0ff7f595ebecc7f4602a92ffdd8
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/Crash-zoom-in
+    extension: effects
+    folder: loras
+  # Effect bullet time: license declared in the card metadata only, no LICENSE file; trigger "b4ll3t t1m3 bullet time shot".
+  - id: remade-matrix-shot
+    file: matrix_shot.safetensors
+    url: https://huggingface.co/Remade-AI/matrix-shot/resolve/main/matrix_shot.safetensors
+    sha256: 9e9b4952022c68014ad93d5e11fd949bd2ad46e26152b5e31c6f61725964f7a0
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/matrix-shot
+    extension: effects
+    folder: loras
+  # Effect 360 orbit: license declared in the card metadata only, no LICENSE file; trigger "0rb4it 360 degree orbit".
+  - id: remade-360-orbit
+    file: 360_Orbit.safetensors
+    url: https://huggingface.co/Remade-AI/360-Orbit/resolve/main/360_Orbit.safetensors
+    sha256: 5a99f1fd2db47344211fe6836a8664cfd5f053d03647b67c981cf163d65ffa82
+    size: 359257680
+    license: Apache-2.0
+    source: https://huggingface.co/Remade-AI/360-Orbit
+    extension: effects
+    folder: loras

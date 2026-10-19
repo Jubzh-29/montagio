@@ -12,8 +12,8 @@ import {
   type ModelEntry,
 } from '@montagio/registry';
 import type { ApiWorkflow } from './compile';
-import { parsePreset } from './parse';
-import type { Preset } from './schema';
+import { parseEffectPreset, parsePreset } from './parse';
+import type { EffectPreset, Preset } from './schema';
 
 export type Library = {
   presets: Map<string, Preset>;
@@ -29,6 +29,10 @@ export type Library = {
   extensionTemplates: Map<string, ApiWorkflow>;
   /** registry/extensions.yaml; null in a repository that has no extensions at all. */
   extensions: ExtensionsConfig | null;
+  /** One-photo effects (presets/effects/), apart from the camera presets: the Studio does not list them. */
+  effects: Map<string, EffectPreset>;
+  /** Repository-relative file of each effect, e.g. "presets/effects/squish.yaml". */
+  effectFiles: Map<string, string>;
   warnings: string[];
 };
 
@@ -115,6 +119,8 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
   const extensionModels = new Map<string, ExtensionModel>();
   const extensionTemplates = new Map<string, ApiWorkflow>();
   let extensions: ExtensionsConfig | null = null;
+  const effects = new Map<string, EffectPreset>();
+  const effectFiles = new Map<string, string>();
 
   const presetsDir = join(root, 'presets');
   for (const name of opts.presets === false ? [] : await yamlFiles(presetsDir)) {
@@ -123,6 +129,18 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
       if (presets.has(preset.id)) problems.push(`presets/${name}: duplicate preset id "${preset.id}"`);
       presets.set(preset.id, preset);
       presetFiles.set(preset.id, `presets/${name}`);
+    } catch (error) {
+      problems.push((error as Error).message);
+    }
+  }
+
+  const effectsDir = join(presetsDir, 'effects');
+  for (const name of opts.presets === false ? [] : await yamlFiles(effectsDir)) {
+    try {
+      const effect = parseEffectPreset(await readFile(join(effectsDir, name), 'utf8'), `presets/effects/${name}`);
+      if (effects.has(effect.id)) problems.push(`presets/effects/${name}: duplicate effect id "${effect.id}"`);
+      effects.set(effect.id, effect);
+      effectFiles.set(effect.id, `presets/effects/${name}`);
     } catch (error) {
       problems.push((error as Error).message);
     }
@@ -214,6 +232,16 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
   }
   problems.push(...lockExtensionProblems(lock, models, extensionModels));
 
+  for (const effect of effects.values()) {
+    const model = extensionModels.get(effect.models.preferred);
+    if (!model) problems.push(`effect ${effect.id}: unknown effect model "${effect.models.preferred}"`);
+    else if (model.task !== 'i2v-effect') problems.push(`effect ${effect.id}: model ${model.id} runs task ${model.task}, not i2v-effect`);
+    else if (!model.weights.includes(effect.effect.lora)) problems.push(`effect ${effect.id}: LoRA "${effect.effect.lora}" is not a weight of model ${model.id}`);
+    if (!(await exists(join(effectsDir, ...effect.preview.split('/'))))) {
+      warnings.push(`effect ${effect.id}: preview ${effect.preview} not found yet`);
+    }
+  }
+
   if (problems.length > 0) throw new LibraryError(problems);
-  return { presets, presetFiles, models, lock, templates, extensionModels, extensionTemplates, extensions, warnings };
+  return { presets, presetFiles, models, lock, templates, extensionModels, extensionTemplates, extensions, effects, effectFiles, warnings };
 }

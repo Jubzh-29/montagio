@@ -42,15 +42,20 @@ const CameraSchema = z
     }
   });
 
+/** The fields every kind of preset shares (camera move, one-photo effect, keyframe transition). */
+const presetHeader = {
+  schema: z.literal('montagio/preset@0.1'),
+  id: kebabId,
+  name: z.string().min(1).max(40),
+  description: z.string().max(140).default(''),
+  preview: z.string().regex(/^previews\/[a-z0-9-]+\.(mp4|webm)$/, 'must look like previews/<id>.mp4'),
+  license: z.enum(['CC-BY-4.0', 'CC0-1.0', 'Apache-2.0', 'MIT']),
+  author: z.string().min(1).max(60),
+};
+
 export const PresetSchema = z
   .object({
-    schema: z.literal('montagio/preset@0.1'),
-    id: kebabId,
-    name: z.string().min(1).max(40),
-    description: z.string().max(140).default(''),
-    preview: z.string().regex(/^previews\/[a-z0-9-]+\.(mp4|webm)$/, 'must look like previews/<id>.mp4'),
-    license: z.enum(['CC-BY-4.0', 'CC0-1.0', 'Apache-2.0', 'MIT']),
-    author: z.string().min(1).max(60),
+    ...presetHeader,
     capability: z.literal('i2v-camera'),
     camera: CameraSchema,
     prompt: z
@@ -89,3 +94,47 @@ export const PresetSchema = z
   .strict();
 
 export type Preset = z.infer<typeof PresetSchema>;
+
+/**
+ * A one-photo effect (`capability: i2v-effect`, in presets/effects/): a LoRA of the effects
+ * model, the trigger it was trained on, and a prompt template whose {subject} the user fills
+ * ("red toy car"). The template must carry the trigger: the LoRA does nothing without it.
+ */
+export const EffectPresetSchema = z
+  .object({
+    ...presetHeader,
+    capability: z.literal('i2v-effect'),
+    effect: z
+      .object({
+        /** Lock entry of the LoRA; a weight of the effects model. */
+        lora: kebabId,
+        strength: z.number().min(0).max(2).default(1),
+        trigger: z.string().min(1).max(80),
+      })
+      .strict(),
+    prompt: z
+      .object({
+        template: z.string().min(1).max(600),
+        /** What {subject} becomes when the user names nothing. */
+        subject: z.string().min(1).max(60).default('subject'),
+        /** Empty keeps the workflow's negative prompt. */
+        negative: z.string().max(300).default(''),
+      })
+      .strict(),
+    defaults: z
+      .object({ duration_s: z.number().int().min(2).max(5).default(5) })
+      .strict()
+      .default({ duration_s: 5 }),
+    models: z.object({ preferred: kebabId }).strict(),
+  })
+  .strict()
+  .superRefine((preset, ctx) => {
+    if (!preset.prompt.template.includes(preset.effect.trigger)) {
+      ctx.addIssue({ code: 'custom', path: ['prompt', 'template'], message: `must contain the trigger "${preset.effect.trigger}"` });
+    }
+    if (!preset.prompt.template.includes('{subject}')) {
+      ctx.addIssue({ code: 'custom', path: ['prompt', 'template'], message: 'must contain {subject}' });
+    }
+  });
+
+export type EffectPreset = z.infer<typeof EffectPresetSchema>;

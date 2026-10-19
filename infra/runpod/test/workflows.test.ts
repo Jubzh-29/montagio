@@ -15,7 +15,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { compileAvatar, compileEdit, compileJob, compileMusic, compileSpeech, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
+import { compileAvatar, compileEdit, compileEffect, compileJob, compileMusic, compileSpeech, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -148,6 +148,17 @@ test.each([
   const inputs = { imageRef: 'start.png', instruction: 'make it night', seed: 3, ...variant };
   const { workflow } = compileEdit(model, library.extensionTemplates.get(model.workflow)!, inputs, library.lock);
   expect(checkWorkflow(workflow, info)).toEqual([]);
+});
+
+test.each([true, false])('every effect job is accepted, in every aspect (fast: %s)', (fast) => {
+  const model = library.extensionModels.get('wan21-i2v-effects')!;
+  const template = library.extensionTemplates.get(model.workflow)!;
+  for (const effect of library.effects.values()) {
+    for (const aspect of ASPECTS) {
+      const { workflow } = compileEffect(effect, model, template, { imageRef: 'start.png', seed: 3, aspect, fast }, library.lock);
+      expect({ effect: effect.id, aspect, problems: checkWorkflow(workflow, info) }).toEqual({ effect: effect.id, aspect, problems: [] });
+    }
+  }
 });
 
 test('the voice job is accepted', () => {

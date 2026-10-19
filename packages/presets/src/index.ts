@@ -1,5 +1,14 @@
-export { CAMERA_COMBINES, CAMERA_POSES, PresetSchema, type CameraCombine, type CameraPose, type Preset } from './schema';
-export { parsePreset, PresetError } from './parse';
+export {
+  CAMERA_COMBINES,
+  CAMERA_POSES,
+  EffectPresetSchema,
+  PresetSchema,
+  type CameraCombine,
+  type CameraPose,
+  type EffectPreset,
+  type Preset,
+} from './schema';
+export { parseEffectPreset, parsePreset, PresetError } from './parse';
 export { dimensionsFor, frameCount, pickAspect, type Aspect, type Resolution } from './dimensions';
 export {
   CAMERA_POSE_PROMPTS,
@@ -31,3 +40,4 @@ export {
   type SpeechInputs,
   type UpscaleInputs,
 } from './extensions';
+export { compileEffect, type EffectInputs } from './effects';

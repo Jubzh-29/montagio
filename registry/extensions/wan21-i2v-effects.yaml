@@ -1,0 +1,40 @@
+# Effects pack (extension "effects"): one photo and one named effect (squish, cake-ify,
+# explosion, crash zoom, bullet time, 360 orbit) give 5 s of 480p video at 16 fps. Each
+# effect is a LoRA of Remade-AI trained on Wan 2.1 I2V 480p, named by a preset of
+# presets/effects/ with its trigger and prompt template. compileEffect writes the preset's
+# LoRA into node 200 and keeps or removes the 4-step LoRA of lightx2v (201).
+schema: montagio/extension-model@0.1
+id: wan21-i2v-effects
+name: Wan 2.1 I2V 480p (effects)
+extension: effects
+task: i2v-effect
+license: Apache-2.0
+weights:
+  - wan21-i2v-480p-14b-fp8
+  - clip-vision-h
+  - lightx2v-wan21-i2v-480p-4step
+  - umt5-xxl-fp8
+  - wan21-vae
+  - remade-squish
+  - remade-cakeify
+  - remade-explode
+  - remade-crash-zoom-in
+  - remade-matrix-shot
+  - remade-360-orbit
+workflow: workflows/wan21-i2v-effect.api.json
+bindings:
+  image: { node: "52", field: image }
+  prompt: { node: "6", field: text }
+  negative: { node: "7", field: text }
+  seed: { node: "3", field: seed }
+  width: { node: "50", field: width }
+  height: { node: "50", field: height }
+  frames: { node: "50", field: length }
+  lora: { node: "200", field: lora_name }
+  lora_strength: { node: "200", field: strength_model }
+output: { node: "56", kind: video }
+# max_chars bounds the subject a user types ("red toy car")
+limits: { max_duration_s: 5, max_chars: 120 }
+# GPU seconds for 5 s at 832x480 on an RTX 4090 with the 4-step LoRA (estimate: 1 to 2 min,
+# about 8 min at 20 steps without it; S2 measures both)
+estimate_s: 120
