@@ -3,7 +3,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync,
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { capture as realCapture, type Capture, type Stream } from '../src/exec.ts';
+import { capture as realCapture, type Capture, type Captured, type Stream } from '../src/exec.ts';
 import { install, markOwned, renderReport, type InstallDeps, type InstallOptions } from '../src/install.ts';
 import { parseVersionsEnv } from '../src/pins.ts';
 import { layout, osOf } from '../src/platform.ts';
@@ -74,7 +74,9 @@ function facts(over: Partial<MachineFacts> = {}): MachineFacts {
 
 type Call = { cmd: string; args: string[]; cwd?: string; shell?: boolean; env?: NodeJS.ProcessEnv };
 
-function harness(opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean; ask?: InstallDeps['ask'] } = {}) {
+function harness(
+  opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean; ask?: InstallDeps['ask']; comfyHead?: string; gitStatus?: Captured } = {},
+) {
   const calls: Call[] = [];
   const lines: string[] = [];
   const events: string[] = [];
@@ -123,9 +125,10 @@ function harness(opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean;
     if (cmd === 'git' && args[0] === '-C' && args[2] === 'rev-parse') {
       const where = args[1]!;
       if (where === repo) return { code: 0, stdout: 'abc123\n', stderr: '' };
-      return existsSync(join(where, '.git')) ? { code: 0, stdout: `${COMMIT}\n`, stderr: '' } : { code: 128, stdout: '', stderr: 'not a git repository' };
+      if (!existsSync(join(where, '.git'))) return { code: 128, stdout: '', stderr: 'not a git repository' };
+      return { code: 0, stdout: `${where === L.comfyDir && opts.comfyHead ? opts.comfyHead : COMMIT}\n`, stderr: '' };
     }
-    if (cmd === 'git' && args[2] === 'status') return { code: 0, stdout: '', stderr: '' };
+    if (cmd === 'git' && args[2] === 'status') return opts.gitStatus ?? { code: 0, stdout: '', stderr: '' };
     return { code: null, stdout: '', stderr: '' };
   };
   const deps: InstallDeps = {
@@ -270,6 +273,18 @@ test('a clone cut short is removed and cloned again', async () => {
   expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
   expect(existsSync(h.L.comfyTmp)).toBe(false);
   expect(existsSync(join(h.L.comfyDir, 'half-cloned.txt'))).toBe(false);
+});
+
+test('a git status that fails before an update is reported with its error, not as local changes', async () => {
+  await install(repo, options({ start: false }), harness().deps);
+  const dubious = { code: 128, stdout: '', stderr: "fatal: detected dubious ownership in repository at 'C:/S/ComfyUI'\n" };
+  const h = harness({ comfyHead: 'f'.repeat(40), gitStatus: dubious });
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(1);
+  expect(h.output()).toContain('detected dubious ownership');
+  expect(h.output()).not.toContain('has local changes');
+  const changed = harness({ comfyHead: 'f'.repeat(40), gitStatus: { code: 0, stdout: ' M comfy/sd.py\n', stderr: '' } });
+  expect(await install(repo, options({ start: false }), changed.deps)).toBe(1);
+  expect(changed.output()).toContain('has local changes');
 });
 
 test('paths with spaces reach every command as single arguments', async () => {

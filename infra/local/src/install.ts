@@ -255,7 +255,12 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     comfyui: async () => {
       if (comfy.exists) {
         const status = await deps.capture('git', ['-C', L.comfyDir, 'status', '--porcelain']);
-        if (status.code !== 0 || status.stdout.trim()) throw new Error(`${L.comfyDir} has local changes: move them away, then run the same command again`);
+        if (status.code !== 0) {
+          // A dubious-ownership refusal or a broken .git is not a local change: say what git said.
+          const why = status.stderr.trim() || (status.code === null ? 'git did not run' : `exit code ${status.code}`);
+          throw new Error(`git status failed in ${L.comfyDir}: ${why}`);
+        }
+        if (status.stdout.trim()) throw new Error(`${L.comfyDir} has local changes: move them away, then run the same command again`);
         await run('git', ['-C', L.comfyDir, 'fetch', '--depth', '1', 'origin', 'tag', versions.comfyuiTag]);
         await run('git', ['-C', L.comfyDir, 'checkout', '--detach', versions.comfyuiCommit]);
       } else {
