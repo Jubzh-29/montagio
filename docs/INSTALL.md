@@ -8,7 +8,7 @@ One command checks your machine, installs everything Montagio needs and opens it
 - the open weights of [`registry/models.lock.yaml`](../registry/models.lock.yaml), about 70 GB, all Apache-2.0, each checked against its sha256;
 - the Montagio app, built and served on `127.0.0.1`.
 
-Nothing is sent anywhere: every service listens on `127.0.0.1` only, there is no account, no key and no paid API.
+The install downloads from GitHub, PyPI, the PyTorch index, npm and Hugging Face. Once installed, Montagio runs on your machine: every service listens on `127.0.0.1` only, there is no account, no key and no paid API, and your images and clips never leave it.
 
 If you just want to see Montagio, the demo link needs no install at all.
 
@@ -153,7 +153,7 @@ Without a 24 GB GPU, `install --app-only` installs the app alone: no ComfyUI, no
 | `partner nodes are loaded` | Montagio refuses to run a ComfyUI that loads partner (paid API) nodes. It always starts ComfyUI with `--disable-partner-nodes`; if you see this, check `MONTAGIO_COMFYUI_ARGS` and `logs/comfyui.log` |
 | `the Montagio node pack did not load` | read its import error in `logs/comfyui.log`, then run `install` again (it relinks the pack) |
 | a download stopped | run `install` again: it resumes |
-| `sha256 mismatch` | the file on the server differs from the lock: the partial file is deleted, run again; if it persists, the upstream file changed, report it |
+| `sha256 mismatch` | a download did not give the bytes the lock pins: the partial file is deleted, run again; if it persists, the upstream file changed, report it. A weight the lock pins with a new sha256 after an update is not an error: `install` removes the old file and downloads the pinned one |
 | `EPERM` during `npm ci` (Windows) | a program still uses `node_modules` (often a `next dev` you started): stop it, run again |
 | `<folder>\ComfyUI exists and was not installed by Montagio` | `--dir` points to a folder with your own ComfyUI: choose an empty folder, Montagio never touches a ComfyUI it did not install |
 | pip is very slow on Windows | an antivirus scans each of the many files PyTorch unpacks; it gets there, give it time |
@@ -165,8 +165,9 @@ The logs of the three services are in `<install folder>/logs/`.
 ## Uninstall
 
 1. Stop Montagio: `./montagio.sh stop` (or `… .\montagio.ps1 stop`).
-2. Delete the install folder (see [where](#what-gets-installed-and-where)). It holds the weights, about 65 GiB.
-3. Delete the repository folder. Keep its `data/` folder first if you want your clips.
+2. Remove the link to the node pack first, so that nothing deletes the repository's `comfy-nodes` through it. On Windows: `cmd /c rmdir "%LOCALAPPDATA%\Montagio\ComfyUI\custom_nodes\montagio"` (`rmdir` without `/s` removes the junction only; Windows PowerShell 5.1's `Remove-Item -Recurse` may follow it into the repository). On Linux: `rm ~/.local/share/montagio/ComfyUI/custom_nodes/montagio`. Adapt the path if you installed with `--dir`.
+3. Delete the install folder (see [where](#what-gets-installed-and-where)). It holds the weights, about 65 GiB.
+4. Delete the repository folder. Keep its `data/` folder first if you want your clips.
 
 Nothing else is changed on your machine: no service, no setting, no file outside these two folders, apart from pip's and npm's download caches.
 
