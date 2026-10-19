@@ -3,6 +3,8 @@ import type { MessageKey } from '@/i18n';
 /** Server refusals worth their own message; any other code shows the generic error. */
 const REFUSALS: Record<string, MessageKey> = {
   'ffmpeg-missing': 'errorFfmpegMissing',
+  // The film's assembly failed: on the server (server/sequences.ts) or in the showcase's browser.
+  'ffmpeg-failed': 'errorFfmpegFailed',
   'workflow-rejected': 'errorWorkflowRejected',
   'backend-unavailable': 'errorBackendUnavailable',
   // The static showcase (src/showcase/router.ts).

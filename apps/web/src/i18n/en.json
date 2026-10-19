@@ -56,6 +56,7 @@
   "errorFfmpegMissing": "FFmpeg is not installed on the server. Install it (or set MONTAGIO_FFMPEG to its path), then try again.",
   "errorWorkflowRejected": "ComfyUI refused this workflow. The server log has the details.",
   "errorBackendUnavailable": "The ComfyUI server cannot be reached. Check that it is running, then try again.",
+  "errorFfmpegFailed": "FFmpeg could not join the shots into a film. Please try again.",
   "modeSingle": "Single shot",
   "modeSequence": "Sequence",
   "modeLabel": "Mode",

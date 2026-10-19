@@ -34,3 +34,10 @@ test('the showcase explains what it cannot do, in English and in French', () => 
   expect((en as Record<string, string>).errorShowcaseUpload).toMatch(/pre-generated/);
   expect((fr as Record<string, string>).errorShowcaseUpload).toMatch(/pré-générés/);
 });
+
+test('a film FFmpeg could not join gets its own message, in English and in French', () => {
+  // Sent by the server's assembly (server/sequences.ts) and by the showcase montage in the browser.
+  expect(refusalMessageKey('ffmpeg-failed')).toBe('errorFfmpegFailed');
+  expect((en as Record<string, string>).errorFfmpegFailed).toMatch(/FFmpeg/);
+  expect((fr as Record<string, string>).errorFfmpegFailed).toMatch(/FFmpeg/);
+});
