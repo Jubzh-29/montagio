@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadLibrary, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
-import { EXTENSION_JOBS, extensionJobs } from '../lib/extension-jobs';
+import { EXTENSION_JOBS, extensionJobs, jobTexts, type ExtensionJobOptions } from '../lib/extension-jobs';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const info = JSON.parse(readFileSync(new URL('./fixtures/object_info-v0.41.0.json', import.meta.url), 'utf8')) as ObjectInfo;
@@ -62,7 +62,7 @@ test('without a list, every effect of the pack runs, each with its own tag', () 
 });
 
 test('the edit job runs a look, so that a GPU session can validate each one', () => {
-  const [edit] = extensionJobs(library, { ...base, jobs: ['edit'], input: '/p.png', look: 'infl8', text: 'inflate the person' });
+  const [edit] = extensionJobs(library, { ...base, jobs: ['edit'], input: '/p.png', look: 'infl8', text: { edit: 'inflate the person' } });
   expect(edit!.params).toMatchObject({ look: 'infl8', instruction: 'inflate the person' });
   expect(edit!.workflow['170']!.inputs.lora_name).toBe(library.lock.get('systms-infl8-qwen-edit-2511')!.file);
   expect(checkWorkflow(edit!.workflow, info, { skip: ['41.image'] })).toEqual([]);
@@ -97,11 +97,37 @@ test('an unknown effect or hook is named, with the known ones', () => {
   expect(() => extensionJobs(library, { ...base, jobs: ['hook-edit'], input: '/p.png', hook: 'karaoke' })).toThrow(/unknown hook "karaoke".*eyes-in/);
 });
 
-test('the text goes to the job that reads one, with a default for each', () => {
-  const [music, edit, voice] = extensionJobs(library, { ...base, jobs: ['music', 'edit', 'voice'], input: '/p.png', text: 'night rain' });
-  expect(music!.params).toMatchObject({ prompt: 'night rain, instrumental', duration_s: 10 });
-  expect(edit!.params).toMatchObject({ instruction: 'night rain' });
-  expect(voice!.params).toMatchObject({ text: 'night rain' });
-  const [defaults] = extensionJobs(library, { ...base, jobs: ['music'] });
-  expect(defaults!.params).toMatchObject({ prompt: expect.stringContaining('instrumental') });
+test('each text reaches the job it is given for, the other jobs keep their default', () => {
+  const run = (text: ExtensionJobOptions['text']) =>
+    Object.fromEntries(extensionJobs(library, { ...base, jobs: ['edit', 'effect', 'voice', 'music'], input: '/p.png', effects: ['squish'], text }).map((job) => [job.name, job.params]));
+  const defaults = run(undefined);
+  const edited = run({ edit: 'make it a snowy night' });
+  expect(edited.edit).toMatchObject({ instruction: 'make it a snowy night' });
+  expect({ effect: edited.effect, voice: edited.voice, music: edited.music }).toEqual({ effect: defaults.effect, voice: defaults.voice, music: defaults.music });
+  const all = run({ edit: 'night rain', effect: 'red toy car', voice: 'Bonjour', music: 'calm piano' });
+  expect(all.edit).toMatchObject({ instruction: 'night rain' });
+  expect(all.effect!.prompt).toContain('red toy car');
+  expect(all.voice).toMatchObject({ text: 'Bonjour' });
+  expect(all.music).toMatchObject({ prompt: 'calm piano, instrumental', duration_s: 10 });
+  expect(defaults.music).toMatchObject({ prompt: expect.stringContaining('instrumental') });
+});
+
+describe('jobTexts (smoke --text)', () => {
+  test('a bare text goes to the one job of the run that reads a text, = and all', () => {
+    // the avatar reads no text: the voice it speaks does
+    expect(jobTexts(['Bonjour, ceci est un essai.'], ['voice', 'avatar'])).toEqual({ voice: 'Bonjour, ceci est un essai.' });
+    expect(jobTexts(['style=noir'], ['edit', 'upscale'])).toEqual({ edit: 'style=noir' });
+    expect(jobTexts([], [...EXTENSION_JOBS])).toEqual({});
+  });
+
+  test('when several jobs read a text, a bare one is refused and each text names its job', () => {
+    expect(() => jobTexts(['night rain'], [...EXTENSION_JOBS])).toThrow(/edit, effect, voice, music read a text: name the job, as in --text edit=/);
+    expect(jobTexts(['music=calm piano', 'edit=make it snow'], [...EXTENSION_JOBS])).toEqual({ music: 'calm piano', edit: 'make it snow' });
+  });
+
+  test('a text for a job the run does not have, a job given two texts, or a run with no text job are refused', () => {
+    expect(() => jobTexts(['music=calm piano'], ['edit'])).toThrow(/--text music=…: the music job is not part of this run/);
+    expect(() => jobTexts(['edit=snow', 'edit=rain'], ['edit'])).toThrow(/two texts for the edit job/);
+    expect(() => jobTexts(['snow'], ['upscale', 'transition'])).toThrow(/no job of this run reads a text/);
+  });
 });
