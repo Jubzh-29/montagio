@@ -10,7 +10,7 @@ web
 
 ## Users
 
-The primary audience is the jury of the Comfy "Open Source Higgsfield" contest. A juror opens the free showcase link, or watches the demo video, with no install and no patience for setup: they decide in the first minute whether Montagio is a real product. The secondary audience is the creator who installs Montagio on their own GPU (or a rented one) to animate their photos with camera moves, chain two or three shots into a short film, and remix presets.
+The primary audience is the jury of the Comfy open-source contest named in the README. A juror opens the free showcase link, or watches the demo video, with no install and no patience for setup: they decide in the first minute whether Montagio is a real product. The secondary audience is the creator who installs Montagio on their own GPU (or a rented one) to animate their photos with camera moves, chain two or three shots into a short film, and remix presets.
 
 ## Product Purpose
 
@@ -18,7 +18,7 @@ Montagio is a one-click camera-move studio on open weights (Wan 2.2 Fun Camera),
 
 ## Positioning
 
-Click like on Higgsfield, open the hood like in ComfyUI: the immediacy of a commercial camera-preset studio, on a stack that is open from the weights to the workflow.
+Click like on a commercial camera-preset studio, open the hood like in ComfyUI: that immediacy, on a stack that is open from the weights to the workflow.
 
 ## Brand Personality
 
@@ -30,7 +30,7 @@ Spectacular, immediate, precise. The camera moves sell themselves, the way they 
 - The raw node editor: the density of a ComfyUI graph. Montagio stays one click; the hood opens only when asked.
 - Neon cyberpunk: glows, glitches, saturated colours everywhere.
 
-The project spec also forbids Higgsfield's name, logo, texts, outputs and preset names anywhere in the product.
+The project spec also forbids the commercial competitor's name, logo, texts, outputs and preset names anywhere in the product (the README alone names it).
 
 ## Design Principles
 
