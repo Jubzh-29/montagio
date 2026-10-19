@@ -364,6 +364,15 @@ test('a program removed after the install is installed again', async () => {
   expect(described(again.calls).some((c) => c.includes('git clone'))).toBe(false);
 });
 
+test('a static export in apps/web/.next (the showcase build) is not a build next start can serve', async () => {
+  await install(repo, options({ start: false }), harness().deps);
+  // What `npm run showcase:build` leaves in .next: a BUILD_ID, and output 'export' in its config.
+  writeFileSync(join(repo, 'apps', 'web', '.next', 'required-server-files.json'), JSON.stringify({ config: { output: 'export' } }));
+  const again = harness();
+  await install(repo, options({ start: false }), again.deps);
+  expect(again.calls.some((c) => c.args[1] === 'build')).toBe(true);
+});
+
 test('a port option is kept for the next runs', async () => {
   const h = harness();
   await install(repo, options({ ports: { comfy: 8288 } }), h.deps);

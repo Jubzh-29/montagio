@@ -131,6 +131,20 @@ function readLink(path: string): string | null {
   }
 }
 
+/**
+ * A build next start can serve: a BUILD_ID, and not a static export. The showcase build
+ * (npm run showcase:build) exports into the same .next, with output: 'export' in its config.
+ */
+function servedBuild(nextDir: string): boolean {
+  if (!existsSync(join(nextDir, 'BUILD_ID'))) return false;
+  try {
+    const files = JSON.parse(readFileSync(join(nextDir, 'required-server-files.json'), 'utf8')) as { config?: { output?: string } };
+    return files.config?.output !== 'export';
+  } catch {
+    return true;
+  }
+}
+
 /** Major and minor of the Python a venv was made with, from its pyvenv.cfg. */
 function venvPython(venv: string): string | null {
   try {
@@ -202,7 +216,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
       artifacts: {
         comfyPython: existsSync(L.comfyPython),
         proxyExe: existsSync(L.proxyExe),
-        appBuild: existsSync(join(repoRoot, 'apps', 'web', '.next', 'BUILD_ID')),
+        appBuild: servedBuild(join(repoRoot, 'apps', 'web', '.next')),
       },
       repo,
       servicesRunning: own.length > 0,
