@@ -70,7 +70,7 @@ Sans `--release`, le pied de page affiche « Lien du code source ajouté à la p
 node apps/web/scripts/serve-static.mjs apps/web/out 3101
 ```
 
-Ouvrir ensuite http://localhost:3101/ et dérouler les vérifications de la partie 4.
+Ouvrir ensuite http://127.0.0.1:3101/ (le serveur de test n'écoute que sur la machine) et dérouler les vérifications de la partie 4.
 
 ## 3. Déployer sur Hugging Face, pas à pas
 
