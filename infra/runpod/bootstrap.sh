@@ -150,6 +150,7 @@ print(f"[montagio] torch {torch.__version__} (CUDA {torch.version.cuda}) on {tor
 
 # The avatar's voice: wildminder/ComfyUI-Chatterbox at the commit of versions.env, its /chatterbox/* routes
 # removed by our patch, its Python packages installed without their own dependencies and checked by hash.
+# Every step is checked here, not by set -e: install_voice_node calls it where a failure must not end the script.
 install_extension_nodes() {
   local dir=$COMFY_DIR/custom_nodes/ComfyUI-Chatterbox
   local patch=$SCRIPT_DIR/patches/comfyui-chatterbox-no-routes.patch
@@ -159,16 +160,21 @@ install_extension_nodes() {
   if [ "$(cat "$dir/.montagio-stamp" 2>/dev/null)" = "$stamp" ]; then return 0; fi
   if [ ! -d "$dir/.git" ]; then
     log "cloning the Chatterbox node (avatar voice) at ${CHATTERBOX_NODE_COMMIT:0:8}"
-    git clone --quiet "$CHATTERBOX_NODE_REPO" "$dir"
+    git clone --quiet "$CHATTERBOX_NODE_REPO" "$dir" || return 1
   fi
   # --force drops an earlier copy of the patch, so it is applied once, to the pinned files
-  git -C "$dir" checkout --quiet --force "$CHATTERBOX_NODE_COMMIT"
-  [ "$(git -C "$dir" rev-parse HEAD)" = "$CHATTERBOX_NODE_COMMIT" ] || die "the Chatterbox node in $dir is not at $CHATTERBOX_NODE_COMMIT"
-  git -C "$dir" apply --check "$patch" || die "$patch no longer applies to the Chatterbox node at $CHATTERBOX_NODE_COMMIT"
-  git -C "$dir" apply "$patch"
+  git -C "$dir" checkout --quiet --force "$CHATTERBOX_NODE_COMMIT" || return 1
+  [ "$(git -C "$dir" rev-parse HEAD)" = "$CHATTERBOX_NODE_COMMIT" ] || { warn "the Chatterbox node in $dir is not at $CHATTERBOX_NODE_COMMIT"; return 1; }
+  git -C "$dir" apply --check "$patch" || { warn "$patch no longer applies to the Chatterbox node at $CHATTERBOX_NODE_COMMIT"; return 1; }
+  git -C "$dir" apply "$patch" || return 1
   log "installing the Python packages of the Chatterbox node (pinned, hashed, no dependencies)"
-  "$COMFY_VENV/bin/pip" install --quiet --no-deps --require-hashes -r "$requirements"
+  "$COMFY_VENV/bin/pip" install --quiet --no-deps --require-hashes -r "$requirements" || return 1
   echo "$stamp" >"$dir/.montagio-stamp"
+}
+
+# Last and optional: without its voice node the avatar is refused, the presets and the other extensions are not.
+install_voice_node() {
+  install_extension_nodes || warn "the avatar's voice node is not installed (see above): the avatar job will be refused, the presets and the other extensions run as usual"
 }
 
 install_proxy() {
@@ -332,25 +338,30 @@ summary() {
 
 # --- main -------------------------------------------------------------------
 
-command=all
-for arg in "$@"; do
-  case $arg in
-    --expose-ui) LISTEN=0.0.0.0 ;;
-    all | install | start | stop | status | collect) command=$arg ;;
-    -h | --help) sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) die "unknown argument: $arg (see --help)" ;;
-  esac
-done
+main() {
+  local command=all
+  for arg in "$@"; do
+    case $arg in
+      --expose-ui) LISTEN=0.0.0.0 ;;
+      all | install | start | stop | status | collect) command=$arg ;;
+      -h | --help) sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+      *) die "unknown argument: $arg (see --help)" ;;
+    esac
+  done
 
-case $command in
-  install)
-    preflight; install_node; install_comfyui; install_extension_nodes; install_proxy; install_npm; write_env ;;
-  start)
-    mkdir -p "$LOG_DIR" "$RUN_DIR"; start_comfyui; start_proxy; summary ;;
-  all)
-    preflight; install_node; install_comfyui; install_extension_nodes; install_proxy; install_npm; write_env
-    start_comfyui; start_proxy; summary ;;
-  stop) stop_services ;;
-  status) status ;;
-  collect) collect ;;
-esac
+  case $command in
+    install)
+      preflight; install_node; install_comfyui; install_proxy; install_npm; write_env; install_voice_node ;;
+    start)
+      mkdir -p "$LOG_DIR" "$RUN_DIR"; start_comfyui; start_proxy; summary ;;
+    all)
+      preflight; install_node; install_comfyui; install_proxy; install_npm; write_env; install_voice_node
+      start_comfyui; start_proxy; summary ;;
+    stop) stop_services ;;
+    status) status ;;
+    collect) collect ;;
+  esac
+}
+
+# Sourced (by the tests), the script only defines its functions.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then main "$@"; fi
