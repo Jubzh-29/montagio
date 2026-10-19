@@ -63,6 +63,7 @@ const { values: args } = parseArgs({
     effect: { type: 'string', default: 'all' },
     hook: { type: 'string' },
     quality: { type: 'boolean', default: false },
+    look: { type: 'string' },
     clip: { type: 'string' },
     audio: { type: 'string' },
     text: { type: 'string' },
@@ -99,6 +100,7 @@ Extensions (instead of presets):
   --input2 PATH      the second image of a two-reference hook (the outfit of outfit-morph)
   --end PATH         the end frame of a transition run alone; without it, the hook's edit runs first and makes it
   --quality          the edit, the effects and the transition without their 4-step LoRAs (more steps, slower)
+  --look LOOK        a look of the edit job: infl8, action or angles
   --clip PATH        the clip to upscale (required by upscale)
   --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
   --text TEXT        the music description, the edit instruction, the effect's subject or the words to say (each has a default)
@@ -439,6 +441,7 @@ async function runExtensions(
     effects: args.effect === 'all' ? undefined : args.effect.split(',').map((id) => id.trim()),
     hook: args.hook,
     fast: !args.quality,
+    look: args.look,
     clip,
     audio: audio ?? (args['dry-run'] ? 'speech.flac' : undefined),
     audio_s: audio_s ?? (args['dry-run'] ? 5 : undefined),

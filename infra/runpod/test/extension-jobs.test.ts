@@ -61,6 +61,17 @@ test('without a list, every effect of the pack runs, each with its own tag', () 
   expect(jobs.map((job) => job.tag).sort()).toEqual(['effect:bullet-time', 'effect:cakeify', 'effect:crash-zoom-in', 'effect:explode', 'effect:orbit-360', 'effect:squish']);
 });
 
+test('the edit job runs a look, so that a GPU session can validate each one', () => {
+  const [edit] = extensionJobs(library, { ...base, jobs: ['edit'], input: '/p.png', look: 'infl8', text: 'inflate the person' });
+  expect(edit!.params).toMatchObject({ look: 'infl8', instruction: 'inflate the person' });
+  expect(edit!.workflow['170']!.inputs.lora_name).toBe(library.lock.get('systms-infl8-qwen-edit-2511')!.file);
+  expect(checkWorkflow(edit!.workflow, info, { skip: ['41.image'] })).toEqual([]);
+});
+
+test('an unknown look is named, with the known ones', () => {
+  expect(() => extensionJobs(library, { ...base, jobs: ['edit'], input: '/p.png', look: 'karaoke' })).toThrow(/unknown look "karaoke".*infl8, action, angles/);
+});
+
 test('the quality path drops the 4-step LoRAs of the edit, the effects and the transition', () => {
   const jobs = extensionJobs(library, { ...base, ...files, jobs: ['edit', 'effect', 'transition'], effects: ['squish'], hook: 'eyes-in', fast: false });
   expect(jobs.map((job) => job.params.fast)).toEqual([false, false, false]);

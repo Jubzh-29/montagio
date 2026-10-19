@@ -199,8 +199,11 @@ Dans l'ordre de priorité réorienté. Le détail de ce qu'il faut regarder est 
    npm run smoke -w @montagio/infra-runpod -- --extension edit --input /workspace/person.png --text "make it a rainy night scene"
    npm run smoke -w @montagio/infra-runpod -- --extension edit --input /workspace/person.png --text "ajoute de la neige"
    npm run smoke -w @montagio/infra-runpod -- --extension edit --quality --input /workspace/person.png --text "make it a rainy night scene"
+   npm run smoke -w @montagio/infra-runpod -- --extension edit --look infl8 --input /workspace/person.png --text "inflate the person"
+   npm run smoke -w @montagio/infra-runpod -- --extension edit --look action --input /workspace/person.png --text "action the person"
+   npm run smoke -w @montagio/infra-runpod -- --extension edit --look angles --input /workspace/object.png --text "front-left quarter view eye-level shot medium shot"
    ```
-   Les deux premières tournent en 4 étapes (LoRA Lightning), la troisième en 40 : comparez le temps et la fidélité à l'instruction.
+   Les deux premières tournent en 4 étapes (LoRA Lightning), la troisième en 40 : comparez le temps et la fidélité à l'instruction. Les trois dernières valident chaque look : aucune ligne `lora key not loaded` dans `/workspace/logs/comfyui.log`, et l'effet attendu (gonflé, figurine, autre angle de vue). Un look qui échoue se note dans la fiche : l'édition peut être datée sans lui, mais le hook Figurine (look ACTION) ne le sera pas.
    Le journal de ComfyUI dit-il `loaded completely` ou `loaded partially` ? Notez le temps par image et le pic de VRAM. Puis animez l'image éditée : `npm run smoke -w @montagio/infra-runpod -- --image s1-results/clips/<l'image éditée>.png`.
 2. **Effets** (≈ 45 min) : les 6 effets sur chaque photo, en 4 étapes ; `--text` donne le sujet que reprend le prompt.
    ```bash
@@ -262,9 +265,9 @@ Dans l'ordre de priorité réorienté. Le détail de ce qu'il faut regarder est 
 > apt-get update && apt-get install -y ffmpeg
 > ./montagio.sh install --dry-run --dir /workspace/montagio-local --comfy-port 8288 --proxy-port 8289 --app-port 3001
 > ```
-> Les ports changent pour ne pas buter sur ComfyUI et le proxy du bootstrap. Attendu : la RTX 4090 avec 24 Go, `driver …, CUDA 13.x: torch 2.14.1+cu130`, puis la liste des étapes. Notez toute ligne en échec. Avec un volume de 250 Go, la ligne du disque passe de justesse une fois les poids de la session téléchargés (≈ 95 Go libres) ; avec 300 Go, largement. L'installeur ne prend pas les poids des extensions par défaut (`--extensions validated`, aucune n'est encore datée).
+> Les ports changent pour ne pas buter sur ComfyUI et le proxy du bootstrap. Attendu : la RTX 4090 avec 24 Go, `driver …, CUDA 13.x: torch 2.14.1+cu130`, puis la liste des étapes. Notez toute ligne en échec. Avec un volume de 300 Go, la ligne du disque passe de justesse une fois les poids de la session téléchargés (≈ 95 Go libres) ; avec 350 Go, largement. L'installeur ne prend pas les poids des extensions par défaut (`--extensions validated`, aucune n'est encore datée).
 >
-> **2. Vraie installation**, après le téléchargement de l'archive (étape 2 ci-dessus) et avant Terminate. Comptez 30 à 45 min de pod en plus, soit environ 0,25 $, dont 10 à 25 min de poids. Il faut environ 80 Gio libres sur `/workspace` (65 Gio de poids des presets, 12 Gio de PyTorch) en plus des 140 Go de la session : sans assez de place, l'installeur refuse au contrôle du disque, avant de rien changer. D'où les 300 Go conseillés en partie 1 pour cet essai.
+> **2. Vraie installation**, après le téléchargement de l'archive (étape 2 ci-dessus) et avant Terminate. Comptez 30 à 45 min de pod en plus, soit environ 0,25 $, dont 10 à 25 min de poids. Il faut environ 80 Gio libres sur `/workspace` (65 Gio de poids des presets, 12 Gio de PyTorch) en plus des ≈ 205 Go de la session (poids et outils) : sans assez de place, l'installeur refuse au contrôle du disque, avant de rien changer. D'où les 350 Go conseillés en partie 1 pour cet essai.
 > ```bash
 > bash infra/runpod/bootstrap.sh stop
 > df -h /workspace
@@ -298,6 +301,7 @@ Installeur local (facultatif) : dry-run, lignes en échec ______________   vraie
 Presets réglés : ______________________________________________
 Extensions (validée oui / non, temps, VRAM max, remarque) :
   Édition 4 étapes ____ s, 40 étapes ____ s, VRAM ____ Mo, loaded completely / partially, français suivi oui / non : __________
+    Looks infl8 ___ action ___ angles ___ (« lora key not loaded » oui / non) : __________
   Effets lisibles (personne / animal / objet) : squish ___ cakeify ___ explode ___ crash zoom ___ bullet time ___ orbit ___
     ____ s par effet, VRAM ____ Mo, « lora key not loaded » oui / non, à repasser en 20 étapes : __________
   Hooks eyes-in ____ s, outfit-morph ____ s (édition + transition), image finale réussie oui / non, continuité : __________

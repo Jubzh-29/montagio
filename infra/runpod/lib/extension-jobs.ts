@@ -12,6 +12,7 @@ import {
   compileMusic,
   compileSpeech,
   compileUpscale,
+  EDIT_LOOK_IDS,
   type ApiWorkflow,
   type Aspect,
   type Library,
@@ -72,6 +73,8 @@ export type ExtensionJobOptions = {
   hook?: string;
   /** The 4-step LoRAs of the edit, the effects and the transition (default), or their quality path. */
   fast?: boolean;
+  /** A look of the edit job (infl8, action, angles), so that a GPU session validates each one. */
+  look?: string;
 };
 
 export type ExtensionJob = {
@@ -117,7 +120,9 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
     switch (name) {
       case 'edit': {
         const photo = need(opts.input, '--input', name);
-        const job = compileEdit(model, template, { imageRef: basename(photo), instruction: text('edit'), seed: opts.seed, fast }, library.lock);
+        const look = opts.look === undefined ? undefined : EDIT_LOOK_IDS.find((id) => id === opts.look);
+        if (opts.look !== undefined && !look) throw new Error(`unknown look "${opts.look}" (known: ${EDIT_LOOK_IDS.join(', ')})`);
+        const job = compileEdit(model, template, { imageRef: basename(photo), instruction: text('edit'), seed: opts.seed, fast, ...(look ? { look } : {}) }, library.lock);
         return [{ name, tag: name, model, ...job, files: [file('image', photo)] }];
       }
       case 'effect': {
