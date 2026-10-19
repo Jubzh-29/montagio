@@ -71,6 +71,12 @@
     linear-gradient(var(--mark), var(--mark)) bottom right / 1px 18px no-repeat;
 }
 
+/* "Choose a photo" is a label for a visually hidden file input: show the keyboard focus on the label. */
+.monitor:has(> input[type='file']:focus-visible) label[for='photo-input'] {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
 .monitor[data-dragging='true'] {
   border-color: var(--rec);
   background: var(--surface-2);
@@ -1085,6 +1091,26 @@
   color: var(--warn);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+}
+
+/* A phone: one sample per row, thumbnail on the left, the badge beside the title instead of over a tiny picture. */
+@media (max-width: 520px) {
+  .samples {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sample {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .sampleImage {
+    flex: none;
+    width: 88px;
+  }
+  .sample .badge {
+    position: static;
+    margin-left: auto;
+  }
 }
 
 .caption {

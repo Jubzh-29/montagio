@@ -5,6 +5,8 @@
   "badgeShort": "Open weights ✓",
   "badgeFailed": "Vérification de la pile ouverte en échec",
   "badgeChecking": "Vérification de la pile ouverte…",
+  "language": "Langue",
+  "monitor": "Moniteur",
   "monitorEmpty": "Déposez une photo ici",
   "monitorEmptyHint": "PNG, JPEG ou WebP · 10 Mo maximum",
   "choosePhoto": "Choisir une photo",

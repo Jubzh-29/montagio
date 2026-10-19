@@ -33,10 +33,10 @@ function OpenStackBadge() {
 }
 
 function LanguageToggle() {
-  const { lang, setLang } = useI18n();
+  const { lang, setLang, t } = useI18n();
   const langs: Lang[] = ['en', 'fr'];
   return (
-    <div className={styles.langs} role="group" aria-label="Language">
+    <div className={styles.langs} role="group" aria-label={t('language')}>
       {langs.map((code) => (
         <button
           key={code}

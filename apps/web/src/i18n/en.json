@@ -5,6 +5,8 @@
   "badgeShort": "Open weights ✓",
   "badgeFailed": "Open stack check failed",
   "badgeChecking": "Checking open stack…",
+  "language": "Language",
+  "monitor": "Monitor",
   "monitorEmpty": "Drop a photo here",
   "monitorEmptyHint": "PNG, JPEG or WebP · up to 10 MB",
   "choosePhoto": "Choose a photo",

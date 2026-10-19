@@ -417,7 +417,10 @@ export function Studio() {
     <>
       <Header recording={busy} />
       <main className={styles.studio} data-motion={motionPaused ? 'paused' : 'playing'}>
-        <section className={styles.stage} aria-label="Monitor">
+        <h1 className="visually-hidden">
+          {t('appName')} — {t('tagline')}
+        </h1>
+        <section className={styles.stage} aria-label={t('monitor')}>
           <Monitor
             upload={upload}
             generation={monitorState}
