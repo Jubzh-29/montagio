@@ -62,6 +62,14 @@ Les quatre workflows partent des templates officiels de [Comfy-Org/workflow_temp
 - Morceau sans voix : `lyrics` = `[Instrumental]`, comme le dit la documentation d'ACE-Step ; le compilateur termine aussi la description par « instrumental ». Que la musique reste vraiment sans voix est un point de la S2.
 - La sortie est un FLAC 48 kHz stéréo. comfy-api-proxy 0.1.6 la rapporte avec le type `audio`, et son `content_type` peut valoir `application/octet-stream` (Python n'a pas de type MIME pour `.flac`) : l'adaptateur choisit la sortie par son type (tâche 1).
 
+### Upscale HD : SeedVR2 3B, nodes du cœur
+
+- Template `templates/utility_seedvr2_3b_int8_upscale_video.json`, le seul template vidéo SeedVR2 fait de nodes du cœur (les autres demandent le custom node `numz/ComfyUI-SeedVR2_VideoUpscaler`, ou passent par une API).
+- Nodes : `LoadVideo` et `GetVideoComponents` (`comfy_extras/nodes_video.py`), `ResizeImageMaskNode` (`comfy_extras/nodes_post_processing.py:417`), `SeedVR2Preprocess`, `SeedVR2TemporalChunk`, `SeedVR2Conditioning`, `SeedVR2TemporalMerge`, `SeedVR2PostProcessing` (`comfy_extras/nodes_seedvr.py`), `VAEEncodeTiled`, `VAEDecodeTiled`, `KSampler` (une étape, cfg 1), `CreateVideo`, `SaveVideo`. ComfyUI v0.41.0 reconnaît le 3B et le 7B (`comfy/model_detection.py:708-745`) ; la classe `SeedVR2` exige les conditionnements de texte intégrés, que seuls les fichiers Comfy-Org portent (`comfy/supported_models.py:1844`).
+- SeedVR2 n'a pas d'entrée de taille : le redimensionnement qui le précède fixe la sortie, 1920×1080, 1080×1920 ou 1080×1080 selon l'aspect du clip, sans étirement. Le prétraitement complète à des multiples de 16 (1080 devient 1088), le post-traitement recadre.
+- Découpage temporel câblé en mode `manual` : morceaux de 33 images, recouvrement de 3. Sans lui, 81 images en 1080p demandent ≈ 35 Gio ; le mode `auto` dépend de la VRAM libre, donc des coutures qui bougent d'un rendu à l'autre.
+- Contrôle hors ligne : `checkWorkflow` ne connaissait pas le type « MatchType » de l'API V3 que déclare `ResizeImageMaskNode` ; il l'accepte désormais, comme ComfyUI (`comfy_execution/validation.py:220-223`).
+
 ## 3. Poids
 
 Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`), recoupés par `fetch-weights --lock-from-hf`, dont le patch est vide. Chaque entrée du lock porte `extension:` : l'installeur local ne la télécharge que pour son extension.
@@ -72,14 +80,17 @@ Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`)
 | Musique | `qwen3-embedding-06b-ace15` | `qwen_0.6b_ace15.safetensors` | 1 191 588 248 | `fd4590c8…` |
 | Musique | `ace-step15-lm-17b` | `qwen_1.7b_ace15.safetensors` | 3 708 523 360 | `ed63e924…` |
 | Musique | `ace-step15-vae` | `ace_1.5_vae.safetensors` | 337 431 732 | `6de92e3a…` |
+| Upscale | `seedvr2-3b-int8` | `seedvr2_3b_int8_convrot.safetensors` (conversion Comfy-Org des `.pth` fp32 de ByteDance) | 3 458 259 704 | `c3dec8bc…` |
+| Upscale | `seedvr2-vae` | `seedvr2_ema_vae_fp16.safetensors` | 501 324 814 | `20678548…` |
 
-Musique : 10,0 Go.
+Musique : 10,0 Go. Upscale : 3,96 Go.
 
 ## 4. VRAM et temps sur une RTX 4090 (24 Go)
 
 Ce sont des **estimations**, tirées de la taille des poids et des formules de mémoire du code de ComfyUI v0.41.0. La S2 les mesure.
 
 - **Musique.** DiT 4,8 Go, encodeurs 4,9 Go, VAE 0,3 Go ; le décodage d'un morceau de 60 s demande ≈ 5,7 Gio (`comfy/sd.py:729`). Tout résident, le pic est ≈ 16 Go : **tient**. Le LM tourne sans vLLM : ≈ 3 à 10 s à chaud pour 60 s de musique, plus le chargement. Après un rendu Wan 14B, ComfyUI ne décharge que ce qu'il faut (`comfy/model_management.py:893-1039`) ; le rendu Wan suivant recharge ses poids.
+- **Upscale.** Poids 3,2 Gio en int8. Par morceau de 9 latents en 1080p, la loi mesurée par ComfyUI (`comfy/ldm/seedvr/constants.py:3-11`, sur une RTX 5090) donne ≈ 10,3 Gio d'activations, soit un pic de ≈ 18–19 Gio : **tient**. Sans découpage, non (≈ 35 Gio). Le 7B int8 serait à la limite, le 7B fp16 ne tient pas. Temps : ≈ 2 à 4 min pour un clip de 81 images, ≈ 3 à 6 min pour 121. L'int8 est plus rapide avec torch cu130 (le pod) ; sur le repli cu128, le noyau CUDA de comfy-kitchen est coupé (`comfy/quant_ops.py:23-29`).
 
 ## 5. Contrat backend et drapeau de coupe
 
