@@ -32,19 +32,25 @@ beforeEach(() => {
   mkdirSync(join(repo, 'infra', 'runpod'), { recursive: true });
   cpSync(join(realRoot, 'infra', 'runpod', 'versions.env'), join(repo, 'infra', 'runpod', 'versions.env'));
   mkdirSync(join(repo, 'registry'));
-  writeFileSync(
-    join(repo, 'registry', 'models.lock.yaml'),
-    `schema: montagio/lock@0.1\nweights:\n${WEIGHTS.map(
-      (w) =>
-        `  - id: ${w.id}\n    file: ${w.file}\n    url: https://huggingface.co/Comfy-Org/x/resolve/main/split_files/${w.folder}/${w.file}\n    sha256: ${w.sha256}\n    size: ${w.size}\n    license: Apache-2.0\n    source: https://huggingface.co/x/y\n`,
-    ).join('')}`,
-  );
+  writeLock(WEIGHTS);
   writeFileSync(join(repo, 'package-lock.json'), '{"lockfileVersion": 3}\n');
   mkdirSync(join(repo, 'node_modules'));
   writeFileSync(join(repo, 'node_modules', '.package-lock.json'), '{}');
   mkdirSync(join(repo, 'comfy-nodes'));
 });
 afterEach(() => rmSync(base, { recursive: true, force: true }));
+
+function writeLock(weights: typeof WEIGHTS): void {
+  writeFileSync(
+    join(repo, 'registry', 'models.lock.yaml'),
+    `schema: montagio/lock@0.1\nweights:\n${weights
+      .map(
+        (w) =>
+          `  - id: ${w.id}\n    file: ${w.file}\n    url: https://huggingface.co/Comfy-Org/x/resolve/main/split_files/${w.folder}/${w.file}\n    sha256: ${w.sha256}\n    size: ${w.size}\n    license: Apache-2.0\n    source: https://huggingface.co/x/y\n`,
+      )
+      .join('')}`,
+  );
+}
 
 function facts(over: Partial<MachineFacts> = {}): MachineFacts {
   return {
@@ -71,11 +77,25 @@ function harness(opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean;
   const calls: Call[] = [];
   const lines: string[] = [];
   const events: string[] = [];
+  /** For each weight fetch-weights is asked for: did its file exist when it was asked? */
+  const existedBefore: Record<string, boolean> = {};
   const L = layout(dir, os);
   const stream: Stream = async (cmd, args, o = {}) => {
     const call = { cmd, args, cwd: o.cwd, shell: o.shell, env: o.env };
     calls.push(call);
     if (opts.failOn?.(call)) return 1;
+    // What the real programs leave behind, which the plan checks for.
+    if (args.includes('venv')) {
+      const venv = args.at(-1)!;
+      const python = os === 'windows' ? join(venv, 'Scripts', 'python.exe') : join(venv, 'bin', 'python');
+      mkdirSync(dirname(python), { recursive: true });
+      writeFileSync(python, '');
+    }
+    if (args.some((a) => a.startsWith('comfy-api-proxy=='))) writeFileSync(L.proxyExe, '');
+    if (args[1] === 'build') {
+      mkdirSync(join(repo, 'apps', 'web', '.next'), { recursive: true });
+      writeFileSync(join(repo, 'apps', 'web', '.next', 'BUILD_ID'), 'x');
+    }
     if (cmd === 'git' && args[0] === 'clone') {
       const target = args.at(-1)!;
       mkdirSync(join(target, '.git'), { recursive: true });
@@ -88,6 +108,7 @@ function harness(opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean;
       const only = args[args.indexOf('--only') + 1]!.split(',');
       const out = args[args.indexOf('--out') + 1]!;
       for (const w of WEIGHTS.filter((w) => only.includes(w.id))) {
+        existedBefore[w.id] = existsSync(join(models, w.folder, w.file));
         mkdirSync(join(models, w.folder), { recursive: true });
         writeFileSync(join(models, w.folder, w.file), w.content);
       }
@@ -120,7 +141,7 @@ function harness(opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean;
     runningPorts: async () => [],
     probe: async () => opts.facts ?? facts(),
   };
-  return { calls, lines, events, deps, L, output: () => lines.join('\n') };
+  return { calls, lines, events, existedBefore, deps, L, output: () => lines.join('\n') };
 }
 
 const options = (over: Partial<InstallOptions> = {}): InstallOptions => ({
@@ -256,6 +277,41 @@ test('the CUDA check looks at the GPU the checks chose, numbered as nvidia-smi n
   const check = h.calls.find((c) => c.args[0] === '-I')!;
   expect(check.env).toMatchObject({ CUDA_DEVICE_ORDER: 'PCI_BUS_ID', CUDA_VISIBLE_DEVICES: '1' });
   expect(readState(h.L.statePath).gpuIndex).toBe(1);
+});
+
+test('a weight half downloaded counts only its missing bytes in the disk check', async () => {
+  // An install cut during the download: everything else is in place, a .part is left.
+  const cut = harness({ failOn: (c) => c.args.includes('--models-dir') });
+  expect(await install(repo, options({ start: false }), cut.deps)).toBe(1);
+  const te = WEIGHTS[1]!;
+  mkdirSync(join(cut.L.modelsDir, te.folder), { recursive: true });
+  writeFileSync(join(cut.L.modelsDir, te.folder, `${te.file}.part`), te.content.slice(0, 10));
+  const total = WEIGHTS.reduce((sum, w) => sum + w.size, 0);
+  // Room for the margin and what is left of the weights, not for the 10 bytes already there.
+  const free = 2 * GiB + total - 10;
+  const h = harness({ facts: facts({ freeBytes: { installDir: free, repo: 500 * GiB } }) });
+  expect(await install(repo, options({ dryRun: true }), h.deps)).toBe(0);
+  expect(h.output()).not.toMatch(/FAIL\s+disk/);
+});
+
+test('a weight the lock now pins with another sha256 is removed, then fetched again', async () => {
+  await install(repo, options({ start: false }), harness().deps);
+  writeLock([{ ...WEIGHTS[0]!, sha256: 'e'.repeat(64) }, WEIGHTS[1]!]);
+  const again = harness();
+  await install(repo, options({ start: false }), again.deps);
+  const fetch = again.calls.find((c) => c.args.includes('--only'))!;
+  expect(fetch.args[fetch.args.indexOf('--only') + 1]).toBe('tiny-vae');
+  expect(again.existedBefore['tiny-vae']).toBe(false);
+});
+
+test('a program removed after the install is installed again', async () => {
+  const h = harness();
+  await install(repo, options({ start: false }), h.deps);
+  rmSync(h.L.proxyExe);
+  const again = harness();
+  await install(repo, options({ start: false }), again.deps);
+  expect(described(again.calls).some((c) => c.includes('comfy-api-proxy==0.1.6'))).toBe(true);
+  expect(described(again.calls).some((c) => c.includes('git clone'))).toBe(false);
 });
 
 test('a port option is kept for the next runs', async () => {

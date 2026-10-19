@@ -1,7 +1,7 @@
 import { win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readLock, readVersions } from '../src/pins.ts';
-import { buildPlan, buildStamp, diskNeed, envStamp, weightsToFetch, type PlanInput, type Step } from '../src/plan.ts';
+import { buildPlan, buildStamp, diskNeed, envStamp, proxyStamp, weightsToClear, weightsToFetch, type PlanInput, type Step } from '../src/plan.ts';
 import { layout } from '../src/platform.ts';
 import { emptyState, type InstallState } from '../src/state.ts';
 
@@ -27,6 +27,7 @@ function fresh(over: Partial<PlanInput> = {}): PlanInput {
     weightStat: () => null,
     comfy: { head: null, exists: false, tmpExists: false },
     packTarget: null,
+    artifacts: { comfyPython: false, proxyExe: false, appBuild: false },
     repo: { head: 'abc123', lockHash: 'h1', nodeModules: false },
     servicesRunning: false,
     start: true,
@@ -41,7 +42,7 @@ function installedState(): InstallState {
     stamps: {
       comfyui: versions.comfyuiCommit,
       comfyEnv: envStamp(versions.comfyuiCommit, versions.torch, python.version),
-      proxy: `comfy-api-proxy==${versions.proxyVersion}`,
+      proxy: proxyStamp(versions, python.version)!,
       npm: 'h1',
       build: buildStamp('abc123', 'h1')!,
     },
@@ -55,6 +56,7 @@ function installed(over: Partial<PlanInput> = {}): PlanInput {
     weightStat: (w) => ({ size: w.size, mtimeMs: 1 }),
     comfy: { head: versions.comfyuiCommit, exists: true, tmpExists: false },
     packTarget: win32.join(repoRoot, 'comfy-nodes'),
+    artifacts: { comfyPython: true, proxyExe: true, appBuild: true },
     repo: { head: 'abc123', lockHash: 'h1', nodeModules: true },
     ...over,
   });
@@ -145,10 +147,51 @@ test('a changed package-lock reinstalls npm and rebuilds the app', () => {
 test('diskNeed counts the weights to fetch, the environment and the margins', () => {
   const total = lock.reduce((sum, w) => sum + w.size, 0);
   expect(total).toBe(69_691_750_955);
-  const need = diskNeed(buildPlan(fresh()), lock);
+  const need = diskNeed(buildPlan(fresh()), lock, () => 0);
   expect(need.installDir).toBe(total + 12 * GiB + 0.5 * GiB + 2 * GiB);
   expect(need.repo).toBe(2 * GiB + 1 * GiB + 2 * GiB);
-  expect(diskNeed(buildPlan(installed()), [])).toEqual({ installDir: 2 * GiB, repo: 2 * GiB });
+  expect(diskNeed(buildPlan(installed()), [], () => 0)).toEqual({ installDir: 2 * GiB, repo: 2 * GiB });
+});
+
+test('diskNeed counts only the bytes still missing of a weight already partly or fully on disk', () => {
+  const total = lock.reduce((sum, w) => sum + w.size, 0);
+  const high = lock.find((w) => w.id === 'wan22-fun-camera-high')!;
+  const half = diskNeed(buildPlan(fresh()), lock, (w) => (w === high ? 10 * GiB : 0));
+  expect(half.installDir).toBe(total - 10 * GiB + 12 * GiB + 0.5 * GiB + 2 * GiB);
+  const whole = diskNeed(buildPlan(fresh()), lock, (w) => (w === high ? high.size : 0));
+  expect(whole.installDir).toBe(total - high.size + 12 * GiB + 0.5 * GiB + 2 * GiB);
+});
+
+test('a weight file the lock no longer pins is cleared before the download', () => {
+  const vae = lock.find((w) => w.id === 'wan21-vae')!;
+  const changed = lock.map((w) => (w === vae ? { ...w, sha256: '0'.repeat(64) } : w));
+  const stat = (w: { size: number }) => ({ size: w.size, mtimeMs: 1 });
+  // Recorded by Montagio with the old sha256, untouched since: the old pinned file.
+  expect(weightsToClear(changed, installedState(), stat).map((w) => w.id)).toEqual(['wan21-vae']);
+  // A file whose size is not the lock one cannot be the pinned file.
+  expect(weightsToClear(lock, emptyState(), (w) => (w === vae ? { size: 5, mtimeMs: 1 } : null)).map((w) => w.id)).toEqual(['wan21-vae']);
+  // An unrecorded file of the right size may be right: fetch-weights hashes it.
+  expect(weightsToClear(lock, emptyState(), stat)).toEqual([]);
+  expect(weightsToClear(lock, installedState(), stat)).toEqual([]);
+  const weights = step(buildPlan(installed({ lock: changed })), 'weights');
+  expect(weights.detail[0]).toContain('remove ');
+  expect(weights.detail[0]).toContain('wan_2.1_vae.safetensors');
+});
+
+test('a stamp whose artifact is gone runs its step again', () => {
+  const gone = (missing: Partial<PlanInput['artifacts']>) =>
+    running(buildPlan(installed({ artifacts: { comfyPython: true, proxyExe: true, appBuild: true, ...missing } })));
+  expect(gone({ comfyPython: false })).toContain('comfyui-env');
+  expect(gone({ proxyExe: false })).toContain('proxy');
+  expect(gone({ appBuild: false })).toContain('app-build');
+  expect(step(buildPlan(installed({ artifacts: { comfyPython: true, proxyExe: false, appBuild: true } })), 'proxy').why).toContain('missing');
+});
+
+test('another Python rebuilds the proxy environment too', () => {
+  const py313 = { command: ['py', '-3.13'], version: [3, 13, 1] as [number, number, number], hasVenv: true };
+  expect(running(buildPlan(installed({ python: py313 })))).toEqual(expect.arrayContaining(['comfyui-env', 'proxy']));
+  expect(proxyStamp(versions, [3, 12, 10])).toBe('comfy-api-proxy==0.1.6 python==3.12');
+  expect(proxyStamp(versions, null)).toBeNull();
 });
 
 test('envStamp and buildStamp change with what they depend on', () => {

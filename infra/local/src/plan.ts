@@ -42,6 +42,8 @@ export type PlanInput = {
   comfy: { head: string | null; exists: boolean; tmpExists: boolean };
   /** Where custom_nodes/montagio points today, null if it does not exist. */
   packTarget: string | null;
+  /** What the stamps stand for is still there: the venv Python, the proxy launcher, the app build (BUILD_ID). */
+  artifacts: { comfyPython: boolean; proxyExe: boolean; appBuild: boolean };
   /** head: the repository's commit (null outside git); lockHash: sha256 of package-lock.json. */
   repo: { head: string | null; lockHash: string; nodeModules: boolean };
   servicesRunning: boolean;
@@ -70,8 +72,25 @@ export function buildStamp(head: string | null, lockHash: string): string | null
   return head ? `${head} ${lockHash}` : null;
 }
 
-export function proxyStamp(versions: Versions): string {
-  return `comfy-api-proxy==${versions.proxyVersion}`;
+/** The proxy venv depends on its Python too: removing that Python breaks the venv. null without a Python. */
+export function proxyStamp(versions: Versions, python: [number, number, number] | null): string | null {
+  return python ? `comfy-api-proxy==${versions.proxyVersion} python==${python[0]}.${python[1]}` : null;
+}
+
+/**
+ * Weight files that cannot be the file the lock pins, removed before the download:
+ * fetch-weights only hashes a file that exists, so it would fail on it at every run.
+ * A file of another size, or the file Montagio recorded (same size and mtime) under
+ * an older sha256. An unrecorded file of the right size is left for fetch-weights to hash.
+ */
+export function weightsToClear(lock: LockWeight[], state: InstallState, stat: (weight: LockWeight) => FileStat | null): LockWeight[] {
+  return lock.filter((weight) => {
+    const file = stat(weight);
+    if (!file) return false;
+    if (file.size !== weight.size) return true;
+    const seen = state.weights[weight.id];
+    return Boolean(seen && seen.sha256 !== weight.sha256 && seen.size === file.size && seen.mtimeMs === file.mtimeMs);
+  });
 }
 
 /** A weight is fetched (or hashed again) unless the state saw these exact bytes: same sha256, size and mtime. */
@@ -146,13 +165,19 @@ export function buildPlan(input: PlanInput): Step[] {
 
     const torch = input.torch;
     const env = torch && input.python ? envStamp(versions.comfyuiCommit, torch, input.python.version) : null;
-    const envStale = env === null || state.stamps.comfyEnv !== env;
+    const envStale = env === null || state.stamps.comfyEnv !== env || !input.artifacts.comfyPython;
     const constraints = path.join(L.cacheDir, 'torch-constraints.txt');
     add({
       id: 'comfyui-env',
       title: torch ? `PyTorch ${torch.torch}+${torch.cuda} and ComfyUI's requirements` : "PyTorch and ComfyUI's requirements",
       run: envStale,
-      why: !state.stamps.comfyEnv ? 'not installed' : envStale ? 'ComfyUI, PyTorch or Python changed' : 'up to date',
+      why: !state.stamps.comfyEnv
+        ? 'not installed'
+        : !input.artifacts.comfyPython
+          ? `missing: ${L.comfyPython}`
+          : envStale
+            ? 'ComfyUI, PyTorch or Python changed'
+            : 'up to date',
       detail: [
         `${python} -m venv ${L.comfyVenv}`,
         `${L.comfyPython} -m pip install --upgrade pip`,
@@ -164,13 +189,20 @@ export function buildPlan(input: PlanInput): Step[] {
       ],
     });
 
-    const proxyStale = state.stamps.proxy !== proxyStamp(versions);
+    const proxy = proxyStamp(versions, input.python?.version ?? null);
+    const proxyStale = proxy === null || state.stamps.proxy !== proxy || !input.artifacts.proxyExe;
     add({
       id: 'proxy',
       title: `comfy-api-proxy ${versions.proxyVersion}`,
       run: proxyStale,
-      why: !state.stamps.proxy ? 'not installed' : proxyStale ? 'new version' : 'up to date',
-      detail: [`${python} -m venv ${L.proxyVenv}`, `${L.proxyPython} -m pip install ${proxyStamp(versions)}`],
+      why: !state.stamps.proxy
+        ? 'not installed'
+        : !input.artifacts.proxyExe
+          ? `missing: ${L.proxyExe}`
+          : proxyStale
+            ? 'new version, or another Python'
+            : 'up to date',
+      detail: [`${python} -m venv ${L.proxyVenv}`, `${L.proxyPython} -m pip install comfy-api-proxy==${versions.proxyVersion}`],
     });
 
     const packDir = path.join(input.repoRoot, 'comfy-nodes');
@@ -184,6 +216,7 @@ export function buildPlan(input: PlanInput): Step[] {
     });
 
     const toFetch = weightsToFetch(input.lock, state, input.weightStat);
+    const toClear = weightsToClear(input.lock, state, input.weightStat);
     const bytes = toFetch.reduce((sum, w) => sum + w.size, 0);
     add({
       id: 'weights',
@@ -194,6 +227,7 @@ export function buildPlan(input: PlanInput): Step[] {
           ? `all ${input.lock.length} files present and verified`
           : `${toFetch.length} of ${input.lock.length} files to fetch or check, up to ${gib(bytes)}`,
       detail: [
+        ...toClear.map((w) => `remove ${path.join(L.modelsDir, w.folder, w.file)} (not the file the lock pins now)`),
         ...toFetch.map((w) => `${`${w.folder}/${w.file}`.padEnd(72)} ${gib(w.size).padStart(10)}`),
         `node ${FETCH_WEIGHTS} --models-dir ${L.modelsDir} --only ${toFetch.map((w) => w.id).join(',') || '-'} --out ${L.weightsOut}`,
       ],
@@ -209,12 +243,19 @@ export function buildPlan(input: PlanInput): Step[] {
   });
 
   const build = buildStamp(input.repo.head, input.repo.lockHash);
-  const buildStale = npmStale || build === null || state.stamps.build !== build;
+  const buildStale = npmStale || build === null || state.stamps.build !== build || !input.artifacts.appBuild;
   add({
     id: 'app-build',
     title: 'build the app (next build)',
     run: buildStale,
-    why: build === null ? 'not a git checkout: always rebuilt' : !state.stamps.build ? 'not built yet' : buildStale ? 'the code or its dependencies changed' : 'up to date',
+    why:
+      build === null
+        ? 'not a git checkout: always rebuilt'
+        : !state.stamps.build || !input.artifacts.appBuild
+          ? 'not built yet'
+          : buildStale
+            ? 'the code or its dependencies changed'
+            : 'up to date',
     detail: [`next build (in ${path.join(input.repoRoot, 'apps', 'web')})`],
   });
 
@@ -233,10 +274,12 @@ export function buildPlan(input: PlanInput): Step[] {
   return steps;
 }
 
-export function diskNeed(steps: Step[], toFetch: LockWeight[]): { installDir: number; repo: number } {
+/** onDisk: bytes of a weight already there (the whole file, or the .part a cut download left), never charged twice. */
+export function diskNeed(steps: Step[], toFetch: LockWeight[], onDisk: (weight: LockWeight) => number): { installDir: number; repo: number } {
   const runs = (id: StepId) => steps.some((step) => step.id === id && step.run);
   return {
-    installDir: toFetch.reduce((sum, w) => sum + w.size, 0) + (runs('comfyui-env') ? ENV_BYTES : 0) + (runs('comfyui') ? CLONE_BYTES : 0) + MARGIN_BYTES,
+    installDir:
+      toFetch.reduce((sum, w) => sum + Math.max(0, w.size - onDisk(w)), 0) + (runs('comfyui-env') ? ENV_BYTES : 0) + (runs('comfyui') ? CLONE_BYTES : 0) + MARGIN_BYTES,
     repo: (runs('npm-ci') ? NPM_BYTES : 0) + (runs('app-build') ? BUILD_BYTES : 0) + MARGIN_BYTES,
   };
 }

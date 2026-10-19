@@ -19,6 +19,7 @@ import {
   FETCH_WEIGHTS,
   OPEN_STACK_REPORT,
   proxyStamp,
+  weightsToClear,
   weightsToFetch,
   type FileStat,
   type Step,
@@ -134,6 +135,12 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     return answer.code === 0 ? answer.stdout.trim() || null : null;
   };
   const weightStat = (w: LockWeight) => statOrNull(join(L.modelsDir, w.folder, w.file));
+  // Bytes already there: the whole file, or what a cut download left in <file>.part (fetch-weights resumes it).
+  const onDisk = (w: LockWeight) => {
+    const file = weightStat(w);
+    if (file) return file.size === w.size ? w.size : 0;
+    return statOrNull(join(L.modelsDir, w.folder, `${w.file}.part`))?.size ?? 0;
+  };
   const comfyExists = existsSync(L.comfyDir);
   const comfy = { exists: comfyExists, tmpExists: existsSync(L.comfyTmp), head: comfyExists ? await gitHead(L.comfyDir) : null };
   const repo = {
@@ -158,12 +165,17 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
       weightStat,
       comfy,
       packTarget: readLink(L.packLink),
+      artifacts: {
+        comfyPython: existsSync(L.comfyPython),
+        proxyExe: existsSync(L.proxyExe),
+        appBuild: existsSync(join(repoRoot, 'apps', 'web', '.next', 'BUILD_ID')),
+      },
       repo,
       servicesRunning: own.length > 0,
       start: opts.start,
     });
     const toFetch = mode === 'full' ? weightsToFetch(lock, state, weightStat) : [];
-    const checks = evaluate(facts, { mode, versions, ports, ownPorts: own, need: diskNeed(steps, toFetch), ignoreVram: opts.ignoreVram });
+    const checks = evaluate(facts, { mode, versions, ports, ownPorts: own, need: diskNeed(steps, toFetch, onDisk), ignoreVram: opts.ignoreVram });
     return { mode, steps, checks, decision: decide(checks, mode), toFetch, torch, python };
   };
 
@@ -244,10 +256,12 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     },
     proxy: async () => {
       if (!python) throw new Error('no suitable Python');
+      const made = venvPython(L.proxyVenv);
+      if (made && made !== `${python.version[0]}.${python.version[1]}`) rmSync(L.proxyVenv, { recursive: true, force: true });
       const [py, ...pre] = python.command;
       await run(py!, [...pre, '-m', 'venv', L.proxyVenv]);
-      await run(L.proxyPython, ['-m', 'pip', 'install', proxyStamp(versions)]);
-      stamp('proxy', proxyStamp(versions));
+      await run(L.proxyPython, ['-m', 'pip', 'install', `comfy-api-proxy==${versions.proxyVersion}`]);
+      stamp('proxy', proxyStamp(versions, python.version)!);
     },
     'node-pack': async () => {
       const target = join(repoRoot, 'comfy-nodes');
@@ -258,6 +272,18 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
       symlinkSync(target, L.packLink, os === 'windows' ? 'junction' : 'dir');
     },
     weights: async () => {
+      // fetch-weights only hashes a file that exists: a file the lock no longer pins would fail at every run.
+      const stale = weightsToClear(lock, state, weightStat);
+      if (stale.length > 0) {
+        const weights = { ...state.weights };
+        for (const w of stale) {
+          const file = join(L.modelsDir, w.folder, w.file);
+          deps.log(`removing ${file}: not the file the lock pins now`);
+          rmSync(file, { force: true });
+          delete weights[w.id];
+        }
+        save({ ...state, weights });
+      }
       const ids = plan.toFetch.map((w) => w.id);
       const report = join(L.weightsOut, 'weights-report.json');
       rmSync(report, { force: true });
