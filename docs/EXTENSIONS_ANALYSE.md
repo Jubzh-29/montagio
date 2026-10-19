@@ -153,16 +153,107 @@ Ce sont des **estimations**, tirées de la taille des poids et des formules de m
 
 ## 5. Contrat backend et drapeau de coupe
 
-*Complétée par la documentation finale.*
+Rien n'est branché dans l'interface (`apps/web` n'a pas changé). Ce qui existe côté serveur et outils :
+
+**Registre.**
+- `registry/extensions/*.yaml` (schéma `montagio/extension-model@0.1`, `packages/registry/src/extensions.ts`) : la tâche (`t2a`, `v2v-upscale`, `i2i-edit`, `tts`, `ia2v-talk`), les poids, le workflow, des bindings qui peuvent viser plusieurs entrées, le node de sortie et son type (`audio`, `video` ou `image`), les limites et une estimation du temps de GPU. Ces modèles sont **à part** de `registry/models/` : le Studio, la vitrine et `compileJob` ne les voient pas.
+- `registry/extensions.yaml` : les 4 extensions, leur priorité, et la date de leur validation sur GPU (`gpu_validated`, `null` pour l'instant).
+- Le lock : `extension:` sur les poids d'une seule extension ; `folder:` quand l'URL ne donne pas le dossier (la voix) ; `git_sha1:` pour un petit fichier hors LFS.
+- La bibliothèque (`loadLibrary`) charge `extensionModels`, `extensionTemplates` et `extensions`, et refuse une marque `extension:` qui ne correspond pas à qui charge le poids.
+
+**Compilateurs** (`packages/presets/src/extensions.ts`) :
+
+| Fonction | Entrées | Sortie |
+|---|---|---|
+| `compileMusic` | description, durée du film, seed, tempo (90 par défaut) | FLAC, node 107 |
+| `compileUpscale` | clip, aspect, seed, nombre d'images (121 au plus) | MP4 1080p, node 76 |
+| `compileEdit` | photo, instruction (500 caractères au plus), seed | PNG ≈ 1 Mpx, node 9 |
+| `compileSpeech` | texte (300 caractères au plus), langue `en` ou `fr`, seed | FLAC, node 3 |
+| `compileAvatar` | photo, parole et sa durée (1 à 15 s), aspect, seed, prompt facultatif | MP4 480p 16 fps avec la parole, node 113 |
+
+Chacune rend `{ workflow, output: { kind, node }, params }` et lève `CompileError` avant tout envoi au GPU.
+
+**Adaptateur** (`@montagio/comfy-adapter`, aussi sur la branche `feat/adapter-outputs`) : `SubmitJob.output` (`video` par défaut, `audio`, `image`) et `outputNode` ; `get(id, want?)` pour un job soumis avant un redémarrage de l'app. La sortie est choisie par son type, jamais par son type MIME.
+
+**Montage** (`@montagio/sequence`) : `mixMusic(film, musique, sortie)` garde chaque image et la durée exacte du film ; `exportVertical` garde la musique dans la coupe 9:16 ; `probeAudio` lit la durée d'une parole.
+
+**Installation.**
+- `fetch-weights --extensions` prend tout par défaut (sessions GPU).
+- L'installeur local lit `--extensions`, puis `MONTAGIO_EXTENSIONS`, puis `validated`. Il laisse l'avatar de côté, dont il n'installe pas encore la voix.
+- `infra/runpod/bootstrap.sh` installe le node de la voix, épinglé et patché.
+- `smoke.ts --extension …` fait tourner chaque extension en S2.
+
+**Drapeau de coupe.** `enabledExtensions(config, MONTAGIO_EXTENSIONS)` (registre) et son double sans dépendance dans l'installeur (test de parité) :
+- non défini ou `validated` : seules les extensions datées dans `registry/extensions.yaml` ;
+- `all` ou `none` ;
+- une liste comme `music,edit`.
+
+Pour la règle du 25/10 au soir, il suffit de dater `gpu_validated` des extensions validées en S2 ou en S3 : les autres restent masquées par défaut, dans l'app (lors du branchement) comme dans l'installeur. `MONTAGIO_EXTENSIONS=all` les montre toutes, en développement.
 
 ## 6. Risques et verdicts
 
-*Complétée par la documentation finale.*
+| Extension | Verdict avant la S2 | Ce qui peut la faire couper |
+|---|---|---|
+| 1. Musique | **prête** | des voix malgré `[Instrumental]` ; la qualité d'un morceau de 10 s coupé à 5 ; un LM lent sans vLLM ; un VAE fp16 qui sature |
+| 2. Upscale HD | **prête** | une sur-netteté sur des clips IA, que le README de SeedVR2 signale (à comparer à un simple lanczos) ; des coutures entre morceaux ; l'int8 lent sur le repli cu128 ; 10 à 18 Go de RAM hôte |
+| 3. Édition | **risquée** | la VRAM juste (19,1 Gio de poids en fp8, encodeur déchargé) ; ≈ 2 min par image ; 30 Go à télécharger ; le recadrage de 4 % |
+| 4. Avatar | **risquée** | la LoRA 4 étapes, faite pour le texte vers vidéo et pas pour S2V (perte de dynamique, pas de guidage audio à cfg 1), sans laquelle il faut une heure pour 15 s ; la vidéo ne part pas de la photo ; le français, non documenté ; la voix, un node tiers patché, `torchaudio` 2.11 sur torch 2.14.1, une voix intégrée anglaise ; 16 fps |
+
+Aucune extension n'est « à couper » sans GPU : licences acceptées, nodes du cœur (sauf la voix), workflows validés par un vrai ComfyUI (sauf la voix), et chacune tient en 24 Go sur le papier. La règle du 25/10 tranchera sur les mesures de la S2.
 
 ## 7. À vérifier en S2
 
-*Complétée par la documentation finale.*
+Dans l'ordre de priorité. Les commandes sont dans [S2_CHECKLIST.md](S2_CHECKLIST.md), partie 6.8.
+
+1. **Musique** : temps et VRAM pour 10 et 60 s, juste après un rendu Wan 14B ; aucune voix (`[Instrumental]`, `language` `en` contre `unknown`) ; un film de 5 s mixé (10 s générées, coupées en fondu) ; même seed, même morceau ?
+2. **Upscale** : pic de VRAM et temps pour 81 et 121 images ; coutures entre morceaux (recouvrement 3 contre 5, morceaux de 33 contre 41) ; couleur `lab`, `wavelet` ou `none` ; comparaison avec un simple lanczos ; 16 fps et nombre d'images conservés.
+3. **Édition** : « loaded completely » ou « partially » dans le journal ; temps en 40 et 20 étapes ; recadrage contre `ImageScaleToTotalPixels` ; une instruction en français ; l'image éditée animée ensuite par Fun Camera.
+4. **Voix** : `import torchaudio, s3tokenizer` sur torch 2.14.1 ; une génération en anglais et en français (`cfg_weight` 0) ; un texte court sans « hmm » ; aucune connexion sortante avec `HF_HUB_OFFLINE` ; régénérer la fixture `ChatterboxMTLTTS` depuis le `/object_info` du pod.
+5. **Avatar** : LoRA 4 étapes contre 20 étapes (synchronisation des lèvres, temps) ; `ImageFromBatch.batch_index` 1, 3 ou 4 ; anglais et français ; `ref_motion` = la photo ; coutures à 5 et 10 s ; pic de VRAM.
+
+Puis dater `gpu_validated` dans `registry/extensions.yaml` pour chaque extension validée.
 
 ## 8. Mini-plan d'intégration dans l'interface
 
-*Complétée par la documentation finale.*
+À faire **après** la fusion de `feat/design-polish` et de `feat/t2i-history` (sessions « finition du design » et « texte → image et historique »), dans cet ordre : musique, upscale, édition, avatar. Rien n'est écrit ici.
+
+**Serveur** (`apps/web/src/server/extensions.ts`, nouveau). Un job d'extension suit le modèle de `generations.ts` :
+- idempotence (même fenêtre de 10 min) ;
+- enregistrement dans `data/` ;
+- `SubmitJob` avec `output` et `outputNode` ;
+- `get(id, want)` après un redémarrage ;
+- sortie copiée avec la mention « AI-generated » (MP4 : `tagClip`).
+
+La lecture du drapeau passe par `enabledExtensions(lib.extensions, process.env.MONTAGIO_EXTENSIONS)`. Une extension masquée répond 404 `extension-disabled`.
+
+**Routes API** :
+
+| Route | Rôle |
+|---|---|
+| `GET /api/extensions` | les extensions montrées, avec leurs limites et estimations |
+| `POST /api/sequences/[id]/music` (`prompt`, `bpm`) | musique du film : job `t2a`, puis `mixMusic` et `exportVertical` ; le film et sa coupe 9:16 gagnent la musique |
+| `POST /api/generations/[id]/upscale` | clip terminé → 1080p |
+| `POST /api/edits` (`imageRef`, `instruction`) | photo éditée, enregistrée comme un nouvel envoi (`imageRef`) et utilisable comme photo de départ |
+| `POST /api/avatars` (`imageRef`, `text`, `language`) | job voix, puis job avatar sur la durée lue par `probeAudio` |
+| `GET /api/extensions/jobs/[id]`, `POST …/cancel` | état et annulation |
+
+Codes d'erreur stables, comme l'existant : `extension-disabled`, `invalid-input` (le message de `CompileError` reste dans le journal), `backend-unavailable`, `workflow-rejected`, `ffmpeg-missing`.
+
+**Écrans.**
+- Séquence terminée : « Ajouter une musique » (description, tempo), puis le film et la coupe 9:16 avec la musique, et un lecteur.
+- Clip terminé : « HD 1080p ».
+- Photo de départ : « Modifier la photo » (instruction), avec aperçu avant/après et « Utiliser cette photo ».
+- Onglet « Avatar » : photo, texte (300 caractères, avec un compteur), langue EN/FR, et la durée estimée.
+- Chaque bouton disparaît quand son extension est masquée.
+
+**Textes EN et FR.** Un seul bloc de clés i18n, à regrouper avec la session « texte → image » pour limiter les conflits : `ext.music.*`, `ext.upscale.*`, `ext.edit.*`, `ext.avatar.*`, `ext.errors.*`. Chaque libellé dit ce qui sort (« Musique instrumentale générée », « Vidéo générée par IA »).
+
+**Démo et vitrine.**
+- Le `DemoBackend` rend des sorties pré-générées par type (un FLAC, un PNG, un MP4), sur le modèle du cas image prévu par la session « texte → image ».
+- La vitrine statique masque les extensions, ou montre des exemples rendus en S3.
+
+**e2e.**
+- Un parcours par extension en mode démo.
+- Le mode local contre le faux proxy, qui rend déjà une sortie audio pour `SaveAudio*` et image pour `SaveImage*` (tâche 1).
+- Un test du drapeau : avec `MONTAGIO_EXTENSIONS=none`, aucun bouton d'extension.
+- Un seul run complet, à la fin (PC limité).

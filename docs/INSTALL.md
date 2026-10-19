@@ -135,13 +135,28 @@ Without a 24 GB GPU, `install --app-only` installs the app alone: no ComfyUI, no
 | `--comfy-port N`, `--proxy-port N`, `--app-port N` | ports (defaults 8188, 8189, 3000), kept for the next runs |
 | `--no-start` | install without starting |
 | `--no-browser` | `install` and `start`: do not open the browser |
+| `--extensions LIST` | `install`: the extensions whose weights to fetch too: `validated` (default: those a GPU session validated, none yet), `all`, `none`, or a list such as `music,edit` (see below) |
 
 | Variable | Meaning |
 |---|---|
 | `MONTAGIO_HOME` | install folder |
+| `MONTAGIO_EXTENSIONS` | the default of `--extensions`; the app reads it too |
 | `MONTAGIO_COMFYUI_ARGS` | extra ComfyUI arguments, separated by spaces, for example `--lowvram`; `--listen` and `--port` are refused, ComfyUI stays on 127.0.0.1 and the install's port |
 | `HF_TOKEN` | a Hugging Face token; not needed for the files of the lock |
 | `MONTAGIO_FFMPEG`, `MONTAGIO_FFPROBE` | FFmpeg and ffprobe outside the `PATH` |
+
+### Extensions
+
+Four extensions run models of their own, beyond the camera presets: film music (ACE-Step 1.5), HD upscale (SeedVR2), photo edit (Qwen-Image-Edit-2511) and the talking avatar (Wan 2.2 S2V and a Chatterbox voice). Their weights are in the lock, marked with their extension, and the installer fetches them only for the extensions asked for. By default that is the ones a GPU session validated, listed with a date in `registry/extensions.yaml`; none is dated yet, so a default install is unchanged. Extra disk space, all Apache-2.0 or MIT:
+
+| Extension | Weights |
+|---|---|
+| `music` | 10.0 GB |
+| `upscale` | 4.0 GB |
+| `edit` | 30.2 GB |
+| `avatar` | 21.5 GB |
+
+The avatar is left out by this installer for now: its voice runs on a custom node (pinned and patched) that only the GPU session's `infra/runpod/bootstrap.sh` installs. Details: [EXTENSIONS_ANALYSE.md](EXTENSIONS_ANALYSE.md) (in French).
 
 ## Troubleshooting
 
