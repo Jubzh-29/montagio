@@ -100,6 +100,16 @@ Les quatre workflows partent des templates officiels de [Comfy-Org/workflow_temp
 - **Ce que l'avatar n'est pas.** La vidéo est conditionnée par l'identité de la photo, elle ne commence pas sur ses pixels ; `ref_motion` (photo en guise de mouvement passé) est un essai de la S2. Sortie en 16 fps.
 - **Chaîne complète.** Job « voix » (texte → FLAC), puis job « avatar » (photo + FLAC → MP4 avec la parole). L'appelant lit la durée du FLAC (`probeAudio`) avant de compiler le second job.
 
+### Validation par un vrai ComfyUI v0.41.0, sans rendu
+
+Sur le ComfyUI CPU de l'analyse S1 (`../comfyui-cpu-v0.41.0`, 679 classes, 0 node partenaire), avec des fichiers de modèle **vides** aux noms du lock, chaque workflow compilé est passé par `POST /prompt`, suivi aussitôt de `/interrupt` et d'un vidage de la file. Résultat du 19/10 : musique, upscale (16:9), édition et avatar en 1, 2 et 3 morceaux sont **acceptés**, sans aucune `node_errors`. Rien n'a été rendu : les loaders s'arrêtent sur les fichiers vides (« header too small »).
+
+Deux constats en chemin :
+- le venv CPU n'avait pas `kornia`, une dépendance de ComfyUI v0.41.0 : sans lui, `LatentConcat`, `LatentCut` et `ResizeImageMaskNode` ne se chargent pas. Il a été ajouté à ce venv ; le pod installe le `requirements.txt` de ComfyUI en entier ;
+- `checkWorkflow` refusait le type « MatchType » de l'API V3 ; il l'accepte désormais, comme ComfyUI.
+
+La voix n'est **pas** validée ici : son node n'est pas installé sur ce ComfyUI. Sa fixture est écrite d'après la source, et la S2 la valide sur le pod.
+
 ## 3. Poids
 
 Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`), recoupés par `fetch-weights --lock-from-hf`, dont le patch est vide. Chaque entrée du lock porte `extension:` : l'installeur local ne la télécharge que pour son extension.
