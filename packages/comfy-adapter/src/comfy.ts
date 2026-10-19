@@ -12,6 +12,7 @@ import {
 } from '@comfyorg/sdk';
 import {
   IDEMPOTENCY_WINDOW_MS,
+  OUTPUT_KINDS,
   type BackendJob,
   type GenerationBackend,
   type OutputKind,
@@ -62,12 +63,16 @@ const describe = (error: unknown) => (error instanceof Error ? error.message : S
 
 /**
  * The result of a finished job: an output of `kind`, from `node` first when it is given.
- * The type the proxy reports wins over the content type, which is a guess from the file
- * name (a FLAC can come back as application/octet-stream); a generic output of that
- * content type is the fallback.
+ * comfy-api-proxy types an output by ComfyUI's UI key: audio and images keep their kind
+ * (a FLAC can come back as application/octet-stream, so the type wins over the content
+ * type), but SaveVideo files its MP4 under "images". A typed output whose content type
+ * names another kind is skipped, and the content type is the fallback: that is how a
+ * video is found.
  */
 function pickOutput(outputs: Output[], kind: OutputKind, node?: string): Output | undefined {
-  const among = (list: Output[]) => list.find((o) => o.type === kind) ?? list.find((o) => o.contentType.startsWith(`${kind}/`));
+  const otherKind = (o: Output) => OUTPUT_KINDS.some((k) => k !== kind && o.contentType.startsWith(`${k}/`));
+  const among = (list: Output[]) =>
+    list.find((o) => o.type === kind && !otherKind(o)) ?? list.find((o) => o.contentType.startsWith(`${kind}/`));
   return (node ? among(outputs.filter((o) => o.nodeId === node)) : undefined) ?? among(outputs);
 }
 
