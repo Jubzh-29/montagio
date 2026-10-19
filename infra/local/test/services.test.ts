@@ -45,6 +45,11 @@ test('ComfyUI listens on 127.0.0.1 with partner nodes disabled', () => {
   expect(specsOf({ ...full, gpuIndex: 1 }, {}, ['--lowvram']).find((s) => s.name === 'comfyui')!.args.slice(-3)).toEqual(['--cuda-device', '1', '--lowvram']);
 });
 
+test('the Python services write their logs unbuffered, so a crash keeps its last lines', () => {
+  const specs = specsOf(full);
+  for (const name of ['comfyui', 'proxy']) expect(specs.find((s) => s.name === name)!.env.PYTHONUNBUFFERED).toBe('1');
+});
+
 test('the proxy and the app follow the install ports', () => {
   const specs = specsOf({ ...full, ports: { comfy: 8288, proxy: 8289, app: 3300 } });
   const proxy = specs.find((s) => s.name === 'proxy')!;
@@ -212,6 +217,7 @@ test('a service that dies while starting stops the start at once and names its l
   expect(await startAll(ctx, { browser: false })).toBe(1);
   expect(Date.now() - started).toBeLessThan(15_000);
   expect(lines.join('\n')).toContain(join(l.logsDir, 'proxy.log'));
+  expect(lines.join('\n')).toContain('exited during startup with code 3');
   // What had started is stopped again.
   expect(existsSync(join(l.runDir, 'comfyui.pid'))).toBe(false);
   void pid;

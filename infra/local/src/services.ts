@@ -106,13 +106,15 @@ export function serviceSpecs(input: {
   if (state.mode !== 'full') return [app];
 
   const gpu = state.gpuIndex && state.gpuIndex > 0 ? ['--cuda-device', String(state.gpuIndex)] : [];
+  // Python buffers a redirected output: unbuffered, a crash still leaves its last lines in the log.
+  const pyEnv: NodeJS.ProcessEnv = { ...env, PYTHONUNBUFFERED: '1' };
   return [
     {
       name: 'comfyui',
       cmd: L.comfyPython,
       args: ['main.py', '--listen', '127.0.0.1', '--port', String(ports.comfy), '--disable-partner-nodes', ...gpu, ...input.extraComfyArgs],
       cwd: L.comfyDir,
-      env,
+      env: pyEnv,
       health: local(ports.comfy, '/system_stats'),
       timeoutMs: 300_000,
       marker: L.comfyVenv,
@@ -123,7 +125,7 @@ export function serviceSpecs(input: {
       cmd: L.proxyExe,
       args: ['run', '--comfyui', local(ports.comfy, ''), '--host', '127.0.0.1', '--port', String(ports.proxy), '--comfyui-base-dir', L.comfyDir],
       cwd: L.dir,
-      env,
+      env: pyEnv,
       health: local(ports.proxy, '/api/v2/health'),
       timeoutMs: 60_000,
       marker: L.proxyVenv,
@@ -308,6 +310,7 @@ export async function startAll(ctx: ServiceContext, opts: { browser: boolean }):
   for (const spec of specs) {
     const log = join(ctx.layout.logsDir, `${spec.name}.log`);
     let pid = ours.get(spec.name);
+    const exited: { how?: string } = {};
     if (pid) {
       ctx.log(`${spec.name} already running (pid ${pid})`);
     } else {
@@ -321,6 +324,9 @@ export async function startAll(ctx: ServiceContext, opts: { browser: boolean }):
         child.once('error', () => resolve(false));
       });
       if (!spawned || !child.pid) return fail(`cannot start ${spec.name} (${spec.cmd}): run the install command again`);
+      child.once('exit', (code, signal) => {
+        exited.how = code !== null ? `code ${code}` : `signal ${signal}`;
+      });
       child.unref();
       pid = child.pid;
       writeFileSync(pidFile(ctx, spec.name), String(pid));
@@ -331,7 +337,10 @@ export async function startAll(ctx: ServiceContext, opts: { browser: boolean }):
     } catch (error) {
       const last = tail(log);
       if (last) ctx.log(last);
-      return fail(`${spec.name} ${(error as Error).message} (full log: ${log})`);
+      // The exit event can trail the liveness check by a few milliseconds.
+      for (let waited = 0; !exited.how && !alive(running) && waited < 1_000; waited += 100) await sleep(100);
+      const reason = exited.how ? `${(error as Error).message} with ${exited.how}` : (error as Error).message;
+      return fail(`${spec.name} ${reason} (full log: ${log})`);
     }
 
     if (spec.name === 'comfyui') {
