@@ -384,3 +384,17 @@ test('the source scan skips the static export of the web app (out/), its own bun
   const hits = r.violations.filter((v) => v.rule === 'forbidden-pattern');
   expect(hits.map((v) => v.file)).toEqual([join('apps', 'web', 'src', 'lib', 'x.ts')]);
 });
+
+test('a source folder that happens to be named out is still scanned', async () => {
+  const routerLike = 'export const go = (x) => x.router.push("/");\n';
+  const root = scratchRepo({
+    'apps/web/src/out/x.ts': routerLike,
+    'apps/other/out/y.ts': routerLike,
+    'packages/p/src/out/z.ts': routerLike,
+  });
+  const r = await checkOpenStack(root);
+  const hits = r.violations.filter((v) => v.rule === 'forbidden-pattern');
+  expect(hits.map((v) => v.file).sort()).toEqual(
+    [join('apps', 'other', 'out', 'y.ts'), join('apps', 'web', 'src', 'out', 'x.ts'), join('packages', 'p', 'src', 'out', 'z.ts')].sort(),
+  );
+});
