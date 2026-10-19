@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parse as parseYaml } from 'yaml';
 import { checkOpenStack } from '../src/index';
 
 const fixture = (name: string) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
@@ -546,4 +547,27 @@ test('the refused repositories include the two license traps of the official tem
   const text = readFileSync(join(toolDir, 'allowed-sources.yaml'), 'utf8');
   expect(text).toMatch(/- repo: Kijai\/WanVideo_comfy\n\s+reason: .*CC BY-NC-SA/);
   expect(text).toMatch(/- repo: Comfy-Org\/HunyuanVideo_1\.5_repackaged\n\s+reason: .*Tencent/);
+});
+
+// A third-party node is allowed at the commit the GPU pod installs (infra/runpod/versions.env), not another one.
+test('every third-party node is allowed at the commit that versions.env pins for its repository', () => {
+  const env = Object.fromEntries(
+    readFileSync(join(repoRoot(), 'infra', 'runpod', 'versions.env'), 'utf8')
+      .split(/\r?\n/)
+      .filter((line) => /^[A-Z0-9_]+=/.test(line))
+      .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1).trim()]),
+  );
+  const pinned = new Map(
+    Object.entries(env)
+      .filter(([key]) => key.endsWith('_NODE_REPO'))
+      .map(([key, url]) => [/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/.exec(url)?.[1], env[key.replace(/_REPO$/, '_COMMIT')]]),
+  );
+  const { nodes } = parseYaml(readFileSync(join(toolDir, 'allowed-nodes.yaml'), 'utf8')) as { nodes: { class_type: string; source: string }[] };
+  const thirdParty = nodes.filter((node) => node.source.includes('@'));
+  expect(thirdParty.map((node) => node.class_type)).toContain('ChatterboxMTLTTS');
+  for (const node of thirdParty) {
+    const [repo, commit] = node.source.split('@') as [string, string];
+    expect(commit.length, node.class_type).toBeGreaterThanOrEqual(8);
+    expect(pinned.get(repo), `${node.class_type} from ${repo}`).toMatch(new RegExp(`^${commit}`));
+  }
 });
