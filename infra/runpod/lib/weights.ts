@@ -187,17 +187,20 @@ export function proposeLock(lockText: string, updates: Map<string, LockUpdate>):
  * files never enter the lock.
  */
 export function lockFromHf(
-  plans: { id: string; url: string; size: number; hf_sha256: string | null; extra: boolean }[],
+  plans: { id: string; url: string; size: number; hf_sha256: string | null; lock_sha256: string | null; extra: boolean }[],
 ): { updates: Map<string, Required<LockUpdate>>; problems: string[] } {
   const updates = new Map<string, Required<LockUpdate>>();
   const problems: string[] = [];
   for (const plan of plans) {
     if (plan.extra) continue;
-    if (!plan.hf_sha256) {
+    // A small file Hugging Face keeps out of LFS publishes no sha256: a plan only exists once
+    // lockDrift has matched its git blob id against the lock's, so the lock's sha256 stands.
+    const sha256 = plan.hf_sha256 ?? plan.lock_sha256;
+    if (!sha256) {
       problems.push(`${plan.id}: Hugging Face publishes no sha256 for ${plan.url}; download it to hash it`);
       continue;
     }
-    updates.set(plan.id, { url: plan.url, sha256: plan.hf_sha256, size: plan.size });
+    updates.set(plan.id, { url: plan.url, sha256, size: plan.size });
   }
   return { updates, problems };
 }

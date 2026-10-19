@@ -170,12 +170,19 @@ test('proposeLock replaces an existing size', () => {
 });
 
 describe('lockFromHf', () => {
-  const plan = (id: string, hf_sha256: string | null, extra = false) => ({
+  const plan = (id: string, hf_sha256: string | null, extra = false, lock_sha256: string | null = null) => ({
     id,
     url: `https://huggingface.co/o/r/resolve/main/${id}.safetensors`,
     size: 1000,
     hf_sha256,
+    lock_sha256,
     extra,
+  });
+
+  test("a small file kept out of LFS keeps the lock's sha256 (its git blob id was checked before)", () => {
+    const { updates, problems } = lockFromHf([plan('tokenizer', null, false, 'c'.repeat(64))]);
+    expect(problems).toEqual([]);
+    expect(updates.get('tokenizer')).toEqual({ url: 'https://huggingface.co/o/r/resolve/main/tokenizer.safetensors', sha256: 'c'.repeat(64), size: 1000 });
   });
 
   test('turns every resolved file into url, sha256 and size', () => {

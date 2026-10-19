@@ -148,6 +148,8 @@ function harness(
     },
     runningPorts: async () => [],
     probe: async () => opts.facts ?? facts(),
+    // the developer's own choice of extensions (MONTAGIO_EXTENSIONS=all, say) stays out of the tests
+    env: Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'MONTAGIO_EXTENSIONS')),
   };
   return { calls, lines, events, timeline, existedBefore, deps, L, output: () => lines.join('\n') };
 }
@@ -340,7 +342,14 @@ function withMusicWeight(size: number): void {
   );
   writeFileSync(
     join(repo, 'registry', 'extensions.yaml'),
-    ['schema: montagio/extensions@0.1', 'extensions:', ...['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale'].flatMap((id, i) => [`  - id: ${id}`, `    priority: ${i + 1}`, '    gpu_validated: null']), ''].join('\n'),
+    ['schema: montagio/extensions@0.1', 'extensions:', ...['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale'].flatMap((id, i) => [
+        `  - id: ${id}`,
+        `    priority: ${i + 1}`,
+        ...(id === 'transitions' ? ['    requires: [edit]'] : []),
+        '    gpu_validated: null',
+      ]),
+      '',
+    ].join('\n'),
   );
 }
 
@@ -355,6 +364,27 @@ test('with no extension validated, the plan and the disk check ignore the extens
   const h = harness();
   expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
   expect(fetchedIds(h.calls).sort()).toEqual(['tiny-te', 'tiny-vae']);
+});
+
+test("the developer's MONTAGIO_EXTENSIONS does not reach the installer under test", async () => {
+  const saved = process.env.MONTAGIO_EXTENSIONS;
+  process.env.MONTAGIO_EXTENSIONS = 'all';
+  try {
+    withMusicWeight(600 * GiB);
+    const h = harness();
+    expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+    expect(fetchedIds(h.calls).sort()).toEqual(['tiny-te', 'tiny-vae']);
+  } finally {
+    if (saved === undefined) delete process.env.MONTAGIO_EXTENSIONS;
+    else process.env.MONTAGIO_EXTENSIONS = saved;
+  }
+});
+
+test('--extensions transitions without edit is refused, saying to add it', async () => {
+  withMusicWeight(5);
+  const h = harness();
+  expect(await install(repo, options({ extensions: 'transitions' }), h.deps)).toBe(2);
+  expect(h.output()).toMatch(/transitions requires edit/);
 });
 
 test('--extensions all fetches the extension weights with --only', async () => {
