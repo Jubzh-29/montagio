@@ -1,0 +1,16 @@
+# A hook of the GPU session S3: the end frame comes from the ACTION look of the edit (systms, Apache-2.0).
+schema: montagio/preset@0.1
+id: figurine
+name: Figurine
+description: The subject turns into a collectible action figure.
+preview: previews/figurine.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-transition
+end_frame:
+  instruction: "action the person"
+  look: "action"
+prompt:
+  motion: "The person smoothly turns into a collectible action figure, skin and clothes becoming painted plastic, while the framing stays the same."
+models:
+  preferred: wan22-flf2v-transition

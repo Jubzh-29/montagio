@@ -1,6 +1,6 @@
 import { parse as parseYaml } from 'yaml';
 import type { z } from 'zod';
-import { EffectPresetSchema, PresetSchema, type EffectPreset, type Preset } from './schema';
+import { EffectPresetSchema, PresetSchema, TransitionPresetSchema, type EffectPreset, type Preset, type TransitionPreset } from './schema';
 
 export class PresetError extends Error {
   override name = 'PresetError';
@@ -20,6 +20,11 @@ export function parsePreset(yamlText: string, sourceName: string): Preset {
 /** An effect preset of presets/effects/. */
 export function parseEffectPreset(yamlText: string, sourceName: string): EffectPreset {
   return parseWith(EffectPresetSchema, yamlText, sourceName);
+}
+
+/** A hook of presets/transitions/. */
+export function parseTransitionPreset(yamlText: string, sourceName: string): TransitionPreset {
+  return parseWith(TransitionPresetSchema, yamlText, sourceName);
 }
 
 function parseWith<T>(schema: z.ZodType<T>, yamlText: string, sourceName: string): T {

@@ -138,3 +138,43 @@ export const EffectPresetSchema = z
   });
 
 export type EffectPreset = z.infer<typeof EffectPresetSchema>;
+
+/** The looks of the edit (a LoRA of Qwen-Image-Edit-2511 each; see EDIT_LOOKS). */
+export const EDIT_LOOK_IDS = ['infl8', 'action', 'angles'] as const;
+export type EditLook = (typeof EDIT_LOOK_IDS)[number];
+
+/**
+ * A keyframe transition hook (`capability: i2v-transition`, in presets/transitions/): the edit
+ * makes the end frame from the photo (and a second image when `references` is 2), then the
+ * transition model animates the passage from the photo to that frame.
+ */
+export const TransitionPresetSchema = z
+  .object({
+    ...presetHeader,
+    capability: z.literal('i2v-transition'),
+    end_frame: z
+      .object({
+        /** The edit instruction that makes the end frame. */
+        instruction: z.string().min(1).max(500),
+        look: z.enum(EDIT_LOOK_IDS).optional(),
+        /** 2: the instruction refers to a second image the user gives (an outfit). */
+        references: z.union([z.literal(1), z.literal(2)]).default(1),
+      })
+      .strict(),
+    prompt: z
+      .object({
+        /** What happens between the two frames. */
+        motion: z.string().min(1).max(300),
+        /** Empty keeps the workflow's negative prompt. */
+        negative: z.string().max(300).default(''),
+      })
+      .strict(),
+    defaults: z
+      .object({ duration_s: z.number().int().min(2).max(5).default(5) })
+      .strict()
+      .default({ duration_s: 5 }),
+    models: z.object({ preferred: kebabId }).strict(),
+  })
+  .strict();
+
+export type TransitionPreset = z.infer<typeof TransitionPresetSchema>;

@@ -76,3 +76,5 @@ nodes:
   - { class_type: CLIPVisionLoader, source: comfyui-core, license: GPL-3.0 }
   - { class_type: CLIPVisionEncode, source: comfyui-core, license: GPL-3.0 }
   - { class_type: WanImageToVideo, source: comfyui-core, license: GPL-3.0 }
+  # Keyframe transitions (workflows/wan22-flf2v-transition.api.json, Wan 2.2 FLF2V): comfy_extras/nodes_wan.py.
+  - { class_type: WanFirstLastFrameToVideo, source: comfyui-core, license: GPL-3.0 }

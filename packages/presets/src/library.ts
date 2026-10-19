@@ -12,8 +12,8 @@ import {
   type ModelEntry,
 } from '@montagio/registry';
 import type { ApiWorkflow } from './compile';
-import { parseEffectPreset, parsePreset } from './parse';
-import type { EffectPreset, Preset } from './schema';
+import { parseEffectPreset, parsePreset, parseTransitionPreset } from './parse';
+import type { EffectPreset, Preset, TransitionPreset } from './schema';
 
 export type Library = {
   presets: Map<string, Preset>;
@@ -33,6 +33,10 @@ export type Library = {
   effects: Map<string, EffectPreset>;
   /** Repository-relative file of each effect, e.g. "presets/effects/squish.yaml". */
   effectFiles: Map<string, string>;
+  /** Keyframe transition hooks (presets/transitions/), apart from the camera presets too. */
+  hooks: Map<string, TransitionPreset>;
+  /** Repository-relative file of each hook, e.g. "presets/transitions/eyes-in.yaml". */
+  hookFiles: Map<string, string>;
   warnings: string[];
 };
 
@@ -121,6 +125,8 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
   let extensions: ExtensionsConfig | null = null;
   const effects = new Map<string, EffectPreset>();
   const effectFiles = new Map<string, string>();
+  const hooks = new Map<string, TransitionPreset>();
+  const hookFiles = new Map<string, string>();
 
   const presetsDir = join(root, 'presets');
   for (const name of opts.presets === false ? [] : await yamlFiles(presetsDir)) {
@@ -141,6 +147,18 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
       if (effects.has(effect.id)) problems.push(`presets/effects/${name}: duplicate effect id "${effect.id}"`);
       effects.set(effect.id, effect);
       effectFiles.set(effect.id, `presets/effects/${name}`);
+    } catch (error) {
+      problems.push((error as Error).message);
+    }
+  }
+
+  const hooksDir = join(presetsDir, 'transitions');
+  for (const name of opts.presets === false ? [] : await yamlFiles(hooksDir)) {
+    try {
+      const hook = parseTransitionPreset(await readFile(join(hooksDir, name), 'utf8'), `presets/transitions/${name}`);
+      if (hooks.has(hook.id)) problems.push(`presets/transitions/${name}: duplicate hook id "${hook.id}"`);
+      hooks.set(hook.id, hook);
+      hookFiles.set(hook.id, `presets/transitions/${name}`);
     } catch (error) {
       problems.push((error as Error).message);
     }
@@ -242,6 +260,17 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
     }
   }
 
+  const hasEditModel = [...extensionModels.values()].some((model) => model.task === 'i2i-edit');
+  for (const hook of hooks.values()) {
+    const model = extensionModels.get(hook.models.preferred);
+    if (!model) problems.push(`hook ${hook.id}: unknown transition model "${hook.models.preferred}"`);
+    else if (model.task !== 'flf2v') problems.push(`hook ${hook.id}: model ${model.id} runs task ${model.task}, not flf2v`);
+    if (!hasEditModel) problems.push(`hook ${hook.id}: no edit model (task i2i-edit) to make its end frame`);
+    if (!(await exists(join(hooksDir, ...hook.preview.split('/'))))) {
+      warnings.push(`hook ${hook.id}: preview ${hook.preview} not found yet`);
+    }
+  }
+
   if (problems.length > 0) throw new LibraryError(problems);
-  return { presets, presetFiles, models, lock, templates, extensionModels, extensionTemplates, extensions, effects, effectFiles, warnings };
+  return { presets, presetFiles, models, lock, templates, extensionModels, extensionTemplates, extensions, effects, effectFiles, hooks, hookFiles, warnings };
 }

@@ -348,3 +348,37 @@ weights:
     source: https://huggingface.co/Remade-AI/360-Orbit
     extension: effects
     folder: loras
+  # The keyframe transitions: Wan 2.2 I2V A14B, first-last frame to video (FLF2V).
+  - id: wan22-i2v-high-fp8
+    file: wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors
+    sha256: 6122e79d55e0f235698d11d657f3b196c5273c830da00b2b013c5a048d5e6a42
+    size: 14294742832
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B
+    extension: transitions
+  - id: wan22-i2v-low-fp8
+    file: wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors
+    sha256: 5471a457b6ac404202a5fbe6c11595a3d5641fc766b00f38763f72303fffc21e
+    size: 14294742832
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B
+    extension: transitions
+  # Byte-identical to lightx2v/Wan2.2-Lightning Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/{high,low}_noise_model.safetensors.
+  - id: lightx2v-wan22-i2v-4step-high
+    file: wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors
+    sha256: d176c808d6fc461999b68e321efcb7501b20b8c3797523ed0df14f7d1deff11e
+    size: 1226977424
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Wan2.2-Lightning
+    extension: transitions
+  - id: lightx2v-wan22-i2v-4step-low
+    file: wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors
+    sha256: 024f21de095bc8fad9809ded3e9e49a2e170dcf27075da8145ba7d60d8aab7f9
+    size: 1226977424
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Wan2.2-Lightning
+    extension: transitions

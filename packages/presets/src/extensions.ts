@@ -1,6 +1,9 @@
 import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, LockEntry, OutputKind } from '@montagio/registry';
 import { CompileError, type ApiWorkflow } from './compile';
 import { dimensionsFor, type Aspect } from './dimensions';
+import type { EditLook } from './schema';
+
+export type { EditLook };
 
 /**
  * Compilers of the extension jobs (music, upscale, image edit, voice, talking avatar).
@@ -161,8 +164,7 @@ export const EDIT_LOOKS = {
   action: { lock: 'systms-action-qwen-edit-2511', strength: 1 },
   /** fal Multiple-Angles: "<sks> <azimuth> <elevation> <distance>"; its card advises 0.8 to 1, from 0.9. */
   angles: { lock: 'fal-multiple-angles-qwen-edit-2511', strength: 0.9 },
-} as const satisfies Record<string, { lock: string; strength: number }>;
-export type EditLook = keyof typeof EDIT_LOOKS;
+} as const satisfies Record<EditLook, { lock: string; strength: number }>;
 
 /** Nodes of workflows/qwen-image-edit-2511.api.json that compileEdit keeps, removes or rewires. */
 const EDIT_NODES = { look: '170', lightning: '171', image2: '42', sampler: '169' } as const;

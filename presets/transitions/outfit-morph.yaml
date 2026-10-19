@@ -1,0 +1,16 @@
+# A hook of the GPU session S2: image 1 is the person, image 2 the outfit; the edit dresses one in the other.
+schema: montagio/preset@0.1
+id: outfit-morph
+name: Outfit Morph
+description: The subject's clothes flow into the outfit of a second photo.
+preview: previews/outfit-morph.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-transition
+end_frame:
+  instruction: "The person of image 1 wears the outfit of image 2, with the same pose, the same face, the same background and the same framing."
+  references: 2
+prompt:
+  motion: "The person's clothes transform smoothly into the new outfit, the fabric flowing and reshaping, while the pose, the face and the background stay the same."
+models:
+  preferred: wan22-flf2v-transition

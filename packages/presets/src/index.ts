@@ -1,14 +1,17 @@
 export {
   CAMERA_COMBINES,
   CAMERA_POSES,
+  EDIT_LOOK_IDS,
   EffectPresetSchema,
   PresetSchema,
+  TransitionPresetSchema,
   type CameraCombine,
   type CameraPose,
   type EffectPreset,
   type Preset,
+  type TransitionPreset,
 } from './schema';
-export { parseEffectPreset, parsePreset, PresetError } from './parse';
+export { parseEffectPreset, parsePreset, parseTransitionPreset, PresetError } from './parse';
 export { dimensionsFor, frameCount, pickAspect, type Aspect, type Resolution } from './dimensions';
 export {
   CAMERA_POSE_PROMPTS,
@@ -41,3 +44,4 @@ export {
   type UpscaleInputs,
 } from './extensions';
 export { compileEffect, type EffectInputs } from './effects';
+export { compileHookEdit, compileHookTransition, compileTransition, type HookEditInputs, type TransitionInputs } from './transitions';

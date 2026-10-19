@@ -15,7 +15,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { compileAvatar, compileEdit, compileEffect, compileJob, compileMusic, compileSpeech, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
+import { compileAvatar, compileEdit, compileEffect, compileHookEdit, compileHookTransition, compileJob, compileMusic, compileSpeech, compileTransition, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -158,6 +158,24 @@ test.each([true, false])('every effect job is accepted, in every aspect (fast: %
       const { workflow } = compileEffect(effect, model, template, { imageRef: 'start.png', seed: 3, aspect, fast }, library.lock);
       expect({ effect: effect.id, aspect, problems: checkWorkflow(workflow, info) }).toEqual({ effect: effect.id, aspect, problems: [] });
     }
+  }
+});
+
+test.each([true, false])('the transition job is accepted, in every aspect (fast: %s)', (fast) => {
+  const model = library.extensionModels.get('wan22-flf2v-transition')!;
+  for (const aspect of ASPECTS) {
+    const { workflow } = compileTransition(model, library.extensionTemplates.get(model.workflow)!, { startRef: 'start.png', endRef: 'end.png', prompt: 'the camera pushes in', seed: 3, aspect, fast });
+    expect({ aspect, problems: checkWorkflow(workflow, info) }).toEqual({ aspect, problems: [] });
+  }
+});
+
+test('the two jobs of every hook are accepted', () => {
+  const edit = library.extensionModels.get('qwen-image-edit-2511')!;
+  const flf2v = library.extensionModels.get('wan22-flf2v-transition')!;
+  for (const hook of library.hooks.values()) {
+    const first = compileHookEdit(hook, edit, library.extensionTemplates.get(edit.workflow)!, { imageRef: 'start.png', image2Ref: 'start2.png', seed: 3 }, library.lock);
+    const second = compileHookTransition(hook, flf2v, library.extensionTemplates.get(flf2v.workflow)!, { imageRef: 'start.png', endRef: 'end.png', seed: 3, aspect: '9:16' });
+    expect({ hook: hook.id, edit: checkWorkflow(first.workflow, info), transition: checkWorkflow(second.workflow, info) }).toEqual({ hook: hook.id, edit: [], transition: [] });
   }
 });
 
