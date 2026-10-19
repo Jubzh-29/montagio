@@ -70,6 +70,30 @@ export async function probe(
   };
 }
 
+/** The first audio stream of a file, or null when it has none (every Wan clip is silent). */
+export async function probeAudio(
+  media: string,
+): Promise<{ codec: string; sampleRate: number; channels: number; duration_s: number } | null> {
+  const out = await run(ffprobe(), [
+    '-v', 'error',
+    '-select_streams', 'a:0',
+    '-show_entries', 'stream=codec_name,sample_rate,channels,duration:format=duration',
+    '-of', 'json',
+    media,
+  ]);
+  const json = JSON.parse(out) as {
+    streams?: { codec_name?: string; sample_rate?: string; channels?: number; duration?: string }[];
+    format?: { duration?: string };
+  };
+  const stream = json.streams?.[0];
+  if (!stream) return null;
+  return {
+    codec: stream.codec_name ?? '',
+    sampleRate: Number(stream.sample_rate ?? 0),
+    channels: stream.channels ?? 0,
+    duration_s: Number(stream.duration ?? json.format?.duration ?? 0),
+  };
+}
 
 /** The container-level tags of a media file, as ffprobe reads them. */
 export async function readTags(media: string): Promise<Record<string, string>> {
@@ -133,15 +157,17 @@ export async function concatClips(
   ]);
 }
 
+/** The audio of the film, when it has some (a soundtrack), is copied as it is. */
 const VERTICAL_X264 = [
   '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast',
-  '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an',
+  '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'copy',
 ] as const;
 
 /**
  * 9:16 cut for Reels/TikTok: the full frame centred over a blurred, cropped copy of itself.
  * The filter works frame by frame, so the cut of a film equals the films of the cuts:
- * the showcase prepares the cut of each clip and joins them.
+ * the showcase prepares the cut of each clip and joins them. A soundtrack goes along;
+ * an encoder that drops the audio (`-an`, the showcase's) keeps the cut silent.
  */
 export async function exportVertical(
   input: string,
@@ -159,6 +185,7 @@ export async function exportVertical(
     '-i', input,
     '-filter_complex', filter,
     '-map', '[out]',
+    '-map', '0:a?',
     ...(opts.encoder ?? VERTICAL_X264),
     ...metadataArgs(opts.tags ?? AI_METADATA),
     out,
@@ -183,6 +210,44 @@ export const SHOWCASE_X264: readonly string[] = [
  * decodes to full range: without this, a placeholder's headers differ from a render's.
  */
 export const SHOWCASE_COLOUR = 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p';
+
+/**
+ * Put a soundtrack under a film. The film keeps its exact length and every frame, copied
+ * without re-encoding; the music is converted to 48 kHz stereo, padded with silence when
+ * it is shorter and cut when it is longer, with a fade-out at the end (`fadeOut_s`, 1.5 s
+ * by default, at most a quarter of the film), then encoded as AAC. Never `-shortest`,
+ * which would cut the film to a short music.
+ */
+export async function mixMusic(
+  film: string,
+  music: string,
+  out: string,
+  opts: { gainDb?: number; fadeOut_s?: number } = {},
+): Promise<void> {
+  const { duration_s } = await probe(film);
+  if (!(duration_s > 0)) throw new SequenceToolError(`no duration in ${film}`);
+  const fade = Math.min(opts.fadeOut_s ?? 1.5, duration_s / 4);
+  const audio = [
+    '[1:a]aformat=sample_rates=48000:channel_layouts=stereo',
+    'apad',
+    `atrim=0:${duration_s.toFixed(3)}`,
+    'asetpts=PTS-STARTPTS',
+    `afade=t=out:st=${(duration_s - fade).toFixed(3)}:d=${fade.toFixed(3)}`,
+    `volume=${opts.gainDb ?? 0}dB[music]`,
+  ].join(',');
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    '-i', film,
+    '-i', music,
+    '-filter_complex', audio,
+    '-map', '0:v:0', '-map', '[music]',
+    '-c:v', 'copy',
+    '-c:a', 'aac', '-b:a', '192k',
+    ...metadataArgs(AI_METADATA),
+    '-movflags', '+faststart',
+    '-f', 'mp4', partial,
+  ]);
+}
 
 /** Run FFmpeg into `<out>.part`, then rename: `out` is never half-written. */
 async function writeAtomically(out: string, args: (partial: string) => string[]): Promise<void> {
