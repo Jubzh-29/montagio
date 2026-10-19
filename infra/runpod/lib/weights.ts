@@ -43,9 +43,22 @@ const LOADER_FOLDERS: Record<string, Record<string, string>> = {
   LoraLoader: { lora_name: 'loras' },
   LoraLoaderModelOnly: { lora_name: 'loras' },
   CLIPVisionLoader: { clip_name: 'clip_vision' },
+  AudioEncoderLoader: { audio_encoder_name: 'audio_encoders' },
 };
 
-const COMFY_FOLDERS = new Set(['checkpoints', 'diffusion_models', 'text_encoders', 'vae', 'loras', 'clip_vision', 'controlnet', 'upscale_models']);
+/** ComfyUI models/ folders a weight may go to (the same set as infra/local/src/pins.ts); `tts` holds the voice packs. */
+const COMFY_FOLDERS = new Set([
+  'checkpoints',
+  'diffusion_models',
+  'text_encoders',
+  'vae',
+  'loras',
+  'clip_vision',
+  'controlnet',
+  'upscale_models',
+  'audio_encoders',
+  'tts',
+]);
 
 export function weightFolders(workflows: ApiWorkflow[]): Map<string, string> {
   const folders = new Map<string, string>();
@@ -60,12 +73,21 @@ export function weightFolders(workflows: ApiWorkflow[]): Map<string, string> {
   return folders;
 }
 
-/** Folder from the workflow loaders first, else from the repository layout (Comfy-Org's split_files/<folder>/). */
-export function folderFor(file: string, repoPath: string, folders: Map<string, string>): string | null {
+/**
+ * The folder the lock names first (a voice pack under tts/), else the one of the
+ * workflow loaders, else the repository layout (Comfy-Org's split_files/<folder>/).
+ */
+export function folderFor(file: string, repoPath: string, folders: Map<string, string>, lockFolder?: string | null): string | null {
+  if (lockFolder) return lockFolder;
   const fromLoader = folders.get(file);
   if (fromLoader) return fromLoader;
   const parent = repoPath.split('/').at(-2);
   return parent && COMFY_FOLDERS.has(parent) ? parent : null;
+}
+
+/** The weights of the camera presets, plus those of the extensions in `enabled`. */
+export function forExtensions<T extends { extension?: string | null }>(lock: T[], enabled: readonly string[]): T[] {
+  return lock.filter((entry) => !entry.extension || enabled.includes(entry.extension));
 }
 
 export type RepoFile = { path: string; size: number; sha256: string | null };

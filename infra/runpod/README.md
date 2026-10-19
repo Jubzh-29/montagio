@@ -22,6 +22,7 @@ bash infra/runpod/bootstrap.sh collect
 - ComfyUI always runs with `--disable-partner-nodes`; `bootstrap.sh` reads `/object_info` and stops if a node is flagged `api_node` or comes from `comfy_api_nodes`.
 - `@comfyorg/sdk` falls back to Comfy Cloud when `COMFY_BASE_URL` is blank. `smoke.ts` sets it explicitly (default `http://127.0.0.1:8189`), refuses every `comfy.org` / `comfy.app` host, drops any `COMFY_API_KEY`, and gives the SDK a `fetch` that refuses requests outside the proxy's origin. No Router method is used, and `check-open-stack` scans `infra/` for one.
 - Weights come only from `registry/models.lock.yaml`. Files fetched with `--extra` (evaluation of a candidate whose license is still being read) are hashed and reported but never added to the lock patch.
+- The weights of the extensions (music, upscale, edit, avatar) carry `extension:` in the lock. `fetch-weights` takes them all by default (`--extensions all`, what a GPU session needs); `--extensions none`, `validated` (the extensions dated in `registry/extensions.yaml`) or a list such as `music,edit` narrows it. A lock entry may also name its folder under `models/` (`folder: tts/chatterbox/<pack>`) when its URL does not end in `<folder>/<file>`.
 
 Without a GPU, `npm run smoke -w @montagio/infra-runpod -- --dry-run` and `npm run weights -w @montagio/infra-runpod -- --dry-run` show what a session would run and download.
 

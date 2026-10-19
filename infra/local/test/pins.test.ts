@@ -2,9 +2,19 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadLibrary } from '@montagio/presets';
-import { parseLock } from '@montagio/registry';
+import { enabledExtensions, parseExtensionsConfig as registryExtensions, parseLock } from '@montagio/registry';
 import { folderFor, parseHfUrl, weightFolders } from '../../runpod/lib/weights';
-import { parseLockWeights, parseVersionsEnv, readLock, readVersions } from '../src/pins.ts';
+import {
+  parseExtensionsConfig,
+  parseLockWeights,
+  parseVersionsEnv,
+  readExtensions,
+  readLock,
+  readVersions,
+  selectExtensions,
+  weightsFor,
+  type LockWeight,
+} from '../src/pins.ts';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -27,22 +37,72 @@ test('a missing pin is named in the error', async () => {
   expect(() => versionsFrom({ COMFYUI_REPO: 'r', COMFYUI_TAG: 't' })).toThrow(/COMFYUI_COMMIT/);
 });
 
-test('readLock gives the same files, URLs, sha256 and sizes as the registry parser', () => {
+test('readLock gives the same files, URLs, sha256, sizes and extensions as the registry parser', () => {
   const text = readFileSync(join(repoRoot, 'registry', 'models.lock.yaml'), 'utf8');
   const official = parseLock(text, 'models.lock.yaml');
   const ours = readLock(repoRoot);
   expect(ours.map(({ folder: _folder, ...rest }) => rest)).toEqual(
-    official.map(({ id, file, url, sha256, size }) => ({ id, file, url, sha256, size })),
+    official.map(({ id, file, url, sha256, size, extension }) => ({ id, file, url, sha256, size, extension: extension ?? null })),
   );
-  expect(ours).toHaveLength(9);
+  expect(ours.length).toBeGreaterThanOrEqual(9);
 });
 
 test('the ComfyUI folder of each weight is the one fetch-weights writes it to', async () => {
   const library = await loadLibrary(repoRoot);
-  const folders = weightFolders([...library.templates.values()]);
+  const folders = weightFolders([...library.templates.values(), ...library.extensionTemplates.values()]);
   for (const weight of readLock(repoRoot)) {
-    expect(weight.folder, weight.id).toBe(folderFor(weight.file, parseHfUrl(weight.url).path!, folders));
+    const entry = library.lock.get(weight.id)!;
+    expect(weight.folder, weight.id).toBe(folderFor(weight.file, parseHfUrl(weight.url).path!, folders, entry.folder));
   }
+});
+
+test('parseExtensionsConfig reads registry/extensions.yaml as @montagio/registry does', () => {
+  const text = readFileSync(join(repoRoot, 'registry', 'extensions.yaml'), 'utf8');
+  expect(parseExtensionsConfig(text)).toEqual(
+    registryExtensions(text, 'extensions.yaml').map(({ id, priority, gpu_validated }) => ({ id, priority, gpuValidated: gpu_validated })),
+  );
+  expect(readExtensions(repoRoot).map((e) => e.id)).toEqual(['music', 'upscale', 'edit', 'avatar']);
+});
+
+test('a repository without registry/extensions.yaml has no extensions', () => {
+  expect(readExtensions(join(repoRoot, 'infra'))).toEqual([]);
+});
+
+describe('selectExtensions agrees with enabledExtensions', () => {
+  const text = [
+    'schema: montagio/extensions@0.1',
+    'extensions:',
+    '  - id: music',
+    '    priority: 1',
+    '    gpu_validated: 2026-10-22',
+    '  - id: upscale',
+    '    priority: 2',
+    '    gpu_validated: null',
+    '  - id: edit',
+    '    priority: 3',
+    '    gpu_validated: 2026-10-22',
+    '  - id: avatar',
+    '    priority: 4',
+    '    gpu_validated: null',
+    '',
+  ].join('\n');
+  test.each([undefined, '', 'validated', 'all', 'none', 'edit, music'])('flag %j', (flag) => {
+    expect(selectExtensions(parseExtensionsConfig(text), flag)).toEqual(enabledExtensions(registryExtensions(text, 'e.yaml'), flag));
+  });
+  test('an unknown extension is refused by both', () => {
+    expect(() => enabledExtensions(registryExtensions(text, 'e.yaml'), 'music,karaoke')).toThrow(/karaoke/);
+    expect(() => selectExtensions(parseExtensionsConfig(text), 'music,karaoke')).toThrow(/karaoke/);
+  });
+});
+
+test('weightsFor keeps the core weights and those of the extensions asked for', () => {
+  const lock = [
+    { id: 'core', extension: null },
+    { id: 'music-vae', extension: 'music' },
+    { id: 'edit-te', extension: 'edit' },
+  ] as LockWeight[];
+  expect(weightsFor(lock, []).map((w) => w.id)).toEqual(['core']);
+  expect(weightsFor(lock, ['music']).map((w) => w.id)).toEqual(['core', 'music-vae']);
 });
 
 const entry = (lines: string[]) => `schema: montagio/lock@0.1\nweights:\n${lines.map((l) => `    ${l}`).join('\n').replace(/^ {4}id/, '  - id')}\n`;
@@ -68,5 +128,28 @@ test('parseLockWeights reads an entry and ignores the keys it does not need', ()
   const sha = 'b'.repeat(64);
   expect(
     parseLockWeights(entry(['id: a', 'file: a.safetensors', `url: ${URL_VAE}`, `sha256: ${sha}`, 'size: 12', 'license: MIT', 'source: https://x'])),
-  ).toEqual([{ id: 'a', file: 'a.safetensors', url: URL_VAE, sha256: sha, size: 12, folder: 'vae' }]);
+  ).toEqual([{ id: 'a', file: 'a.safetensors', url: URL_VAE, sha256: sha, size: 12, folder: 'vae', extension: null }]);
+});
+
+test('a lock entry may carry an extension', () => {
+  const sha = 'c'.repeat(64);
+  const base = ['id: a', 'file: a.safetensors', `url: ${URL_VAE}`, `sha256: ${sha}`, 'size: 12', 'license: MIT'];
+  expect(parseLockWeights(entry([...base, 'extension: music']))[0]?.extension).toBe('music');
+  expect(parseLockWeights(entry(base))[0]?.extension).toBeNull();
+});
+
+test('audio_encoders is a ComfyUI folder', () => {
+  const url = 'https://huggingface.co/Comfy-Org/x/resolve/main/split_files/audio_encoders/w.safetensors';
+  expect(parseLockWeights(entry(['id: a', 'file: w.safetensors', `url: ${url}`, `sha256: ${'d'.repeat(64)}`, 'size: 3']))[0]?.folder).toBe('audio_encoders');
+});
+
+test('an explicit nested folder wins over the URL', () => {
+  const url = 'https://huggingface.co/ResembleAI/chatterbox/resolve/main/t3_mtl23ls_v3.safetensors';
+  const lines = ['id: a', 'file: t3_mtl23ls_v3.safetensors', `url: ${url}`, `sha256: ${'e'.repeat(64)}`, 'size: 3', 'folder: tts/chatterbox/resembleai-mtl-v3'];
+  expect(parseLockWeights(entry(lines))[0]?.folder).toBe('tts/chatterbox/resembleai-mtl-v3');
+});
+
+test.each(['weights/x', 'tts/../vae', '/abs'])('the folder %s is refused', (folder) => {
+  const lines = ['id: a', 'file: a.safetensors', `url: ${URL_VAE}`, `sha256: ${'f'.repeat(64)}`, 'size: 3', `folder: ${folder}`];
+  expect(() => parseLockWeights(entry(lines))).toThrow(/lock entry a.*folder/);
 });

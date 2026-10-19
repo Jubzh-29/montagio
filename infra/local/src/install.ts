@@ -22,7 +22,7 @@ import {
 import { basename, dirname, join } from 'node:path';
 import { decide, evaluate, pickGpu, pickPython, pickTorch, type Check, type Decision, type Mode, type Ports } from './checks.ts';
 import { npmInvocation, nextBin, tsxCli, type Capture, type Stream } from './exec.ts';
-import { readLock, readVersions, type LockWeight } from './pins.ts';
+import { readExtensions, readLock, readVersions, selectExtensions, weightsFor, type LockWeight } from './pins.ts';
 import {
   buildPlan,
   buildStamp,
@@ -53,6 +53,8 @@ export type InstallOptions = {
   dryRun: boolean;
   start: boolean;
   browser: boolean;
+  /** --extensions: whose weights to fetch besides the camera presets'; null or absent reads MONTAGIO_EXTENSIONS, then "validated". */
+  extensions?: string | null;
 };
 
 export type InstallDeps = {
@@ -166,7 +168,15 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
   };
   const execPath = deps.execPath ?? process.execPath;
   const versions = readVersions(repoRoot);
-  const lock = readLock(repoRoot);
+  let enabled: string[];
+  try {
+    enabled = selectExtensions(readExtensions(repoRoot), opts.extensions ?? env.MONTAGIO_EXTENSIONS);
+  } catch (error) {
+    deps.log(`error: ${(error as Error).message}`);
+    return 2;
+  }
+  // The weights of the extensions nobody asked for stay out of the plan and of the disk check.
+  const lock = weightsFor(readLock(repoRoot), enabled);
   let state: InstallState = readState(L.statePath);
   const ports: Ports = { ...state.ports, ...opts.ports };
   const proxyUrl = opts.demo ? null : (opts.proxyUrl ?? state.proxyUrl);

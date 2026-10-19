@@ -329,6 +329,49 @@ test('the CUDA check looks at the GPU the checks chose, numbered as nvidia-smi n
   expect(readState(h.L.statePath).gpuIndex).toBe(1);
 });
 
+/** The two-file lock plus one weight of the music extension, and registry/extensions.yaml with nothing validated. */
+function withMusicWeight(size: number): void {
+  const sha = createHash('sha256').update('music').digest('hex');
+  writeFileSync(
+    join(repo, 'registry', 'models.lock.yaml'),
+    readFileSync(join(repo, 'registry', 'models.lock.yaml'), 'utf8') +
+      `  - id: tiny-music\n    file: tiny_music.safetensors\n    url: https://huggingface.co/Comfy-Org/x/resolve/main/split_files/vae/tiny_music.safetensors\n` +
+      `    sha256: ${sha}\n    size: ${size}\n    license: MIT\n    source: https://huggingface.co/x/y\n    extension: music\n`,
+  );
+  writeFileSync(
+    join(repo, 'registry', 'extensions.yaml'),
+    ['schema: montagio/extensions@0.1', 'extensions:', ...['music', 'upscale', 'edit', 'avatar'].flatMap((id, i) => [`  - id: ${id}`, `    priority: ${i + 1}`, '    gpu_validated: null']), ''].join('\n'),
+  );
+}
+
+const fetchedIds = (calls: Call[]) => {
+  const fetch = calls.find((c) => c.args.includes('--models-dir'));
+  return fetch ? fetch.args[fetch.args.indexOf('--only') + 1]!.split(',') : [];
+};
+
+test('with no extension validated, the plan and the disk check ignore the extension weights', async () => {
+  // 600 GiB of music weights on a 500 GiB drive: counted, they would fail the disk check
+  withMusicWeight(600 * GiB);
+  const h = harness();
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+  expect(fetchedIds(h.calls).sort()).toEqual(['tiny-te', 'tiny-vae']);
+});
+
+test('--extensions all fetches the extension weights with --only', async () => {
+  withMusicWeight(5);
+  const h = harness();
+  expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
+  expect(fetchedIds(h.calls).sort()).toEqual(['tiny-music', 'tiny-te', 'tiny-vae']);
+});
+
+test('an unknown extension is refused before anything runs', async () => {
+  withMusicWeight(5);
+  const h = harness();
+  expect(await install(repo, options({ extensions: 'music,karaoke' }), h.deps)).toBe(2);
+  expect(h.calls).toEqual([]);
+  expect(h.output()).toMatch(/karaoke/);
+});
+
 test('a weight half downloaded counts only its missing bytes in the disk check', async () => {
   // An install cut during the download: everything else is in place, a .part is left.
   const cut = harness({ failOn: (c) => c.args.includes('--models-dir') });

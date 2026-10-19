@@ -40,7 +40,7 @@ test('writeState then readState gives the same state, and leaves no temporary fi
 
 test('recordWeights keeps downloaded or present files whose sha256 is the lock one', () => {
   const sha = (c: string) => c.repeat(64);
-  const lock: LockWeight[] = ['a', 'b', 'c', 'd'].map((id) => ({ id, file: `${id}.safetensors`, url: 'u', sha256: sha(id), size: 10, folder: 'vae' }));
+  const lock: LockWeight[] = ['a', 'b', 'c', 'd'].map((id) => ({ id, file: `${id}.safetensors`, url: 'u', sha256: sha(id), size: 10, folder: 'vae', extension: null }));
   const report = {
     weights: [
       { id: 'a', status: 'downloaded', sha256: sha('a') },

@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import {
   downloadFile,
   folderFor,
+  forExtensions,
   gib,
   lockDrift,
   lockFromHf,
@@ -58,6 +59,41 @@ test('the ComfyUI folder of a weight comes from the loader that names it, else f
   expect(folderFor('unet.safetensors', 'x/unet.safetensors', folders)).toBe('diffusion_models');
   expect(folderFor('lora.safetensors', 'split_files/loras/lora.safetensors', folders)).toBe('loras');
   expect(folderFor('odd.safetensors', 'odd.safetensors', folders)).toBeNull();
+});
+
+test('the loaders of the extension workflows give their ComfyUI folder', () => {
+  const folders = weightFolders([
+    {
+      '57': { class_type: 'AudioEncoderLoader', inputs: { audio_encoder_name: 'wav2vec2.safetensors' } },
+      '105': { class_type: 'DualCLIPLoader', inputs: { clip_name1: 'qwen_0.6b.safetensors', clip_name2: 'qwen_1.7b.safetensors', type: 'ace' } },
+      '107': { class_type: 'LoraLoaderModelOnly', inputs: { lora_name: 'lightx2v.safetensors', strength_model: 1 } },
+    },
+  ]);
+  expect(Object.fromEntries(folders)).toEqual({
+    'wav2vec2.safetensors': 'audio_encoders',
+    'qwen_0.6b.safetensors': 'text_encoders',
+    'qwen_1.7b.safetensors': 'text_encoders',
+    'lightx2v.safetensors': 'loras',
+  });
+  expect(folderFor('w.safetensors', 'split_files/audio_encoders/w.safetensors', new Map())).toBe('audio_encoders');
+});
+
+test('the folder of the lock wins over the loaders and the repository path', () => {
+  const folders = new Map([['t3_mtl23ls_v3.safetensors', 'diffusion_models']]);
+  expect(folderFor('t3_mtl23ls_v3.safetensors', 't3_mtl23ls_v3.safetensors', folders, 'tts/chatterbox/resembleai-mtl-v3')).toBe(
+    'tts/chatterbox/resembleai-mtl-v3',
+  );
+  expect(folderFor('t3_mtl23ls_v3.safetensors', 't3_mtl23ls_v3.safetensors', folders, null)).toBe('diffusion_models');
+});
+
+describe('forExtensions', () => {
+  const lock = [{ id: 'core' }, { id: 'music-vae', extension: 'music' }, { id: 'edit-te', extension: 'edit' }];
+  test('--extensions none keeps only the core weights', () => {
+    expect(forExtensions(lock, []).map((w) => w.id)).toEqual(['core']);
+  });
+  test('--extensions music adds the music weights', () => {
+    expect(forExtensions(lock, ['music']).map((w) => w.id)).toEqual(['core', 'music-vae']);
+  });
 });
 
 describe('pickCandidate', () => {
