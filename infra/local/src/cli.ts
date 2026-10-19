@@ -1,0 +1,219 @@
+/**
+ * The Montagio installer's command line, run by montagio.sh and montagio.ps1:
+ *   install   check the machine, install what is missing, start Montagio
+ *   start     start ComfyUI, comfy-api-proxy and the app, open the browser
+ *   stop      stop them
+ *   status    say what runs
+ */
+import { homedir } from 'node:os';
+import { resolve } from 'node:path';
+import { createInterface } from 'node:readline/promises';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseArgs as parseNodeArgs } from 'node:util';
+import type { Ports } from './checks.ts';
+import { capture, stream } from './exec.ts';
+import { install } from './install.ts';
+import { defaultInstallDir, layout, osOf } from './platform.ts';
+import { probe } from './probe.ts';
+import { runningPorts, startAll, status, stopAll, type ServiceContext } from './services.ts';
+import { readState } from './state.ts';
+
+export const USAGE = `Usage: ./montagio.sh <command> [options]           (Linux)
+       powershell -ExecutionPolicy Bypass -File .\\montagio.ps1 <command> [options]   (Windows)
+
+Commands:
+  install        check this machine, install what is missing or out of date, then start Montagio
+  start          start ComfyUI, comfy-api-proxy and the app, then open the browser
+  stop           stop them
+  status         say what runs, where, and where the logs are
+  help           this text
+
+Options:
+  --dry-run          install: show the checks and every step, change nothing
+  --app-only         install the app alone: no ComfyUI, no weights (demo mode, or --proxy-url)
+  --proxy-url URL    with --app-only: the comfy-api-proxy of a remote GPU (for example an SSH tunnel)
+  --ignore-vram      install even on a GPU under 24 GB (renders may run out of memory)
+  --dir DIR          install folder (default: %LOCALAPPDATA%\\Montagio or ~/.local/share/montagio, or MONTAGIO_HOME)
+  --comfy-port N     ComfyUI port (default 8188)
+  --proxy-port N     comfy-api-proxy port (default 8189)
+  --app-port N       app port (default 3000)
+  --no-start         install: do not start Montagio at the end
+  --no-browser       do not open the browser
+
+Environment:
+  MONTAGIO_COMFYUI_ARGS   extra ComfyUI arguments, for example "--lowvram"
+  HF_TOKEN               Hugging Face token, only if a download is refused
+  MONTAGIO_FFMPEG, MONTAGIO_FFPROBE   FFmpeg binaries outside the PATH
+
+Guide: docs/INSTALL.md`;
+
+export type Command = 'install' | 'start' | 'stop' | 'status' | 'help';
+export type CliOptions = {
+  dryRun: boolean;
+  appOnly: boolean;
+  ignoreVram: boolean;
+  dir: string | null;
+  start: boolean;
+  browser: boolean;
+  proxyUrl: string | null;
+  ports: Partial<Ports>;
+};
+
+const COMMANDS: Command[] = ['install', 'start', 'stop', 'status', 'help'];
+const PORT_FLAGS = { comfy: 'comfy-port', proxy: 'proxy-port', app: 'app-port' } as const;
+
+export function parseArgs(argv: string[]): { command: Command; options: CliOptions } {
+  let parsed: ReturnType<typeof parseNodeArgs<{ options: Record<string, { type: 'string' | 'boolean' }>; allowPositionals: true; strict: true }>>;
+  try {
+    parsed = parseNodeArgs({
+      args: argv,
+      allowPositionals: true,
+      strict: true,
+      options: {
+        'dry-run': { type: 'boolean' },
+        'app-only': { type: 'boolean' },
+        'ignore-vram': { type: 'boolean' },
+        'no-start': { type: 'boolean' },
+        'no-browser': { type: 'boolean' },
+        dir: { type: 'string' },
+        'proxy-url': { type: 'string' },
+        'comfy-port': { type: 'string' },
+        'proxy-port': { type: 'string' },
+        'app-port': { type: 'string' },
+        help: { type: 'boolean' },
+      },
+    });
+  } catch (error) {
+    throw new Error((error as Error).message.replace(/^Unknown option '(.*?)'.*$/s, 'unknown option $1'));
+  }
+  const values = parsed.values as Record<string, string | boolean | undefined>;
+  const [name = 'help', ...extra] = parsed.positionals;
+  if (!COMMANDS.includes(name as Command)) throw new Error(`unknown command "${name}" (expected ${COMMANDS.join(', ')})`);
+  if (extra.length > 0) throw new Error(`unexpected argument "${extra[0]}"`);
+
+  const ports: Partial<Ports> = {};
+  for (const [key, flag] of Object.entries(PORT_FLAGS) as [keyof Ports, string][]) {
+    const raw = values[flag];
+    if (raw === undefined) continue;
+    const port = Number(raw);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`--${flag} must be a port number from 1 to 65535, got "${raw}"`);
+    ports[key] = port;
+  }
+  const proxyUrl = typeof values['proxy-url'] === 'string' ? values['proxy-url'] : null;
+  if (proxyUrl !== null) {
+    if (!values['app-only']) throw new Error('--proxy-url only goes with --app-only (the full install runs its own proxy)');
+    let protocol = '';
+    try {
+      protocol = new URL(proxyUrl).protocol;
+    } catch {
+      protocol = '';
+    }
+    if (protocol !== 'http:' && protocol !== 'https:') throw new Error(`--proxy-url must be an http(s) URL, got "${proxyUrl}"`);
+  }
+  return {
+    command: values.help ? 'help' : (name as Command),
+    options: {
+      dryRun: Boolean(values['dry-run']),
+      appOnly: Boolean(values['app-only']),
+      ignoreVram: Boolean(values['ignore-vram']),
+      dir: typeof values.dir === 'string' ? values.dir : null,
+      start: !values['no-start'],
+      browser: !values['no-browser'],
+      proxyUrl,
+      ports,
+    },
+  };
+}
+
+async function askYesNo(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return /^y(es)?$/i.test((await rl.question(question)).trim());
+  } finally {
+    rl.close();
+  }
+}
+
+export async function main(argv: string[]): Promise<number> {
+  let parsed: ReturnType<typeof parseArgs>;
+  try {
+    parsed = parseArgs(argv);
+  } catch (error) {
+    console.error(`error: ${(error as Error).message}\n(run "help" for the usage)`);
+    return 2;
+  }
+  const { command, options } = parsed;
+  if (command === 'help') {
+    console.log(USAGE);
+    return 0;
+  }
+  const repoRoot = resolve(fileURLToPath(new URL('../../../', import.meta.url)));
+  const os = osOf(process.platform);
+  const dir = resolve(options.dir ?? defaultInstallDir(os ?? 'linux', process.env, homedir()));
+  const log = (line: string) => console.log(line);
+  const L = layout(dir, os ?? 'linux');
+  // Read the state at each call: install writes it (save-state) right before it starts the services.
+  const services = (): ServiceContext => ({ os: os ?? 'linux', layout: L, repoRoot, state: readState(L.statePath), capture, log });
+
+  if (command === 'start') return startAll(services(), { browser: options.browser });
+  if (command === 'stop') {
+    await stopAll(services());
+    return 0;
+  }
+  if (command === 'status') {
+    log(await status(services()));
+    return 0;
+  }
+  return install(
+    repoRoot,
+    {
+      dir,
+      mode: options.appOnly ? 'app-only' : 'full',
+      ignoreVram: options.ignoreVram,
+      ports: options.ports,
+      proxyUrl: options.proxyUrl,
+      dryRun: options.dryRun,
+      start: options.start,
+      browser: options.browser,
+    },
+    {
+      capture,
+      stream,
+      log,
+      ask: process.stdin.isTTY && process.stdout.isTTY ? askYesNo : null,
+      probe,
+      runningPorts: () => runningPorts(services()),
+      stopAll: () => stopAll(services()),
+      startAll: (opts) => startAll(services(), opts),
+    },
+  );
+}
+
+/**
+ * The arguments. montagio.ps1 sends them as JSON in MONTAGIO_ARGV: Windows
+ * PowerShell 5.1 splits an argument that starts with "-" and holds a space
+ * ("--dir=C:\Shot Rig") when it passes it to a program.
+ */
+export function argvFrom(env: Record<string, string | undefined>, argv: string[]): string[] {
+  const raw = env.MONTAGIO_ARGV;
+  if (!raw) return argv;
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed) || !parsed.every((arg) => typeof arg === 'string')) throw new Error('MONTAGIO_ARGV must be a JSON list of strings');
+  return parsed;
+}
+
+const entry = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : '';
+if (entry === import.meta.url) {
+  const argv = argvFrom(process.env, process.argv.slice(2));
+  // Not for the programs the installer starts.
+  delete process.env.MONTAGIO_ARGV;
+  main(argv).then(
+    (code) => {
+      process.exitCode = code;
+    },
+    (error: unknown) => {
+      console.error(`error: ${(error as Error).stack ?? error}`);
+      process.exitCode = 1;
+    },
+  );
+}
