@@ -125,6 +125,13 @@ test('the app alone has no ComfyUI, proxy, pack or weights step', () => {
   for (const id of ['comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights'] as const) expect(ids).not.toContain(id);
 });
 
+test('the app alone says whether it renders through a saved proxy URL or runs the demo', () => {
+  const appOnly = (proxyUrl: string | null) =>
+    step(buildPlan(fresh({ mode: 'app-only', python: null, torch: null, state: { ...emptyState(), proxyUrl } })), 'start').detail.join('\n');
+  expect(appOnly('http://127.0.0.1:9189')).toContain('comfy-api-proxy at http://127.0.0.1:9189 (--demo forgets it)');
+  expect(appOnly(null)).toContain('demo mode');
+});
+
 test('the weights step lists each file with its size and folder', () => {
   const weights = step(buildPlan(fresh()), 'weights');
   expect(weights.detail).toContainEqual(expect.stringMatching(/diffusion_models\/wan2\.2_fun_camera_high_noise_14B_fp8_scaled\.safetensors\s+14\.25 GiB/));

@@ -34,7 +34,9 @@ export type InstallOptions = {
   mode: Mode;
   ignoreVram: boolean;
   ports: Partial<Ports>;
+  /** null keeps the saved one; demo forgets it. */
   proxyUrl: string | null;
+  demo: boolean;
   dryRun: boolean;
   start: boolean;
   browser: boolean;
@@ -127,6 +129,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
   const lock = readLock(repoRoot);
   let state: InstallState = readState(L.statePath);
   const ports: Ports = { ...state.ports, ...opts.ports };
+  const proxyUrl = opts.demo ? null : (opts.proxyUrl ?? state.proxyUrl);
   const own = await deps.runningPorts();
   const facts = await deps.probe({ os, repoRoot, installDir: opts.dir, ports: [ports.comfy, ports.proxy, ports.app], capture: deps.capture });
 
@@ -160,7 +163,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
       versions,
       torch,
       python,
-      state: { ...state, ports },
+      state: { ...state, ports, proxyUrl },
       lock,
       weightStat,
       comfy,
@@ -310,7 +313,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
         mode: plan.mode,
         ports,
         gpuIndex: plan.mode === 'full' ? (pickGpu(facts.gpus)?.index ?? null) : null,
-        proxyUrl: opts.proxyUrl ?? state.proxyUrl,
+        proxyUrl,
       }),
     start: () => deps.startAll({ browser: opts.browser }),
   };

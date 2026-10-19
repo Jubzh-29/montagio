@@ -150,6 +150,7 @@ const options = (over: Partial<InstallOptions> = {}): InstallOptions => ({
   ignoreVram: false,
   ports: {},
   proxyUrl: null,
+  demo: false,
   dryRun: false,
   start: true,
   browser: false,
@@ -320,6 +321,17 @@ test('a port option is kept for the next runs', async () => {
   expect(readState(h.L.statePath).ports).toEqual({ comfy: 8288, proxy: 8189, app: 3000 });
   await install(repo, options(), harness().deps);
   expect(readState(h.L.statePath).ports.comfy).toBe(8288);
+});
+
+test('a saved --proxy-url is kept by the next runs, and --demo forgets it', async () => {
+  const h = harness();
+  const appOnly = (over: Partial<InstallOptions>) => install(repo, options({ mode: 'app-only', start: false, ...over }), harness().deps);
+  await appOnly({ proxyUrl: 'http://127.0.0.1:9189' });
+  expect(readState(h.L.statePath).proxyUrl).toBe('http://127.0.0.1:9189');
+  await appOnly({});
+  expect(readState(h.L.statePath).proxyUrl).toBe('http://127.0.0.1:9189');
+  expect(await appOnly({ demo: true })).toBe(0);
+  expect(readState(h.L.statePath).proxyUrl).toBeNull();
 });
 
 test('running services are stopped before anything else', async () => {

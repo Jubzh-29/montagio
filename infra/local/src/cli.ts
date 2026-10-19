@@ -31,7 +31,8 @@ Commands:
 Options:
   --dry-run          install: show the checks and every step, change nothing
   --app-only         install the app alone: no ComfyUI, no weights (demo mode, or --proxy-url)
-  --proxy-url URL    with --app-only: the comfy-api-proxy of a remote GPU (for example an SSH tunnel)
+  --proxy-url URL    with --app-only: the comfy-api-proxy of a remote GPU (for example an SSH tunnel), kept for the next runs
+  --demo             with --app-only: forget a saved --proxy-url, run the demo mode
   --ignore-vram      install even on a GPU under 24 GB (renders may run out of memory)
   --dir DIR          install folder (default: %LOCALAPPDATA%\\Montagio or ~/.local/share/montagio, or MONTAGIO_HOME)
   --comfy-port N     install: ComfyUI port (default 8188), kept for the next runs
@@ -56,6 +57,7 @@ export type CliOptions = {
   start: boolean;
   browser: boolean;
   proxyUrl: string | null;
+  demo: boolean;
   ports: Partial<Ports>;
 };
 
@@ -63,7 +65,7 @@ const COMMANDS: Command[] = ['install', 'start', 'stop', 'status', 'help'];
 const PORT_FLAGS = { comfy: 'comfy-port', proxy: 'proxy-port', app: 'app-port' } as const;
 /** The options each command reads: another one is refused, not ignored (start --dry-run would start). */
 const COMMAND_OPTIONS: Record<Exclude<Command, 'help'>, string[]> = {
-  install: ['dry-run', 'app-only', 'ignore-vram', 'no-start', 'no-browser', 'dir', 'proxy-url', 'comfy-port', 'proxy-port', 'app-port'],
+  install: ['dry-run', 'app-only', 'ignore-vram', 'no-start', 'no-browser', 'dir', 'proxy-url', 'demo', 'comfy-port', 'proxy-port', 'app-port'],
   start: ['dir', 'no-browser'],
   stop: ['dir'],
   status: ['dir'],
@@ -84,6 +86,7 @@ export function parseArgs(argv: string[]): { command: Command; options: CliOptio
         'no-browser': { type: 'boolean' },
         dir: { type: 'string' },
         'proxy-url': { type: 'string' },
+        demo: { type: 'boolean' },
         'comfy-port': { type: 'string' },
         'proxy-port': { type: 'string' },
         'app-port': { type: 'string' },
@@ -124,6 +127,10 @@ export function parseArgs(argv: string[]): { command: Command; options: CliOptio
     }
     if (protocol !== 'http:' && protocol !== 'https:') throw new Error(`--proxy-url must be an http(s) URL, got "${proxyUrl}"`);
   }
+  if (values.demo) {
+    if (!values['app-only']) throw new Error('--demo only goes with --app-only (the full install renders on this machine)');
+    if (proxyUrl !== null) throw new Error('--demo and --proxy-url do not go together: --demo forgets the proxy URL');
+  }
   return {
     command: values.help ? 'help' : (name as Command),
     options: {
@@ -134,6 +141,7 @@ export function parseArgs(argv: string[]): { command: Command; options: CliOptio
       start: !values['no-start'],
       browser: !values['no-browser'],
       proxyUrl,
+      demo: Boolean(values.demo),
       ports,
     },
   };
@@ -186,6 +194,7 @@ export async function main(argv: string[]): Promise<number> {
       ignoreVram: options.ignoreVram,
       ports: options.ports,
       proxyUrl: options.proxyUrl,
+      demo: options.demo,
       dryRun: options.dryRun,
       start: options.start,
       browser: options.browser,

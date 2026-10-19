@@ -17,6 +17,7 @@ test('install options are read', () => {
       start: false,
       browser: false,
       proxyUrl: null,
+      demo: false,
       ports: { comfy: 8288 },
     },
   });
@@ -49,6 +50,13 @@ test('--proxy-url needs --app-only and an http(s) URL', () => {
   expect(() => parseArgs(['install', '--proxy-url', 'http://127.0.0.1:8189'])).toThrow(/--app-only/);
   expect(() => parseArgs(['install', '--app-only', '--proxy-url', 'ftp://x'])).toThrow(/http/);
   expect(parseArgs(['install', '--app-only', '--proxy-url', 'http://127.0.0.1:9189']).options).toMatchObject({ appOnly: true, proxyUrl: 'http://127.0.0.1:9189' });
+});
+
+test('--demo goes with --app-only, never with --proxy-url', () => {
+  expect(parseArgs(['install', '--app-only', '--demo']).options).toMatchObject({ appOnly: true, demo: true, proxyUrl: null });
+  expect(() => parseArgs(['install', '--demo'])).toThrow(/--app-only/);
+  expect(() => parseArgs(['install', '--app-only', '--demo', '--proxy-url', 'http://127.0.0.1:9189'])).toThrow(/--demo/);
+  expect(() => parseArgs(['start', '--demo'])).toThrow(/only goes with install/);
 });
 
 test('status, start and stop work on a folder where nothing is installed', async () => {

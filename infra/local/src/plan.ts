@@ -268,7 +268,10 @@ export function buildPlan(input: PlanInput): Step[] {
     why: input.start ? 'then open the browser' : '--no-start',
     detail: full
       ? [`ComfyUI on 127.0.0.1:${state.ports.comfy}`, `comfy-api-proxy on 127.0.0.1:${state.ports.proxy}`, `the app on http://127.0.0.1:${state.ports.app}`]
-      : [`the app on http://127.0.0.1:${state.ports.app}`],
+      : [
+          `the app on http://127.0.0.1:${state.ports.app}`,
+          state.proxyUrl ? `rendering through the comfy-api-proxy at ${state.proxyUrl} (--demo forgets it)` : 'demo mode: pre-rendered clips',
+        ],
   });
 
   return steps;
