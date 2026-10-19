@@ -3,8 +3,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync,
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Capture, Stream } from '../src/exec.ts';
-import { install, renderReport, type InstallDeps, type InstallOptions } from '../src/install.ts';
+import { capture as realCapture, type Capture, type Stream } from '../src/exec.ts';
+import { install, markOwned, renderReport, type InstallDeps, type InstallOptions } from '../src/install.ts';
 import { parseVersionsEnv } from '../src/pins.ts';
 import { layout, osOf } from '../src/platform.ts';
 import type { MachineFacts } from '../src/probe.ts';
@@ -242,6 +242,25 @@ test('a rerun after an interruption resumes without manual cleanup', async () =>
   const calls = described(resumed.calls);
   expect(calls.some((c) => c.includes('git clone'))).toBe(false);
   expect(calls.some((c) => c.includes(' -r '))).toBe(true);
+});
+
+test('a lost install-state.json does not make Montagio refuse its own ComfyUI', async () => {
+  // Also what a Ctrl+C between the rename of ComfyUI.tmp and its stamp leaves.
+  await install(repo, options({ start: false }), harness().deps);
+  const h = harness();
+  rmSync(h.L.statePath);
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+  expect(h.output()).not.toContain('was not installed by Montagio');
+  expect(described(h.calls).some((c) => c.includes('git clone'))).toBe(false);
+});
+
+test('the ownership marker leaves git status clean, so the next update is not refused', async () => {
+  const clone = join(base, 'real clone');
+  mkdirSync(clone);
+  expect((await realCapture('git', ['-C', clone, 'init', '-q'])).code).toBe(0);
+  markOwned(clone);
+  expect(existsSync(join(clone, '.montagio'))).toBe(true);
+  expect(await realCapture('git', ['-C', clone, 'status', '--porcelain'])).toMatchObject({ code: 0, stdout: '' });
 });
 
 test('a clone cut short is removed and cloned again', async () => {

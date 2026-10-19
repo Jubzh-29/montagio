@@ -5,7 +5,20 @@
  * again picks up from there.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  renameSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { decide, evaluate, pickGpu, pickPython, pickTorch, type Check, type Decision, type Mode, type Ports } from './checks.ts';
 import { npmInvocation, nextBin, tsxCli, type Capture, type Stream } from './exec.ts';
@@ -87,6 +100,16 @@ export function renderReport(checks: Check[], decision: Decision, steps: Step[],
   return lines.join('\n');
 }
 
+/** The file that says a ComfyUI folder is Montagio's, should install-state.json be lost. */
+export const OWNER_MARKER = '.montagio';
+
+/** Marks a Montagio clone as ours. git is told to ignore the marker: an update refuses a non-empty `git status`. */
+export function markOwned(clone: string): void {
+  writeFileSync(join(clone, OWNER_MARKER), 'This ComfyUI was installed by Montagio: its install command updates it.\n');
+  mkdirSync(join(clone, '.git', 'info'), { recursive: true });
+  appendFileSync(join(clone, '.git', 'info', 'exclude'), `\n/${OWNER_MARKER}\n`);
+}
+
 function sha256(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
@@ -145,7 +168,12 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     return statOrNull(join(L.modelsDir, w.folder, `${w.file}.part`))?.size ?? 0;
   };
   const comfyExists = existsSync(L.comfyDir);
-  const comfy = { exists: comfyExists, tmpExists: existsSync(L.comfyTmp), head: comfyExists ? await gitHead(L.comfyDir) : null };
+  const comfy = {
+    exists: comfyExists,
+    tmpExists: existsSync(L.comfyTmp),
+    head: comfyExists ? await gitHead(L.comfyDir) : null,
+    marked: comfyExists && existsSync(join(L.comfyDir, OWNER_MARKER)),
+  };
   const repo = {
     head: await gitHead(repoRoot),
     lockHash: sha256(join(repoRoot, 'package-lock.json')),
@@ -233,6 +261,8 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
         await run('git', ['clone', '--depth', '1', '--branch', versions.comfyuiTag, versions.comfyuiRepo, L.comfyTmp]);
         const head = await gitHead(L.comfyTmp);
         if (head !== versions.comfyuiCommit) throw new Error(`the clone is at ${head}, expected ${versions.comfyuiCommit} (${versions.comfyuiTag})`);
+        // Before the rename: a Ctrl+C between the rename and the stamp leaves a folder that still says it is ours.
+        markOwned(L.comfyTmp);
         renameSync(L.comfyTmp, L.comfyDir);
       }
       const head = await gitHead(L.comfyDir);
