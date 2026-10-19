@@ -1,6 +1,16 @@
 import { access, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { parseLock, parseModel, type LockEntry, type ModelEntry } from '@montagio/registry';
+import {
+  parseExtensionModel,
+  parseExtensionsConfig,
+  parseLock,
+  parseModel,
+  type ExtensionId,
+  type ExtensionModel,
+  type ExtensionsConfig,
+  type LockEntry,
+  type ModelEntry,
+} from '@montagio/registry';
 import type { ApiWorkflow } from './compile';
 import { parsePreset } from './parse';
 import type { Preset } from './schema';
@@ -13,6 +23,12 @@ export type Library = {
   lock: Map<string, LockEntry>;
   /** Workflow templates keyed by the model's `workflow` path, e.g. "workflows/wan22-fun-camera.api.json". */
   templates: Map<string, ApiWorkflow>;
+  /** Models of the extensions (registry/extensions/), kept apart from the preset models. */
+  extensionModels: Map<string, ExtensionModel>;
+  /** Workflow templates of the extension models, by `workflow` path. */
+  extensionTemplates: Map<string, ApiWorkflow>;
+  /** registry/extensions.yaml; null in a repository that has no extensions at all. */
+  extensions: ExtensionsConfig | null;
   warnings: string[];
 };
 
@@ -41,6 +57,48 @@ async function exists(path: string): Promise<boolean> {
 }
 
 /**
+ * The `extension:` mark of the lock against who loads each weight. The installer
+ * downloads a marked weight only for its extension, so a weight a preset model
+ * needs must stay unmarked, and a weight only one extension needs must carry it.
+ */
+function lockExtensionProblems(
+  lock: Map<string, LockEntry>,
+  models: Map<string, ModelEntry>,
+  extensionModels: Map<string, ExtensionModel>,
+): string[] {
+  const problems: string[] = [];
+  const presetUsers = new Map<string, string[]>();
+  for (const model of models.values()) {
+    for (const weight of model.weights) presetUsers.set(weight, [...(presetUsers.get(weight) ?? []), model.id]);
+  }
+  const extensionUsers = new Map<string, { model: string; extension: ExtensionId }[]>();
+  for (const model of extensionModels.values()) {
+    for (const weight of model.weights) {
+      extensionUsers.set(weight, [...(extensionUsers.get(weight) ?? []), { model: model.id, extension: model.extension }]);
+    }
+  }
+  for (const entry of lock.values()) {
+    const presets = presetUsers.get(entry.id) ?? [];
+    const users = extensionUsers.get(entry.id) ?? [];
+    if (entry.extension) {
+      for (const preset of presets) {
+        problems.push(`lock entry ${entry.id} belongs to extension ${entry.extension} but preset model ${preset} loads it`);
+      }
+      for (const user of users.filter((u) => u.extension !== entry.extension)) {
+        problems.push(`lock entry ${entry.id} belongs to extension ${entry.extension} but extension model ${user.model} (${user.extension}) loads it`);
+      }
+    }
+    if (presets.length > 0) continue;
+    const kinds = [...new Set(users.map((user) => user.extension))];
+    if (kinds.length > 1) problems.push(`lock entry ${entry.id} is shared by extensions ${kinds.join(' and ')}`);
+    else if (kinds.length === 1 && !entry.extension) {
+      problems.push(`lock entry ${entry.id} is loaded only by extension ${kinds[0]}: mark it "extension: ${kinds[0]}"`);
+    }
+  }
+  return problems;
+}
+
+/**
  * Read and cross-check the repository library. `presets: false` skips
  * `presets/`, so a tool that checks preset files one by one (`montagio preset
  * validate`) still gets the models, the lock and the templates when one of
@@ -54,6 +112,9 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
   const models = new Map<string, ModelEntry>();
   const lock = new Map<string, LockEntry>();
   const templates = new Map<string, ApiWorkflow>();
+  const extensionModels = new Map<string, ExtensionModel>();
+  const extensionTemplates = new Map<string, ApiWorkflow>();
+  let extensions: ExtensionsConfig | null = null;
 
   const presetsDir = join(root, 'presets');
   for (const name of opts.presets === false ? [] : await yamlFiles(presetsDir)) {
@@ -76,6 +137,23 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
     } catch (error) {
       problems.push((error as Error).message);
     }
+  }
+
+  const extensionsDir = join(root, 'registry', 'extensions');
+  for (const name of await yamlFiles(extensionsDir)) {
+    try {
+      const model = parseExtensionModel(await readFile(join(extensionsDir, name), 'utf8'), `registry/extensions/${name}`);
+      if (extensionModels.has(model.id)) problems.push(`registry/extensions/${name}: duplicate extension model id "${model.id}"`);
+      extensionModels.set(model.id, model);
+    } catch (error) {
+      problems.push((error as Error).message);
+    }
+  }
+  try {
+    extensions = parseExtensionsConfig(await readFile(join(root, 'registry', 'extensions.yaml'), 'utf8'), 'registry/extensions.yaml');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') problems.push((error as Error).message);
+    else if (extensionModels.size > 0) problems.push('registry/extensions/ holds extension models but registry/extensions.yaml is missing');
   }
 
   const lockPath = join(root, 'registry', 'models.lock.yaml');
@@ -117,6 +195,25 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
     }
   }
 
+  for (const model of extensionModels.values()) {
+    for (const weight of model.weights) {
+      if (lock.size > 0 && !lock.has(weight)) problems.push(`extension model ${model.id}: weights "${weight}" not in lock`);
+    }
+    if (extensionTemplates.has(model.workflow)) continue;
+    try {
+      const text = await readFile(join(root, ...model.workflow.split('/')), 'utf8');
+      extensionTemplates.set(model.workflow, JSON.parse(text) as ApiWorkflow);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      problems.push(
+        code === 'ENOENT'
+          ? `extension model ${model.id}: workflow ${model.workflow} not found`
+          : `extension model ${model.id}: workflow ${model.workflow} is not valid JSON (${(error as Error).message})`,
+      );
+    }
+  }
+  problems.push(...lockExtensionProblems(lock, models, extensionModels));
+
   if (problems.length > 0) throw new LibraryError(problems);
-  return { presets, presetFiles, models, lock, templates, warnings };
+  return { presets, presetFiles, models, lock, templates, extensionModels, extensionTemplates, extensions, warnings };
 }

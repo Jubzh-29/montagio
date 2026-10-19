@@ -1,0 +1,22 @@
+# The four extensions decided on 2026-10-19, in their order of priority, and the day a
+# GPU session validated each one (null until then). Their models are in
+# registry/extensions/, apart from the camera-preset models of registry/models/.
+#
+# Cut rule (decided on 2026-10-19): an extension not validated on GPU by the evening
+# of 25/10 is hidden from the demo. The app and the local installer read
+# MONTAGIO_EXTENSIONS: unset or "validated" keeps the extensions dated below; "all",
+# "none" or a list such as "music,edit" overrides it (development, GPU sessions).
+schema: montagio/extensions@0.1
+extensions:
+  - id: music
+    priority: 1
+    gpu_validated: null
+  - id: upscale
+    priority: 2
+    gpu_validated: null
+  - id: edit
+    priority: 3
+    gpu_validated: null
+  - id: avatar
+    priority: 4
+    gpu_validated: null

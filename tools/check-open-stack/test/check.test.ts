@@ -69,6 +69,49 @@ test('a workflow loading a file that is not a declared weight of its model fails
   );
 });
 
+test('a workflow of an extension may load only the weights of its own model', async () => {
+  const clean = (path: string) => readFileSync(join(fixture('clean'), path), 'utf8');
+  const root = scratchRepo({
+    'presets/crash-push.yaml': clean('presets/crash-push.yaml'),
+    'registry/models/wan-fun-camera.yaml': clean('registry/models/wan-fun-camera.yaml'),
+    'workflows/wan22-fun-camera.api.json': clean('workflows/wan22-fun-camera.api.json'),
+    'registry/models.lock.yaml':
+      clean('registry/models.lock.yaml') +
+      '  - id: ace-step15-vae\n    file: ace_1.5_vae.safetensors\n    url: https://huggingface.co/Comfy-Org/ace_step_1.5_ComfyUI_files\n' +
+      '    license: MIT\n    source: https://huggingface.co/ACE-Step/Ace-Step1.5\n    extension: music\n',
+    'registry/extensions.yaml':
+      'schema: montagio/extensions@0.1\nextensions:\n  - { id: music, priority: 1, gpu_validated: null }\n  - { id: upscale, priority: 2, gpu_validated: null }\n' +
+      '  - { id: edit, priority: 3, gpu_validated: null }\n  - { id: avatar, priority: 4, gpu_validated: null }\n',
+    'registry/extensions/ace-music.yaml': [
+      'schema: montagio/extension-model@0.1',
+      'id: ace-music',
+      'name: ACE-Step music',
+      'extension: music',
+      'task: t2a',
+      'license: MIT',
+      'weights: [ace-step15-vae]',
+      'workflow: workflows/ace-music.api.json',
+      'bindings:',
+      '  prompt: { node: "94", field: tags }',
+      '  duration_s: { node: "98", field: seconds }',
+      '  seed: { node: "3", field: seed }',
+      '  bpm: { node: "94", field: bpm }',
+      'output: { node: "107", kind: audio }',
+      'estimate_s: 20',
+      '',
+    ].join('\n'),
+    // loads its own VAE, and a Fun Camera file that is not one of its weights
+    'workflows/ace-music.api.json': JSON.stringify({
+      '106': { class_type: 'VAELoader', inputs: { vae_name: 'ace_1.5_vae.safetensors' } },
+      '104': { class_type: 'UNETLoader', inputs: { unet_name: 'wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors', weight_dtype: 'default' } },
+    }),
+  });
+  const r = await checkOpenStack(root);
+  expect(r.violations.filter((v) => v.rule === 'weight-file')).toEqual([
+    expect.objectContaining({ detail: expect.stringMatching(/node 104 loads "wan2\.2_fun_camera_high_noise_14B_fp8_scaled\.safetensors", which is not one of the declared weights of ace-music/) }),
+  ]);
+});
+
 test('a preset LoRA missing from the lock fails', async () => {
   const r = await checkOpenStack(fixture('dirty-lora'));
   expect(r.violations).toContainEqual(

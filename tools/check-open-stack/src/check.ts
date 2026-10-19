@@ -306,7 +306,9 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
   // model's workflow, one of that model's declared weights.
   const lockFiles = new Map(lock.map((entry) => [entry.file, entry]));
   const allowedFilesFor = (workflowPath: string): { files: Set<string>; owner: string } => {
-    const owners = library ? [...library.models.values()].filter((model) => model.workflow === workflowPath) : [];
+    const owners = library
+      ? [...library.models.values(), ...library.extensionModels.values()].filter((model) => model.workflow === workflowPath)
+      : [];
     if (owners.length === 0) return { files: new Set(lockFiles.keys()), owner: 'any lock entry' };
     const ids = new Set(owners.flatMap((model) => model.weights));
     return {
