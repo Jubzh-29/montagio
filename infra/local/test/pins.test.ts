@@ -64,6 +64,26 @@ test('parseExtensionsConfig reads registry/extensions.yaml as @montagio/registry
   expect(readExtensions(repoRoot).map((e) => e.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale']);
 });
 
+describe('requires: an inline list, as registry/extensions.yaml keeps it', () => {
+  const config = (requires: string) =>
+    ['schema: montagio/extensions@0.1', 'extensions:', '  - id: edit', '    priority: 1', '  - id: transitions', '    priority: 3', requires, '    gpu_validated: null', ''].join('\n');
+
+  test.each([
+    ['    requires: []', []],
+    ['    requires: [edit]', ['edit']],
+    ['    requires: [ edit, music ]  # both', ['edit', 'music']],
+  ])('%s', (requires, ids) => {
+    expect(parseExtensionsConfig(config(requires))[1]?.requires).toEqual(ids);
+  });
+
+  test.each([
+    ['a block list, which the flat reader would read as none', '    requires:\n      - edit'],
+    ['a bare id, which the registry refuses', '    requires: edit'],
+  ])('%s is refused', (_case, requires) => {
+    expect(() => parseExtensionsConfig(config(requires))).toThrow(/extension transitions: requires must be an inline list/);
+  });
+});
+
 test('a repository without registry/extensions.yaml has no extensions', () => {
   expect(readExtensions(join(repoRoot, 'infra'))).toEqual([]);
 });
@@ -165,7 +185,7 @@ test('an explicit nested folder wins over the URL', () => {
   expect(parseLockWeights(entry(lines))[0]?.folder).toBe('tts/chatterbox/resembleai-mtl-v3');
 });
 
-test.each(['weights/x', 'tts/../vae', '/abs'])('the folder %s is refused', (folder) => {
+test.each(['weights/x', 'tts/../vae', '/abs', 'tts/chatterbox\\..\\..\\evil', 'tts\\chatterbox','tts/a b', 'tts/c:d'])('the folder %s is refused', (folder) => {
   const lines = ['id: a', 'file: a.safetensors', `url: ${URL_VAE}`, `sha256: ${'f'.repeat(64)}`, 'size: 3', `folder: ${folder}`];
   expect(() => parseLockWeights(entry(lines))).toThrow(/lock entry a.*folder/);
 });

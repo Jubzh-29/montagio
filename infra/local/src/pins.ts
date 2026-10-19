@@ -114,8 +114,9 @@ export function parseLockWeights(text: string): LockWeight[] {
     if (!Number.isSafeInteger(size) || size <= 0) throw new Error(`lock entry ${id} has an invalid size ${entry.size}`);
     let folder: string;
     if (entry.folder) {
+      // the registry's rule: "/"-separated names of letters, digits, ".", "_" and "-" (no "\", which Windows reads as a separator)
       const parts = entry.folder.split('/');
-      if (!COMFY_FOLDERS.has(parts[0]!) || parts.some((part) => part === '' || part === '.' || part === '..')) {
+      if (!COMFY_FOLDERS.has(parts[0]!) || parts.some((part) => !/^[A-Za-z0-9._-]+$/.test(part) || part === '.' || part === '..')) {
         throw new Error(`lock entry ${id}: folder "${entry.folder}" is not a path under a ComfyUI models/ folder`);
       }
       folder = entry.folder;
@@ -148,17 +149,22 @@ export function parseExtensionsConfig(text: string): ExtensionPin[] {
     if (item) entries.push({ [item[1]!]: scalar(item[2]!) });
     else if (field && entries.length > 0) entries.at(-1)![field[1]!] = scalar(field[2]!);
   }
-  return entries.map((entry) => ({
-    id: entry.id ?? '?',
-    priority: Number(entry.priority),
-    // an inline list: "[edit]", "[edit, music]"
-    requires: (entry.requires ?? '')
-      .replace(/^\[|\]$/g, '')
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean),
-    gpuValidated: !entry.gpu_validated || entry.gpu_validated === 'null' ? null : entry.gpu_validated,
-  }));
+  return entries.map((entry) => {
+    const id = entry.id ?? '?';
+    // an inline list: "[edit]", "[edit, music]"; this reader would see a block list (`requires:`
+    // then `- edit` lines) as no requirement at all, so anything else is refused
+    const inline = /^\[(.*)\]$/.exec(entry.requires ?? '[]');
+    if (!inline) throw new Error(`registry/extensions.yaml: extension ${id}: requires must be an inline list such as [edit], not "${entry.requires}"`);
+    return {
+      id,
+      priority: Number(entry.priority),
+      requires: inline[1]!
+        .split(',')
+        .map((required) => required.trim())
+        .filter(Boolean),
+      gpuValidated: !entry.gpu_validated || entry.gpu_validated === 'null' ? null : entry.gpu_validated,
+    };
+  });
 }
 
 /** The extensions of the repository; none when it has no registry/extensions.yaml. */
