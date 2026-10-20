@@ -2,7 +2,7 @@ import { validatePreset } from '@montagio/presets/browser';
 import type { ShowcaseData } from '@montagio/showcase/data';
 import { galleryOrder } from '@/lib/gallery-order';
 import { MAX_PRESET_YAML_BYTES } from '@/lib/limits';
-import type { GenerationRecord, PresetSummary, SequenceSummary, ShowcaseInfo } from '@/lib/api-types';
+import type { ExtensionsInfo, GenerationRecord, PresetSummary, SequenceSummary, ShowcaseInfo } from '@/lib/api-types';
 import { filmTags } from './montage-args';
 import { MontageError, type Montage, type MontageStage } from './types';
 import { BASE_PATH, urlsFor } from './urls';
@@ -65,6 +65,12 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     } catch {
       return {};
     }
+  }
+
+  /** The text-to-image estimate of the core model, as the server gives it. */
+  function extensionsInfo(): ExtensionsInfo {
+    const t2i = data.models.find((model) => model.id === 'z-image-turbo')?.estimate_s['720p'] ?? 12;
+    return { extensions: [], effects: [], hooks: [], estimates: { t2i } };
   }
 
   function presetSummaries(): PresetSummary[] {
@@ -221,6 +227,8 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     }
     if (method === 'POST' && resource === 'presets' && id === 'validate') return validate(await body(init));
     if (method === 'GET' && resource === 'models') return json(data.models);
+    // No extension has a pre-generated example yet (they come with the GPU session S3): none is shown.
+    if (method === 'GET' && resource === 'extensions' && !id) return json(extensionsInfo());
     if (method === 'GET' && resource === 'open-stack') return json(data.openStack);
     if (method === 'GET' && resource === 'showcase' && !id) return json(info());
     if (method === 'POST' && resource === 'showcase' && id === 'preload') {

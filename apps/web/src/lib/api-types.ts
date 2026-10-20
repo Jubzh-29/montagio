@@ -83,3 +83,37 @@ export type ShowcaseInfo = {
   placeholders: boolean;
   repoUrl: string | null;
 };
+
+/** The six extensions, as registry/extensions.yaml names them. */
+export type ExtensionId = 'edit' | 'effects' | 'transitions' | 'avatar' | 'music' | 'upscale';
+
+/** A one-photo effect of the wall (GET /api/extensions). */
+export type EffectSummary = {
+  id: string;
+  name: string;
+  description: string;
+  /** Absent while the effect has no preview file yet. */
+  previewUrl?: string;
+  estimate_s: number;
+  /** The longest "what the photo shows" the effects model takes. */
+  subjectMax: number;
+};
+
+/** A keyframe hook of the wall: an edit makes its end frame, then a transition. */
+export type HookSummary = {
+  id: string;
+  name: string;
+  description: string;
+  previewUrl?: string;
+  estimate_s: number;
+  /** 2: the hook needs a second photo (an outfit). */
+  references: 1 | 2;
+};
+
+/** What the Studio may show: the extensions the flag and the GPU dates allow, and the time estimates. */
+export type ExtensionsInfo = {
+  extensions: ExtensionId[];
+  effects: EffectSummary[];
+  hooks: HookSummary[];
+  estimates: { t2i: number; edit?: number };
+};

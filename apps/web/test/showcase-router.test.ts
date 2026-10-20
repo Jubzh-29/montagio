@@ -299,3 +299,10 @@ test('an unreadable data.json answers 503 and is retried', async () => {
   expect(second.status).toBe(200);
   expect(attempts).toBe(2);
 });
+
+test('the showcase shows no extension before the GPU session', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  const { status, json } = await call(router, 'GET', '/api/extensions');
+  expect(status).toBe(200);
+  expect(json).toEqual({ extensions: [], effects: [], hooks: [], estimates: { t2i: 12 } });
+});
