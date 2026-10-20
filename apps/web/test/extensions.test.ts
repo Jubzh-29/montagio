@@ -69,9 +69,9 @@ test('unset flag: nothing is dated yet, nothing is shown', async () => {
   expect(await info()).toEqual({ extensions: [], effects: [], hooks: [], estimates: { t2i: 12 } });
 });
 
-test('all shows the six extensions, every effect and every hook', async () => {
+test('all shows the seven extensions, every effect and every hook', async () => {
   process.env.MONTAGIO_EXTENSIONS = 'all';
-  expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale']);
+  expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion']);
   expect(await visibleEffects()).toHaveLength(6);
   expect(await visibleHooks()).toHaveLength(4);
 });
@@ -105,7 +105,7 @@ test('a rejected extension disappears until the process restarts, and so does on
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   process.env.MONTAGIO_EXTENSIONS = 'all';
   markRejected('edit', 'ComfyUI rejected the workflow');
-  expect(await visibleExtensions()).toEqual(['effects', 'avatar', 'music', 'upscale']);
+  expect(await visibleExtensions()).toEqual(['effects', 'avatar', 'music', 'upscale', 'motion']);
   expect(await visibleHooks()).toEqual([]);
   resetRejectedForTests();
   expect(await visibleExtensions()).toContain('transitions');
