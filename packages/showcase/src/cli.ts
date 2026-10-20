@@ -4,7 +4,7 @@
  *
  *   npm run showcase -- verify [--strict]
  *   npm run showcase -- ingest <smoke results folder> --sample <id> [--pick <preset>=<run> ...]
- *   npm run showcase -- ingest --examples <smoke results folder> --sample <id> [--pick <job>=<run> ...]
+ *   npm run showcase -- ingest --examples <smoke results folder> --sample <id>
  *   npm run showcase -- prepare [--strict] [--out <dir>] [--repo-url <url>]
  *
  * Exit code: 0 when everything is fine, 1 on an error, 2 on a usage error.
@@ -21,7 +21,7 @@ const USAGE = [
   'Usage:',
   '  showcase verify [--strict]',
   '  showcase ingest <smoke results folder> --sample <id> [--pick <preset>=<run> ...]',
-  '  showcase ingest --examples <smoke results folder> --sample <id> [--pick <job>=<run> ...]   (job: effect:<id> or transition:<hook>)',
+  '  showcase ingest --examples <smoke results folder> --sample <id>   (one smoke folder per call)',
   '  showcase prepare [--strict] [--out <dir>] [--repo-url <url>]',
 ].join('\n');
 
@@ -70,13 +70,17 @@ async function ingest(args: string[], io: CliIo): Promise<number> {
     io.err(USAGE);
     return 2;
   }
-  // An example's job names its effect, or its hook's transition: effect:squish, transition:iris-dive.
-  const pickPattern = values.examples ? /^((?:effect|transition):[a-z0-9-]+)=(\d+)$/ : /^([a-z0-9-]+)=(\d+)$/;
+  // smoke.ts numbers every extension record run 1: two tries of an example live in two folders,
+  // and the one to keep is the folder ingested, so --pick has nothing to choose among.
+  if (values.examples && (values.pick ?? []).length > 0) {
+    io.err('--pick does not apply to --examples: use one --out folder per smoke call, and ingest the folder of the try to keep');
+    return 2;
+  }
   const picks: Record<string, number> = {};
   for (const pick of values.pick ?? []) {
-    const match = pickPattern.exec(pick);
+    const match = /^([a-z0-9-]+)=(\d+)$/.exec(pick);
     if (!match) {
-      io.err(values.examples ? `--pick ${pick}: expected <job>=<run>, e.g. --pick effect:squish=2` : `--pick ${pick}: expected <preset>=<run>, e.g. --pick crash-push=2`);
+      io.err(`--pick ${pick}: expected <preset>=<run>, e.g. --pick crash-push=2`);
       return 2;
     }
     picks[match[1]!] = Number(match[2]);

@@ -236,7 +236,8 @@ export async function ingestExamples(
       if (matches.length === 1) chosen.push({ kind, id, record: matches[0]! });
       else problems.push(`${job}: ${matches.length === 0 ? `no run ${pick}` : `run ${pick} appears ${matches.length} times (use one --out folder per smoke call)`}:\n${listing}`);
     } else if (runs.length > 1) {
-      problems.push(`${job}: ${runs.length} successful runs, choose one with --pick ${job}=<run>:\n${listing}`);
+      // Every extension record is run 1, and the folder holds one workflow per job: two calls shared it.
+      problems.push(`${job}: ${runs.length} successful runs in one folder; use one --out folder per smoke call and ingest the one to keep:\n${listing}`);
     } else {
       chosen.push({ kind, id, record: runs[0]! });
     }

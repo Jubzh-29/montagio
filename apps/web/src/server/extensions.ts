@@ -1,6 +1,7 @@
 import type { EffectPreset, Library, TransitionPreset } from '@montagio/presets';
 import { enabledExtensions, type ExtensionId, type ExtensionModel } from '@montagio/registry';
 import type { EffectSummary, ExtensionsInfo, HookSummary } from '@/lib/api-types';
+import { EFFECT_ORDER, HOOK_ORDER, wallOrder } from '@/lib/wall-order';
 import { getEnv } from './env';
 import { JobError } from './errors';
 import { presetPreviewUrl } from './gallery';
@@ -13,8 +14,6 @@ const T2I_MODEL = 'z-image-turbo';
 const T2I_FALLBACK_S = 12;
 
 /** The wall's order: the most adopted effect first, then the spectacular ones; others follow. */
-const EFFECT_ORDER = ['squish', 'explode', 'cakeify', 'snap-zoom', 'frozen-moment', 'full-circle'];
-const HOOK_ORDER = ['iris-dive', 'wardrobe-swap', 'figurine', 'ignite'];
 
 // Extensions ComfyUI refused (a node or a file missing), for the life of this process,
 // shared by every route bundle like the services.
@@ -54,22 +53,17 @@ export async function visibleExtensions(): Promise<ExtensionId[]> {
   return enabled.filter((id) => shown.has(id));
 }
 
-function ordered<T extends { id: string }>(items: T[], order: string[]): T[] {
-  const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
-  return [...items].sort((a, b) => rank(a.id) - rank(b.id));
-}
-
 /** A preset shows once a GPU session dated it, or always with MONTAGIO_EXTENSIONS=all. */
 const dated = (preset: { gpu_validated: string | null }) => preset.gpu_validated !== null || showsEverything();
 
 export async function visibleEffects(): Promise<EffectPreset[]> {
   if (!(await visibleExtensions()).includes('effects')) return [];
-  return ordered([...(await getServices().library).effects.values()].filter(dated), EFFECT_ORDER);
+  return wallOrder([...(await getServices().library).effects.values()].filter(dated), EFFECT_ORDER);
 }
 
 export async function visibleHooks(): Promise<TransitionPreset[]> {
   if (!(await visibleExtensions()).includes('transitions')) return [];
-  return ordered([...(await getServices().library).hooks.values()].filter(dated), HOOK_ORDER);
+  return wallOrder([...(await getServices().library).hooks.values()].filter(dated), HOOK_ORDER);
 }
 
 export function estimateFor(model: ExtensionModel, fast: boolean): number {
