@@ -24,9 +24,10 @@ export function ChoiceCard({
   previewUrl?: string;
   poses?: string[];
   speed?: number;
-  icon: 'camera' | 'effect' | 'hook';
+  icon: 'camera' | 'effect' | 'hook' | 'avatar';
   paused: boolean;
-  onChange: () => void;
+  /** Brings the wall back; absent on a tab without a wall (Avatar). */
+  onChange?: () => void;
 }) {
   const { t } = useI18n();
   const video = useRef<HTMLVideoElement>(null);
@@ -47,7 +48,7 @@ export function ChoiceCard({
           <MoveGlyph poses={poses} speed={speed} />
         ) : (
           <span className={styles.choiceIcon} aria-hidden="true">
-            {icon === 'hook' ? '◎' : '✦'}
+            {icon === 'hook' ? '◎' : icon === 'avatar' ? '◉' : '✦'}
           </span>
         )}
         <span id="choice-name" className={styles.choiceName}>
@@ -56,9 +57,11 @@ export function ChoiceCard({
       </div>
       <div className={styles.choiceMeta}>
         <span>{kindLabel}</span>
-        <button type="button" className={styles.buttonGhost} onClick={onChange}>
-          {t('choiceChange')}
-        </button>
+        {onChange && (
+          <button type="button" className={styles.buttonGhost} onClick={onChange}>
+            {t('choiceChange')}
+          </button>
+        )}
       </div>
     </section>
   );

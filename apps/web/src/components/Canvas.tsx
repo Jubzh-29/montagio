@@ -25,9 +25,11 @@ export function Canvas({
   recent?: ReactNode;
 }) {
   const { t } = useI18n();
+  // A tab without a wall (Avatar) shows the monitor: the photo, then the render.
+  const shown = view === 'gallery' && !gallery ? 'result' : view;
   return (
     <section className={styles.stage} aria-label={t('monitor')}>
-      {view !== 'atelier' && (
+      {view !== 'atelier' && gallery && (
         <div className={styles.canvasViews} role="group" aria-label={t('canvasViews')}>
           {(['gallery', 'result'] as const).map((value) => (
             <button key={value} type="button" className={styles.mode} aria-pressed={view === value} onClick={() => onView(value)}>
@@ -36,9 +38,9 @@ export function Canvas({
           ))}
         </div>
       )}
-      {view === 'gallery' && <div className={styles.canvasGallery}>{gallery}</div>}
+      {shown === 'gallery' && <div className={styles.canvasGallery}>{gallery}</div>}
       {/* Kept mounted out of view: a render in progress keeps its monitor, its focus and its live region. */}
-      <div className={styles.canvasResult} hidden={view !== 'result'}>
+      <div className={styles.canvasResult} hidden={shown !== 'result'}>
         {result}
         {recent}
       </div>

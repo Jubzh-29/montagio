@@ -43,6 +43,11 @@ test('a tab whose screen is not built yet stays hidden, whatever the extensions 
   expect([...READY_TABS].every((tab) => TAB_ORDER.includes(tab))).toBe(true);
 });
 
+test('the Avatar tab is built: it shows with its extension', () => {
+  expect(READY_TABS.has('avatar')).toBe(true);
+  expect(visibleTabs({ ...none, extensions: ['avatar'] })).toEqual(['camera', 'film', 'avatar']);
+});
+
 test('the Effects tab is built: one shown effect opens it by default', () => {
   expect(READY_TABS.has('effects')).toBe(true);
   expect(visibleTabs({ ...none, extensions: ['effects'], effects: [effect] })).toEqual(['effects', 'camera', 'film']);

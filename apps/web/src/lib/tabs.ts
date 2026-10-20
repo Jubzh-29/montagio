@@ -8,7 +8,7 @@ export const TAB_ORDER: readonly Tab[] = ['effects', 'camera', 'film', 'avatar']
  * The tabs whose screen exists in this build: a tab the extensions allow but whose screen
  * is not built yet stays hidden, so a lot cut short shows nothing half-wired.
  */
-export const READY_TABS: ReadonlySet<Tab> = new Set<Tab>(['effects', 'camera', 'film']);
+export const READY_TABS: ReadonlySet<Tab> = new Set<Tab>(['effects', 'camera', 'film', 'avatar']);
 
 /** Hooks join the Effects wall once their two-step render (edit, then transition) is wired. */
 export const HOOKS_READY = true;

@@ -24,6 +24,7 @@ import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/sho
 import { useMotionPaused } from '@/lib/use-motion';
 import { needsConsent } from '@/lib/consent';
 import { defaultSubject, pickWallChoice } from '@/lib/effect-choice';
+import { estimateSpeech } from '@/lib/speech';
 import { nextView, tabEvent, type CanvasEvent, type CanvasState, type ShownTab } from '@/lib/studio-view';
 import { HOOKS_READY, pickTab, tabHref, visibleTabs } from '@/lib/tabs';
 import { refreshExtensions, useExtensions } from '@/lib/use-extensions';
@@ -33,6 +34,7 @@ import { Canvas } from './Canvas';
 import { ChoiceCard } from './ChoiceCard';
 import { Composer } from './Composer';
 import { ConsentCheck } from './ConsentCheck';
+import { AvatarFields } from './AvatarFields';
 import { EffectFields } from './EffectFields';
 import { OutfitSource } from './OutfitSource';
 import { EffectWall } from './EffectWall';
@@ -141,6 +143,9 @@ export function Studio() {
   // The Effects tab: the effect chosen on the wall, what the photo shows, and the consent box.
   const [effectId, setEffectId] = useState<string | null>(null);
   const [outfit, setOutfit] = useState<UploadState>({ status: 'idle' });
+  // The Avatar tab: what the photo says, and in which language.
+  const [speechText, setSpeechText] = useState('');
+  const [speechLanguage, setSpeechLanguage] = useState<'en' | 'fr'>('en');
   const [subject, setSubject] = useState('');
   const [consent, setConsent] = useState(false);
   // History: the latest creations under the result, and the item a "Reuse" link brings back (?from=).
@@ -360,7 +365,10 @@ export function Studio() {
   const selectedEffect = wallChoice?.kind === 'effect' ? wallChoice.item : undefined;
   const selectedHook = wallChoice?.kind === 'hook' ? wallChoice.item : undefined;
   const needsOutfit = selectedHook?.references === 2;
-  const askConsent = tab === 'effects' && needsConsent(upload, selectedHook ? 'hook' : 'effect', needsOutfit ? outfit : undefined);
+  const askConsent =
+    tab === 'effects'
+      ? needsConsent(upload, selectedHook ? 'hook' : 'effect', needsOutfit ? outfit : undefined)
+      : tab === 'avatar' && needsConsent(upload, 'avatar');
   // A photo made from a text says what it shows (state adjusted while rendering, when that photo changes).
   const [subjectFor, setSubjectFor] = useState(photoPrompt);
   if (subjectFor !== photoPrompt) {
@@ -376,7 +384,9 @@ export function Studio() {
   }
 
   const ready = upload.status === 'ready' && modelId !== null && !busy;
-  const canGenerate = tab === 'effects'
+  const canGenerate = tab === 'avatar'
+    ? upload.status === 'ready' && !busy && speechText.trim().length > 0 && (!askConsent || consent)
+    : tab === 'effects'
     ? upload.status === 'ready' && !busy && wallChoice !== undefined && (!askConsent || consent) && (!needsOutfit || outfit.status === 'ready')
     : remix
     ? ready && remix.text.trim().length > 0
@@ -445,6 +455,10 @@ export function Studio() {
     if (back.shots) setShots(back.shots);
     if (back.effectId) setEffectId(back.effectId);
     if (back.hookId) setEffectId(back.hookId);
+    if (back.speech) {
+      setSpeechText(back.speech.text);
+      setSpeechLanguage(back.speech.language);
+    }
     setCanvas({ view: 'gallery', before: 'gallery' });
     if (back.remixGenerationId && back.presetId) {
       void openRemix(back.presetId, `/api/generations/${encodeURIComponent(back.remixGenerationId)}/preset`, back.remixGenerationId);
@@ -569,6 +583,11 @@ export function Studio() {
     followJob.current = true;
     moveCanvas('generate');
     const userPrompt = prompt.trim() || undefined;
+    if (tab === 'avatar') {
+      const body = { imageRef: upload.imageRef, text: speechText.trim(), language: speechLanguage, ...(askConsent ? { consent } : {}) };
+      void submit('job', body, undefined, '/api/avatars');
+      return;
+    }
     if (tab === 'effects') {
       if (selectedHook) {
         const image2 = needsOutfit && outfit.status === 'ready' ? { image2Ref: outfit.imageRef } : {};
@@ -653,7 +672,12 @@ export function Studio() {
         : undefined;
 
   const selectedModel = models.find((model) => model.id === modelId);
-  const estimate = tab === 'effects' ? (wallChoice?.item.estimate_s ?? 0) : (selectedModel?.estimate_s['480p'] ?? 0);
+  const estimate =
+    tab === 'avatar'
+      ? (extensions?.estimates.avatar ?? 0)
+      : tab === 'effects'
+        ? (wallChoice?.item.estimate_s ?? 0)
+        : (selectedModel?.estimate_s['480p'] ?? 0);
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
   const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
@@ -677,7 +701,7 @@ export function Studio() {
       ? t(tracked?.kind === 'sequence' ? 'announceFilmReady' : 'announceClipReady')
       : '';
   // The empty monitor plays the move in hand: the preset being remixed, the chosen one, or the last shot added.
-  const moveId = tab === 'effects' ? undefined : remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
+  const moveId = tab === 'effects' || tab === 'avatar' ? undefined : remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
   const movePreset = presets.find((preset) => preset.id === moveId);
   const move = movePreset && {
     id: mode === 'sequence' ? `${shots.length}-${movePreset.id}` : movePreset.id,
@@ -685,16 +709,18 @@ export function Studio() {
     speed: movePreset.speed,
   };
   // The slate under the monitor: the take about to be shot, even once a photo hides the viewfinder.
-  const slateMove = tab === 'effects' ? wallChoice?.item.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  const slateMove = tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoice?.item.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
   const slate = slateMove && [
     slateMove,
-    tab !== 'effects' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
+    tab !== 'effects' && tab !== 'avatar' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
     t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
   ].filter(Boolean);
 
   const wallItemOfResult = tracked?.kind === 'job' ? [...effects, ...hooks].find((item) => item.id === tracked.record.label.itemId) : undefined;
   const resultModel: { name: string; license: string } | undefined = wallItemOfResult
     ? { name: wallItemOfResult.modelName, license: wallItemOfResult.license }
+    : tracked?.kind === 'job' && tracked.record.task === 'avatar'
+      ? extensions?.avatarModel
     : tracked?.kind === 'generation'
       ? models.find((model) => model.id === tracked.record.modelId)
       : tracked?.kind === 'sequence'
@@ -720,7 +746,14 @@ export function Studio() {
         <Composer
           label={t('composerLabel')}
           choice={
-            tab === 'effects' ? (
+            tab === 'avatar' ? (
+              <ChoiceCard
+                name={t('tabAvatar')}
+                kindLabel={t('avatarKind', { s: estimateSpeech(speechText, speechLanguage) })}
+                icon="avatar"
+                paused={motionPaused}
+              />
+            ) : tab === 'effects' ? (
               wallChoice ? (
                 <ChoiceCard
                   name={wallChoice.item.name}
@@ -788,7 +821,9 @@ export function Studio() {
             </>
           }
           fields={
-            tab === 'effects' ? (
+            tab === 'avatar' ? (
+              <AvatarFields text={speechText} language={speechLanguage} max={300} onText={setSpeechText} onLanguage={setSpeechLanguage} />
+            ) : tab === 'effects' ? (
               selectedEffect ? (
                 <EffectFields subject={subject} max={selectedEffect.subjectMax} onSubject={setSubject} />
               ) : needsOutfit ? (
@@ -887,7 +922,7 @@ export function Studio() {
           }
           onView={(value) => setCanvas({ view: value, before: value })}
           gallery={
-            tab === 'effects' ? (
+            tab === 'avatar' ? null : tab === 'effects' ? (
               <EffectWall
                 effects={effects}
                 hooks={hooks}
