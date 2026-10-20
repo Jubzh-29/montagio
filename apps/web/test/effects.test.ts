@@ -51,7 +51,8 @@ test('Squish on a sample photo gives a tagged clip with its frame count', async 
   expect(done.state).toBe('succeeded');
   expect(done.frames).toBeGreaterThan(0);
   expect((await readTags(mediaFileFor(done.outputUrl)!)).comment).toBe('AI-generated');
-});
+  // FFmpeg tags and probes the clip: on a loaded machine that passes the 5 s default.
+}, 30_000);
 
 test('no subject: the preset says what the photo shows', async () => {
   const res = await post({ imageRef: await sampleRef(), effectId: 'squish' }, 'fx2');

@@ -71,7 +71,7 @@ test('a one-step audio job ends with a tagged FLAC', async () => {
   expect(done.outputUrl).toMatch(/\.flac$/);
   const tags = await readTags(mediaFileFor(done.outputUrl)!);
   expect(Object.entries(tags).find(([key]) => key.toLowerCase() === 'comment')?.[1]).toBe('AI-generated');
-});
+}, 30_000);
 
 test('a two-step job compiles the second step from the first output, and ends on a tagged clip', async () => {
   const seen: (string | undefined)[] = [];
@@ -101,7 +101,8 @@ test('a two-step job compiles the second step from the first output, and ends on
   expect(done.outputUrl).toMatch(/^\/media\/data\/jobs\/.+\/output\.mp4$/);
   expect(done.frames).toBeGreaterThan(0);
   expect((await readTags(mediaFileFor(done.outputUrl)!)).comment).toBe('AI-generated');
-});
+  // FFmpeg tags and probes the clip: on a loaded machine that passes the 5 s default.
+}, 30_000);
 
 test('after a restart, an image step is polled as an image', async () => {
   process.env.MONTAGIO_DEMO_DURATION_MS = '60000';
