@@ -7,8 +7,9 @@ Le 19/10, l'utilisateur a choisi d'ajouter à Montagio quatre extensions (musiqu
 4. **Avatar parlant** : Wan 2.2 S2V et sa voix Chatterbox, gardés à la validation du plan révisé.
 5. **Musique des films** (ACE-Step 1.5), mixée sous le film 16:9 et sa coupe 9:16.
 6. **Upscale HD** (SeedVR2) : sans lien avec la viralité, plusieurs minutes par clip, c'est le premier candidat à la coupe.
+7. **Transfert de mouvement** (Wan2.2-Animate-2 distillé), ajouté le 20/10 en dernière priorité : la photo d'un personnage et une courte vidéo de référence donnent ce personnage qui reproduit le mouvement. Moteur seulement ; partie 9.
 
-Hors périmètre : le transfert de mouvement (Wan-Animate, SCAIL-2), reporté après le concours ; le selfie avec une célébrité, exclu ; les LoRA publiées seulement sur Civitai et la série Redmond (CC0-1.0, hors de la règle Apache ou MIT), exclues.
+Hors périmètre : le transfert de mouvement complet (remplacer une personne dans sa propre vidéo, « Objects swap », SCAIL-2), reporté après le concours ; le selfie avec une célébrité, exclu ; les LoRA publiées seulement sur Civitai et la série Redmond (CC0-1.0, hors de la règle Apache ou MIT), exclues.
 
 Cette analyse suit la méthode de [S1_ANALYSE.md](S1_ANALYSE.md). Aucun poids n'a été téléchargé et rien n'a été rendu. Les seuls accès réseau sont les pages et l'API de Hugging Face, GitHub (sources, templates, licences) et PyPI. Les recherches détaillées, avec chaque source datée, sont dans le dossier de travail de la session ; les faits qui portent une décision sont repris ici.
 
@@ -187,7 +188,7 @@ Tailles et sha256 lus dans l'API Hugging Face (`paths-info`, sha256 = `lfs.oid`)
 
 L'avatar, les effets et les transitions réutilisent aussi `umt5-xxl-fp8` et `wan21-vae`, déjà au lock pour les presets (même sha256) et donc sans marque `extension`. Les LoRA posées à la racine de leur dépôt portent `folder: loras` au lock, pour que l'installeur sache où les ranger.
 
-Édition : 31,9 Go (le bf16, 40,9 Go, n'est pas retenu). Effets : 20,6 Go. Transitions : 31,0 Go. Avatar : 18,25 Go, plus la voix, 3,2 Go, dans le dossier `models/tts/chatterbox/resembleai-mtl-v3` que le lock nomme (`folder:`). Musique : 10,0 Go. Upscale : 3,96 Go. Au total, le lock compte 43 fichiers et 188,6 Go (175,7 Gio), dont 69,7 Go pour les presets ; `fetch-weights --lock-from-hf` en redonne un patch vide.
+Édition : 31,9 Go (le bf16, 40,9 Go, n'est pas retenu). Effets : 20,6 Go. Transitions : 31,0 Go. Avatar : 18,25 Go, plus la voix, 3,2 Go, dans le dossier `models/tts/chatterbox/resembleai-mtl-v3` que le lock nomme (`folder:`). Musique : 10,0 Go. Upscale : 3,96 Go. Mouvement : 16,65 Go, un seul fichier ; `clip_vision_h` y figure une seconde fois (`clip-vision-h-motion`), le même fichier, téléchargé une fois. Au total, le lock compte 45 entrées, 44 fichiers et 205,3 Go (191,2 Gio), dont 69,7 Go pour les presets ; `fetch-weights --lock-from-hf` en redonne un patch vide.
 
 Le tokenizer de la voix est un petit fichier que Hugging Face garde hors LFS : l'API ne publie que son identifiant git (SHA-1). Son sha256 a été calculé sur le fichier (70 Ko, pas un poids). Le lock porte les deux ; `fetch-weights` compare l'identifiant git avant le téléchargement, puis le sha256 après.
 
@@ -257,6 +258,7 @@ Pour la règle du 25/10 au soir, il suffit de dater `gpu_validated` des extensio
 | 4. Avatar | **risquée** | la LoRA 4 étapes, faite pour le texte vers vidéo et pas pour S2V (perte de dynamique, pas de guidage audio à cfg 1), sans laquelle il faut une heure pour 15 s ; la vidéo ne part pas de la photo ; le français, non documenté ; la voix, un node tiers patché, `torchaudio` 2.11 sur torch 2.14.1, une voix intégrée anglaise ; 16 fps |
 | 5. Musique | **prête** | des voix malgré `[Instrumental]` ; la qualité d'un morceau de 10 s coupé à 5 ; un LM lent sans vLLM ; un VAE fp16 qui sature |
 | 6. Upscale HD | **prête, premier candidat à la coupe** | aucun lien avec la viralité ; ≈ 6 à 9 min pour 10 s ; une sur-netteté sur des clips IA, que le README de SeedVR2 signale (à comparer à un simple lanczos) ; des coutures entre morceaux ; l'int8 lent sur le repli cu128 ; 10 à 18 Go de RAM hôte |
+| 7. Mouvement | **risquée** | des nodes expérimentaux (`WanAnimate2ToVideo`, `WanAnimate2Cache`) ; la VRAM, ≈ 21 Go ; le cadrage : la photo et la vidéo sont recadrées au centre au même format, et un gros plan contre un plan large est la première cause d'échec selon le template ; aucune mesure publique sur RTX 4090 ; 16,65 Go à télécharger |
 
 Aucune extension n'est « à couper » sans GPU : licences acceptées (celle des effets avec une preuve faible, écrite), nodes du cœur (sauf la voix), workflows validés par un vrai ComfyUI (sauf la voix), et chacune tient en 24 Go sur le papier. La règle du 25/10 tranchera sur les mesures de la S2 et de la S3 ; si la S2 déborde, l'upscale sort en premier.
 
@@ -271,6 +273,7 @@ Dans l'ordre de priorité. Les commandes sont dans [S2_CHECKLIST.md](S2_CHECKLIS
 5. **Avatar** : LoRA 4 étapes contre 20 étapes (synchronisation des lèvres, temps) ; `ImageFromBatch.batch_index` 1, 3 ou 4 ; anglais et français ; `ref_motion` = la photo ; coutures à 5 et 10 s ; pic de VRAM.
 6. **Musique**, en fond : temps et VRAM pour 10 et 60 s, juste après un rendu Wan 14B ; aucune voix ; un film de 5 s mixé.
 7. **Upscale**, s'il reste du temps : pic de VRAM et temps pour 81 images ; coutures ; comparaison avec un simple lanczos.
+8. **Mouvement**, en dernier : deux personnages et deux vidéos de référence ; identité gardée, mouvement suivi (les mains), pas de scintillement ; un cadrage discordant pour voir l'échec ; pic de VRAM, RAM, temps ; le cache des poses sur CPU puis sur GPU.
 
 En S3 (24-25/10) : les repasses sans distillation, les hooks Figurine et Ignite, Earth Zoom Out en cinq images clés si le temps le permet, puis les clips de la galerie et de la démo.
 
@@ -331,3 +334,50 @@ Codes d'erreur stables, comme l'existant : `extension-disabled`, `invalid-input`
 - Le mode local contre le faux proxy, qui rend déjà une sortie audio pour `SaveAudio*` et image pour `SaveImage*` (tâche 1).
 - Un test du drapeau : avec `MONTAGIO_EXTENSIONS=none`, aucun bouton d'extension.
 - Un seul run complet, à la fin (PC limité).
+
+## 9. Transfert de mouvement (7e extension, 20/10)
+
+Décidé par l'utilisateur le 20/10 : « ajoute quand même le transfert de mouvement minimal (Wan2.2-Animate) en 7e extension, dernière priorité et soumise à la règle de coupe ». Périmètre de la v0.1 : la photo d'un personnage (fictif de préférence) et une vidéo de référence de 5 s au plus donnent ce personnage qui reproduit le mouvement. Hors périmètre : remplacer une personne dans sa propre vidéo, « Objects swap ». Moteur seulement : rien dans `apps/web/src/components`.
+
+### Le nœud retenu : Wan2.2-Animate-2 distillé
+
+| | Animate v1 (`WanAnimateToVideo`) | **Animate-2 distillé** (`WanAnimate2ToVideo`) | SCAIL-2 (`WanSCAILToVideo`) |
+|---|---|---|---|
+| Template officiel | `video_wan2_2_14B_animate` | `video_wan_animate2_distilled` | `video_wan21_scail2_character_replacement` |
+| Nodes | custom nodes : `comfyui_controlnet_aux` (DWPose), `comfyui-kjnodes`, `ComfyUI-segment-anything-2` | **tous du cœur** | tous du cœur |
+| Vidéo de référence | squelettes DWPose et visage dessiné | **la vidéo brute** | la vidéo brute, plus des masques SAM 3.1 exigés même en animation |
+| Poids du template | modèle et LoRA chez `Kijai/WanVideo_comfy*` | un dépôt Comfy-Org, Apache-2.0 | SAM 3.1 (licence Meta, refusée), VAE et LoRA de Kijai |
+| Verdict | écarté | **retenu** | écarté |
+
+Les trois nœuds sont marqués expérimentaux dans ComfyUI v0.41.0. Le template distillé (même fichier à `59a3b48b` et sur `main`) n'a ni extracteur de pose, ni masque, ni LoRA : 10 étapes, cfg 1, lcm, shift 5, une fenêtre de 81 images, soit 5 s à 16 fps, exactement le périmètre. Le template non distillé (6 étapes) demande la LoRA lightx2v que `Comfy-Org/Wan-Animate-2` copie octet pour octet de Kijai : écarté. Le distillé ne sait pas boucler au-delà d'une fenêtre sans copies du sous-graphe à la main ; la v0.1 n'en a pas besoin.
+
+### Licence et poids
+
+- Source : [Wan-AI/Wan2.2-Animate-2-14B](https://huggingface.co/Wan-AI/Wan2.2-Animate-2-14B) (`6e8f1973`), Apache-2.0, **sans** le paragraphe d'usage des autres cartes Wan ; pas de LICENSE sur Hugging Face, le texte Apache-2.0 est sur GitHub `Wan-Video/Wan-Animate-2`. Données d'entraînement non décrites.
+- Miroir : `Comfy-Org/Wan-Animate-2` (`e7181fe1`), Apache-2.0 en carte. Seul le modèle distillé en int8 entre au lock : `wan_animate_2_distill_int8_convrot.safetensors`, 16 653 175 528 octets, sha256 `d2e566ec…`. La VAE du template (`Wan2_1_VAE_bf16`, identique au fichier de Kijai) est remplacée par la `wan_2.1_vae` du lock, la même VAE de Wan 2.1.
+- `umt5-xxl-fp8` et `wan21-vae` sont ceux des presets ; `clip_vision_h` est au lock deux fois, une entrée par extension (`clip-vision-h` pour les effets, `clip-vision-h-motion` ici), le même fichier, que l'installeur trouve déjà là quand les deux sont demandées.
+- Les deux dépôts sont dans `tools/check-open-stack/allowed-sources.yaml`.
+
+### Le workflow et le contrat
+
+- `workflows/wan-animate2-motion.api.json` : le chemin actif du template, aplati (ids internes du sous-graphe gardés). Écarts : la VAE du lock ; `WanAnimate2Cache` sur **cpu** (le template dit gpu, sa note conseille cpu contre les pics de VRAM sur 24 Go) ; `CreateVideo` à 16 fps **sans le son** de la vidéo de référence (il peut s'agir d'une musique que l'utilisateur n'a pas le droit de partager) ; la taille suit l'aspect de la vidéo (480×832, 832×480 ou 640×640), la photo y est recadrée au centre.
+- `prepareMotionClip(input, output)` (`@montagio/sequence`) : garde les 5 premières secondes à 16 fps (aucun node du cœur ne baisse la cadence), sans son, en H.264 ; rend durée, images, largeur et hauteur.
+- `compileMotion(model, template, { imageRef, videoRef, video_s, aspect, seed, character?, motion? })` (`@montagio/presets`) : 4n+1 images couvrant le clip, 81 au plus (5 s → 81, 3 s → 49, 1 s → 17) ; une vidéo de moins de 1 s ou de plus de 5 s est refusée (`CompileError`) ; deux textes, le personnage (prompt principal) et le mouvement (prompt des poses), avec des valeurs par défaut.
+- Registre : extension `motion`, priorité 7, tâche `motion-transfer`, modèle `registry/extensions/wan-animate2-motion.yaml`. Smoke : `--extension motion --input <photo> --motion <vidéo>`.
+
+### VRAM et temps
+
+Modèle int8 : 15,5 Gio, plus `clip_vision_h` (1,2 Gio) ; l'encodeur umt5 est déchargé après l'encodage. Deux branches (la vidéo générée et celle des poses) à 480×832 et 81 images : ≈ 3 à 4 Gio d'activations, soit ≈ 21 Go avec le cache des poses en RAM (≈ 6 Go en int8). **Tient de justesse.** Temps estimé : 3 à 5 min pour 5 s ; aucune mesure publique sur RTX 4090.
+
+### Verdict : risquée
+
+Nodes expérimentaux, VRAM juste, qualité non mesurée, et un cadrage photo/vidéo qui doit concorder. Dernière priorité : si la S2 n'a pas le temps de la valider, la règle de coupe la masque le 25/10 au soir.
+
+### Mini-plan d'interface (pour la session du Studio unifié)
+
+- **Écran** : un onglet « Mouvement » (affiché seulement si l'extension est visible) : la photo du personnage (celle du Studio ou une autre), la vidéo de référence (5 s au plus, avec un aperçu et la durée gardée), deux champs facultatifs, « À quoi ressemble le personnage » et « Ce qu'il fait », et la durée estimée.
+- **Garde-fou retenu par l'utilisateur le 20/10** : une case obligatoire, « J'ai les droits sur cette vidéo et sur cette photo » ; sans elle, le serveur refuse le job (400 `rights-required`). La mention « AI-generated » reste.
+- **Route** : `POST /api/motion` (`imageRef`, `videoRef`, `character?`, `motion?`, `rights: true`) : le serveur prépare la vidéo (`prepareMotionClip`), lit sa durée et son aspect, compile (`compileMotion`) et envoie les deux fichiers ; un job du moteur de jobs, comme les effets. Codes : `extension-disabled`, `rights-required`, `invalid-input` (vidéo trop courte, sans image), `ffmpeg-missing`, `backend-unavailable`, `workflow-rejected`.
+- **Textes EN et FR** : `ext.motion.*`. Le libellé dit ce qui sort (« Vidéo générée par IA ») et que le son de la vidéo de référence n'est pas repris.
+- **e2e** : un parcours en mode démo (un MP4 pré-rendu), et un test de la case : sans elle, le bouton reste désactivé.
+

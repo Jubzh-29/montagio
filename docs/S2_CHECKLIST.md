@@ -1,6 +1,6 @@
 # Session GPU S2 : pas-à-pas
 
-Date prévue : 21–22/10/2026. C'est la **première session GPU** : la S1 du 18/10 a été remplacée par une analyse sans GPU ([S1_ANALYSE.md](S1_ANALYSE.md)). Durée visée : 6 h 30 à 8 h 30 de RTX 4090, dont 2 h 30 pour les extensions. Budget : environ 0,34 $/h en Community Cloud, soit 2,20 à 2,90 $ (spec §10).
+Date prévue : 21–22/10/2026. C'est la **première session GPU** : la S1 du 18/10 a été remplacée par une analyse sans GPU ([S1_ANALYSE.md](S1_ANALYSE.md)). Durée visée : 7 h 30 à 10 h de RTX 4090, dont 3 h 30 à 4 h pour les extensions (le transfert de mouvement compris). Budget : environ 0,34 $/h en Community Cloud, soit 2,55 à 3,40 $ (spec §10).
 
 **Objet :**
 - premier rendu réel ;
@@ -38,7 +38,7 @@ Tout ce qui sort de la session va dans `s1-results/`. Le nom est resté celui de
 | 4. Télécharger les poids | 28 à 70 min | oui |
 | 5. Premiers rendus et mesures | 45 min | oui |
 | 6. Vérifications et réglage des presets | 2 à 3 h | oui |
-| 6.8 Les extensions | ≈ 2 h 30 | oui |
+| 6.8 Les extensions | ≈ 3 h 30 à 4 h | oui |
 | 7. Rassembler, télécharger, éteindre | 15 min | jusqu'à l'arrêt |
 
 ## 0. La veille, sur votre PC (sans GPU)
@@ -65,7 +65,7 @@ Tout ce qui sort de la session va dans `s1-results/`. Le nom est resté celui de
 4. Template : **Runpod PyTorch**, le plus récent.
 5. **Edit Template** :
    - Container Disk : 40 Go ;
-   - Volume Disk : **300 Go**, monté sur `/workspace` : 189 Go de poids (70 Go pour les presets, 119 Go pour les extensions), 15 Go de PyTorch et d'outils, les sorties et la marge ; **350 Go** si vous prévoyez aussi l'essai de l'installeur local (encadré de la partie 7), qui télécharge sa propre copie des 70 Go des presets ;
+   - Volume Disk : **300 Go**, monté sur `/workspace` : 206 Go de poids (70 Go pour les presets, 136 Go pour les extensions), 15 Go de PyTorch et d'outils, les sorties et la marge ; **350 Go** si vous prévoyez aussi l'essai de l'installeur local (encadré de la partie 7), qui télécharge sa propre copie des 70 Go des presets ;
    - Expose HTTP Ports : `8888` et **`8188`** ;
    - aucune variable d'environnement contenant une clé.
 6. **On-Demand**, pas Spot. Notez l'heure de démarrage.
@@ -118,7 +118,7 @@ npm run weights -w @montagio/infra-runpod -- --dry-run
 npm run weights -w @montagio/infra-runpod -- --models-dir /workspace/ComfyUI/models
 ```
 
-- Le `--dry-run` affiche les 43 fichiers, soit 188,6 Go (175,7 Gio) : les 9 des presets (69,7 Go) et les 34 des extensions (édition 31,9 Go, effets 20,6 Go, transitions 31,0 Go, avatar et sa voix 21,5 Go, musique 10,0 Go, upscale 4,0 Go), avec leur dossier ComfyUI et leur URL exacte. Les fichiers de la voix vont dans `tts/chatterbox/resembleai-mtl-v3/`, les LoRA dans `loras/`. Pour ne prendre que les presets : `--extensions none`. Une ligne `the file changed upstream` signifie que Hugging Face sert un autre fichier que celui du lock : **arrêtez-vous** et notez-la.
+- Le `--dry-run` affiche les 45 entrées du lock, soit 44 fichiers et 205,3 Go (191,2 Gio) : les 9 des presets (69,7 Go) et ceux des extensions (édition 31,9 Go, effets 20,6 Go, transitions 31,0 Go, avatar et sa voix 21,5 Go, musique 10,0 Go, upscale 4,0 Go, mouvement 16,7 Go ; `clip_vision_h` y figure deux fois et n'est téléchargé qu'une fois), avec leur dossier ComfyUI et leur URL exacte. Les fichiers de la voix vont dans `tts/chatterbox/resembleai-mtl-v3/`, les LoRA dans `loras/`. Pour ne prendre que les presets : `--extensions none`. Une ligne `the file changed upstream` signifie que Hugging Face sert un autre fichier que celui du lock : **arrêtez-vous** et notez-la.
 - Chaque ligne du vrai lancement doit finir par `(matches Hugging Face)`. Le sha256 est aussi comparé à celui du lock.
 - À noter : le débit (Mo/s) et la durée totale.
 - Le lock est déjà exact : `s1-results/models.lock.patch` doit être vide.
@@ -190,7 +190,7 @@ Si c'est adopté, le plan suivant ajoutera :
 ### 6.7 Rotations
 Faites un rendu de `roll_cw` à 0,3 avec `--camera-pose "ClockWise (CW)" --camera-speed 0.3`. Décidez ensuite d'un preset « Dutch », ou non.
 
-### 6.8 Les extensions (≈ 2 h 30)
+### 6.8 Les extensions (≈ 3 h 30 à 4 h)
 
 Dans l'ordre de priorité réorienté. Le détail de ce qu'il faut regarder est dans [EXTENSIONS_ANALYSE.md](EXTENSIONS_ANALYSE.md), partie 7. Chaque commande note temps, VRAM et sortie dans `s1-results/smoke.jsonl`, et range la sortie dans `s1-results/clips/`. Il faut `ffprobe` pour l'avatar : `apt-get install -y ffmpeg`. Groupez les jobs par modèle : chaque changement de famille recharge des poids. Préparez trois photos dont vous avez les droits : une personne de face (`/workspace/person.png`), un animal (`animal.png`), un objet (`object.png`), plus une tenue sur fond neutre (`outfit.png`).
 
@@ -237,8 +237,14 @@ Dans l'ordre de priorité réorienté. Le détail de ce qu'il faut regarder est 
    npm run smoke -w @montagio/infra-runpod -- --extension upscale --clip s1-results/clips/<un clip 720p>.mp4
    ```
    Comparez au même clip agrandi par FFmpeg (`ffmpeg -i clip.mp4 -vf scale=1920:1080:flags=lanczos lanczos.mp4`) : la netteté est-elle meilleure, ou artificielle ? Regardez les coutures entre morceaux (toutes les 33 images). Pour comparer la correction de couleur, changez `color_correction_method` du node 59 (`lab`, `wavelet`, `none`) dans `s1-results/workflows/ext-upscale__seedvr2-upscale.api.json`, chargé dans l'interface.
-8. **Fixture de la voix** : `curl -s http://127.0.0.1:8188/object_info/ChatterboxMTLTTS > s1-results/object_info-chatterbox.json`. De retour sur le PC, elle remplace l'entrée écrite à la main dans `infra/runpod/test/fixtures/object_info-v0.41.0.json`.
-9. **Décision** : pour chaque extension qui donne un résultat montrable, notez-la dans la fiche (partie 8). De retour sur le PC, sa date ira dans `gpu_validated` de `registry/extensions.yaml` ; une extension non datée le 25/10 au soir est masquée de la démo. Les repasses sans distillation, les hooks Figurine et Ignite, et Earth Zoom Out en cinq images clés (si le temps le permet) sont pour la S3 (24–25/10).
+8. **Transfert de mouvement** (≈ 1 h à 1 h 30, en dernier) : deux vidéos de référence dont vous avez les droits (une danse de 5 s, un geste de 3 s, cadrées en pied) et deux personnages, un fictif (`/workspace/character.png`, une figurine, un personnage dessiné ou une image du texte → image) et `/workspace/person.png`.
+   ```bash
+   npm run smoke -w @montagio/infra-runpod -- --extension motion --input /workspace/character.png --motion /workspace/dance.mp4 --text "motion=the character dances energetically"
+   npm run smoke -w @montagio/infra-runpod -- --extension motion --input /workspace/person.png --motion /workspace/gesture.mp4
+   ```
+   La vidéo est d'abord préparée (5 s au plus, 16 fps, sans son) dans `s1-results/inputs/`. Regardez : l'identité gardée (visage, vêtements), le mouvement suivi (les mains), le scintillement, le pic de VRAM et la RAM de l'hôte (le cache des poses est sur le CPU). Puis un cadrage discordant (un portrait serré contre une vidéo en pied) pour voir l'échec que le template annonce. Si le temps le permet, comparez dans l'interface le cache sur GPU (node 594, `device` gpu). Un échec n'est pas grave : l'extension est la dernière, la règle de coupe la masquera.
+9. **Fixture de la voix** : `curl -s http://127.0.0.1:8188/object_info/ChatterboxMTLTTS > s1-results/object_info-chatterbox.json`. De retour sur le PC, elle remplace l'entrée écrite à la main dans `infra/runpod/test/fixtures/object_info-v0.41.0.json`.
+10. **Décision** : pour chaque extension qui donne un résultat montrable, notez-la dans la fiche (partie 8). De retour sur le PC, sa date ira dans `gpu_validated` de `registry/extensions.yaml` ; une extension non datée le 25/10 au soir est masquée de la démo. Les repasses sans distillation, les hooks Figurine et Ignite, et Earth Zoom Out en cinq images clés (si le temps le permet) sont pour la S3 (24–25/10).
 
 > **Le Studio en mode local sur le pod.** Une fois le proxy lancé :
 > ```bash
@@ -309,6 +315,7 @@ Extensions (validée oui / non, temps, VRAM max, remarque) :
   Avatar 5 s ____ s, 10 s ____ s, VRAM ____ Mo, lèvres : __________, LoRA gardée oui / non
   Musique 10 s ____ s, 60 s ____ s, VRAM ____ Mo, voix entendues oui / non : __________
   Upscale 81 images ____ s, VRAM ____ Mo, mieux que lanczos oui / non, coutures : __________
+  Mouvement 5 s ____ s, VRAM ____ Mo, RAM ____ Go, identité gardée oui / non, mouvement suivi oui / non, cache cpu / gpu : __________
 ```
 
 ## 9. De retour sur le PC
