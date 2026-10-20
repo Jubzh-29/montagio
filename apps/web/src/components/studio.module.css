@@ -905,15 +905,26 @@
     padding: var(--space-4);
     gap: var(--space-5);
   }
-  /* On a phone the media comes first, then the setup. */
-  .stage {
-    order: -1;
+  /* On a phone the setup comes first (the wall below is long); Generate stays pinned at the bottom
+     of the screen, and starting a render moves the focus, and the page, to the monitor. */
+  .studio {
+    padding-bottom: 104px;
   }
   .panel {
     position: static;
     max-height: none;
     overflow: visible;
     padding-right: 0;
+  }
+  .panel .generateBlock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-sticky);
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg);
+    border-top: 1px solid var(--line);
   }
   .generateBlock {
     padding-block: var(--space-3);
