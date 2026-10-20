@@ -1,5 +1,8 @@
 import type { ExtensionsInfo } from '@/lib/api-types';
-import { pickTab, tabHref, TAB_ORDER, visibleTabs } from '@/lib/tabs';
+import { pickTab, READY_TABS, tabHref, TAB_ORDER, visibleTabs } from '@/lib/tabs';
+
+/** Every tab built: the target behaviour, whatever the lots shipped so far. */
+const ALL = new Set(TAB_ORDER);
 
 const none: ExtensionsInfo = { extensions: [], effects: [], hooks: [], estimates: { t2i: 12 } };
 const effect = { id: 'squish', name: 'Squish', description: '', estimate_s: 90, subjectMax: 120 };
@@ -11,14 +14,14 @@ test('without extensions, camera then film', () => {
 });
 
 test('effects comes first as soon as one effect or hook is shown', () => {
-  expect(visibleTabs({ ...none, extensions: ['effects'], effects: [effect] })).toEqual(['effects', 'camera', 'film']);
-  expect(visibleTabs({ ...none, extensions: ['edit', 'transitions'], hooks: [hook] })).toEqual(['effects', 'camera', 'film']);
+  expect(visibleTabs({ ...none, extensions: ['effects'], effects: [effect] }, ALL)).toEqual(['effects', 'camera', 'film']);
+  expect(visibleTabs({ ...none, extensions: ['edit', 'transitions'], hooks: [hook] }, ALL)).toEqual(['effects', 'camera', 'film']);
   // The extension is on but no effect is dated: nothing to show, no tab.
-  expect(visibleTabs({ ...none, extensions: ['effects'] })).toEqual(['camera', 'film']);
+  expect(visibleTabs({ ...none, extensions: ['effects'] }, ALL)).toEqual(['camera', 'film']);
 });
 
 test('avatar only when the avatar extension is shown', () => {
-  expect(visibleTabs({ ...none, extensions: ['avatar'] })).toEqual(['camera', 'film', 'avatar']);
+  expect(visibleTabs({ ...none, extensions: ['avatar'] }, ALL)).toEqual(['camera', 'film', 'avatar']);
 });
 
 test('a hidden or unknown tab in the URL falls back to the first visible one', () => {
@@ -32,4 +35,10 @@ test('a hidden or unknown tab in the URL falls back to the first visible one', (
 test('tabHref builds the query, in the order of TAB_ORDER', () => {
   expect(tabHref('camera')).toBe('/?tab=camera');
   expect(TAB_ORDER).toEqual(['effects', 'camera', 'film', 'avatar']);
+});
+
+test('a tab whose screen is not built yet stays hidden, whatever the extensions say', () => {
+  const everything = { ...none, extensions: ['effects', 'avatar'] as const, effects: [effect] };
+  expect(visibleTabs({ ...everything, extensions: [...everything.extensions] }, new Set(['camera', 'film']))).toEqual(['camera', 'film']);
+  expect([...READY_TABS].every((tab) => TAB_ORDER.includes(tab))).toBe(true);
 });

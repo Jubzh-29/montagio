@@ -5,14 +5,20 @@ export type Tab = 'effects' | 'camera' | 'film' | 'avatar';
 export const TAB_ORDER: readonly Tab[] = ['effects', 'camera', 'film', 'avatar'];
 
 /**
+ * The tabs whose screen exists in this build: a tab the extensions allow but whose screen
+ * is not built yet stays hidden, so a lot cut short shows nothing half-wired.
+ */
+export const READY_TABS: ReadonlySet<Tab> = new Set<Tab>(['camera', 'film']);
+
+/**
  * The tabs the Studio shows: Effects as soon as one effect or hook is shown (the viral
  * format opens the Studio), Camera and Film always, Avatar with its extension.
  */
-export function visibleTabs(info: ExtensionsInfo | null): Tab[] {
+export function visibleTabs(info: ExtensionsInfo | null, ready: ReadonlySet<Tab> = READY_TABS): Tab[] {
   const shown = new Set<Tab>(['camera', 'film']);
   if (info && info.effects.length + info.hooks.length > 0) shown.add('effects');
   if (info?.extensions.includes('avatar')) shown.add('avatar');
-  return TAB_ORDER.filter((tab) => shown.has(tab));
+  return TAB_ORDER.filter((tab) => shown.has(tab) && ready.has(tab));
 }
 
 /** The tab a URL asks for, if it is shown; otherwise the first shown one. */
