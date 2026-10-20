@@ -42,6 +42,9 @@ function run(tool: Tool, args: string[], opts: { failOnStderr?: boolean } = {}):
   });
 }
 
+/** Input options that open a local file and nothing else: a URL given as the media is not fetched. */
+const LOCAL_FILE_ONLY = ['-protocol_whitelist', 'file'];
+
 export async function probe(
   media: string,
 ): Promise<{ width: number; height: number; duration_s: number; fps: number; codec: string; pixFmt: string }> {
@@ -50,7 +53,7 @@ export async function probe(
     '-select_streams', 'v:0',
     '-show_entries', 'stream=width,height,r_frame_rate,codec_name,pix_fmt:format=duration',
     '-of', 'json',
-    media,
+    ...LOCAL_FILE_ONLY, media,
   ]);
   const json = JSON.parse(out) as {
     streams?: { width?: number; height?: number; r_frame_rate?: string; codec_name?: string; pix_fmt?: string }[];
@@ -297,8 +300,10 @@ export async function normalizeClip(
 /**
  * The reference clip of a motion transfer, as Wan2.2-Animate-2 takes it: its first `max_s`
  * seconds (5 by default) at `fps` (16; no ComfyUI core node lowers a frame rate), without sound
- * (the user's clip may carry music they cannot share), in H.264 with even dimensions. A file
- * without a video stream fails before any encoding. Returns what compileMotion needs.
+ * (the user's clip may carry music they cannot share), in H.264 with even dimensions, and
+ * without its metadata (a phone writes where it filmed; the AI mention is put on the render).
+ * `input` is read as a local file only. A file without a video stream fails before any
+ * encoding. Returns what compileMotion needs.
  */
 export async function prepareMotionClip(
   input: string,
@@ -309,8 +314,8 @@ export async function prepareMotionClip(
   await probe(input);
   await writeAtomically(out, (partial) => [
     '-loglevel', 'error', '-y',
-    '-i', input,
-    '-map', '0:v:0', '-an',
+    ...LOCAL_FILE_ONLY, '-i', input,
+    '-map', '0:v:0', '-an', '-map_metadata', '-1',
     '-t', String(max_s),
     '-vf', `fps=${fps},scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1`,
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
