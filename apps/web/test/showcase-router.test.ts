@@ -321,3 +321,18 @@ test('an extension without examples answers like the server hides it: 404 extens
     expect([path, status, json]).toEqual([path, 404, { error: 'extension-disabled' }]);
   }
 });
+
+test('the showcase history holds the clips of this visit only, newest first', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  expect((await call(router, 'GET', '/api/history')).json).toEqual([]);
+  await call(router, 'POST', '/api/generations', { presetId: 'crash-push', imageRef: 'samples/landscape-a' });
+  await call(router, 'POST', '/api/generations', { presetId: 'pan-left', imageRef: 'samples/landscape-a' });
+  const { status, json } = await call(router, 'GET', '/api/history');
+  expect(status).toBe(200);
+  const items = json as unknown as { kind: string; name: string; reprise: Record<string, unknown> }[];
+  expect(items.map((item) => item.name)).toEqual(['Pan Left', 'Crash Push']);
+  expect(items[0]).toMatchObject({ kind: 'clip', reprise: { tab: 'camera', imageRef: 'samples/landscape-a', presetId: 'pan-left' } });
+  // Another visit (a new page) starts empty.
+  const next = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  expect((await call(next, 'GET', '/api/history')).json).toEqual([]);
+});

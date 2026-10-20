@@ -156,3 +156,34 @@ export type JobSummary = {
   placeholder?: boolean;
   createdAt: string;
 };
+
+/** What it takes to make a history item again: the Studio reopens its tab with these (GET /api/history). */
+export type Reprise = {
+  tab: 'effects' | 'camera' | 'film' | 'avatar';
+  imageRef?: string;
+  /** The start photo is gone (data wiped): the reprise reopens everything but the photo. */
+  photoMissing?: true;
+  presetId?: string;
+  effectId?: string;
+  hookId?: string;
+  prompt?: string;
+  modelId?: string;
+  /** A remixed clip: the remix editor reopens on that generation's preset text. */
+  remixGenerationId?: string;
+  shots?: { presetId: string; prompt?: string }[];
+};
+
+/** One finished creation, newest first (GET /api/history). */
+export type HistoryItem = {
+  /** `${source}:${id}`, unique across the list. */
+  key: string;
+  source: 'generation' | 'sequence' | 'job';
+  kind: 'photo' | 'clip' | 'film';
+  task: 'camera' | 'film' | JobTask;
+  name: string;
+  modelName: string;
+  createdAt: string;
+  previewUrl: string;
+  downloadUrl: string;
+  reprise: Reprise;
+};
