@@ -128,3 +128,26 @@ export type ExtensionsInfo = {
   hooks: HookSummary[];
   estimates: { t2i: number; edit?: number };
 };
+
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale';
+
+/** A photo, effect or chained render (GET /api/jobs/:id). */
+export type JobSummary = {
+  id: string;
+  task: JobTask;
+  state: JobState;
+  progress: number;
+  outputUrl?: string;
+  /** An image output registered as an upload: usable as the start photo. */
+  outputImageRef?: string;
+  personal?: boolean;
+  /** An intermediate image already made (a hook's end frame), shown while the rest renders. */
+  stepImageUrl?: string;
+  label: { itemId?: string; name?: string };
+  modelId: string;
+  error?: string;
+  /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
+  workflowUrl?: string;
+  frames?: number;
+  createdAt: string;
+};

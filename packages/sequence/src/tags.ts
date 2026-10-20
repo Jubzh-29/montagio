@@ -10,6 +10,9 @@ export const AI_METADATA = {
   description: 'AI-generated video made with Montagio, an open-source camera-move studio running open-weights models.',
 } as const;
 
+/** The mention for a sound: FLAC's Vorbis comments fold a description into the comment, so it is the one tag. */
+export const AI_AUDIO_METADATA = { comment: 'AI-generated' } as const;
+
 /** The same mention for a still image (a photo made from a text, or edited). */
 export const AI_IMAGE_METADATA = {
   comment: 'AI-generated',

@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { AI_METADATA, metadataArgs, type VideoTags } from './tags';
+import { AI_AUDIO_METADATA, AI_METADATA, metadataArgs, type VideoTags } from './tags';
 
 export { AI_METADATA };
 
@@ -117,6 +117,17 @@ export async function tagClip(input: string, out: string): Promise<void> {
       '-movflags', '+faststart',
       '-f', 'mp4', partial,
     ]);
+    await rename(partial, out);
+  } finally {
+    await rm(partial, { force: true });
+  }
+}
+
+/** Copy a FLAC (music, speech) with the AI mention as its tags, without re-encoding. */
+export async function tagAudio(input: string, out: string): Promise<void> {
+  const partial = `${out}.part`;
+  try {
+    await run(ffmpeg(), ['-loglevel', 'error', '-y', '-i', input, '-map', '0:a', '-c', 'copy', ...metadataArgs(AI_AUDIO_METADATA), '-f', 'flac', partial]);
     await rename(partial, out);
   } finally {
     await rm(partial, { force: true });
