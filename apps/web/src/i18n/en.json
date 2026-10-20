@@ -184,6 +184,8 @@
   "musicDownloadVertical": "9:16 with music",
   "hdAction": "HD 1080p (~{s} s)",
   "hdDownload": "Download in HD",
+  "showcaseT2iNote": "These images were pre-generated with {model} ({license}). Run Montagio locally to write your own text.",
+  "showcaseT2iPick": "The texts of the sample photos",
   "effectSubject": "What the photo shows (optional)",
   "effectSubjectPlaceholder": "a golden retriever",
   "historyTitle": "History",

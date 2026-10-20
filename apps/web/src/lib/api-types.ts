@@ -86,6 +86,8 @@ export type SampleSummary = {
   imageRef: `samples/${string}`;
   url: string;
   placeholder: boolean;
+  /** The text the photo was made from (Z-Image-Turbo), offered by the showcase's Text to image. */
+  prompt?: string;
 };
 
 /** What the static showcase offers (GET /api/showcase, answered in the page). */
@@ -115,6 +117,8 @@ export type EffectSummary = {
   /** The model that renders it and its license, for the caption under the clip. */
   modelName: string;
   license: string;
+  /** Showcase: the sample photos it has an example for. */
+  samples?: string[];
 };
 
 /** A keyframe hook of the wall: an edit makes its end frame, then a transition. */
@@ -126,6 +130,8 @@ export type HookSummary = {
   estimate_s: number;
   /** 2: the hook needs a second photo (an outfit). */
   references: 1 | 2;
+  /** Showcase: the sample photos it has an example for. */
+  samples?: string[];
   /** The transition model, for the caption under the clip. */
   modelName: string;
   license: string;

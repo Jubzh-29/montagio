@@ -167,6 +167,7 @@ export async function prepareShowcase(
       id: preset.id,
       name: preset.name,
       description: preset.description,
+      modelId: preset.models.preferred,
       modelName: model?.name ?? preset.models.preferred,
       license: model?.license ?? '',
       examples: exampleUrls.get(`${kind}:${preset.id}`) ?? [],

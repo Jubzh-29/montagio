@@ -1,4 +1,4 @@
-import { defaultSubject, pickWallChoice, wallFilter } from '@/lib/effect-choice';
+import { defaultSubject, forSample, pickWallChoice, wallFilter } from '@/lib/effect-choice';
 
 test('the subject takes the creation text, cut on a word', () => {
   expect(defaultSubject('a red fox in a snowy forest at dawn', 20)).toBe('a red fox in a snowy');
@@ -27,4 +27,10 @@ test('the wall choice is the tile picked, else the first effect, else the first 
   expect(pickWallChoice(effects, hooks, 'gone')).toEqual({ kind: 'effect', item: effects[0] });
   expect(pickWallChoice([], hooks, null)).toEqual({ kind: 'hook', item: hooks[0] });
   expect(pickWallChoice([], [], null)).toBeUndefined();
+});
+
+test('in the showcase, the wall offers on a photo only what has an example for it', () => {
+  const items = [{ id: 'squish', samples: ['a', 'b'] }, { id: 'explode', samples: ['b'] }, { id: 'local' }];
+  expect(forSample(items, 'a').map((item) => item.id)).toEqual(['squish', 'local']);
+  expect(forSample(items, null).map((item) => item.id)).toEqual(['squish', 'explode', 'local']);
 });

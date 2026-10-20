@@ -8,6 +8,7 @@ export type ShowcaseExampleItem = {
   id: string;
   name: string;
   description: string;
+  modelId: string;
   modelName: string;
   license: string;
   examples: { sample: string; url: string; workflowUrl: string }[];

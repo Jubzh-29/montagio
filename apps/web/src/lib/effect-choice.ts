@@ -39,3 +39,8 @@ export function pickWallChoice<E extends { id: string }, H extends { id: string 
   if (effects[0]) return { kind: 'effect', item: effects[0] };
   return hooks[0] ? { kind: 'hook', item: hooks[0] } : undefined;
 }
+
+/** In the showcase, what the wall offers on a sample photo: the effects and hooks with an example for it (all of them before a photo is picked). */
+export function forSample<T extends { samples?: string[] }>(items: T[], sampleId: string | null): T[] {
+  return sampleId === null ? items : items.filter((item) => !item.samples || item.samples.includes(sampleId));
+}

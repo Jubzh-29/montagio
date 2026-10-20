@@ -204,3 +204,39 @@ test('/history/ loads directly, with nothing outside its origin', async ({ page 
   await expect(page.getByText('Your creations will show here.')).toBeVisible();
   expect(problems()).toEqual([]);
 });
+
+/** The showcase's data.json as the GPU session would leave it: Squish rendered on the first sample (its clip stands in). */
+async function withSquishExample(page: Page) {
+  await page.route('**/showcase/data.json', async (route) => {
+    const response = await route.fetch();
+    const data = (await response.json()) as Record<string, unknown>;
+    const squish = {
+      id: 'squish',
+      name: 'Squish',
+      description: 'The subject gets squished.',
+      modelId: 'wan21-i2v-effects',
+      modelName: 'Wan 2.1 I2V 480p (effects)',
+      license: 'Apache-2.0',
+      examples: [{ sample: 'landscape-a', url: 'clips/pan-left--landscape-a.mp4', workflowUrl: 'workflows/pan-left--landscape-a.json' }],
+    };
+    return route.fulfill({ response, json: { ...data, effects: [squish], hooks: [] } });
+  });
+}
+
+test('an effect example plays on its sample photo, and only there', async ({ page }) => {
+  const problems = watchRequests(page);
+  await withSquishExample(page);
+  await page.goto('/');
+  await arrival(page);
+  await page.getByRole('link', { name: 'Effects', exact: true }).click();
+  await page.getByRole('button', { name: 'Squish' }).click();
+  await page.getByRole('button', { name: /^(Show clip|Generate)/ }).click();
+  await expect(result(page)).toHaveAttribute('src', /\/showcase\/clips\/pan-left--landscape-a\.mp4$/);
+  await expect(page.getByTestId('ai-caption').or(page.getByTestId('result-caption'))).toBeVisible();
+  // Another sample photo has no example: the wall offers nothing there.
+  await page.getByRole('button', { name: 'Other sample photo' }).click();
+  await page.getByRole('button', { name: /Placeholder portrait A/ }).click();
+  await showGallery(page);
+  await expect(page.getByRole('button', { name: 'Squish' })).toHaveCount(0);
+  expect(problems()).toEqual([]);
+});

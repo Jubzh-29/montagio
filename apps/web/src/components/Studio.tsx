@@ -23,7 +23,8 @@ import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { useMotionPaused } from '@/lib/use-motion';
 import { needsConsent } from '@/lib/consent';
-import { defaultSubject, pickWallChoice } from '@/lib/effect-choice';
+import { defaultSubject, forSample, pickWallChoice } from '@/lib/effect-choice';
+import { showcaseTexts } from '@/lib/showcase-t2i';
 import { canUpscale } from '@/lib/hd';
 import { estimateSpeech } from '@/lib/speech';
 import { nextView, tabEvent, type CanvasEvent, type CanvasState, type ShownTab } from '@/lib/studio-view';
@@ -38,6 +39,7 @@ import { ConsentCheck } from './ConsentCheck';
 import { AvatarFields } from './AvatarFields';
 import { HdPanel } from './HdPanel';
 import { MusicPanel } from './MusicPanel';
+import { ShowcaseTextAtelier } from './ShowcaseTextAtelier';
 import { EffectFields } from './EffectFields';
 import { OutfitSource } from './OutfitSource';
 import { EffectWall } from './EffectWall';
@@ -361,8 +363,12 @@ export function Studio() {
     else setShots((current) => (current.length < MAX_SHOTS ? [...current, { presetId: id, prompt: '' }] : current));
   };
 
-  const effects = extensions?.effects ?? [];
-  const hooks = HOOKS_READY ? (extensions?.hooks ?? []) : [];
+  const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
+  // In the showcase the wall offers on a sample photo only what was rendered on it.
+  const effects = IS_SHOWCASE ? forSample(extensions?.effects ?? [], selectedSample) : (extensions?.effects ?? []);
+  const hooks = HOOKS_READY ? (IS_SHOWCASE ? forSample(extensions?.hooks ?? [], selectedSample) : (extensions?.hooks ?? [])) : [];
+  // The showcase's Text to image: the texts its final sample photos were made from.
+  const sampleTexts = IS_SHOWCASE ? showcaseTexts(showcase?.samples ?? []) : [];
   // The wall's choice: an effect, or a hook (an edit, then a transition); a two-reference hook needs its outfit.
   const wallChoice = pickWallChoice(effects, hooks, effectId);
   const selectedEffect = wallChoice?.kind === 'effect' ? wallChoice.item : undefined;
@@ -683,7 +689,6 @@ export function Studio() {
         : (selectedModel?.estimate_s['480p'] ?? 0);
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
-  const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
   const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
   const sequenceTiles: SequenceTiles = {
     shotsOf: (id) => shots.flatMap((shot, index) => (shot.presetId === id ? [index + 1] : [])),
@@ -805,7 +810,7 @@ export function Studio() {
               disabled={busy}
               onFile={onFile}
               onSample={() => void loadSample()}
-              t2i={!IS_SHOWCASE}
+              t2i={!IS_SHOWCASE || sampleTexts.length > 0}
               edit={extensions?.extensions.includes('edit') ?? false}
               onAtelier={openAtelier}
               showcase={
@@ -914,6 +919,14 @@ export function Studio() {
             ateliers.length > 0 &&
             ateliers.map((kind) => (
               <div key={kind} hidden={atelier !== kind}>
+                {IS_SHOWCASE && kind === 't2i' ? (
+                  <ShowcaseTextAtelier
+                    texts={sampleTexts}
+                    model={{ name: 'Z-Image Turbo', license: catalogModels.find((model) => model.id === 'z-image-turbo')?.license ?? 'Apache-2.0' }}
+                    onUse={(photo) => takePhoto(photo, kind)}
+                    onClose={() => closeAtelier(kind)}
+                  />
+                ) : (
                 <PhotoAtelier
                   kind={kind}
                   photo={upload}
@@ -924,6 +937,7 @@ export function Studio() {
                     catalogModels.find((model) => model.id === id)?.license ?? (extensions?.editModel?.id === id ? extensions.editModel.license : undefined)
                   }
                 />
+                )}
               </div>
             ))
           }

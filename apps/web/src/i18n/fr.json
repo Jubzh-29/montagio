@@ -184,6 +184,8 @@
   "musicDownloadVertical": "9:16 avec musique",
   "hdAction": "HD 1080p (~{s} s)",
   "hdDownload": "Télécharger en HD",
+  "showcaseT2iNote": "Ces images ont été pré-générées avec {model} ({license}). En local, écrivez votre propre texte.",
+  "showcaseT2iPick": "Les textes des photos d’exemple",
   "effectSubject": "Ce que montre la photo (facultatif)",
   "effectSubjectPlaceholder": "un golden retriever",
   "historyTitle": "Historique",
