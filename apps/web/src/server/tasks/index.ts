@@ -5,6 +5,7 @@ import { effectTask } from './effect';
 import { hookTask } from './hook';
 import { musicTask } from './music';
 import { t2iTask } from './t2i';
+import { upscaleTask } from './upscale';
 
 /** The tasks the job engine runs; each lot adds its own. */
 export const TASKS: Partial<Record<JobTask, TaskDef>> = {
@@ -14,4 +15,5 @@ export const TASKS: Partial<Record<JobTask, TaskDef>> = {
   hook: hookTask,
   avatar: avatarTask,
   music: musicTask,
+  upscale: upscaleTask,
 };

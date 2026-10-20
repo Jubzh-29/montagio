@@ -44,6 +44,8 @@ export type GenerationRecord = {
   outputUrl?: string;
   error?: string;
   remix?: boolean;
+  /** The delivered clip's frame count (HD takes 121 at most). */
+  frames?: number;
   /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
   workflowUrl?: string;
   /** A showcase clip whose camera move FFmpeg simulated, waiting for the GPU session. */
@@ -134,13 +136,15 @@ export type ExtensionsInfo = {
   extensions: ExtensionId[];
   effects: EffectSummary[];
   hooks: HookSummary[];
-  estimates: { t2i: number; edit?: number; avatar?: number; music?: number };
+  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number };
   /** The photo edit's model, for the caption under an edit (the preset catalogue does not hold it). */
   editModel?: { id: string; name: string; license: string };
   /** The avatar model, for the caption under a talking avatar. */
   avatarModel?: { id: string; name: string; license: string };
   /** The music model, for the caption under a film with music. */
   musicModel?: { id: string; name: string; license: string };
+  /** The 1080p model, and the longest clip it takes (frames): the HD action shows only up to it. */
+  upscaleModel?: { id: string; name: string; license: string; maxFrames: number };
 };
 
 export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale';

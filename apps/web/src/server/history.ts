@@ -105,6 +105,19 @@ async function fromSequence(lib: Library, record: SequenceRecord): Promise<Histo
   };
 }
 
+/** The history item of an HD clip's source, whatever made it. */
+async function parentItem(lib: Library, parent: JobRecord['parent']): Promise<HistoryItem | null> {
+  if (parent?.source === 'generation') {
+    const record = await getGeneration(parent.id).catch(() => null);
+    return record?.state === 'succeeded' && record.outputUrl ? fromGeneration(lib, record) : null;
+  }
+  if (parent?.source === 'job') {
+    const record = await jobs.read(parent.id);
+    return record?.state === 'succeeded' && record.outputUrl ? fromJob(lib, record) : null;
+  }
+  return null;
+}
+
 async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | null> {
   const base = {
     key: `job:${record.id}`,
@@ -176,8 +189,18 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
         reprise: parent?.reprise ?? { tab: 'film' },
       };
     }
+    case 'upscale': {
+      // An HD clip is a clip of its own; Reuse reopens the setup of the clip it was made from.
+      const parent = await parentItem(lib, record.parent);
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'upscale',
+        name: parent ? `${parent.name} · HD` : base.name,
+        reprise: parent?.reprise ?? { tab: 'camera' },
+      };
+    }
     default:
-      // HD joins the history with its own lot.
       return null;
   }
 }

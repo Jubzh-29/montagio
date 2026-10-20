@@ -3,7 +3,7 @@ import { access } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { IDEMPOTENCY_WINDOW_MS, isBackendError, type BackendErrorCode } from '@montagio/comfy-adapter';
 import { compileJob, CompileError, validatePreset, type Preset } from '@montagio/presets';
-import { ensureTools, tagClip } from '@montagio/sequence';
+import { ensureTools, probe, tagClip } from '@montagio/sequence';
 import { MAX_PRESET_YAML_BYTES, MAX_REQUEST_BYTES } from '@/lib/limits';
 import { getEnv } from './env';
 import { getServices } from './services';
@@ -234,11 +234,26 @@ export async function getGeneration(id: string): Promise<GenerationRecord | null
   };
   if (job.state === 'succeeded' && job.outputPath) {
     const url = await deliverClip(record.id, job.outputPath);
-    if (url) updated.outputUrl = url;
+    if (url) {
+      updated.outputUrl = url;
+      const frames = await frameCount(mediaFileFor(url));
+      if (frames !== undefined) updated.frames = frames;
+    }
   }
   if (job.state === 'failed') updated.error = job.error ?? 'failed';
   await saveRecord(updated);
   return updated;
+}
+
+/** A clip's frame count, or undefined when probe cannot read it (the HD action then stays hidden). */
+async function frameCount(file: string | null): Promise<number | undefined> {
+  if (!file) return undefined;
+  try {
+    const info = await probe(file);
+    return Math.round(info.duration_s * info.fps);
+  } catch {
+    return undefined;
+  }
 }
 
 /**

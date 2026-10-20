@@ -10,7 +10,7 @@ export function jobCreationRoute(task: JobTask, fromParams?: (params: Record<str
   return async function POST(request: Request, context?: { params: Promise<Record<string, string>> }): Promise<Response> {
     const idempotencyKey = request.headers.get('idempotency-key');
     if (!idempotencyKey) return Response.json({ error: 'missing-idempotency-key' }, { status: 400 });
-    const read = await readJsonBody(request, MAX_REQUEST_BYTES);
+    const read = await readJsonBody(request, MAX_REQUEST_BYTES, { allowEmpty: fromParams !== undefined });
     if (!read.ok) return Response.json({ error: read.reason === 'too-large' ? 'invalid-input' : 'invalid-json' }, { status: 400 });
     const sent = read.value && typeof read.value === 'object' ? (read.value as Record<string, unknown>) : {};
     // The URL's own ids win over the body's (/api/sequences/:id/music names its film).
