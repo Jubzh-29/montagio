@@ -141,8 +141,19 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
           ...(record.inputs.subject ? { prompt: String(record.inputs.subject) } : {}),
         },
       };
+    case 'hook':
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'hook',
+        reprise: {
+          tab: 'effects',
+          ...(await photo(typeof record.inputs.imageRef === 'string' ? record.inputs.imageRef : undefined)),
+          hookId: String(record.inputs.hookId),
+        },
+      };
     default:
-      // Hooks, avatars, music and HD join the history with their own lots.
+      // Avatars, music and HD join the history with their own lots.
       return null;
   }
 }
