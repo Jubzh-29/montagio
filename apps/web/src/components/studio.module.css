@@ -1584,3 +1584,79 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The Effects wall: big looping tiles, the name over the picture; the motion is the menu. */
+.wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+
+.wallTile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
+}
+
+.wallTile:hover {
+  border-color: var(--line-strong);
+}
+
+.wallTile[aria-pressed='true'] {
+  border-color: var(--rec);
+  box-shadow: 0 0 0 1px var(--rec);
+}
+
+.wallTile:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.wallVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wallIcon {
+  font-size: 2.75rem;
+  color: var(--ink-faint);
+}
+
+.wallName {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-3);
+  font-size: var(--text-l);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  text-shadow: 0 1px 10px oklch(0 0 0 / 0.7);
+}
+
+@media (max-width: 480px) {
+  .wall {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wallName {
+    font-size: var(--text-m);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallTile {
+    transition: none;
+  }
+}

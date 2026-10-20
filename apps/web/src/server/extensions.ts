@@ -98,6 +98,8 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
         ...(previewUrl ? { previewUrl } : {}),
         estimate_s: model ? estimateFor(model, preset.defaults.fast) : 0,
         subjectMax: model?.limits.max_chars ?? 120,
+        modelName: model?.name ?? preset.models.preferred,
+        license: model?.license ?? '',
       };
     }),
   );

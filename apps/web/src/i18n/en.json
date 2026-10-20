@@ -156,5 +156,12 @@
   "consentLabel": "I am the person in this photo, or I have their consent",
   "charCount": "{n}/{max}",
   "atelierClose": "Close",
-  "atelierReady": "Image ready"
+  "atelierReady": "Image ready",
+  "effectsTitle": "One-photo effects",
+  "effectsFilterAll": "All",
+  "effectsFilterEffects": "Effects",
+  "effectsFilterHooks": "Hooks",
+  "effectKind": "Effect · {s} s",
+  "effectSubject": "What the photo shows (optional)",
+  "effectSubjectPlaceholder": "a golden retriever"
 }

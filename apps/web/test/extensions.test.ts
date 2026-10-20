@@ -130,6 +130,8 @@ test('GET /api/extensions describes the wall: effects first in their order, hook
     description: expect.any(String),
     estimate_s: expect.any(Number),
     subjectMax: expect.any(Number),
+    modelName: expect.stringMatching(/Wan 2.1/),
+    license: 'Apache-2.0',
   });
   expect(body.hooks.find((hook) => hook.id === 'wardrobe-swap')?.references).toBe(2);
   expect(body.estimates).toEqual({ t2i: 12, edit: 25 });

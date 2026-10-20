@@ -108,6 +108,9 @@ export type EffectSummary = {
   estimate_s: number;
   /** The longest "what the photo shows" the effects model takes. */
   subjectMax: number;
+  /** The model that renders it and its license, for the caption under the clip. */
+  modelName: string;
+  license: string;
 };
 
 /** A keyframe hook of the wall: an edit makes its end frame, then a transition. */
@@ -149,5 +152,7 @@ export type JobSummary = {
   /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
   workflowUrl?: string;
   frames?: number;
+  /** Showcase: an example still waiting for the GPU session. */
+  placeholder?: boolean;
   createdAt: string;
 };
