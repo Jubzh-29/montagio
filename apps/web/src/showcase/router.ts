@@ -238,6 +238,10 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     if (method === 'POST' && resource === 'uploads') return refuse('showcase-upload', 403);
     // Its sample photos were made from texts in advance: the showcase creates no image.
     if (method === 'POST' && resource === 'images' && !id) return refuse('showcase-t2i', 403);
+    // No extension has an example in the showcase yet: their routes answer as the server answers a hidden one.
+    if (method === 'POST' && !id && (resource === 'edits' || resource === 'effects' || resource === 'hooks' || resource === 'avatars')) {
+      return refuse('extension-disabled', 404);
+    }
 
     if (resource === 'generations') {
       if (method === 'POST' && !id) return createGeneration(await body(init));

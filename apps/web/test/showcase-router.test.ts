@@ -313,3 +313,11 @@ test('the showcase creates no image from a text: 403 showcase-t2i', async () => 
   expect(status).toBe(403);
   expect(json).toEqual({ error: 'showcase-t2i' });
 });
+
+test('an extension without examples answers like the server hides it: 404 extension-disabled', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  for (const path of ['/api/edits', '/api/effects', '/api/hooks', '/api/avatars']) {
+    const { status, json } = await call(router, 'POST', path, {});
+    expect([path, status, json]).toEqual([path, 404, { error: 'extension-disabled' }]);
+  }
+});
