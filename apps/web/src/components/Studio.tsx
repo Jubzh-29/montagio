@@ -18,7 +18,7 @@ import {
   type ShowcaseInfo,
   type UploadResult,
 } from '@/lib/api-types';
-import { refusalMessageKey } from '@/lib/refusals';
+import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
@@ -134,7 +134,7 @@ function lostJob(job: Tracked): Job {
 }
 
 export function Studio() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   // The tab comes from the URL (?tab=), among those the extensions allow; Camera is the single shot, Film the sequence.
   const extensions = useExtensions();
   const [requestedTab, setRequestedTab] = useState<string | null>(null);
@@ -151,7 +151,9 @@ export function Studio() {
   const [outfit, setOutfit] = useState<UploadState>({ status: 'idle' });
   // The Avatar tab: what the photo says, and in which language.
   const [speechText, setSpeechText] = useState('');
-  const [speechLanguage, setSpeechLanguage] = useState<'en' | 'fr'>('en');
+  // The spoken language follows the interface's until the visitor picks one.
+  const [pickedLanguage, setSpeechLanguage] = useState<'en' | 'fr' | null>(null);
+  const speechLanguage = pickedLanguage ?? lang;
   const [subject, setSubject] = useState('');
   const [consent, setConsent] = useState(false);
   // History: the latest creations under the result, and the item a "Reuse" link brings back (?from=).
@@ -222,6 +224,12 @@ export function Studio() {
   const tracked = job.status === 'tracking' ? job : undefined;
   const view = tracked ? trackedJob(tracked) : undefined;
   const busy = job.status === 'submitting' || (view !== undefined && !TERMINAL_STATES.has(view.state));
+  // A step ComfyUI refused while the job ran (a hook's transition, an avatar after its voice): the server
+  // now hides that extension, and the Studio asks again so its button goes too.
+  const failedCode = view?.state === 'failed' ? view.error : undefined;
+  useEffect(() => {
+    if (hidesExtension(failedCode)) refreshExtensions();
+  }, [failedCode, view?.id]);
 
   // Poll the current job until it reaches a terminal state. A 404 means the
   // server lost it (data wiped, restart); 5xx and network errors are retried
@@ -537,7 +545,7 @@ export function Studio() {
       if (!res.ok) {
         const refusal = (await res.json().catch(() => null)) as Refusal | null;
         // ComfyUI refused a workflow: the server now hides that extension, and so does the Studio.
-        if (refusal?.error === 'workflow-rejected') refreshExtensions();
+        if (hidesExtension(refusal?.error)) refreshExtensions();
         if (onRefused?.(res.status, refusal)) setJob({ status: 'idle' });
         else setJob({ status: 'error', message: t(refusalMessageKey(refusal?.error)) });
         return;
@@ -849,7 +857,7 @@ export function Studio() {
               <AvatarFields text={speechText} language={speechLanguage} max={300} onText={setSpeechText} onLanguage={setSpeechLanguage} />
             ) : tab === 'effects' ? (
               selectedEffect ? (
-                <EffectFields subject={subject} max={selectedEffect.subjectMax} onSubject={setSubject} />
+                <EffectFields subject={subject} max={selectedEffect.subjectMax} onSubject={setSubject} disabled={IS_SHOWCASE} />
               ) : needsOutfit ? (
                 <OutfitSource outfit={outfit} disabled={busy} onFile={(file) => void onOutfit(file)} />
               ) : null
@@ -961,6 +969,7 @@ export function Studio() {
                 hooks={hooks}
                 selectedId={wallChoice?.item.id ?? null}
                 paused={motionPaused}
+                onPause={setMotionPaused}
                 onSelect={setEffectId}
               />
             ) : remix ? (

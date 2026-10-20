@@ -64,6 +64,8 @@ export const avatarTask: TaskDef = {
           if (!template || !speech) throw new Error(`avatar: no workflow for ${avatar.id}, or no voice`);
           const audio_s = (await probeAudio(speech))?.duration_s ?? 0;
           if (audio_s > (avatar.limits.max_duration_s ?? Infinity)) throw new JobError('speech-too-long');
+          // A voice that cannot be read counts as none: too short to animate.
+          if (audio_s < (avatar.limits.min_duration_s ?? 0) || audio_s === 0) throw new JobError('speech-too-short');
           const imageRef = String(current.inputs.imageRef);
           const { workflow, output } = compileAvatar(avatar, template, {
             imageRef,

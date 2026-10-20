@@ -88,6 +88,22 @@ test('a voice over 15 s ends in speech-too-long without submitting the avatar', 
   }
 }, 30_000);
 
+test('a voice under 1 s ends in speech-too-short without submitting the avatar', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'montagio-voice-'));
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=220:duration=0.5', '-c:a', 'flac', join(dir, 'avatar-voice.flac')]);
+  process.env.MONTAGIO_DEMO_AUDIO = dir;
+  resetServicesForTests();
+  try {
+    const { id } = (await (await post({ imageRef: await sampleRef(), text: 'Hi!', language: 'en' }, 'av-short')).json()) as JobSummary;
+    expect(await poll(id)).toMatchObject({ state: 'failed', error: 'speech-too-short' });
+    expect((await jobs.read(id))!.steps[1]!.backendJobId).toBeUndefined();
+  } finally {
+    delete process.env.MONTAGIO_DEMO_AUDIO;
+    resetServicesForTests();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, 30_000);
+
 test('text over 300 characters: 400 invalid-input', async () => {
   const res = await post({ imageRef: await sampleRef(), text: 'a'.repeat(301), language: 'en' }, 'av4');
   expect(res.status).toBe(400);

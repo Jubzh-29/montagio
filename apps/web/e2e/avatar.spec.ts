@@ -37,3 +37,11 @@ test('without the avatar extension, no Avatar tab', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Camera', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Avatar', exact: true })).toHaveCount(0);
 });
+
+test('on the French interface, the avatar speaks French by default', async ({ page }) => {
+  await page.goto(AVATAR);
+  await page.getByRole('button', { name: 'FR', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Français', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'English', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'English', exact: true })).toHaveAttribute('aria-pressed', 'true');
+});

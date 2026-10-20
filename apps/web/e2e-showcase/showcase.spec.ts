@@ -232,6 +232,9 @@ test('with an effect example, the showcase opens on it, and offers it only on it
   await expect(result(page)).toHaveAttribute('src', /\/showcase\/clips\/pan-left--landscape-a\.mp4$/);
   await expect(page.getByRole('region', { name: 'Squish' })).toBeVisible();
   await expect(page.getByTestId('result-caption')).toHaveText(/Wan 2[.]1 I2V 480p [(]effects[)]/);
+  // The example is pre-rendered: the subject field says so instead of being ignored.
+  await expect(page.getByRole('textbox', { name: /What the photo shows/ })).toBeDisabled();
+  await expect(page.getByText('What the photo shows applies when you generate locally.')).toBeVisible();
   // Another sample photo has no example: the wall offers nothing there.
   await page.getByRole('button', { name: 'Other sample photo' }).click();
   await page.getByRole('button', { name: /Placeholder portrait A/ }).click();

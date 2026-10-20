@@ -412,6 +412,7 @@ const STATUS: Record<JobError['code'], number> = {
   'unknown-image': 400,
   'ffmpeg-missing': 503,
   'speech-too-long': 400,
+  'speech-too-short': 400,
 };
 
 /** The HTTP answer for a known failure of a job route, or null for an unexpected error. */

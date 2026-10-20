@@ -1,11 +1,8 @@
 'use client';
 
 import { useI18n } from '@/i18n';
-import { estimateSpeech } from '@/lib/speech';
+import { estimateSpeech, speechHint } from '@/lib/speech';
 import styles from './studio.module.css';
-
-/** The longest speech the avatar model animates, in seconds. */
-export const AVATAR_MAX_S = 15;
 
 /** Each spoken language by its own name: the header's EN | FR is the interface's language, not the avatar's. */
 const LANGUAGES = [
@@ -29,6 +26,7 @@ export function AvatarFields({
 }) {
   const { t } = useI18n();
   const seconds = estimateSpeech(text, language);
+  const hint = speechHint(seconds);
   return (
     <div className={styles.panelSection}>
       <label htmlFor="avatar-text" className={styles.sectionTitle}>
@@ -57,9 +55,9 @@ export function AvatarFields({
       <p id="avatar-duration" className={styles.hint}>
         {t('avatarDuration', { s: seconds })}
       </p>
-      {seconds > AVATAR_MAX_S && (
+      {hint && (
         <p className={styles.hint} role="status">
-          {t('avatarTooLongHint')}
+          {t(hint === 'too-long' ? 'avatarTooLongHint' : 'avatarTooShortHint')}
         </p>
       )}
     </div>

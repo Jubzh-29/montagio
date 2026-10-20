@@ -49,12 +49,15 @@ export function EffectWall({
   hooks,
   selectedId,
   paused,
+  onPause,
   onSelect,
 }: {
   effects: EffectSummary[];
   hooks: HookSummary[];
   selectedId: string | null;
   paused: boolean;
+  /** The same pause as the Camera wall's (WCAG 2.2.2): the tiles and the choice card stop with it. */
+  onPause: (paused: boolean) => void;
   onSelect: (id: string) => void;
 }) {
   const { t } = useI18n();
@@ -62,9 +65,20 @@ export function EffectWall({
   const tiles = wallFilter(effects, hooks, hooks.length > 0 ? filter : 'effects');
   return (
     <section className={styles.panelSection} aria-labelledby="wall-title">
-      <h2 id="wall-title" className={styles.sectionTitle}>
-        {t('effectsTitle')}
-      </h2>
+      <div className={styles.sectionHead}>
+        <h2 id="wall-title" className={styles.sectionTitle}>
+          {t('effectsTitle')}
+        </h2>
+        <button
+          type="button"
+          className={styles.toolButton}
+          aria-label={paused ? t('motionPlayLabel') : t('motionPauseLabel')}
+          onClick={() => onPause(!paused)}
+        >
+          <span className={styles.motionIcon} data-paused={paused} aria-hidden="true" />
+          {paused ? t('motionPlay') : t('motionPause')}
+        </button>
+      </div>
       {hooks.length > 0 && (
         <div className={styles.canvasViews} role="group" aria-label={t('effectsTitle')}>
           {(

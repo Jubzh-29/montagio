@@ -79,3 +79,37 @@ test('the filter shows hooks only', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Iris Dive' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Squish' })).toHaveCount(0);
 });
+
+test('a hook ComfyUI refuses at its second step takes the hooks away', async ({ page }) => {
+  let rejected = false;
+  // The edit ran; the transition's workflow is refused while the job advances (a missing node or file).
+  await page.route('**/api/jobs/*', async (route) => {
+    const response = await route.fetch();
+    const job = (await response.json()) as Record<string, unknown>;
+    rejected = true;
+    return route.fulfill({ response, json: { ...job, state: 'failed', error: 'workflow-rejected' } });
+  });
+  await page.route('**/api/extensions', async (route) => {
+    const response = await route.fetch();
+    const info = (await response.json()) as { extensions: string[] };
+    if (!rejected) return route.fulfill({ response });
+    return route.fulfill({ response, json: { ...info, extensions: info.extensions.filter((id) => id !== 'transitions'), hooks: [] } });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Iris Dive' }).click();
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.getByRole('alert').filter({ hasText: /./ }).first()).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Iris Dive' })).toHaveCount(0);
+});
+
+test('the Effects wall has its pause button', async ({ page }) => {
+  await page.goto('/');
+  // Its own button, in the wall: the Camera wall's one does not stop these tiles.
+  const pause = page.getByRole('region', { name: 'One-photo effects' }).getByRole('button', { name: /^(Pause|Play) previews$/ });
+  await expect(pause).toHaveCount(1);
+  const before = await pause.getAttribute('aria-label');
+  await pause.click();
+  await expect(pause).not.toHaveAttribute('aria-label', before!);
+});
