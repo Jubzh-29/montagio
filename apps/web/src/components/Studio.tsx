@@ -35,6 +35,7 @@ import { ChoiceCard } from './ChoiceCard';
 import { Composer } from './Composer';
 import { ConsentCheck } from './ConsentCheck';
 import { AvatarFields } from './AvatarFields';
+import { MusicPanel } from './MusicPanel';
 import { EffectFields } from './EffectFields';
 import { OutfitSource } from './OutfitSource';
 import { EffectWall } from './EffectWall';
@@ -1061,6 +1062,14 @@ export function Studio() {
                     </a>
                   )}
                 </div>
+              )}
+              {!IS_SHOWCASE && tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && extensions?.extensions.includes('music') && (
+                <MusicPanel
+                  key={tracked.record.id}
+                  sequenceId={tracked.record.id}
+                  estimate_s={extensions.estimates.music ?? 0}
+                  {...(extensions.musicModel ? { model: extensions.musicModel } : {})}
+                />
               )}
               {/* What the showcase is, in sight whatever the monitor shows. */}
               {showcaseNote && <p className={styles.stageNote}>{showcaseNote}</p>}
