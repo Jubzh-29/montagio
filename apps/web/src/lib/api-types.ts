@@ -132,9 +132,11 @@ export type ExtensionsInfo = {
   extensions: ExtensionId[];
   effects: EffectSummary[];
   hooks: HookSummary[];
-  estimates: { t2i: number; edit?: number };
+  estimates: { t2i: number; edit?: number; avatar?: number };
   /** The photo edit's model, for the caption under an edit (the preset catalogue does not hold it). */
   editModel?: { id: string; name: string; license: string };
+  /** The avatar model, for the caption under a talking avatar. */
+  avatarModel?: { id: string; name: string; license: string };
 };
 
 export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale';
@@ -174,6 +176,8 @@ export type Reprise = {
   effectId?: string;
   hookId?: string;
   prompt?: string;
+  /** The language an avatar speaks. */
+  language?: 'en' | 'fr';
   modelId?: string;
   /** A remixed clip: the remix editor reopens on that generation's preset text. */
   remixGenerationId?: string;

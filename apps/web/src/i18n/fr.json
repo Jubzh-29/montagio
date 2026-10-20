@@ -168,6 +168,7 @@
   "hookOutfitEmpty": "La tenue à porter",
   "hookNeedsOutfit": "Ajoutez la photo de la tenue pour générer.",
   "hookEndFrame": "Image finale · Générée par IA · {model} ({license}). Le clip suit.",
+  "avatarTooLong": "La voix dure plus de 15 s, le maximum qu'un avatar anime. Raccourcissez le texte et réessayez.",
   "effectSubject": "Ce que montre la photo (facultatif)",
   "effectSubjectPlaceholder": "un golden retriever",
   "historyTitle": "Historique",

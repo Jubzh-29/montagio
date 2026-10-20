@@ -1,4 +1,4 @@
-import type { EffectPreset, TransitionPreset } from '@montagio/presets';
+import type { EffectPreset, Library, TransitionPreset } from '@montagio/presets';
 import { enabledExtensions, type ExtensionId, type ExtensionModel } from '@montagio/registry';
 import type { EffectSummary, ExtensionsInfo, HookSummary } from '@/lib/api-types';
 import { getEnv } from './env';
@@ -82,6 +82,18 @@ export async function requireExtension(id: ExtensionId): Promise<void> {
 }
 
 /** GET /api/extensions: what the Studio may show, with the wall's tiles and the time estimates. */
+/** The voice and the avatar models of the extension "avatar". */
+export function avatarModels(lib: Library): { voice: ExtensionModel; avatar: ExtensionModel } {
+  const models = [...lib.extensionModels.values()];
+  const voice = models.find((model) => model.task === 'tts');
+  const avatar = models.find((model) => model.task === 'ia2v-talk');
+  if (!voice || !avatar) throw new Error('no tts or ia2v-talk model in registry/extensions');
+  return { voice, avatar };
+}
+
+/** What a caption names of an extension model. */
+const summaryOf = (model: ExtensionModel) => ({ id: model.id, name: model.name, license: model.license });
+
 export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const lib = await getServices().library;
   const { root } = getEnv();
@@ -122,11 +134,17 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     }),
   );
   const t2i = lib.models.get(T2I_MODEL)?.estimate_s['720p'] ?? T2I_FALLBACK_S;
+  const avatar = extensions.includes('avatar') ? avatarModels(lib) : null;
   return {
     extensions,
     effects,
     hooks,
-    estimates: { t2i, ...(extensions.includes('edit') && editModel ? { edit: estimateFor(editModel, true) } : {}) },
-    ...(extensions.includes('edit') && editModel ? { editModel: { id: editModel.id, name: editModel.name, license: editModel.license } } : {}),
+    estimates: {
+      t2i,
+      ...(extensions.includes('edit') && editModel ? { edit: estimateFor(editModel, true) } : {}),
+      ...(avatar ? { avatar: estimateFor(avatar.voice, true) + estimateFor(avatar.avatar, true) } : {}),
+    },
+    ...(extensions.includes('edit') && editModel ? { editModel: summaryOf(editModel) } : {}),
+    ...(avatar ? { avatarModel: summaryOf(avatar.avatar) } : {}),
   };
 }

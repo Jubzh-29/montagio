@@ -20,6 +20,8 @@ const REFUSALS: Record<string, MessageKey> = {
   'extension-disabled': 'errorExtensionDisabled',
   'invalid-input': 'errorInvalidInput',
   'showcase-t2i': 'errorShowcaseT2i',
+  // An avatar job whose voice is over 15 s (server/tasks/avatar.ts).
+  'speech-too-long': 'avatarTooLong',
 };
 
 export function refusalMessageKey(code: string | undefined): MessageKey {

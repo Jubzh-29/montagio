@@ -1,4 +1,5 @@
 import type { JobTask, TaskDef } from '../jobs';
+import { avatarTask } from './avatar';
 import { editTask } from './edit';
 import { effectTask } from './effect';
 import { hookTask } from './hook';
@@ -10,4 +11,5 @@ export const TASKS: Partial<Record<JobTask, TaskDef>> = {
   edit: editTask,
   effect: effectTask,
   hook: hookTask,
+  avatar: avatarTask,
 };

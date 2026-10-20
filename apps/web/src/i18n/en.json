@@ -168,6 +168,7 @@
   "hookOutfitEmpty": "The outfit to wear",
   "hookNeedsOutfit": "Add the outfit photo to generate.",
   "hookEndFrame": "End frame · AI-generated · {model} ({license}). The clip follows.",
+  "avatarTooLong": "The speech came out longer than 15 s, the most an avatar animates. Shorten the text and try again.",
   "effectSubject": "What the photo shows (optional)",
   "effectSubjectPlaceholder": "a golden retriever",
   "historyTitle": "History",
