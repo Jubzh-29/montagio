@@ -710,10 +710,14 @@ export function Studio() {
   };
   // The slate under the monitor: the take about to be shot, even once a photo hides the viewfinder.
   const slateMove = tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoice?.item.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  // An avatar lasts as long as its speech: the slate says the estimate, once there is a text.
+  const speechSeconds = estimateSpeech(speechText, speechLanguage);
   const slate = slateMove && [
     slateMove,
     tab !== 'effects' && tab !== 'avatar' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
-    t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
+    tab === 'avatar'
+      ? speechSeconds > 0 && t('slateSpec', { s: speechSeconds })
+      : t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
   ].filter(Boolean);
 
   const wallItemOfResult = tracked?.kind === 'job' ? [...effects, ...hooks].find((item) => item.id === tracked.record.label.itemId) : undefined;
@@ -749,7 +753,7 @@ export function Studio() {
             tab === 'avatar' ? (
               <ChoiceCard
                 name={t('tabAvatar')}
-                kindLabel={t('avatarKind', { s: estimateSpeech(speechText, speechLanguage) })}
+                kindLabel={t('avatarKind', { s: speechSeconds })}
                 icon="avatar"
                 paused={motionPaused}
               />

@@ -9,7 +9,9 @@ test('an avatar from the sample photo: the clip and its caption', async ({ page 
   await expect(page.getByRole('button', { name: 'Gallery', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await page.getByRole('textbox', { name: 'What the photo says' }).fill('Welcome to the studio: here is what we make.');
-  await expect(page.getByText(/≈ 3 s of speech/)).toBeVisible();
+  await expect(page.getByText('≈ 2.9 s of speech', { exact: true })).toBeVisible();
+  // The slate under the monitor says how long the take may last, not a camera clip's 5 s.
+  await expect(page.getByText('480p · 2.9 s', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('ai-caption')).toHaveText(/S2V/);
