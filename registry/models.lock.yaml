@@ -382,3 +382,24 @@ weights:
     license: Apache-2.0
     source: https://huggingface.co/lightx2v/Wan2.2-Lightning
     extension: transitions
+  # Motion transfer: Wan2.2-Animate-2 distilled (10 steps, no LoRA), quantized to int8 by Comfy-Org.
+  # Apache-2.0 at the source (Wan-AI), with no added paragraph; the Comfy-Org repository also holds a
+  # lightx2v LoRA and a VAE byte-identical to Kijai's files, which Montagio does not use.
+  - id: wan-animate-2-distill-int8
+    file: wan_animate_2_distill_int8_convrot.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan-Animate-2/resolve/main/diffusion_models/wan_animate_2_distill_int8_convrot.safetensors
+    sha256: d2e566ecac3f164cb1a6b63dc7d868d6678c9affa49fbceb3abe4f9458f89c8a
+    size: 16653175528
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.2-Animate-2-14B
+    extension: motion
+  # The same file as clip-vision-h (effects), listed again for the motion transfer: a lock entry
+  # serves one extension, and the installer finds the file already there when both are asked.
+  - id: clip-vision-h-motion
+    file: clip_vision_h.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/clip_vision/clip_vision_h.safetensors
+    sha256: 64a7ef761bfccbadbaa3da77366aac4185a6c58fa5de5f589b42a65bcc21f161
+    size: 1264219396
+    license: MIT
+    source: https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K
+    extension: motion

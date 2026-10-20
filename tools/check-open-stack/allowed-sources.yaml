@@ -226,6 +226,20 @@ sources:
     license_file: false
     note: the README adds Wan's user-conduct paragraph and links a LICENSE.txt the repository does not hold; GitHub Wan-Video/Wan2.2 has the plain Apache-2.0 text
 
+  # Motion transfer: Wan2.2-Animate-2 (read on 2026-10-20).
+  - repo: Comfy-Org/Wan-Animate-2
+    license: Apache-2.0
+    role: mirror
+    revision: e7181fe1896b7f2ce34120d1a3663413548240d7
+    license_file: false
+    note: only the distilled int8 model is used; its lightx2v LoRA and Wan2_1_VAE_bf16 are byte-identical to Kijai's files and stay out of the lock
+  - repo: Wan-AI/Wan2.2-Animate-2-14B
+    license: Apache-2.0
+    role: source
+    revision: 6e8f1973bf0abc2aafd517992e8b6d88c3c46e69
+    license_file: false
+    note: the card says Apache-2.0 with no added paragraph; GitHub Wan-Video/Wan-Animate-2 holds the plain Apache-2.0 text
+
 # Never a source or a download repository, whatever a template or a tutorial fetches from it.
 denied:
   - repo: Kijai/WanVideo_comfy
