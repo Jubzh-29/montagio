@@ -1,5 +1,5 @@
 # Effects pack (extension "effects"): one photo and one named effect (squish, cake-ify,
-# explosion, crash zoom, bullet time, 360 orbit) give 5 s of 480p video at 16 fps. Each
+# explode, snap zoom, frozen moment, full circle) give 5 s of 480p video at 16 fps. Each
 # effect is a LoRA of Remade-AI trained on Wan 2.1 I2V 480p, named by a preset of
 # presets/effects/ with its trigger and prompt template. compileEffect writes the preset's
 # LoRA into node 200 and keeps or removes the 4-step LoRA of lightx2v (201).

@@ -3,15 +3,24 @@ import { loadLibrary } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
-// The project's rule: no effect, hook or preset name taken from a commercial competitor.
-test('no effect or hook carries a name taken from the competitor', async () => {
+// The project's rule: every effect and hook carries a name of its own. The list is exact, so a
+// renamed or added preset is a decision this test makes visible.
+test('the effects and hooks carry the project names, ids and display names', async () => {
   const lib = await loadLibrary(repoRoot);
-  const takenNames = ['eyes in', 'outfit morph', 'bullet time', 'crash zoom', '360 orbit'];
-  const takenIds = ['eyes-in', 'outfit-morph', 'bullet-time', 'crash-zoom-in', 'orbit-360'];
-  for (const preset of [...lib.effects.values(), ...lib.hooks.values()]) {
-    expect(takenNames).not.toContain(preset.name.toLowerCase());
-    expect(takenIds).not.toContain(preset.id);
-  }
-  expect([...lib.effects.keys()].sort()).toEqual(['cakeify', 'explode', 'frozen-moment', 'full-circle', 'snap-zoom', 'squish']);
-  expect([...lib.hooks.keys()].sort()).toEqual(['figurine', 'ignite', 'iris-dive', 'wardrobe-swap']);
+  const names = (presets: Iterable<{ id: string; name: string }>) =>
+    Object.fromEntries([...presets].map((preset) => [preset.id, preset.name]).sort(([a], [b]) => a!.localeCompare(b!)));
+  expect(names(lib.effects.values())).toEqual({
+    cakeify: 'Cake-ify',
+    explode: 'Explode',
+    'frozen-moment': 'Frozen Moment',
+    'full-circle': 'Full Circle',
+    'snap-zoom': 'Snap Zoom',
+    squish: 'Squish',
+  });
+  expect(names(lib.hooks.values())).toEqual({
+    figurine: 'Figurine',
+    ignite: 'Ignite',
+    'iris-dive': 'Iris Dive',
+    'wardrobe-swap': 'Wardrobe Swap',
+  });
 });

@@ -302,7 +302,7 @@ Presets réglés : ______________________________________________
 Extensions (validée oui / non, temps, VRAM max, remarque) :
   Édition 4 étapes ____ s, 40 étapes ____ s, VRAM ____ Mo, loaded completely / partially, français suivi oui / non : __________
     Looks infl8 ___ action ___ angles ___ (« lora key not loaded » oui / non) : __________
-  Effets lisibles (personne / animal / objet) : squish ___ cakeify ___ explode ___ crash zoom ___ bullet time ___ orbit ___
+  Effets lisibles (personne / animal / objet) : squish ___ cakeify ___ explode ___ snap-zoom ___ frozen-moment ___ full-circle ___
     ____ s par effet, VRAM ____ Mo, « lora key not loaded » oui / non, à repasser en 20 étapes : __________
   Hooks iris-dive ____ s, wardrobe-swap ____ s (édition + transition), image finale réussie oui / non, continuité : __________
   Voix node chargé oui / non, en ____ s, français : __________

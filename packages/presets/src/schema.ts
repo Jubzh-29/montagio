@@ -95,14 +95,14 @@ export const PresetSchema = z
 
 export type Preset = z.infer<typeof PresetSchema>;
 
+/** A YYYY-MM-DD date, as in registry/extensions.yaml. */
+const gpuDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected a YYYY-MM-DD date');
+
 /**
  * A one-photo effect (`capability: i2v-effect`, in presets/effects/): a LoRA of the effects
  * model, the trigger it was trained on, and a prompt template whose {subject} the user fills
  * ("red toy car"). The template must carry the trigger: the LoRA does nothing without it.
  */
-/** A YYYY-MM-DD date, as in registry/extensions.yaml. */
-const gpuDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected a YYYY-MM-DD date');
-
 export const EffectPresetSchema = z
   .object({
     ...presetHeader,
