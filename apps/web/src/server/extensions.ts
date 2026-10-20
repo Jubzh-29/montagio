@@ -91,6 +91,13 @@ export function avatarModels(lib: Library): { voice: ExtensionModel; avatar: Ext
   return { voice, avatar };
 }
 
+/** The music model of the extension "music". */
+export function musicModel(lib: Library): ExtensionModel {
+  const model = [...lib.extensionModels.values()].find((entry) => entry.task === 't2a');
+  if (!model) throw new Error('no t2a model in registry/extensions');
+  return model;
+}
+
 /** What a caption names of an extension model. */
 const summaryOf = (model: ExtensionModel) => ({ id: model.id, name: model.name, license: model.license });
 
@@ -135,6 +142,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
   );
   const t2i = lib.models.get(T2I_MODEL)?.estimate_s['720p'] ?? T2I_FALLBACK_S;
   const avatar = extensions.includes('avatar') ? avatarModels(lib) : null;
+  const music = extensions.includes('music') ? musicModel(lib) : null;
   return {
     extensions,
     effects,
@@ -143,8 +151,10 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
       t2i,
       ...(extensions.includes('edit') && editModel ? { edit: estimateFor(editModel, true) } : {}),
       ...(avatar ? { avatar: estimateFor(avatar.voice, true) + estimateFor(avatar.avatar, true) } : {}),
+      ...(music ? { music: estimateFor(music, true) } : {}),
     },
     ...(extensions.includes('edit') && editModel ? { editModel: summaryOf(editModel) } : {}),
     ...(avatar ? { avatarModel: summaryOf(avatar.avatar) } : {}),
+    ...(music ? { musicModel: summaryOf(music) } : {}),
   };
 }

@@ -53,6 +53,8 @@ export type SequenceRecord = {
   progress: number;
   outputUrl?: string;
   verticalUrl?: string;
+  /** The last music added under the film; the earlier ones keep their own job folders. */
+  music?: { jobId: string };
   error?: string;
   createdAt: string;
   updatedAt: string;
@@ -88,6 +90,16 @@ async function saveSequence(record: SequenceRecord): Promise<void> {
   record.updatedAt = new Date().toISOString();
   await mkdir(sequenceDir(record.id), { recursive: true });
   await writeAtomic(join(sequenceDir(record.id), 'record.json'), JSON.stringify(record, null, 2));
+}
+
+/** Remember the last music added under a film (its job), under the film's lock. */
+export function setSequenceMusic(id: string, jobId: string): Promise<void> {
+  return withLock(id, async () => {
+    const record = await readSequence(id);
+    if (!record) return;
+    record.music = { jobId };
+    await saveSequence(record);
+  });
 }
 
 export async function readSequence(id: string): Promise<SequenceRecord | null> {

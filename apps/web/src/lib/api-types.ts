@@ -68,6 +68,8 @@ export type SequenceSummary = {
   outputUrl?: string;
   verticalUrl?: string;
   error?: string;
+  /** The last music added under the film (POST /api/sequences/:id/music). */
+  music?: { jobId: string };
   /** Showcase: at least one shot is a placeholder clip. */
   placeholder?: boolean;
   /** Showcase: what the in-browser montage is doing while the film is assembling. */
@@ -132,11 +134,13 @@ export type ExtensionsInfo = {
   extensions: ExtensionId[];
   effects: EffectSummary[];
   hooks: HookSummary[];
-  estimates: { t2i: number; edit?: number; avatar?: number };
+  estimates: { t2i: number; edit?: number; avatar?: number; music?: number };
   /** The photo edit's model, for the caption under an edit (the preset catalogue does not hold it). */
   editModel?: { id: string; name: string; license: string };
   /** The avatar model, for the caption under a talking avatar. */
   avatarModel?: { id: string; name: string; license: string };
+  /** The music model, for the caption under a film with music. */
+  musicModel?: { id: string; name: string; license: string };
 };
 
 export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale';
@@ -159,6 +163,8 @@ export type JobSummary = {
   /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
   workflowUrl?: string;
   frames?: number;
+  /** A film's 9:16 cut with music. */
+  verticalUrl?: string;
   /** Showcase: an example still waiting for the GPU session. */
   placeholder?: boolean;
   createdAt: string;

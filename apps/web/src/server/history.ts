@@ -5,7 +5,7 @@ import { TERMINAL_STATES, type HistoryItem, type JobState, type Reprise } from '
 import { getEnv } from './env';
 import { getGeneration } from './generations';
 import { jobs, type JobRecord } from './jobs';
-import { advanceSequence, type SequenceRecord } from './sequences';
+import { advanceSequence, readSequence, type SequenceRecord } from './sequences';
 import { getServices } from './services';
 import type { GenerationRecord } from './store';
 import { readUploadMeta } from './uploads';
@@ -164,8 +164,20 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
           language: record.inputs.language === 'fr' ? 'fr' : 'en',
         },
       };
+    case 'music': {
+      // A film with music is a film of its own; Reuse reopens the silent film's setup.
+      const film = record.parent ? await readSequence(record.parent.id) : null;
+      const parent = film?.state === 'succeeded' && film.outputUrl ? await fromSequence(lib, film) : null;
+      return {
+        ...base,
+        kind: 'film',
+        task: 'music',
+        name: parent ? `${parent.name} ♪` : base.name,
+        reprise: parent?.reprise ?? { tab: 'film' },
+      };
+    }
     default:
-      // Music and HD join the history with their own lots.
+      // HD joins the history with its own lot.
       return null;
   }
 }
