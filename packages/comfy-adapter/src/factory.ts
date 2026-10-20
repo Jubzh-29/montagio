@@ -16,6 +16,8 @@ export function createBackend(env: Record<string, string | undefined>): Generati
     case 'demo':
       return new DemoBackend({
         clipsDir: env.MONTAGIO_DEMO_CLIPS ?? join(root, 'demo-assets', 'clips'),
+        imagesDir: env.MONTAGIO_DEMO_IMAGES ?? join(root, 'demo-assets', 'images'),
+        audioDir: env.MONTAGIO_DEMO_AUDIO ?? join(root, 'demo-assets', 'audio'),
         durationMs: Number(env.MONTAGIO_DEMO_DURATION_MS ?? 6000),
       });
     case 'local': {

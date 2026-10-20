@@ -132,3 +132,52 @@ test('hosted is not available yet', () => {
 test('factory refuses an unknown backend', () => {
   expect(() => createBackend({ MONTAGIO_BACKEND: 'closed-api' })).toThrow(/unknown backend/i);
 });
+
+describe('outputs by kind', () => {
+  const finished = async (b: DemoBackend, job: Parameters<DemoBackend['submit']>[0], want?: Parameters<DemoBackend['get']>[1]) => {
+    const { backendJobId } = await b.submit(job);
+    t = 5000;
+    return b.get(backendJobId, want);
+  };
+
+  test('an image job delivers the default PNG', async () => {
+    const done = await finished(make(), { workflow: {}, presetId: 'text-to-image', idempotencyKey: 'img', output: 'image' });
+    expect(done.state).toBe('succeeded');
+    expect(done.outputPath).toMatch(/[\\/]images[\\/]_default\.png$/);
+  });
+
+  test('an audio job delivers the default FLAC', async () => {
+    const done = await finished(make(), { workflow: {}, presetId: 'music', idempotencyKey: 'aud', output: 'audio' });
+    expect(done.outputPath).toMatch(/[\\/]audio[\\/]_default\.flac$/);
+  });
+
+  test('want overrides the kind given at submit', async () => {
+    const done = await finished(make(), { workflow: {}, presetId: 'crash-push', idempotencyKey: 'w' }, { output: 'image' });
+    expect(done.outputPath).toMatch(/[\\/]images[\\/]_default\.png$/);
+  });
+
+  test('a job without an output kind is still a video job', async () => {
+    const done = await finished(make(), { workflow: {}, presetId: 'crash-push', idempotencyKey: 'v' });
+    expect(done.outputPath).toMatch(/[\\/]clips[\\/]crash-push\.mp4$/);
+  });
+
+  test('a job forgotten by a restart is lost, whatever kind get() asks for', async () => {
+    const { backendJobId } = await make().submit({ workflow: {}, presetId: 'text-to-image', idempotencyKey: 'r', output: 'image' });
+    expect(await make().get(backendJobId, { output: 'image' })).toMatchObject({ state: 'failed', error: 'lost' });
+  });
+
+  test('createBackend reads MONTAGIO_DEMO_IMAGES and MONTAGIO_DEMO_AUDIO', async () => {
+    const images = mkdtempSync(join(tmpdir(), 'montagio-demo-images-'));
+    const audio = mkdtempSync(join(tmpdir(), 'montagio-demo-audio-'));
+    try {
+      const b = createBackend({ MONTAGIO_BACKEND: 'demo', MONTAGIO_DEMO_DURATION_MS: '0', MONTAGIO_DEMO_IMAGES: images, MONTAGIO_DEMO_AUDIO: audio });
+      const img = await b.submit({ workflow: {}, presetId: 'p', idempotencyKey: 'ci', output: 'image' });
+      const snd = await b.submit({ workflow: {}, presetId: 'p', idempotencyKey: 'ca', output: 'audio' });
+      expect((await b.get(img.backendJobId)).outputPath).toBe(join(images, '_default.png'));
+      expect((await b.get(snd.backendJobId)).outputPath).toBe(join(audio, '_default.flac'));
+    } finally {
+      rmSync(images, { recursive: true, force: true });
+      rmSync(audio, { recursive: true, force: true });
+    }
+  });
+});
