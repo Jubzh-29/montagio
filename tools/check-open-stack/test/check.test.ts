@@ -83,7 +83,8 @@ test('a workflow of an extension may load only the weights of its own model', as
     'registry/extensions.yaml':
       'schema: montagio/extensions@0.1\nextensions:\n  - { id: edit, priority: 1, gpu_validated: null }\n  - { id: effects, priority: 2, gpu_validated: null }\n' +
       '  - { id: transitions, priority: 3, requires: [edit], gpu_validated: null }\n  - { id: avatar, priority: 4, gpu_validated: null }\n' +
-      '  - { id: music, priority: 5, gpu_validated: null }\n  - { id: upscale, priority: 6, gpu_validated: null }\n',
+      '  - { id: music, priority: 5, gpu_validated: null }\n  - { id: upscale, priority: 6, gpu_validated: null }\n' +
+      '  - { id: motion, priority: 7, gpu_validated: null }\n',
     'registry/extensions/ace-music.yaml': [
       'schema: montagio/extension-model@0.1',
       'id: ace-music',

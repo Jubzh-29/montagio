@@ -3,8 +3,11 @@ import { z } from 'zod';
 /** Weight licenses the official distribution accepts: usable by anyone, anywhere, for any purpose. */
 export const ALLOWED_WEIGHT_LICENSES = ['Apache-2.0', 'MIT'] as const;
 
-/** The six extensions, in their order of priority (reoriented toward one-photo hooks on 2026-10-19). */
-export const EXTENSION_IDS = ['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale'] as const;
+/**
+ * The seven extensions, in their order of priority (reoriented toward one-photo hooks on
+ * 2026-10-19; motion transfer added last on 2026-10-20).
+ */
+export const EXTENSION_IDS = ['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion'] as const;
 export type ExtensionId = (typeof EXTENSION_IDS)[number];
 
 export const CAPABILITIES = ['i2v-camera', 'i2v', 't2i'] as const;

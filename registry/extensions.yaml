@@ -1,4 +1,4 @@
-# The six extensions, in their order of priority, and the day a GPU session validated
+# The seven extensions, in their order of priority, and the day a GPU session validated
 # each one (null until then). Their models are in registry/extensions/, apart from the
 # camera-preset models of registry/models/. On 2026-10-19 the order was reoriented toward
 # one-photo hooks: the image edit first (it also makes the transitions' end frames), the
@@ -29,4 +29,8 @@ extensions:
     gpu_validated: null
   - id: upscale
     priority: 6
+    gpu_validated: null
+  # Motion transfer (2026-10-20): last in priority, under the cut rule like the others.
+  - id: motion
+    priority: 7
     gpu_validated: null
