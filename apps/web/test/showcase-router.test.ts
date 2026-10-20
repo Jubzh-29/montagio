@@ -319,7 +319,7 @@ test('the showcase creates no image from a text: 403 showcase-t2i', async () => 
 
 test('an extension without examples answers like the server hides it: 404 extension-disabled', async () => {
   const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
-  for (const path of ['/api/edits', '/api/effects', '/api/hooks', '/api/avatars']) {
+  for (const path of ['/api/edits', '/api/effects', '/api/hooks', '/api/avatars', '/api/motion']) {
     const { status, json } = await call(router, 'POST', path, {});
     expect([path, status, json]).toEqual([path, 404, { error: 'extension-disabled' }]);
   }
@@ -409,4 +409,9 @@ test("the showcase wall follows the Studio's order, Squish first, whatever the f
   const info = (await call(router, 'GET', '/api/extensions')).json as unknown as ExtensionsInfo;
   expect(info.effects.map((effect) => effect.id)).toEqual(['squish', 'cakeify']);
   expect(info.hooks.map((hook) => hook.id)).toEqual(['iris-dive', 'figurine']);
+});
+
+test('the showcase takes no reference video', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  expect(await call(router, 'POST', '/api/uploads/video', {})).toMatchObject({ status: 403, json: { error: 'showcase-upload' } });
 });

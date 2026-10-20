@@ -24,7 +24,7 @@ import { saveUploadFromFile, type Provenance } from './uploads';
 
 export { JobError } from './errors';
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'motion';
 
 export type StepRecord = {
   name: string;
@@ -413,6 +413,7 @@ const STATUS: Record<JobError['code'], number> = {
   'ffmpeg-missing': 503,
   'speech-too-long': 400,
   'speech-too-short': 400,
+  'rights-required': 400,
 };
 
 /** The HTTP answer for a known failure of a job route, or null for an unexpected error. */

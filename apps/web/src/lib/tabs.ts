@@ -1,8 +1,8 @@
 import type { ExtensionsInfo } from './api-types';
 
 /** The Studio's creation tabs, in the header's order. */
-export type Tab = 'effects' | 'camera' | 'film' | 'avatar';
-export const TAB_ORDER: readonly Tab[] = ['effects', 'camera', 'film', 'avatar'];
+export type Tab = 'effects' | 'camera' | 'film' | 'avatar' | 'motion';
+export const TAB_ORDER: readonly Tab[] = ['effects', 'camera', 'film', 'avatar', 'motion'];
 
 /**
  * The tabs whose screen exists in this build: a tab the extensions allow but whose screen
@@ -21,6 +21,7 @@ export function visibleTabs(info: ExtensionsInfo | null, ready: ReadonlySet<Tab>
   const shown = new Set<Tab>(['camera', 'film']);
   if (info && info.effects.length + (hooksReady ? info.hooks.length : 0) > 0) shown.add('effects');
   if (info?.extensions.includes('avatar')) shown.add('avatar');
+  if (info?.extensions.includes('motion')) shown.add('motion');
   return TAB_ORDER.filter((tab) => shown.has(tab) && ready.has(tab));
 }
 

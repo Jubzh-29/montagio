@@ -54,7 +54,7 @@ function LanguageToggle() {
   );
 }
 
-const TAB_LABELS = { effects: 'tabEffects', camera: 'tabCamera', film: 'tabFilm', avatar: 'tabAvatar' } as const;
+const TAB_LABELS = { effects: 'tabEffects', camera: 'tabCamera', film: 'tabFilm', avatar: 'tabAvatar', motion: 'tabMotion' } as const;
 
 /** The creation tabs, as links: the Studio reads the tab from the URL. */
 function Tabs({ current }: { current?: Tab | 'history' }) {

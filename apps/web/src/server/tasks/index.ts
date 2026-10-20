@@ -3,6 +3,7 @@ import { avatarTask } from './avatar';
 import { editTask } from './edit';
 import { effectTask } from './effect';
 import { hookTask } from './hook';
+import { motionTask } from './motion';
 import { musicTask } from './music';
 import { t2iTask } from './t2i';
 import { upscaleTask } from './upscale';
@@ -16,4 +17,5 @@ export const TASKS: Partial<Record<JobTask, TaskDef>> = {
   avatar: avatarTask,
   music: musicTask,
   upscale: upscaleTask,
+  motion: motionTask,
 };

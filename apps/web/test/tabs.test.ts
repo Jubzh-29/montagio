@@ -34,7 +34,7 @@ test('a hidden or unknown tab in the URL falls back to the first visible one', (
 
 test('tabHref builds the query, in the order of TAB_ORDER', () => {
   expect(tabHref('camera')).toBe('/?tab=camera');
-  expect(TAB_ORDER).toEqual(['effects', 'camera', 'film', 'avatar']);
+  expect(TAB_ORDER).toEqual(['effects', 'camera', 'film', 'avatar', 'motion']);
 });
 
 test('a tab whose screen is not built yet stays hidden, whatever the extensions say', () => {

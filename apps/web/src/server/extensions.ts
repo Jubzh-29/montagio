@@ -92,6 +92,13 @@ export function musicModel(lib: Library): ExtensionModel {
   return model;
 }
 
+/** The motion transfer model of the extension "motion". */
+export function motionModel(lib: Library): ExtensionModel {
+  const model = [...lib.extensionModels.values()].find((entry) => entry.task === 'motion-transfer');
+  if (!model) throw new Error('no motion-transfer model in registry/extensions');
+  return model;
+}
+
 /** The 1080p model of the extension "upscale". */
 export function upscaleModel(lib: Library): ExtensionModel {
   const model = [...lib.extensionModels.values()].find((entry) => entry.task === 'v2v-upscale');
@@ -145,6 +152,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const avatar = extensions.includes('avatar') ? avatarModels(lib) : null;
   const music = extensions.includes('music') ? musicModel(lib) : null;
   const upscale = extensions.includes('upscale') ? upscaleModel(lib) : null;
+  const motion = extensions.includes('motion') ? motionModel(lib) : null;
   return {
     extensions,
     effects,
@@ -155,10 +163,12 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
       ...(avatar ? { avatar: estimateFor(avatar.voice, true) + estimateFor(avatar.avatar, true) } : {}),
       ...(music ? { music: estimateFor(music, true) } : {}),
       ...(upscale ? { upscale: estimateFor(upscale, true) } : {}),
+      ...(motion ? { motion: estimateFor(motion, true) } : {}),
     },
     ...(extensions.includes('edit') && editModel ? { editModel: summaryOf(editModel) } : {}),
     ...(avatar ? { avatarModel: summaryOf(avatar.avatar) } : {}),
     ...(music ? { musicModel: summaryOf(music) } : {}),
     ...(upscale ? { upscaleModel: { ...summaryOf(upscale), maxFrames: upscale.limits.max_input_frames ?? 121 } } : {}),
+    ...(motion ? { motionModel: summaryOf(motion) } : {}),
   };
 }

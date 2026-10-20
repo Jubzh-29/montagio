@@ -23,6 +23,8 @@ const REFUSALS: Record<string, MessageKey> = {
   // An avatar job whose voice is over 15 s (server/tasks/avatar.ts).
   'speech-too-long': 'avatarTooLong',
   'speech-too-short': 'avatarTooShort',
+  // A motion transfer without the rights box (server/tasks/motion.ts).
+  'rights-required': 'errorRightsRequired',
 };
 
 export function refusalMessageKey(code: string | undefined): MessageKey {
