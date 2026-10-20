@@ -142,7 +142,7 @@ export type ExtensionsInfo = {
   extensions: ExtensionId[];
   effects: EffectSummary[];
   hooks: HookSummary[];
-  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number };
+  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; motion?: number };
   /** The photo edit's model, for the caption under an edit (the preset catalogue does not hold it). */
   editModel?: { id: string; name: string; license: string };
   /** The avatar model, for the caption under a talking avatar. */
@@ -151,9 +151,11 @@ export type ExtensionsInfo = {
   musicModel?: { id: string; name: string; license: string };
   /** The 1080p model, and the longest clip it takes (frames): the HD action shows only up to it. */
   upscaleModel?: { id: string; name: string; license: string; maxFrames: number };
+  /** The motion transfer model, for the caption under its clip. */
+  motionModel?: { id: string; name: string; license: string };
 };
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'motion';
 
 /** A photo, effect or chained render (GET /api/jobs/:id). */
 export type JobSummary = {
@@ -182,7 +184,7 @@ export type JobSummary = {
 
 /** What it takes to make a history item again: the Studio reopens its tab with these (GET /api/history). */
 export type Reprise = {
-  tab: 'effects' | 'camera' | 'film' | 'avatar';
+  tab: 'effects' | 'camera' | 'film' | 'avatar' | 'motion';
   imageRef?: string;
   /** The photo is, or derives from, an imported one: an effect on it asks for consent. */
   personal?: boolean;
@@ -194,6 +196,9 @@ export type Reprise = {
   prompt?: string;
   /** The language an avatar speaks. */
   language?: 'en' | 'fr';
+  /** A motion transfer's reference clip (absent once it is gone), and what its character does. */
+  videoRef?: string;
+  motion?: string;
   modelId?: string;
   /** A remixed clip: the remix editor reopens on that generation's preset text. */
   remixGenerationId?: string;

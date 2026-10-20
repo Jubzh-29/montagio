@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { pickAspect, type Aspect } from '@montagio/presets';
+import { prepareMotionClip, probe } from '@montagio/sequence';
 import { imageSize } from 'image-size';
+import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { getEnv } from './env';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -79,6 +81,85 @@ export async function readUploadMeta(imageRef: string): Promise<UploadMeta | nul
     const meta = JSON.parse(await readFile(join(getEnv().data, 'uploads', `${match[1]}.json`), 'utf8')) as Partial<UploadMeta>;
     // Written before photos kept their origin: the cautious reading is an imported photo.
     return { origin: 'upload', personal: true, ...meta } as UploadMeta;
+  } catch {
+    return null;
+  }
+}
+
+export { MAX_VIDEO_BYTES };
+/** The multipart body around one video: the file and room for its boundaries and headers. */
+export const MAX_VIDEO_FORM_BYTES = MAX_VIDEO_BYTES + 64 * 1024;
+const VIDEO_TYPES: Record<string, string> = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
+/** The shortest reference clip the motion model animates. */
+const MIN_VIDEO_S = 1;
+
+/** A reference clip for a motion transfer, prepared once at upload: 5 s at most, 16 fps, silent. */
+export type VideoMeta = {
+  videoRef: string;
+  /** What is kept, and how long the clip sent was. */
+  duration_s: number;
+  sourceDuration_s: number;
+  frames: number;
+  width: number;
+  height: number;
+  aspect: Aspect;
+};
+
+const videosDir = () => join(getEnv().data, 'uploads', 'videos');
+
+/**
+ * Keep the first 5 s of a reference clip at 16 fps, without its sound (it may be music the
+ * user cannot share), in the folder of the uploads. A file that is not a readable video, or
+ * shorter than 1 s, is refused.
+ */
+export async function saveVideoUpload(file: File): Promise<VideoMeta> {
+  const ext = VIDEO_TYPES[file.type];
+  if (!ext) throw new UploadError(415, 'only MP4, WebM and QuickTime videos are accepted');
+  if (file.size > MAX_VIDEO_BYTES) throw new UploadError(413, 'videos are limited to 50 MB');
+  const id = randomUUID();
+  const dir = videosDir();
+  await mkdir(dir, { recursive: true });
+  const source = join(dir, `${id}.source.${ext}`);
+  const out = join(dir, `${id}.mp4`);
+  const metaFile = join(dir, `${id}.json`);
+  try {
+    await writeFile(source, new Uint8Array(await file.arrayBuffer()));
+    let sourceDuration_s: number;
+    let prepared: Awaited<ReturnType<typeof prepareMotionClip>>;
+    try {
+      sourceDuration_s = (await probe(source)).duration_s;
+      prepared = await prepareMotionClip(source, out);
+    } catch {
+      throw new UploadError(400, 'the file is not a readable video');
+    }
+    if (!(prepared.duration_s >= MIN_VIDEO_S)) throw new UploadError(400, `a reference video lasts ${MIN_VIDEO_S} s at least`);
+    const meta: VideoMeta = {
+      videoRef: `videos/${id}.mp4`,
+      duration_s: prepared.duration_s,
+      sourceDuration_s,
+      frames: prepared.frames,
+      width: prepared.width,
+      height: prepared.height,
+      aspect: pickAspect(prepared.width, prepared.height),
+    };
+    await writeFile(metaFile, JSON.stringify(meta));
+    return meta;
+  } catch (error) {
+    // A refused or half-made clip leaves nothing behind: no video without its meta.
+    await Promise.all([rm(out, { force: true }), rm(metaFile, { force: true })]);
+    throw error;
+  } finally {
+    await rm(source, { force: true });
+  }
+}
+
+/** A prepared reference clip, or null when its ref is not one or its clip or meta is gone. */
+export async function readVideoMeta(videoRef: string): Promise<VideoMeta | null> {
+  const match = /^videos\/([0-9a-f-]{36})\.mp4$/.exec(videoRef);
+  if (!match) return null;
+  try {
+    await access(join(videosDir(), `${match[1]}.mp4`));
+    return JSON.parse(await readFile(join(videosDir(), `${match[1]}.json`), 'utf8')) as VideoMeta;
   } catch {
     return null;
   }

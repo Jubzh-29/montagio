@@ -24,7 +24,7 @@ export function ChoiceCard({
   previewUrl?: string;
   poses?: string[];
   speed?: number;
-  icon: 'camera' | 'effect' | 'hook' | 'avatar';
+  icon: 'camera' | 'effect' | 'hook' | 'avatar' | 'motion';
   paused: boolean;
   /** Brings the wall back; absent on a tab without a wall (Avatar). */
   onChange?: () => void;
@@ -48,7 +48,7 @@ export function ChoiceCard({
           <MoveGlyph poses={poses} speed={speed} />
         ) : (
           <span className={styles.choiceIcon} aria-hidden="true">
-            {icon === 'hook' ? '◎' : icon === 'avatar' ? '◉' : '✦'}
+            {icon === 'hook' ? '◎' : icon === 'avatar' ? '◉' : icon === 'motion' ? '⇄' : '✦'}
           </span>
         )}
         <span id="choice-name" className={styles.choiceName}>
