@@ -9,6 +9,7 @@ import {
   compileEffect,
   compileHookEdit,
   compileHookTransition,
+  compileMotion,
   compileMusic,
   compileSpeech,
   compileUpscale,
@@ -20,10 +21,11 @@ import {
 import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } from '@montagio/registry';
 
 /**
- * In the order a session runs them, the priority order of 2026-10-19: a hook's edit comes
- * before its transition, the voice before the avatar that speaks it.
+ * In the order a session runs them, the priority order of 2026-10-19 (the motion transfer,
+ * added on 2026-10-20, last): a hook's edit comes before its transition, the voice before the
+ * avatar that speaks it.
  */
-export const EXTENSION_JOBS = ['edit', 'effect', 'hook-edit', 'transition', 'voice', 'avatar', 'music', 'upscale'] as const;
+export const EXTENSION_JOBS = ['edit', 'effect', 'hook-edit', 'transition', 'voice', 'avatar', 'music', 'upscale', 'motion'] as const;
 export type ExtensionJobName = (typeof EXTENSION_JOBS)[number];
 
 const TASKS: Record<ExtensionJobName, ExtensionTask> = {
@@ -35,10 +37,14 @@ const TASKS: Record<ExtensionJobName, ExtensionTask> = {
   avatar: 'ia2v-talk',
   music: 't2a',
   upscale: 'v2v-upscale',
+  motion: 'motion-transfer',
 };
 
-/** The jobs that read a text: the edit instruction, the effects' subject, the words to say, the music description. */
-export const TEXT_JOBS = ['edit', 'effect', 'voice', 'music'] as const satisfies readonly ExtensionJobName[];
+/**
+ * The jobs that read a text: the edit instruction, the effects' subject, the words to say, the
+ * music description, the motion's description.
+ */
+export const TEXT_JOBS = ['edit', 'effect', 'voice', 'music', 'motion'] as const satisfies readonly ExtensionJobName[];
 export type TextJobName = (typeof TEXT_JOBS)[number];
 
 const DEFAULT_TEXT: Record<'music' | 'edit' | 'voice', string> = {
@@ -62,6 +68,10 @@ export type ExtensionJobOptions = {
   clip?: string;
   clipAspect?: Aspect;
   clipFrames?: number;
+  /** The reference clip of the motion transfer, prepared by prepareMotionClip, with its length and aspect. */
+  motion?: string;
+  motion_s?: number;
+  motionAspect?: Aspect;
   /** The speech of avatar, and its length in seconds (the caller reads it). */
   audio?: string;
   audio_s?: number;
@@ -196,6 +206,21 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
       case 'music': {
         const job = compileMusic(model, template, { prompt: text('music'), duration_s: opts.duration_s, seed: opts.seed });
         return [{ name, tag: name, model, ...job, files: [] }];
+      }
+      case 'motion': {
+        const photo = need(opts.input, '--input', name);
+        const clip = need(opts.motion, '--motion', name);
+        if (opts.motion_s === undefined || opts.motionAspect === undefined) throw new Error('the motion job needs the length and the aspect of its prepared clip');
+        const motion = opts.text?.motion?.trim();
+        const job = compileMotion(model, template, {
+          imageRef: basename(photo),
+          videoRef: basename(clip),
+          video_s: opts.motion_s,
+          aspect: opts.motionAspect,
+          seed: opts.seed,
+          ...(motion ? { motion } : {}),
+        });
+        return [{ name, tag: name, model, ...job, files: [file('image', photo), file('video', clip)] }];
       }
       case 'upscale': {
         const clip = need(opts.clip, '--clip', name);
