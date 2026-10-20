@@ -20,7 +20,18 @@ export type ModelSummary = {
   estimate_s: { '480p': number; '720p'?: number };
 };
 
-export type UploadResult = { imageRef: string; width: number; height: number; aspect: '16:9' | '9:16' | '1:1' };
+/** Where a photo comes from (server/uploads.ts). */
+export type PhotoOrigin = 'upload' | 'sample' | 't2i' | 'edit' | 'frame';
+
+export type UploadResult = {
+  imageRef: string;
+  width: number;
+  height: number;
+  aspect: '16:9' | '9:16' | '1:1';
+  origin: PhotoOrigin;
+  /** The photo is, or derives from, an imported one: an effect on it asks for consent. */
+  personal: boolean;
+};
 
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled';
 

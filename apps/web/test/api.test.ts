@@ -9,11 +9,13 @@ import { GET as getOpenStack } from '@/app/api/open-stack/route';
 import { GET as getPresets } from '@/app/api/presets/route';
 import { GET as getPresetYaml } from '@/app/api/presets/[id]/yaml/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
+import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import { GET as getWorkflow } from '@/app/api/workflows/[id]/route';
 import { GET as getMedia } from '@/app/media/[...path]/route';
 import { galleryOrder, presetPreviewUrl } from '@/server/gallery';
 import { failureResponse, mediaFileFor } from '@/server/generations';
 import { resetServicesForTests } from '@/server/services';
+import { readUploadMeta, saveUploadFromFile } from '@/server/uploads';
 import { loadLibrary } from '@montagio/presets';
 import { readTags, tagClip } from '@montagio/sequence';
 import {
@@ -66,6 +68,8 @@ describe('uploads', () => {
       width: 1920,
       height: 1080,
       aspect: '16:9',
+      origin: 'upload',
+      personal: true,
     });
   });
 
@@ -83,6 +87,31 @@ describe('uploads', () => {
   test('an unrotated landscape JPEG keeps its size', async () => {
     const res = await postUpload(uploadRequest(jpegWithOrientation(4032, 3024, 1)));
     expect(await res.json()).toMatchObject({ width: 4032, height: 3024, aspect: '1:1' });
+  });
+
+  test('an imported photo is personal', async () => {
+    expect(await (await postUpload(uploadRequest(pngFile(1280, 720)))).json()).toMatchObject({ origin: 'upload', personal: true });
+  });
+
+  test('the sample route gives a sample photo that is not personal', async () => {
+    const res = await postSampleUpload();
+    expect(res.status).toBe(201);
+    const result = (await res.json()) as { imageRef: string };
+    expect(result).toMatchObject({ imageRef: expect.stringMatching(/^uploads\/[0-9a-f-]{36}\.png$/), aspect: '16:9', origin: 'sample', personal: false });
+    expect(await readUploadMeta(result.imageRef)).toMatchObject({ origin: 'sample', personal: false });
+  });
+
+  test('an upload written before origins existed reads as personal', async () => {
+    const id = '00000000-0000-4000-8000-000000000000';
+    mkdirSync(join(dataDir(), 'uploads'), { recursive: true });
+    writeFileSync(join(dataDir(), 'uploads', `${id}.json`), JSON.stringify({ imageRef: `uploads/${id}.png`, width: 4, height: 3, aspect: '1:1' }));
+    expect(await readUploadMeta(`uploads/${id}.png`)).toMatchObject({ origin: 'upload', personal: true });
+  });
+
+  test('a frame of a sequence is not personal', async () => {
+    const frame = join(dataDir(), 'frame.png');
+    writeFileSync(frame, Buffer.from(await pngFile(832, 480).arrayBuffer()));
+    expect(await saveUploadFromFile(frame)).toMatchObject({ origin: 'frame', personal: false });
   });
 
   test('a PNG-typed file that is not an image is refused with 415', async () => {
