@@ -128,5 +128,10 @@
   "photoEdit": "Edit",
   "choiceChange": "Change",
   "choiceCamera": "Camera move · {s} s",
-  "aiCaption": "AI-generated · {model} ({license})"
+  "aiCaption": "AI-generated · {model} ({license})",
+  "errorBlockedName": "This text names a well-known person. Montagio does not make images of real people without their consent.",
+  "errorConsentRequired": "Tick the box to confirm you are the person in this photo, or that you have their consent.",
+  "errorExtensionDisabled": "This feature is not available on this installation.",
+  "errorInvalidInput": "This request cannot be rendered. Check the text and the options, then try again.",
+  "errorShowcaseT2i": "The showcase does not create images: its sample photos were made in advance. Run Montagio on your machine to write your own text."
 }

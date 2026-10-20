@@ -236,6 +236,8 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       return new Response(null, { status: 204 });
     }
     if (method === 'POST' && resource === 'uploads') return refuse('showcase-upload', 403);
+    // Its sample photos were made from texts in advance: the showcase creates no image.
+    if (method === 'POST' && resource === 'images' && !id) return refuse('showcase-t2i', 403);
 
     if (resource === 'generations') {
       if (method === 'POST' && !id) return createGeneration(await body(init));

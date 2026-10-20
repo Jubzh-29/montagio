@@ -306,3 +306,10 @@ test('the showcase shows no extension before the GPU session', async () => {
   expect(status).toBe(200);
   expect(json).toEqual({ extensions: [], effects: [], hooks: [], estimates: { t2i: 12 } });
 });
+
+test('the showcase creates no image from a text: 403 showcase-t2i', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  const { status, json } = await call(router, 'POST', '/api/images', { prompt: 'a fox', aspect: '16:9' });
+  expect(status).toBe(403);
+  expect(json).toEqual({ error: 'showcase-t2i' });
+});

@@ -41,3 +41,17 @@ test('a film FFmpeg could not join gets its own message, in English and in Frenc
   expect((en as Record<string, string>).errorFfmpegFailed).toMatch(/FFmpeg/);
   expect((fr as Record<string, string>).errorFfmpegFailed).toMatch(/FFmpeg/);
 });
+
+test('the photo and effect refusals say what to do, in English and in French', () => {
+  const expected = {
+    'blocked-name': 'errorBlockedName',
+    'consent-required': 'errorConsentRequired',
+    'extension-disabled': 'errorExtensionDisabled',
+    'invalid-input': 'errorInvalidInput',
+    'showcase-t2i': 'errorShowcaseT2i',
+  } as const;
+  for (const [code, key] of Object.entries(expected)) {
+    expect(refusalMessageKey(code)).toBe(key);
+    for (const dictionary of [en, fr] as Record<string, string>[]) expect(dictionary[key], key).toBeTruthy();
+  }
+});

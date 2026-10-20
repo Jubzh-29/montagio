@@ -128,5 +128,10 @@
   "photoEdit": "Modifier",
   "choiceChange": "Changer",
   "choiceCamera": "Mouvement de caméra · {s} s",
-  "aiCaption": "Généré par IA · {model} ({license})"
+  "aiCaption": "Généré par IA · {model} ({license})",
+  "errorBlockedName": "Ce texte nomme une personne connue. Montagio ne fabrique pas d'images de personnes réelles sans leur accord.",
+  "errorConsentRequired": "Cochez la case pour confirmer que vous êtes la personne sur la photo, ou que vous avez son accord.",
+  "errorExtensionDisabled": "Cette fonction n'est pas disponible sur cette installation.",
+  "errorInvalidInput": "Cette demande ne peut pas être rendue. Vérifiez le texte et les options, puis réessayez.",
+  "errorShowcaseT2i": "La vitrine ne crée pas d'images : ses photos d'exemple ont été faites à l'avance. Installez Montagio chez vous pour écrire votre propre texte."
 }
