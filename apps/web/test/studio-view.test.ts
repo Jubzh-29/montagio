@@ -1,4 +1,13 @@
-import { nextView } from '@/lib/studio-view';
+import { nextView, tabEvent } from '@/lib/studio-view';
+
+test('a tab the visitor opens brings its wall back', () => {
+  expect(tabEvent({ tab: 'effects', known: true }, { tab: 'camera', known: true })).toBe('tab');
+});
+
+test('the extensions arriving only settle the guessed tab: an open atelier stays open', () => {
+  expect(tabEvent({ tab: 'camera', known: false }, { tab: 'effects', known: true })).toBeNull();
+  expect(tabEvent({ tab: 'camera', known: false }, { tab: 'camera', known: true })).toBeNull();
+});
 
 test('Generate shows the result', () => {
   expect(nextView('generate', { view: 'gallery', before: 'gallery' })).toEqual({ view: 'result', before: 'gallery' });

@@ -24,7 +24,7 @@ import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/sho
 import { useMotionPaused } from '@/lib/use-motion';
 import { needsConsent } from '@/lib/consent';
 import { defaultSubject } from '@/lib/effect-choice';
-import { nextView, type CanvasEvent, type CanvasState } from '@/lib/studio-view';
+import { nextView, tabEvent, type CanvasEvent, type CanvasState, type ShownTab } from '@/lib/studio-view';
 import { HOOKS_READY, pickTab, tabHref, visibleTabs } from '@/lib/tabs';
 import { refreshExtensions, useExtensions } from '@/lib/use-extensions';
 import { useShowcase } from '@/lib/use-showcase';
@@ -175,10 +175,12 @@ export function Studio() {
   }, [remix, canvas.view]);
 
   // A new tab opens on its wall, and the remix editor belongs to the Camera tab (state adjusted while rendering).
-  const [shownTab, setShownTab] = useState(tab);
-  if (shownTab !== tab) {
-    setShownTab(tab);
-    setCanvas((current) => nextView('tab', current));
+  const shown: ShownTab = { tab, known: extensions !== null };
+  const [shownTab, setShownTab] = useState(shown);
+  if (shownTab.tab !== shown.tab || shownTab.known !== shown.known) {
+    setShownTab(shown);
+    const event = tabEvent(shownTab, shown);
+    if (event) setCanvas((current) => nextView(event, current));
     if (tab !== 'camera' && remix) setRemix(null);
   }
   useEffect(() => {
@@ -557,7 +559,9 @@ export function Studio() {
         } else {
           return false;
         }
-        remixTextRef.current?.focus();
+        // Generate moved the canvas to the monitor: bring the editor back with its reason, then the focus effect moves there.
+        remixFocus.current = 'editor';
+        moveCanvas('change');
         return true;
       }).then((record) => {
         // This editor now holds that generation's remix: the result's "Remix preset" leads back here.

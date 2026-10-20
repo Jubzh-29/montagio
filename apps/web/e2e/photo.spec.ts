@@ -32,6 +32,24 @@ test('a double click on Create image makes one job', async ({ page }) => {
   expect(posts).toBe(1);
 });
 
+test('the atelier stays open when the extensions answer late', async ({ page }) => {
+  // On a slow first load the Studio guesses Camera, then Effects opens: that must not close the atelier.
+  let release!: () => void;
+  const late = new Promise<void>((done) => (release = done));
+  await page.route('**/api/extensions', async (route) => {
+    await late;
+    await route.continue();
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Text to image', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Describe the photo' }).fill('a red kite over a field');
+  release();
+  await expect(page.getByRole('link', { name: 'Effects', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('textbox', { name: 'Describe the photo' })).toHaveValue('a red kite over a field');
+  await page.getByRole('button', { name: /^Create image/ }).click();
+  await page.getByRole('button', { name: 'Use this photo', exact: true }).click({ timeout: 15_000 });
+});
+
 test('editing an imported photo asks for consent first', async ({ page }) => {
   await page.goto(CAMERA);
   await page.setInputFiles('input[type=file]', sampleImage);

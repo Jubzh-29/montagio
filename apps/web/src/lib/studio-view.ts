@@ -23,3 +23,14 @@ export function nextView(event: CanvasEvent, state: CanvasState): CanvasState {
       return { view: state.before, before: state.before };
   }
 }
+
+/** The tab the Studio shows, and whether /api/extensions had answered when it was chosen. */
+export type ShownTab = { tab: string; known: boolean };
+
+/**
+ * A tab the visitor opens brings its wall back. Until /api/extensions answers, the tab is a
+ * guess (Camera): the answer only settles it, and leaves an open atelier or a render in place.
+ */
+export function tabEvent(before: ShownTab, after: ShownTab): CanvasEvent | null {
+  return before.known && before.tab !== after.tab ? 'tab' : null;
+}
