@@ -246,7 +246,8 @@ info = json.load(sys.stdin)
 partner = sorted(name for name, node in info.items()
                  if node.get("api_node") or str(node.get("python_module", "")).startswith("comfy_api_nodes"))
 needed = ["WanCameraEmbedding", "WanCameraImageToVideo", "Wan22ImageToVideoLatent", "CreateVideo", "SaveVideo", "UNETLoader",
-          "MontagioCameraEmbedding", "ChatterboxMTLTTS", "WanImageToVideo", "CLIPVisionEncode", "WanFirstLastFrameToVideo"]
+          "MontagioCameraEmbedding", "ChatterboxMTLTTS", "WanImageToVideo", "CLIPVisionEncode", "WanFirstLastFrameToVideo",
+          "WanAnimate2ToVideo"]
 missing = [name for name in needed if name not in info]
 print(f"[montagio] {len(info)} node classes loaded, {len(partner)} partner node(s)")
 if missing:

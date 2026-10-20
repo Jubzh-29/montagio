@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { Comfy, type Job, type WorkflowGraph } from '@comfyorg/sdk';
 import { CAMERA_POSE_VALUES, compileJob, loadLibrary, pickAspect, type ApiWorkflow, type Aspect, type Library, type Resolution } from '@montagio/presets';
-import { probe, probeAudio } from '@montagio/sequence';
+import { prepareMotionClip, probe, probeAudio } from '@montagio/sequence';
 import { imageSize } from 'image-size';
 import { EXTENSION_JOBS, extensionJobs, jobTexts, photoFile, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
 import { imageFingerprint } from './lib/image';
@@ -65,6 +65,7 @@ const { values: args } = parseArgs({
     quality: { type: 'boolean', default: false },
     look: { type: 'string' },
     clip: { type: 'string' },
+    motion: { type: 'string' },
     audio: { type: 'string' },
     text: { type: 'string', multiple: true, default: [] },
     language: { type: 'string', default: 'en' },
@@ -93,7 +94,7 @@ if (args.help) {
   --dry-run          compile and write the workflows, contact nothing
 
 Extensions (instead of presets):
-  --extension LIST   edit, effect, hook (= hook-edit then transition), voice, avatar, music, upscale (comma list) or "all"
+  --extension LIST   edit, effect, hook (= hook-edit then transition), voice, avatar, music, upscale, motion (comma list) or "all"
   --input PATH       the photo of edit, effect, hook and avatar (default demo-assets/images/sample-16x9.png)
   --effect LIST      the effects to run, e.g. squish,explode, or "all" (default all)
   --hook ID          the hook of hook-edit and transition (default iris-dive)
@@ -102,6 +103,7 @@ Extensions (instead of presets):
   --quality          the edit, the effects and the transition without their 4-step LoRAs (more steps, slower)
   --look LOOK        a look of the edit job: infl8, action or angles
   --clip PATH        the clip to upscale (required by upscale)
+  --motion PATH      the reference video of the motion transfer (required by motion): its first 5 s are kept, at 16 fps, silent
   --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
   --text [JOB=]TEXT  the edit instruction, the effects' subject, the words to say or the music description (each has
                      a default), for the one job of the run that reads a text; when several do, name it:
@@ -448,6 +450,23 @@ async function runExtensions(
     clipAspect = pickAspect(width, height);
     clipFrames = Math.round(duration_s * fps);
   }
+  // The motion transfer's clip is prepared first (5 s at 16 fps, silent), and sizes its own job.
+  let motion: string | undefined;
+  let motion_s: number | undefined;
+  let motionAspect: Aspect | undefined;
+  if (names.includes('motion')) {
+    if (args['dry-run']) {
+      motion = args.motion ? fromCaller(args.motion) : 'motion.mp4';
+      motion_s = 5;
+      motionAspect = '9:16';
+    } else if (args.motion) {
+      await mkdir(join(outDir, 'inputs'), { recursive: true });
+      motion = join(outDir, 'inputs', 'motion.mp4');
+      const prepared = await prepareMotionClip(fromCaller(args.motion), motion);
+      motion_s = prepared.duration_s;
+      motionAspect = pickAspect(prepared.width, prepared.height);
+    }
+  }
   let audio = args.audio ? fromCaller(args.audio) : undefined;
   let audio_s = audio ? (await probeAudio(audio))?.duration_s : undefined;
   if (audio && !audio_s) throw new Error(`no audio stream in ${audio}`);
@@ -463,6 +482,9 @@ async function runExtensions(
     clip,
     clipAspect,
     clipFrames,
+    motion,
+    motion_s,
+    motionAspect,
     audio: audio ?? (args['dry-run'] ? 'speech.flac' : undefined),
     audio_s: audio_s ?? (args['dry-run'] ? 5 : undefined),
     text,

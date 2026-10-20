@@ -295,6 +295,32 @@ export async function normalizeClip(
 }
 
 /**
+ * The reference clip of a motion transfer, as Wan2.2-Animate-2 takes it: its first `max_s`
+ * seconds (5 by default) at `fps` (16; no ComfyUI core node lowers a frame rate), without sound
+ * (the user's clip may carry music they cannot share), in H.264 with even dimensions. A file
+ * without a video stream fails before any encoding. Returns what compileMotion needs.
+ */
+export async function prepareMotionClip(
+  input: string,
+  out: string,
+  opts: { max_s?: number; fps?: number } = {},
+): Promise<{ duration_s: number; frames: number; width: number; height: number }> {
+  const { max_s = 5, fps = 16 } = opts;
+  await probe(input);
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    '-i', input,
+    '-map', '0:v:0', '-an',
+    '-t', String(max_s),
+    '-vf', `fps=${fps},scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1`,
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
+    '-f', 'mp4', partial,
+  ]);
+  const prepared = await probe(out);
+  return { duration_s: prepared.duration_s, frames: Math.round(prepared.duration_s * fps), width: prepared.width, height: prepared.height };
+}
+
+/**
  * A light copy of a clip for a looping gallery tile: `width` pixels wide and a
  * high CRF, so a dozen tiles cost the visitor a megabyte or two, not twenty.
  */

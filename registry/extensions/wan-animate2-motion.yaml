@@ -1,0 +1,31 @@
+# Motion transfer (extension "motion"): the photo of a character (fictional preferably) and a
+# short reference video give that character performing the video's motion, at 480p and 16 fps,
+# silent. The clip is prepared first (prepareMotionClip of @montagio/sequence: 5 s at most,
+# 16 fps, no sound). Wan2.2-Animate-2 distilled reads the raw frames: no pose extractor, no
+# mask, no LoRA; 10 steps, one 81-frame window. The output takes the clip's aspect, and the
+# photo is center-cropped to it. Converted from the official template video_wan_animate2_distilled.
+schema: montagio/extension-model@0.1
+id: wan-animate2-motion
+name: Wan2.2-Animate-2 distilled (motion transfer)
+extension: motion
+task: motion-transfer
+license: Apache-2.0
+weights: [wan-animate-2-distill-int8, clip-vision-h-motion, umt5-xxl-fp8, wan21-vae]
+workflow: workflows/wan-animate2-motion.api.json
+bindings:
+  image: { node: "189", field: image }
+  video: { node: "240", field: file }
+  # what the character looks like (the template's main prompt), and what it does (its pose prompt)
+  prompt: { node: "582", field: text }
+  motion_prompt: { node: "585", field: text }
+  negative: { node: "581", field: text }
+  seed: { node: "597", field: noise_seed }
+  # the clip's size; the photo follows it through GetImageSize (596)
+  width: { node: "600", field: resize_type.width }
+  height: { node: "600", field: resize_type.height }
+  frames: { node: "587", field: length }
+output: { node: "246", kind: video }
+limits: { min_duration_s: 1, max_duration_s: 5, max_chars: 500 }
+# GPU seconds for 5 s on an RTX 4090 (estimate: 10 distilled steps, two branches, the pose cache
+# on the CPU; S2 measures it)
+estimate_s: 240

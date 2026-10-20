@@ -14,7 +14,7 @@ beforeAll(async () => {
 
 const base = { language: 'en' as const, duration_s: 10, seed: 7, aspect: '16:9' as const };
 
-const files = { input: '/data/photo.png', input2: '/data/outfit.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6 };
+const files = { input: '/data/photo.png', input2: '/data/outfit.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const };
 
 test('one job per extension, in the order of the session, each accepted by ComfyUI v0.41.0 once its files are uploaded', () => {
   const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
@@ -27,6 +27,7 @@ test('one job per extension, in the order of the session, each accepted by Comfy
     ['avatar', 'wan22-s2v-avatar'],
     ['music', 'ace-step15-music'],
     ['upscale', 'seedvr2-upscale'],
+    ['motion', 'wan-animate2-motion'],
   ]);
   for (const job of jobs) {
     const skip = job.files.map((file) => `${file.node}.${file.field}`);
@@ -40,6 +41,10 @@ test('each job uploads the files it reads and nothing else', () => {
   expect(uploads.music).toEqual([]);
   expect(uploads.voice).toEqual([]);
   expect(uploads.upscale).toEqual([{ node: '73', field: 'file', path: '/data/clip.mp4' }]);
+  expect(uploads.motion).toEqual([
+    { node: '189', field: 'image', path: '/data/photo.png' },
+    { node: '240', field: 'file', path: '/data/motion.mp4' },
+  ]);
   expect(uploads.edit).toEqual([{ node: '41', field: 'image', path: '/data/photo.png' }]);
   expect(uploads.effect).toEqual([{ node: '52', field: 'image', path: '/data/photo.png' }]);
   expect(uploads['hook-edit']).toEqual([
@@ -136,7 +141,7 @@ describe('jobTexts (smoke --text)', () => {
   });
 
   test('when several jobs read a text, a bare one is refused and each text names its job', () => {
-    expect(() => jobTexts(['night rain'], [...EXTENSION_JOBS])).toThrow(/edit, effect, voice, music read a text: name the job, as in --text edit=/);
+    expect(() => jobTexts(['night rain'], [...EXTENSION_JOBS])).toThrow(/edit, effect, voice, music, motion read a text: name the job, as in --text edit=/);
     expect(jobTexts(['music=calm piano', 'edit=make it snow'], [...EXTENSION_JOBS])).toEqual({ music: 'calm piano', edit: 'make it snow' });
   });
 

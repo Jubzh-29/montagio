@@ -78,3 +78,13 @@ nodes:
   - { class_type: WanImageToVideo, source: comfyui-core, license: GPL-3.0 }
   # Keyframe transitions (workflows/wan22-flf2v-transition.api.json, Wan 2.2 FLF2V): comfy_extras/nodes_wan.py.
   - { class_type: WanFirstLastFrameToVideo, source: comfyui-core, license: GPL-3.0 }
+  # Motion transfer (workflows/wan-animate2-motion.api.json, Wan2.2-Animate-2): comfy_extras/nodes_wan.py
+  # (WanAnimate2ToVideo, WanAnimate2Cache, TrimVideoLatent), nodes_custom_sampler.py (SamplerCustom,
+  # BasicScheduler, KSamplerSelect) and nodes_images.py (GetImageSize).
+  - { class_type: WanAnimate2ToVideo, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: WanAnimate2Cache, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: TrimVideoLatent, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: SamplerCustom, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: BasicScheduler, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: KSamplerSelect, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: GetImageSize, source: comfyui-core, license: GPL-3.0 }

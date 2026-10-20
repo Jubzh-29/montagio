@@ -1348,7 +1348,8 @@
      {
       "multiselect": false,
       "options": [
-       "clip.mp4"
+       "clip.mp4",
+       "motion.mp4"
       ],
       "video_upload": true
      }
@@ -3004,7 +3005,8 @@
       "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors",
       "wan2.2_s2v_14B_fp8_scaled.safetensors",
       "wan2.2_ti2v_5B_fp16.safetensors",
-      "z_image_turbo_bf16.safetensors"
+      "z_image_turbo_bf16.safetensors",
+      "wan_animate_2_distill_int8_convrot.safetensors"
      ]
     ],
     "weight_dtype": [
@@ -3986,5 +3988,680 @@
    "latent"
   ],
   "python_module": "comfy_extras.nodes_wan"
+ },
+ "WanAnimate2ToVideo": {
+  "input": {
+   "required": {
+    "positive": [
+     "CONDITIONING",
+     {}
+    ],
+    "negative": [
+     "CONDITIONING",
+     {}
+    ],
+    "vae": [
+     "VAE",
+     {}
+    ],
+    "width": [
+     "INT",
+     {
+      "tooltip": "Output video width in pixels.",
+      "default": 832,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "height": [
+     "INT",
+     {
+      "tooltip": "Output video height in pixels.",
+      "default": 480,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "length": [
+     "INT",
+     {
+      "tooltip": "Number of frames to generate.",
+      "default": 81,
+      "min": 1,
+      "max": 16384,
+      "step": 4
+     }
+    ],
+    "batch_size": [
+     "INT",
+     {
+      "tooltip": "Number of videos to generate simultaneously.",
+      "default": 1,
+      "min": 1,
+      "max": 4096
+     }
+    ],
+    "video_frame_offset": [
+     "INT",
+     {
+      "tooltip": "Frames to seek into the pose video. Connect to the video_frame_offset output of the previous node when extending.",
+      "default": 0,
+      "min": 0,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "pose_strength": [
+     "FLOAT",
+     {
+      "tooltip": "Scales the pose video's influence on the motion. 1.0 is the trained behavior; below weakens adherence, above amplifies. 0.0 mutes it but does not fully remove it.",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 10.0,
+      "step": 0.01
+     }
+    ],
+    "pose_start_percent": [
+     "FLOAT",
+     {
+      "tooltip": "Sampling percent at which the pose influence starts. Outside the window the pose branch is skipped entirely, which also speeds those steps up.",
+      "default": 0.0,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01
+     }
+    ],
+    "pose_end_percent": [
+     "FLOAT",
+     {
+      "tooltip": "Sampling percent at which the pose influence ends. Motion is mostly established early, so e.g. 0.7 can loosen fine detail while keeping the choreography.",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01
+     }
+    ],
+    "reference_image_strength": [
+     "FLOAT",
+     {
+      "tooltip": "Scales how strongly generated frames attend to the reference image's latent frame. Below 1.0 loosens identity/appearance adherence (e.g. to let the prompt restyle), above tightens it against drift.",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 10.0,
+      "step": 0.01
+     }
+    ]
+   },
+   "optional": {
+    "reference_image": [
+     "IMAGE",
+     {
+      "tooltip": "The character to animate."
+     }
+    ],
+    "pose_video": [
+     "IMAGE",
+     {
+      "tooltip": "The video whose motion is transferred to the reference character."
+     }
+    ],
+    "clip_vision_output": [
+     "CLIP_VISION_OUTPUT",
+     {
+      "tooltip": "CLIP vision of the reference image."
+     }
+    ],
+    "positive_pose": [
+     "CONDITIONING",
+     {
+      "tooltip": "Prompt for the pose-video branch, describing the motion rather than the character. Defaults to positive. Used for both the cond and uncond passes."
+     }
+    ],
+    "clip_vision_output_pose": [
+     "CLIP_VISION_OUTPUT",
+     {
+      "tooltip": "CLIP vision of the pose video's first frame. Defaults to clip_vision_output."
+     }
+    ],
+    "continue_motion": [
+     "IMAGE",
+     {
+      "tooltip": "Previous motion sequence to continue from for temporal consistency."
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "positive",
+    "negative",
+    "vae",
+    "width",
+    "height",
+    "length",
+    "batch_size",
+    "video_frame_offset",
+    "pose_strength",
+    "pose_start_percent",
+    "pose_end_percent",
+    "reference_image_strength"
+   ],
+   "optional": [
+    "reference_image",
+    "pose_video",
+    "clip_vision_output",
+    "positive_pose",
+    "clip_vision_output_pose",
+    "continue_motion"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "CONDITIONING",
+   "CONDITIONING",
+   "LATENT",
+   "INT",
+   "INT",
+   "INT"
+  ],
+  "output_is_list": [
+   false,
+   false,
+   false,
+   false,
+   false,
+   false
+  ],
+  "output_name": [
+   "positive",
+   "negative",
+   "latent",
+   "trim_latent",
+   "trim_image",
+   "video_frame_offset"
+  ],
+  "output_tooltips": [
+   null,
+   null,
+   null,
+   "Number of latent frames that should be trimmed before decoding.",
+   "Number of overlapping image frames when extending a video.",
+   "Frames to seek into the pose video."
+  ],
+  "output_matchtypes": null,
+  "name": "WanAnimate2ToVideo",
+  "display_name": null,
+  "description": "Animate a character in a reference image using a video, effectively replicating the facial animation, body motion and hands gesture from the video.",
+  "python_module": "comfy_extras.nodes_wan",
+  "category": "model/conditioning/wan/animate",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": true,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "WanAnimate2Cache": {
+  "input": {
+   "required": {
+    "model": [
+     "MODEL",
+     {}
+    ],
+    "device": [
+     "COMBO",
+     {
+      "tooltip": "Where to keep the cache. cpu (RAM) is the safe choice, the cache will not fit in VRAM alongside the model at typical sizes. gpu (VRAM) can be faster if it fits.",
+      "default": "cpu",
+      "multiselect": false,
+      "options": [
+       "cpu",
+       "gpu"
+      ]
+     }
+    ],
+    "dtype": [
+     "COMBO",
+     {
+      "tooltip": "Storage precision. default stores the activations in the model's compute dtype. int8 halves the cache, int4 quarters it, convrot is used to retain accuracy.",
+      "default": "default",
+      "multiselect": false,
+      "options": [
+       "default",
+       "int8",
+       "int4"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model",
+    "device",
+    "dtype"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "MODEL"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "MODEL"
+  ],
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "WanAnimate2Cache",
+  "display_name": null,
+  "description": "Caches the pose-video's per-block activations so it runs once instead of on every sampling step. Roughly halves generation time Tradeoff is ~12.5 GB of system RAM at 480x832/81 frames in bf16 (scales with resolution and length). With context windows each window is cached separately, so RAM scales with the window count; use the static_standard schedule, as uniform schedules shift the windows every step and nothing ever recurs to hit the cache.",
+  "python_module": "comfy_extras.nodes_wan",
+  "category": "model/conditioning/wan/animate",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": true,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "TrimVideoLatent": {
+  "input": {
+   "required": {
+    "samples": [
+     "LATENT",
+     {}
+    ],
+    "trim_amount": [
+     "INT",
+     {
+      "default": 0,
+      "min": 0,
+      "max": 99999
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "samples",
+    "trim_amount"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "LATENT"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "LATENT"
+  ],
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "TrimVideoLatent",
+  "display_name": "Trim Video Latent",
+  "description": "",
+  "python_module": "comfy_extras.nodes_wan",
+  "category": "model/latent",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "SamplerCustom": {
+  "input": {
+   "required": {
+    "model": [
+     "MODEL",
+     {}
+    ],
+    "add_noise": [
+     "BOOLEAN",
+     {
+      "advanced": true,
+      "default": true
+     }
+    ],
+    "noise_seed": [
+     "INT",
+     {
+      "default": 0,
+      "min": 0,
+      "max": 18446744073709551615,
+      "control_after_generate": true
+     }
+    ],
+    "cfg": [
+     "FLOAT",
+     {
+      "default": 8.0,
+      "min": 0.0,
+      "max": 100.0,
+      "step": 0.1,
+      "round": 0.01
+     }
+    ],
+    "positive": [
+     "CONDITIONING",
+     {}
+    ],
+    "negative": [
+     "CONDITIONING",
+     {}
+    ],
+    "sampler": [
+     "SAMPLER",
+     {}
+    ],
+    "sigmas": [
+     "SIGMAS",
+     {}
+    ],
+    "latent_image": [
+     "LATENT",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model",
+    "add_noise",
+    "noise_seed",
+    "cfg",
+    "positive",
+    "negative",
+    "sampler",
+    "sigmas",
+    "latent_image"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "LATENT",
+   "LATENT"
+  ],
+  "output_is_list": [
+   false,
+   false
+  ],
+  "output_name": [
+   "output",
+   "denoised_output"
+  ],
+  "output_tooltips": [
+   null,
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "SamplerCustom",
+  "display_name": null,
+  "description": "",
+  "python_module": "comfy_extras.nodes_custom_sampler",
+  "category": "model/sampling/custom",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "BasicScheduler": {
+  "input": {
+   "required": {
+    "model": [
+     "MODEL",
+     {}
+    ],
+    "scheduler": [
+     "COMBO",
+     {
+      "multiselect": false,
+      "options": [
+       "simple",
+       "sgm_uniform",
+       "karras",
+       "exponential",
+       "ddim_uniform",
+       "beta",
+       "normal",
+       "linear_quadratic",
+       "kl_optimal"
+      ]
+     }
+    ],
+    "steps": [
+     "INT",
+     {
+      "default": 20,
+      "min": 1,
+      "max": 10000
+     }
+    ],
+    "denoise": [
+     "FLOAT",
+     {
+      "default": 1.0,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model",
+    "scheduler",
+    "steps",
+    "denoise"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "SIGMAS"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "SIGMAS"
+  ],
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "BasicScheduler",
+  "display_name": null,
+  "description": "",
+  "python_module": "comfy_extras.nodes_custom_sampler",
+  "category": "model/sampling/schedulers",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "KSamplerSelect": {
+  "input": {
+   "required": {
+    "sampler_name": [
+     "COMBO",
+     {
+      "multiselect": false,
+      "options": [
+       "euler",
+       "euler_cfg_pp",
+       "euler_ancestral",
+       "euler_ancestral_cfg_pp",
+       "heun",
+       "heunpp2",
+       "exp_heun_2_x0",
+       "exp_heun_2_x0_sde",
+       "dpm_2",
+       "dpm_2_ancestral",
+       "lms",
+       "dpm_fast",
+       "dpm_adaptive",
+       "dpmpp_2s_ancestral",
+       "dpmpp_2s_ancestral_cfg_pp",
+       "dpmpp_sde",
+       "dpmpp_sde_gpu",
+       "dpmpp_2m",
+       "dpmpp_2m_cfg_pp",
+       "dpmpp_2m_sde",
+       "dpmpp_2m_sde_gpu",
+       "dpmpp_2m_sde_heun",
+       "dpmpp_2m_sde_heun_gpu",
+       "dpmpp_3m_sde",
+       "dpmpp_3m_sde_gpu",
+       "ddpm",
+       "lcm",
+       "ipndm",
+       "ipndm_v",
+       "deis",
+       "cfgpp_ud10_ab",
+       "res_multistep",
+       "res_multistep_cfg_pp",
+       "res_multistep_ancestral",
+       "res_multistep_ancestral_cfg_pp",
+       "gradient_estimation",
+       "gradient_estimation_cfg_pp",
+       "er_sde",
+       "seeds_2",
+       "seeds_3",
+       "sa_solver",
+       "sa_solver_pece",
+       "ddim",
+       "uni_pc",
+       "uni_pc_bh2"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "sampler_name"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "SAMPLER"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "SAMPLER"
+  ],
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "KSamplerSelect",
+  "display_name": null,
+  "description": "",
+  "python_module": "comfy_extras.nodes_custom_sampler",
+  "category": "model/sampling/samplers",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "GetImageSize": {
+  "input": {
+   "required": {
+    "image": [
+     "IMAGE",
+     {}
+    ]
+   },
+   "hidden": {
+    "unique_id": [
+     "UNIQUE_ID"
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "image"
+   ],
+   "hidden": [
+    "unique_id"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "INT",
+   "INT",
+   "INT"
+  ],
+  "output_is_list": [
+   false,
+   false,
+   false
+  ],
+  "output_name": [
+   "width",
+   "height",
+   "batch_size"
+  ],
+  "output_tooltips": [
+   null,
+   null,
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "GetImageSize",
+  "display_name": "Get Image Size",
+  "description": "Returns the width, height, and batch size of the image.",
+  "python_module": "comfy_extras.nodes_images",
+  "category": "image",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": [
+   "dimensions",
+   "resolution",
+   "image info"
+  ],
+  "essentials_category": null,
+  "has_intermediate_output": false
  }
 }

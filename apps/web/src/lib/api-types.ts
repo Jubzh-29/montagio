@@ -101,8 +101,8 @@ export type ShowcaseInfo = {
   repoUrl: string | null;
 };
 
-/** The six extensions, as registry/extensions.yaml names them. */
-export type ExtensionId = 'edit' | 'effects' | 'transitions' | 'avatar' | 'music' | 'upscale';
+/** The seven extensions, as registry/extensions.yaml names them. */
+export type ExtensionId = 'edit' | 'effects' | 'transitions' | 'avatar' | 'music' | 'upscale' | 'motion';
 
 /** A one-photo effect of the wall (GET /api/extensions). */
 export type EffectSummary = {

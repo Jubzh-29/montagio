@@ -19,3 +19,6 @@ extensions:
   - id: upscale
     priority: 6
     gpu_validated: null
+  - id: motion
+    priority: 7
+    gpu_validated: null

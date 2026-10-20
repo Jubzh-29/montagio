@@ -10,6 +10,7 @@ export {
   mixMusic,
   normalizeClip,
   placeholderClip,
+  prepareMotionClip,
   previewClip,
   probe,
   probeAudio,

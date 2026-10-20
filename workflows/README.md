@@ -61,6 +61,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 | `wan22-s2v-avatar.api.json` | `templates/video_wan2_2_14B_s2v.json` | Wan 2.2 S2V 14B fp8 | node 113, MP4 with the speech |
 | `wan21-i2v-effect.api.json` | `templates/image_to_video_wan.json` | Wan 2.1 I2V 14B 480p fp8, an effect LoRA | node 56, MP4 |
 | `wan22-flf2v-transition.api.json` | `templates/video_wan2_2_14B_flf2v.json` | Wan 2.2 I2V A14B fp8 (high and low noise) | node 61, MP4 |
+| `wan-animate2-motion.api.json` | `templates/video_wan_animate2_distilled.json` | Wan2.2-Animate-2 distilled, int8 | node 246, MP4 |
 
 ### ace-step15-music
 
@@ -112,6 +113,13 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 - The template's 4-step group loads the end image into the start input and the reverse: fixed (68 is the start, 62 the end).
 - Size of the photo's aspect at 480p instead of 640×640; 16 fps; `SaveVideo` writes `montagio/transition`.
 
+### wan-animate2-motion
+
+- The template's active subgraph, flattened with its inner ids (`672:587` becomes `587`), as one 81-frame window; its bypassed copy for chaining windows is left out (the v0.1 clip lasts 5 s at most, prepared at 16 fps by `prepareMotionClip`).
+- The raw frames of the clip feed `WanAnimate2ToVideo.pose_video` (no pose extractor, no mask, no LoRA): 10 steps, cfg 1, lcm, shift 5, as the template.
+- `VAELoader` (584) loads the lock's `wan_2.1_vae` instead of the template's `Wan2_1_VAE_bf16` (a copy of Kijai's file); `WanAnimate2Cache` (594) runs on the CPU instead of the GPU, as the template's note advises against VRAM spikes; `CreateVideo` (245) writes 16 fps without the reference clip's sound.
+- The size follows the clip's aspect at 480p (bound on the clip's `ResizeImageMaskNode`, 600); the photo is cropped to it through `GetImageSize` (596).
+
 ## Bindings
 
 | Model | image | prompt | negative | seed | width / height / frames | fps | camera_pose / camera_speed |
@@ -131,3 +139,4 @@ Extension models (a binding with several inputs gets the same value in each):
 | `wan22-s2v-avatar` | image 52.image; audio 58.audio; prompt 6.text; seed 3.seed (+1, +2 on the extension samplers); width / height 93.width / 93.height; frames 96.length | 113 (video) |
 | `wan21-i2v-effects` | image 52.image; prompt 6.text; negative 7.text; seed 3.seed; width / height / frames 50.width / height / length; lora 200.lora_name; lora_strength 200.strength_model | 56 (video) |
 | `wan22-flf2v-transition` | image 68.image; end_image 62.image; prompt 6.text; negative 7.text; seed 57.noise_seed; width / height / frames 67.width / height / length | 61 (video) |
+| `wan-animate2-motion` | image 189.image; video 240.file; prompt 582.text; motion_prompt 585.text; negative 581.text; seed 597.noise_seed; width / height 600.resize_type.width / height; frames 587.length | 246 (video) |
