@@ -116,5 +116,17 @@
   "tabCamera": "Camera",
   "tabFilm": "Film",
   "tabAvatar": "Avatar",
-  "tabHistory": "History"
+  "tabHistory": "History",
+  "composerLabel": "Shot setup",
+  "canvasViews": "Canvas",
+  "canvasGallery": "Gallery",
+  "canvasResult": "Monitor",
+  "photoTitle": "Start photo",
+  "photoImport": "Import",
+  "photoSample": "Sample",
+  "photoT2i": "Text to image",
+  "photoEdit": "Edit",
+  "choiceChange": "Change",
+  "choiceCamera": "Camera move · {s} s",
+  "aiCaption": "AI-generated · {model} ({license})"
 }

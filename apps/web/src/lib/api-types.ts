@@ -62,7 +62,7 @@ export const TERMINAL_STATES: ReadonlySet<JobState> = new Set(['succeeded', 'fai
 export type SequenceSummary = {
   id: string;
   state: 'running' | 'assembling' | 'succeeded' | 'failed' | 'canceled';
-  shots: { presetId: string; state: string }[];
+  shots: { presetId: string; state: string; modelId?: string }[];
   currentShot: number;
   progress: number;
   outputUrl?: string;

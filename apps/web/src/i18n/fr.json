@@ -116,5 +116,17 @@
   "tabCamera": "Caméra",
   "tabFilm": "Film",
   "tabAvatar": "Avatar",
-  "tabHistory": "Historique"
+  "tabHistory": "Historique",
+  "composerLabel": "Réglages du plan",
+  "canvasViews": "Zone de travail",
+  "canvasGallery": "Galerie",
+  "canvasResult": "Moniteur",
+  "photoTitle": "Photo de départ",
+  "photoImport": "Importer",
+  "photoSample": "Exemple",
+  "photoT2i": "Texte → image",
+  "photoEdit": "Modifier",
+  "choiceChange": "Changer",
+  "choiceCamera": "Mouvement de caméra · {s} s",
+  "aiCaption": "Généré par IA · {model} ({license})"
 }

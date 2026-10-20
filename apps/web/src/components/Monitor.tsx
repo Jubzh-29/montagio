@@ -6,7 +6,6 @@ import type { JobState, SampleSummary } from '@/lib/api-types';
 import { photoTarget } from '@/lib/move-glyph';
 import { refusalMessageKey } from '@/lib/refusals';
 import { MoveGlyph } from './MoveGlyph';
-import { SamplePicker } from './SamplePicker';
 import styles from './studio.module.css';
 
 /** What the monitor needs from a generation or a sequence. */
@@ -15,7 +14,8 @@ export type TrackedJob = { id: string; state: JobState; progress: number; output
 export type UploadState =
   | { status: 'idle' }
   | { status: 'uploading'; localUrl: string }
-  | { status: 'ready'; localUrl: string; imageRef: string }
+  /** `personal`: imported, or made from an imported photo; an effect on it asks for consent. */
+  | { status: 'ready'; localUrl: string; imageRef: string; personal: boolean }
   | { status: 'error'; message: string; localUrl?: string };
 
 export type GenerationState =
@@ -78,7 +78,6 @@ export function Monitor({
     generation.status === 'submitting' || (record !== undefined && (record.state === 'queued' || record.state === 'running'));
   const percent = record ? Math.round(record.progress * 100) : 0;
   const result = record?.state === 'succeeded' ? record.outputUrl : undefined;
-  const acceptsFiles = !showcase || showcase.uploads;
 
   const onDrop = (event: DragEvent) => {
     event.preventDefault();
@@ -101,21 +100,6 @@ export function Monitor({
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
     >
-      {acceptsFiles && (
-        <input
-          id="photo-input"
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="visually-hidden"
-          disabled={rendering}
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) onFile(file);
-            event.target.value = '';
-          }}
-        />
-      )}
-
       {result ? (
         <video
           key={result}
@@ -142,8 +126,8 @@ export function Monitor({
           {move && <MoveGlyph variant="monitor" poses={move.poses} speed={move.speed} replay={move.id} />}
           {showcase ? (
             <div className={styles.monitorEmpty}>
+              {/* The sample photos are in the composer, beside the photo slot. */}
               <p className={styles.monitorEmptyTitle}>{t('showcasePickSample')}</p>
-              <SamplePicker samples={showcase.samples} selectedId={showcase.selectedId} onPick={showcase.onPick} />
               {showcase.uploads && (
                 <label htmlFor="photo-input" className={styles.buttonSecondary}>
                   {t('choosePhoto')}
@@ -221,12 +205,6 @@ export function Monitor({
           <button type="button" className={styles.buttonSecondary} onClick={onRetry}>
             {t('tryAgain')}
           </button>
-        </div>
-      )}
-
-      {upload.status === 'error' && (
-        <div className={styles.monitorNotice} role="alert" data-tone="error">
-          <p>{upload.message}</p>
         </div>
       )}
 

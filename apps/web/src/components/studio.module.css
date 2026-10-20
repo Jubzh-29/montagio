@@ -1,7 +1,7 @@
-/* Layout: the monitor gets the room, the panel holds the shot setup. */
+/* Layout: the composer on the left holds the shot setup, the canvas gets the room. */
 .studio {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
   gap: var(--space-6);
   width: 100%;
   max-width: 1360px;
@@ -10,18 +10,25 @@
   align-items: start;
 }
 
+/* The canvas: the wall of previews, or the monitor and its result. */
 .stage {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  position: sticky;
-  top: 72px;
+  min-width: 0;
 }
 
+/* The composer stays in view while the wall scrolls; its Generate button stays at its foot. */
 .panel {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  position: sticky;
+  top: 72px;
+  max-height: calc(100dvh - 88px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: var(--space-1);
 }
 
 .panelSection {
@@ -898,8 +905,15 @@
     padding: var(--space-4);
     gap: var(--space-5);
   }
+  /* On a phone the media comes first, then the setup. */
   .stage {
+    order: -1;
+  }
+  .panel {
     position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
   }
   .generateBlock {
     padding-block: var(--space-3);
@@ -1306,4 +1320,145 @@
 
 .footerLinks a:hover {
   color: var(--ink);
+}
+
+/* Canvas views: the wall or the monitor. */
+.canvasViews {
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  align-self: flex-start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+
+.canvasGallery,
+.canvasResult {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.canvasResult[hidden] {
+  display: none;
+}
+
+/* In the canvas the wall gets wider tiles than the old side panel had. */
+.canvasGallery .presetGrid {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-3);
+}
+
+/* The composer's card: the move, effect or hook the next render will be. */
+.choiceCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.choiceMedia {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.choiceMedia > .glyph {
+  position: absolute;
+  inset: 0;
+}
+
+.choiceVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.choiceIcon {
+  font-size: 2.5rem;
+  color: var(--ink-faint);
+}
+
+.choiceName {
+  position: absolute;
+  left: var(--space-3);
+  bottom: var(--space-2);
+  font-size: var(--text-l);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 8px oklch(0 0 0 / 0.6);
+}
+
+.choiceMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+}
+
+/* The start photo: a thumbnail, or a drop zone while there is none. */
+.photoSlot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+}
+
+.photoSlot[data-dragging='true'] {
+  border-color: var(--rec);
+  background: var(--rec-soft);
+}
+
+.photoThumb {
+  flex: none;
+  width: 96px;
+  height: 64px;
+  border-radius: var(--radius-s);
+  object-fit: cover;
+}
+
+.photoEmpty {
+  flex: none;
+  width: 96px;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+}
+
+.photoActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.photoActions .buttonSecondary {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-s);
+}
+
+.photoActions > input:focus-visible + label {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.photoActions label[aria-disabled='true'] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.photoError {
+  color: var(--error);
+  font-size: var(--text-s);
 }

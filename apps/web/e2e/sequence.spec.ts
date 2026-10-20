@@ -5,8 +5,7 @@ const sampleImage = resolve(__dirname, '../../../demo-assets/images/sample-16x9.
 
 test('sequence happy path: three moves, one film, a 9:16 cut', async ({ page }) => {
   test.setTimeout(90_000);
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Sequence', exact: true }).click();
+  await page.goto('/?tab=film');
   await page.setInputFiles('input[type=file]', sampleImage);
   for (const name of ['Crash Push', 'Pan Left', 'Slow Push']) await page.getByRole('button', { name }).click();
   await page.getByRole('button', { name: /^Generate film/ }).click();
@@ -19,8 +18,7 @@ test('sequence happy path: three moves, one film, a 9:16 cut', async ({ page }) 
 });
 
 test('generate film needs two shots', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Sequence', exact: true }).click();
+  await page.goto('/?tab=film');
   await page.setInputFiles('input[type=file]', sampleImage);
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await expect(page.getByRole('button', { name: /^Generate film/ })).toBeDisabled();
@@ -29,8 +27,7 @@ test('generate film needs two shots', async ({ page }) => {
 });
 
 test('a shot can be removed and the list is capped at three', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Sequence', exact: true }).click();
+  await page.goto('/?tab=film');
   for (const name of ['Crash Push', 'Pan Left', 'Slow Push', 'Crash Push']) await page.getByRole('button', { name }).click();
   const shots = page.getByRole('listitem').filter({ has: page.getByRole('button', { name: /^Remove shot/ }) });
   await expect(shots).toHaveCount(3);
@@ -40,8 +37,7 @@ test('a shot can be removed and the list is capped at three', async ({ page }) =
 });
 
 test('each shot can carry its own optional text', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Sequence', exact: true }).click();
+  await page.goto('/?tab=film');
   await page.setInputFiles('input[type=file]', sampleImage);
   for (const name of ['Crash Push', 'Pan Left']) await page.getByRole('button', { name }).click();
   await page.getByLabel('Scene (optional)').fill('a harbour at dawn');

@@ -28,6 +28,8 @@ export default defineConfig({
     env: {
       MONTAGIO_BACKEND: 'demo',
       MONTAGIO_DEMO_DURATION_MS: '1500',
+      // Every extension and every effect, dated or not: the suite covers what the GPU sessions will validate.
+      MONTAGIO_EXTENSIONS: 'all',
       MONTAGIO_DATA: join(tmpdir(), `montagio-e2e-${Date.now()}`),
     },
   },
