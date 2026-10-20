@@ -153,10 +153,11 @@ test('the open stack page loads directly', async ({ page }) => {
   expect(problems()).toEqual([]);
 });
 
-test('a missing data.json shows the generic error, not a blank page', async ({ page }) => {
+test('a missing data.json says the catalogue failed, not a blank page', async ({ page }) => {
   await page.route('**/showcase/data.json', (route) => route.fulfill({ status: 404, body: 'not found' }));
   await page.goto('/');
-  await expect(page.getByRole('alert').filter({ hasText: 'Something went wrong' })).toBeVisible();
+  // The canvas opens on the wall, which says what failed and what to do.
+  await expect(page.getByText('The camera moves could not be loaded. Reload the page to try again.')).toBeVisible();
   await page.goto('/open-stack/');
   await expect(page.getByRole('heading', { name: 'Open stack' })).toBeVisible();
 });
@@ -179,8 +180,9 @@ test('when FFmpeg cannot load, the film says so and single clips still play', as
 test('the showcase shows the camera and film tabs only, and no photo tool beyond the samples', async ({ page }) => {
   await page.goto('/');
   await arrival(page);
+  // The creation tabs, then the History link that closes the row.
   const tabs = page.getByRole('navigation', { name: 'Creation' }).getByRole('link');
-  await expect(tabs).toHaveText(['Camera', 'Film']);
+  await expect(tabs).toHaveText(['Camera', 'Film', 'History']);
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Text to image', exact: true })).toHaveCount(0);
 });
