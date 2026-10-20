@@ -73,6 +73,7 @@ test('an extension record carries the sha256 of its photo', () => {
     avatar: '/data/photo.png',
     music: null,
     upscale: null,
+    motion: '/data/photo.png',
   });
 });
 
