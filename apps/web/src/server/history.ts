@@ -34,9 +34,9 @@ async function readRecords<T>(kind: 'generations' | 'sequences'): Promise<T[]> {
 }
 
 /** The photo to reopen, or the note that it is gone. */
-async function photo(imageRef: string | undefined): Promise<Pick<Reprise, 'imageRef' | 'photoMissing'>> {
-  if (imageRef && (await readUploadMeta(imageRef))) return { imageRef };
-  return { photoMissing: true };
+async function photo(imageRef: string | undefined): Promise<Pick<Reprise, 'imageRef' | 'personal' | 'photoMissing'>> {
+  const meta = imageRef ? await readUploadMeta(imageRef) : null;
+  return meta ? { imageRef: meta.imageRef, personal: meta.personal } : { photoMissing: true };
 }
 
 const presetName = (lib: Library, id: string) => lib.presets.get(id)?.name ?? id;

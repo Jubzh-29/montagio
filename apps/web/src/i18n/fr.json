@@ -163,5 +163,21 @@
   "effectsFilterHooks": "Hooks",
   "effectKind": "Effet · {s} s",
   "effectSubject": "Ce que montre la photo (facultatif)",
-  "effectSubjectPlaceholder": "un golden retriever"
+  "effectSubjectPlaceholder": "un golden retriever",
+  "historyTitle": "Historique",
+  "historyFilterAll": "Tout",
+  "historyFilterPhotos": "Photos",
+  "historyFilterClips": "Clips",
+  "historyFilterFilms": "Films",
+  "historyDownload": "Télécharger",
+  "historyReuse": "Reprendre",
+  "historyEmpty": "Vos créations s'afficheront ici.",
+  "historyBackToStudio": "Aller au studio",
+  "historyShowcaseNote": "Dans la vitrine, l'historique ne garde que cette visite : rien n'est enregistré.",
+  "historySeeAll": "Tout voir",
+  "historyRecent": "Vos dernières créations",
+  "historyKindPhoto": "Photo",
+  "historyKindClip": "Clip",
+  "historyKindFilm": "Film",
+  "repriseNoPhoto": "La photo de cette création n'existe plus : choisissez-en une nouvelle."
 }

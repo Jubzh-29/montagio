@@ -184,3 +184,21 @@ test('the showcase shows the camera and film tabs only, and no photo tool beyond
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Text to image', exact: true })).toHaveCount(0);
 });
+
+test('the showcase history shows the clip of this visit, and says it keeps only this visit', async ({ page }) => {
+  const problems = watchRequests(page);
+  await page.goto('/');
+  await arrival(page);
+  await page.getByRole('link', { name: 'History', exact: true }).click();
+  await expect(page.getByText(/keeps only this visit/)).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'Clip · Crash Push' })).toBeVisible();
+  expect(problems()).toEqual([]);
+});
+
+test('/history/ loads directly, with nothing outside its origin', async ({ page }) => {
+  const problems = watchRequests(page);
+  await page.goto('/history/');
+  await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();
+  await expect(page.getByText('Your creations will show here.')).toBeVisible();
+  expect(problems()).toEqual([]);
+});

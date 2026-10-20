@@ -67,6 +67,9 @@ function Tabs({ current }: { current?: Tab | 'history' }) {
           {t(TAB_LABELS[tab])}
         </Link>
       ))}
+      <Link href="/history" className={styles.tab} aria-current={current === 'history' ? 'page' : undefined}>
+        {t('tabHistory')}
+      </Link>
     </nav>
   );
 }

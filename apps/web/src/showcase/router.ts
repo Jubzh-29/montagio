@@ -145,7 +145,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
         createdAt: new Date().toISOString(),
         previewUrl: record.outputUrl!,
         downloadUrl: record.outputUrl!,
-        reprise: { tab: 'camera', imageRef: input.imageRef, presetId: input.presetId, modelId: data.model.id },
+        reprise: { tab: 'camera', imageRef: input.imageRef, personal: false, presetId: input.presetId, modelId: data.model.id },
       },
       ...visit,
     ];
@@ -215,7 +215,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
             createdAt: new Date().toISOString(),
             previewUrl: filmUrls[0]!,
             downloadUrl: filmUrls[0]!,
-            reprise: { tab: 'film', imageRef: String(input.imageRef), shots: record.shots.map((shot) => ({ presetId: shot.presetId })) },
+            reprise: { tab: 'film', imageRef: String(input.imageRef), personal: false, shots: record.shots.map((shot) => ({ presetId: shot.presetId })) },
           },
           ...visit.filter((item) => item.kind !== 'film'),
         ];

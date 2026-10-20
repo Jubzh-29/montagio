@@ -161,6 +161,8 @@ export type JobSummary = {
 export type Reprise = {
   tab: 'effects' | 'camera' | 'film' | 'avatar';
   imageRef?: string;
+  /** The photo is, or derives from, an imported one: an effect on it asks for consent. */
+  personal?: boolean;
   /** The start photo is gone (data wiped): the reprise reopens everything but the photo. */
   photoMissing?: true;
   presetId?: string;

@@ -7,6 +7,7 @@ import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import {
   TERMINAL_STATES,
   type GenerationRecord,
+  type HistoryItem,
   type JobState,
   type JobSummary,
   type ModelSummary,
@@ -17,13 +18,14 @@ import {
   type UploadResult,
 } from '@/lib/api-types';
 import { refusalMessageKey } from '@/lib/refusals';
+import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { useMotionPaused } from '@/lib/use-motion';
 import { needsConsent } from '@/lib/consent';
 import { defaultSubject } from '@/lib/effect-choice';
 import { nextView, type CanvasEvent, type CanvasState } from '@/lib/studio-view';
-import { HOOKS_READY, pickTab, visibleTabs } from '@/lib/tabs';
+import { HOOKS_READY, pickTab, tabHref, visibleTabs } from '@/lib/tabs';
 import { refreshExtensions, useExtensions } from '@/lib/use-extensions';
 import { useShowcase } from '@/lib/use-showcase';
 import { AiCaption } from './AiCaption';
@@ -39,6 +41,7 @@ import { Monitor, type GenerationState, type TrackedJob, type UploadState } from
 import { PhotoAtelier, type AtelierPhoto } from './PhotoAtelier';
 import { PhotoSource } from './PhotoSource';
 import { PresetGallery, type SequenceTiles } from './PresetGallery';
+import { RecentStrip } from './RecentStrip';
 import { RemixEditor, type RemixCheck } from './RemixEditor';
 import { ShotList } from './ShotList';
 import { ShowcaseFooter } from './ShowcaseFooter';
@@ -120,6 +123,11 @@ export function Studio() {
   const [effectId, setEffectId] = useState<string | null>(null);
   const [subject, setSubject] = useState('');
   const [consent, setConsent] = useState(false);
+  // History: the latest creations under the result, and the item a "Reuse" link brings back (?from=).
+  const [recent, setRecent] = useState<HistoryItem[]>([]);
+  const [from, setFrom] = useState<string | null>(null);
+  const appliedFrom = useRef<string | null>(null);
+  const [repriseNotice, setRepriseNotice] = useState(false);
   const moveCanvas = (event: CanvasEvent) => setCanvas((current) => nextView(event, current));
   const [presets, setPresets] = useState<PresetSummary[]>([]);
   const [models, setModels] = useState<ModelSummary[]>([]);
@@ -214,6 +222,18 @@ export function Studio() {
     // t only changes with the language and is read when the error is shown.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracked?.record, pollRetry]);
+
+  // The latest creations, under the result: at the start, and after each render that succeeds.
+  const loadRecent = useCallback(() => {
+    apiFetch('/api/history')
+      .then((res) => jsonOrThrow<HistoryItem[]>(res))
+      .then(setRecent)
+      .catch(() => undefined);
+  }, []);
+  const finishedId = view?.state === 'succeeded' ? view.id : null;
+  useEffect(() => {
+    loadRecent();
+  }, [loadRecent, finishedId]);
 
   const busyRef = useRef(false);
   useEffect(() => {
@@ -375,6 +395,49 @@ export function Studio() {
     remixFocus.current = 'toggle';
     setRemix(null);
   };
+
+  /** A history item's "Reuse": its tab, photo, choice and texts come back, ready to render again. */
+  const restore = (item: HistoryItem) => {
+    const back = applyReprise(item);
+    touched.current = true;
+    ++uploadToken.current;
+    setJob({ status: 'idle' });
+    if (back.photo) {
+      const sample = showcase?.samples.find((entry) => entry.imageRef === back.photo!.imageRef);
+      setUpload({ status: 'ready', localUrl: sample?.url ?? `/media/data/${back.photo.imageRef}`, imageRef: back.photo.imageRef, personal: back.photo.personal });
+    } else {
+      setUpload({ status: 'idle' });
+    }
+    setRepriseNotice(back.notice === 'photo-missing');
+    setPhotoPrompt(back.photoPrompt);
+    setSubjectFor(back.photoPrompt);
+    setSubject(back.subject ?? defaultSubject(back.photoPrompt, 120));
+    if (back.presetId) setPresetId(back.presetId);
+    if (back.modelId && models.some((model) => model.id === back.modelId)) setModelId(back.modelId);
+    if (back.prompt !== undefined) setPrompt(back.prompt);
+    if (back.shots) setShots(back.shots);
+    if (back.effectId) setEffectId(back.effectId);
+    setCanvas({ view: 'gallery', before: 'gallery' });
+    if (back.remixGenerationId && back.presetId) {
+      void openRemix(back.presetId, `/api/generations/${encodeURIComponent(back.remixGenerationId)}/preset`, back.remixGenerationId);
+    }
+    // The link did its work: the address keeps the tab only.
+    window.history.replaceState(null, '', tabHref(back.tab));
+  };
+
+  useEffect(() => {
+    if (!from || catalog !== 'ready' || appliedFrom.current === from) return;
+    appliedFrom.current = from;
+    apiFetch('/api/history')
+      .then((res) => jsonOrThrow<HistoryItem[]>(res))
+      .then((items) => {
+        const item = items.find((entry) => entry.key === from);
+        if (item) restore(item);
+      })
+      .catch(() => undefined);
+    // restore reads the catalogue, which is ready here; the item to bring back is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from, catalog]);
 
   const checkRemix = async () => {
     if (!remix) return;
@@ -610,6 +673,7 @@ export function Studio() {
             if (value !== null) touched.current = true;
             setRequestedTab(value);
           }}
+          onFrom={setFrom}
         />
       </Suspense>
       <Header recording={busy} current={tab} />
@@ -659,6 +723,7 @@ export function Studio() {
             ) : null
           }
           photo={
+            <>
             <PhotoSource
               upload={upload}
               disabled={busy}
@@ -679,6 +744,12 @@ export function Studio() {
                   : undefined
               }
             />
+            {repriseNotice && upload.status === 'idle' && (
+              <p className={styles.hint} role="status">
+                {t('repriseNoPhoto')}
+              </p>
+            )}
+            </>
           }
           fields={
             tab === 'effects' ? (
@@ -755,6 +826,7 @@ export function Studio() {
         />
         <Canvas
           view={canvas.view}
+          recent={<RecentStrip items={recent} />}
           atelier={
             atelier && (
               <PhotoAtelier
@@ -912,12 +984,18 @@ export function Studio() {
 }
 
 /** Reads ?tab= in its own Suspense boundary: the rest of the Studio prerenders without the URL. */
-function TabParam({ onTab }: { onTab: (tab: string | null) => void }) {
-  const tab = useSearchParams().get('tab');
+function TabParam({ onTab, onFrom }: { onTab: (tab: string | null) => void; onFrom: (key: string | null) => void }) {
+  const params = useSearchParams();
+  const tab = params.get('tab');
+  const from = params.get('from');
   useEffect(() => {
     onTab(tab);
     // onTab is a new function on every render of the Studio; the URL's tab is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+  useEffect(() => {
+    onFrom(from);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from]);
   return null;
 }
