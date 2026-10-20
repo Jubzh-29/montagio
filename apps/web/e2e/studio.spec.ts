@@ -146,3 +146,27 @@ test('a tab the Studio does not show falls back to the first one', async ({ page
   await page.goto('/?tab=nowhere');
   await expect(page.locator('nav').getByRole('link').first()).toHaveAttribute('aria-current', 'page');
 });
+
+test('a camera clip gets its HD version', async ({ page }) => {
+  await page.goto('/?tab=camera');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Pan Left' }).click();
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: /^HD 1080p/ }).click();
+  await expect(page.getByRole('link', { name: 'Download in HD' })).toHaveAttribute('href', /\/media\/data\/jobs\/.+\/output\.mp4$/, { timeout: 15_000 });
+  await expect(page.getByTestId('hd-caption')).toHaveText(/SeedVR2/);
+});
+
+test('with no extension shown, no extension button anywhere', async ({ page }) => {
+  await page.route('**/api/extensions', (route) => route.fulfill({ json: { extensions: [], effects: [], hooks: [], estimates: { t2i: 12 } } }));
+  await page.goto('/');
+  await expect(page.getByRole('link', { name: 'Camera', exact: true })).toHaveAttribute('aria-current', 'page');
+  for (const tab of ['Effects', 'Avatar']) await expect(page.getByRole('link', { name: tab, exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Pan Left' }).click();
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: /^HD 1080p/ })).toHaveCount(0);
+});

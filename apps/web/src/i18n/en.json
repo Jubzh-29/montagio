@@ -182,6 +182,8 @@
   "musicAdd": "Add music (~{s} s)",
   "musicDownload": "Download with music",
   "musicDownloadVertical": "9:16 with music",
+  "hdAction": "HD 1080p (~{s} s)",
+  "hdDownload": "Download in HD",
   "effectSubject": "What the photo shows (optional)",
   "effectSubjectPlaceholder": "a golden retriever",
   "historyTitle": "History",

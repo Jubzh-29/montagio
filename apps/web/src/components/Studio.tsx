@@ -24,6 +24,7 @@ import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/sho
 import { useMotionPaused } from '@/lib/use-motion';
 import { needsConsent } from '@/lib/consent';
 import { defaultSubject, pickWallChoice } from '@/lib/effect-choice';
+import { canUpscale } from '@/lib/hd';
 import { estimateSpeech } from '@/lib/speech';
 import { nextView, tabEvent, type CanvasEvent, type CanvasState, type ShownTab } from '@/lib/studio-view';
 import { HOOKS_READY, pickTab, tabHref, visibleTabs } from '@/lib/tabs';
@@ -35,6 +36,7 @@ import { ChoiceCard } from './ChoiceCard';
 import { Composer } from './Composer';
 import { ConsentCheck } from './ConsentCheck';
 import { AvatarFields } from './AvatarFields';
+import { HdPanel } from './HdPanel';
 import { MusicPanel } from './MusicPanel';
 import { EffectFields } from './EffectFields';
 import { OutfitSource } from './OutfitSource';
@@ -1049,6 +1051,18 @@ export function Studio() {
                   </a>
                 </div>
               )}
+              {!IS_SHOWCASE &&
+                (tracked?.kind === 'generation' || tracked?.kind === 'job') &&
+                tracked.record.state === 'succeeded' &&
+                extensions?.upscaleModel &&
+                canUpscale(tracked.record, extensions) && (
+                  <HdPanel
+                    key={tracked.record.id}
+                    path={`/api/${tracked.kind === 'generation' ? 'generations' : 'jobs'}/${encodeURIComponent(tracked.record.id)}/upscale`}
+                    estimate_s={extensions.estimates.upscale ?? 0}
+                    model={extensions.upscaleModel}
+                  />
+                )}
               {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (
