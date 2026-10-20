@@ -15,7 +15,7 @@ import { GET as getMedia } from '@/app/media/[...path]/route';
 import { galleryOrder, presetPreviewUrl } from '@/server/gallery';
 import { failureResponse, mediaFileFor } from '@/server/generations';
 import { resetServicesForTests } from '@/server/services';
-import { readUploadMeta, saveUploadFromFile } from '@/server/uploads';
+import { MAX_UPLOAD_FORM_BYTES, readUploadMeta, saveUploadFromFile } from '@/server/uploads';
 import { loadLibrary } from '@montagio/presets';
 import { readTags, tagClip } from '@montagio/sequence';
 import {
@@ -54,6 +54,22 @@ const poll = async (id: string) => (await getGeneration(new Request('http://loca
 describe('uploads', () => {
   test('11 MB is refused with 413', async () => {
     expect((await postUpload(uploadRequest(bigPng(11 * 1024 * 1024)))).status).toBe(413);
+  });
+
+  test('a body past 10 MB: 413 at the limit, the rest never read', async () => {
+    const chunk = new Uint8Array(1024 * 1024);
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= 30 * chunk.byteLength) return controller.close();
+        sent += chunk.byteLength;
+        controller.enqueue(chunk);
+      },
+    });
+    const init = { method: 'POST', headers: { 'content-type': 'multipart/form-data; boundary=x' }, body, duplex: 'half' };
+    const res = await postUpload(new Request('http://localhost/api/uploads', init as RequestInit));
+    expect(res.status).toBe(413);
+    expect(sent).toBeLessThanOrEqual(MAX_UPLOAD_FORM_BYTES + 2 * chunk.byteLength);
   });
 
   test('text/plain is refused with 415', async () => {
