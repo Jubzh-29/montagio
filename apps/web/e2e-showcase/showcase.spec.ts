@@ -204,3 +204,41 @@ test('/history/ loads directly, with nothing outside its origin', async ({ page 
   await expect(page.getByText('Your creations will show here.')).toBeVisible();
   expect(problems()).toEqual([]);
 });
+
+/** The showcase's data.json as the GPU session would leave it: Squish rendered on the first sample (its clip stands in). */
+async function withSquishExample(page: Page) {
+  await page.route('**/showcase/data.json', async (route) => {
+    const response = await route.fetch();
+    const data = (await response.json()) as Record<string, unknown>;
+    const squish = {
+      id: 'squish',
+      name: 'Squish',
+      description: 'The subject gets squished.',
+      modelId: 'wan21-i2v-effects',
+      modelName: 'Wan 2.1 I2V 480p (effects)',
+      license: 'Apache-2.0',
+      examples: [{ sample: 'landscape-a', url: 'clips/pan-left--landscape-a.mp4', workflowUrl: 'workflows/pan-left--landscape-a.json' }],
+    };
+    return route.fulfill({ response, json: { ...data, effects: [squish], hooks: [] } });
+  });
+}
+
+test('with an effect example, the showcase opens on it, and offers it only on its photo', async ({ page }) => {
+  const problems = watchRequests(page);
+  await withSquishExample(page);
+  await page.goto('/');
+  // Effects first: the showcase opens on its first effect's example, captioned with that effect's model.
+  await expect(page.getByRole('link', { name: 'Effects', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(result(page)).toHaveAttribute('src', /\/showcase\/clips\/pan-left--landscape-a\.mp4$/);
+  await expect(page.getByRole('region', { name: 'Squish' })).toBeVisible();
+  await expect(page.getByTestId('result-caption')).toHaveText(/Wan 2[.]1 I2V 480p [(]effects[)]/);
+  // The example is pre-rendered: the subject field says so instead of being ignored.
+  await expect(page.getByRole('textbox', { name: /What the photo shows/ })).toBeDisabled();
+  await expect(page.getByText('What the photo shows applies when you generate locally.')).toBeVisible();
+  // Another sample photo has no example: the wall offers nothing there.
+  await page.getByRole('button', { name: 'Other sample photo' }).click();
+  await page.getByRole('button', { name: /Placeholder portrait A/ }).click();
+  await showGallery(page);
+  await expect(page.getByRole('button', { name: 'Squish' })).toHaveCount(0);
+  expect(problems()).toEqual([]);
+});

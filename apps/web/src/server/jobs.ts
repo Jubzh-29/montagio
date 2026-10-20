@@ -64,6 +64,8 @@ export type JobRecord = {
   personal?: boolean;
   /** A video output's frame count (the HD step takes 121 at most). */
   frames?: number;
+  /** A film's 9:16 cut, when the task makes one (music under a film). */
+  verticalUrl?: string;
   error?: string;
   idempotencyKey: string;
   createdAt: string;
@@ -100,6 +102,11 @@ export type TaskDef = {
   steps(record: JobRecord, lib: Library): StepPlan[];
   /** Provenance given to an image output registered as an upload. */
   imageOrigin?(record: JobRecord): Promise<Provenance>;
+  /**
+   * The task's own delivery of its last output (music: mixed under its film, then cut to 9:16),
+   * in place of the delivery by output kind. A failure ends the job in deliver-failed.
+   */
+  deliver?(record: JobRecord, outputPath: string, dir: string): Promise<{ outputUrl: string; verticalUrl?: string; frames?: number }>;
 };
 
 export type JobEngine = {
@@ -200,9 +207,19 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
     }
   }
 
-  /** Copy the last step's output with the AI-generated mention, where the client can fetch it. */
-  async function deliver(record: JobRecord, step: StepRecord, outputPath: string): Promise<void> {
+  /** Copy the last step's output with the AI-generated mention, where the client can fetch it; false when the task's own delivery failed. */
+  async function deliver(record: JobRecord, step: StepRecord, outputPath: string): Promise<boolean> {
     const dir = jobDir(record.id);
+    const own = taskOf(record.task).deliver;
+    if (own) {
+      try {
+        Object.assign(record, await own(record, outputPath, dir));
+        return true;
+      } catch (error) {
+        console.error(`[montagio] job ${record.id}: the ${record.task} delivery failed`, error);
+        return false;
+      }
+    }
     try {
       if (step.output === 'video') {
         const out = join(dir, 'output.mp4');
@@ -228,6 +245,7 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
       console.error(`[montagio] job ${record.id}: the AI-generated mention could not be written, output delivered untagged`, error);
       record.outputUrl = mediaUrlFor(outputPath);
     }
+    return true;
   }
 
   async function createOnce(task: JobTask, body: Record<string, unknown>, idempotencyKey: string) {
@@ -350,7 +368,7 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
           return record;
         }
 
-        await deliver(record, step, job.outputPath);
+        if (!(await deliver(record, step, job.outputPath))) return finish(record, 'failed', 'deliver-failed');
         record.state = 'succeeded';
         record.progress = 1;
         await saveJob(record);
@@ -393,6 +411,8 @@ const STATUS: Record<JobError['code'], number> = {
   'blocked-name': 400,
   'unknown-image': 400,
   'ffmpeg-missing': 503,
+  'speech-too-long': 400,
+  'speech-too-short': 400,
 };
 
 /** The HTTP answer for a known failure of a job route, or null for an unexpected error. */
@@ -417,6 +437,7 @@ export function jobSummary(record: JobRecord): JobSummary {
     modelId: record.modelId,
     ...(record.error ? { error: record.error } : {}),
     ...(record.frames !== undefined ? { frames: record.frames } : {}),
+    ...(record.verticalUrl ? { verticalUrl: record.verticalUrl } : {}),
     createdAt: record.createdAt,
   };
 }

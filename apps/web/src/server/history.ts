@@ -5,7 +5,7 @@ import { TERMINAL_STATES, type HistoryItem, type JobState, type Reprise } from '
 import { getEnv } from './env';
 import { getGeneration } from './generations';
 import { jobs, type JobRecord } from './jobs';
-import { advanceSequence, type SequenceRecord } from './sequences';
+import { advanceSequence, readSequence, type SequenceRecord } from './sequences';
 import { getServices } from './services';
 import type { GenerationRecord } from './store';
 import { readUploadMeta } from './uploads';
@@ -105,6 +105,19 @@ async function fromSequence(lib: Library, record: SequenceRecord): Promise<Histo
   };
 }
 
+/** The history item of an HD clip's source, whatever made it. */
+async function parentItem(lib: Library, parent: JobRecord['parent']): Promise<HistoryItem | null> {
+  if (parent?.source === 'generation') {
+    const record = await getGeneration(parent.id).catch(() => null);
+    return record?.state === 'succeeded' && record.outputUrl ? fromGeneration(lib, record) : null;
+  }
+  if (parent?.source === 'job') {
+    const record = await jobs.read(parent.id);
+    return record?.state === 'succeeded' && record.outputUrl ? fromJob(lib, record) : null;
+  }
+  return null;
+}
+
 async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | null> {
   const base = {
     key: `job:${record.id}`,
@@ -141,8 +154,53 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
           ...(record.inputs.subject ? { prompt: String(record.inputs.subject) } : {}),
         },
       };
+    case 'hook':
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'hook',
+        reprise: {
+          tab: 'effects',
+          ...(await photo(typeof record.inputs.imageRef === 'string' ? record.inputs.imageRef : undefined)),
+          hookId: String(record.inputs.hookId),
+        },
+      };
+    case 'avatar':
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'avatar',
+        reprise: {
+          tab: 'avatar',
+          ...(await photo(typeof record.inputs.imageRef === 'string' ? record.inputs.imageRef : undefined)),
+          prompt: String(record.inputs.text),
+          language: record.inputs.language === 'fr' ? 'fr' : 'en',
+        },
+      };
+    case 'music': {
+      // A film with music is a film of its own; Reuse reopens the silent film's setup.
+      const film = record.parent ? await readSequence(record.parent.id) : null;
+      const parent = film?.state === 'succeeded' && film.outputUrl ? await fromSequence(lib, film) : null;
+      return {
+        ...base,
+        kind: 'film',
+        task: 'music',
+        name: parent ? `${parent.name} ♪` : base.name,
+        reprise: parent?.reprise ?? { tab: 'film' },
+      };
+    }
+    case 'upscale': {
+      // An HD clip is a clip of its own; Reuse reopens the setup of the clip it was made from.
+      const parent = await parentItem(lib, record.parent);
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'upscale',
+        name: parent ? `${parent.name} · HD` : base.name,
+        reprise: parent?.reprise ?? { tab: 'camera' },
+      };
+    }
     default:
-      // Hooks, avatars, music and HD join the history with their own lots.
       return null;
   }
 }

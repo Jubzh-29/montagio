@@ -6,6 +6,7 @@ import { useI18n } from '@/i18n';
 import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import {
   TERMINAL_STATES,
+  type ExtensionsInfo,
   type GenerationRecord,
   type HistoryItem,
   type JobState,
@@ -17,13 +18,16 @@ import {
   type ShowcaseInfo,
   type UploadResult,
 } from '@/lib/api-types';
-import { refusalMessageKey } from '@/lib/refusals';
+import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { useMotionPaused } from '@/lib/use-motion';
 import { needsConsent } from '@/lib/consent';
-import { defaultSubject } from '@/lib/effect-choice';
+import { defaultSubject, forSample, pickWallChoice } from '@/lib/effect-choice';
+import { showcaseTexts } from '@/lib/showcase-t2i';
+import { canUpscale } from '@/lib/hd';
+import { estimateSpeech } from '@/lib/speech';
 import { nextView, tabEvent, type CanvasEvent, type CanvasState, type ShownTab } from '@/lib/studio-view';
 import { HOOKS_READY, pickTab, tabHref, visibleTabs } from '@/lib/tabs';
 import { refreshExtensions, useExtensions } from '@/lib/use-extensions';
@@ -33,7 +37,12 @@ import { Canvas } from './Canvas';
 import { ChoiceCard } from './ChoiceCard';
 import { Composer } from './Composer';
 import { ConsentCheck } from './ConsentCheck';
+import { AvatarFields } from './AvatarFields';
+import { HdPanel } from './HdPanel';
+import { MusicPanel } from './MusicPanel';
+import { ShowcaseTextAtelier } from './ShowcaseTextAtelier';
 import { EffectFields } from './EffectFields';
+import { OutfitSource } from './OutfitSource';
 import { EffectWall } from './EffectWall';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
@@ -94,6 +103,22 @@ const SEQUENCE_STATE: Record<SequenceSummary['state'], JobState> = {
   canceled: 'canceled',
 };
 
+/** POST /api/uploads, and what the photo slot shows afterwards. */
+async function sendUpload(file: File, localUrl: string, t: (key: 'errorUpload413' | 'errorUpload415' | 'errorGeneric') => string): Promise<UploadState> {
+  const form = new FormData();
+  form.set('image', file);
+  try {
+    const res = await apiFetch('/api/uploads', { method: 'POST', body: form });
+    if (res.status === 413) return { status: 'error', message: t('errorUpload413') };
+    if (res.status === 415) return { status: 'error', message: t('errorUpload415') };
+    if (!res.ok) return { status: 'error', message: t('errorGeneric') };
+    const result = (await res.json()) as UploadResult;
+    return { status: 'ready', localUrl, imageRef: result.imageRef, personal: result.personal };
+  } catch {
+    return { status: 'error', message: t('errorGeneric') };
+  }
+}
+
 function trackedJob(job: Tracked): TrackedJob {
   if (job.kind === 'generation' || job.kind === 'job') return job.record;
   const { id, progress, outputUrl, error } = job.record;
@@ -109,7 +134,7 @@ function lostJob(job: Tracked): Job {
 }
 
 export function Studio() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   // The tab comes from the URL (?tab=), among those the extensions allow; Camera is the single shot, Film the sequence.
   const extensions = useExtensions();
   const [requestedTab, setRequestedTab] = useState<string | null>(null);
@@ -123,6 +148,12 @@ export function Studio() {
   const [photoPrompt, setPhotoPrompt] = useState<string | undefined>(undefined);
   // The Effects tab: the effect chosen on the wall, what the photo shows, and the consent box.
   const [effectId, setEffectId] = useState<string | null>(null);
+  const [outfit, setOutfit] = useState<UploadState>({ status: 'idle' });
+  // The Avatar tab: what the photo says, and in which language.
+  const [speechText, setSpeechText] = useState('');
+  // The spoken language follows the interface's until the visitor picks one.
+  const [pickedLanguage, setSpeechLanguage] = useState<'en' | 'fr' | null>(null);
+  const speechLanguage = pickedLanguage ?? lang;
   const [subject, setSubject] = useState('');
   const [consent, setConsent] = useState(false);
   // History: the latest creations under the result, and the item a "Reuse" link brings back (?from=).
@@ -193,6 +224,12 @@ export function Studio() {
   const tracked = job.status === 'tracking' ? job : undefined;
   const view = tracked ? trackedJob(tracked) : undefined;
   const busy = job.status === 'submitting' || (view !== undefined && !TERMINAL_STATES.has(view.state));
+  // A step ComfyUI refused while the job ran (a hook's transition, an avatar after its voice): the server
+  // now hides that extension, and the Studio asks again so its button goes too.
+  const failedCode = view?.state === 'failed' ? view.error : undefined;
+  useEffect(() => {
+    if (hidesExtension(failedCode)) refreshExtensions();
+  }, [failedCode, view?.id]);
 
   // Poll the current job until it reaches a terminal state. A 404 means the
   // server lost it (data wiped, restart); 5xx and network errors are retried
@@ -259,24 +296,22 @@ export function Studio() {
       setJob({ status: 'idle' });
       setPhotoPrompt(undefined);
       setUpload({ status: 'uploading', localUrl });
-      const form = new FormData();
-      form.set('image', file);
-      const settle = (next: UploadState) => {
-        if (token === uploadToken.current) setUpload(next);
-      };
-      try {
-        const res = await apiFetch('/api/uploads', { method: 'POST', body: form });
-        if (res.status === 413) return settle({ status: 'error', message: t('errorUpload413') });
-        if (res.status === 415) return settle({ status: 'error', message: t('errorUpload415') });
-        if (!res.ok) return settle({ status: 'error', message: t('errorGeneric') });
-        const result = (await res.json()) as UploadResult;
-        settle({ status: 'ready', localUrl, imageRef: result.imageRef, personal: result.personal });
-      } catch {
-        settle({ status: 'error', message: t('errorGeneric') });
-      }
+      const next = await sendUpload(file, localUrl, t);
+      if (token === uploadToken.current) setUpload(next);
     },
     [t],
   );
+
+  /** The outfit of a two-reference hook: a second upload, which the start photo does not replace. */
+  const outfitToken = useRef(0);
+  const onOutfit = async (file: File) => {
+    if (busyRef.current) return;
+    const token = ++outfitToken.current;
+    const localUrl = URL.createObjectURL(file);
+    setOutfit({ status: 'uploading', localUrl });
+    const next = await sendUpload(file, localUrl, t);
+    if (token === outfitToken.current) setOutfit(next);
+  };
 
   /** The sample photo, copied by the server: its origin is known, so no effect on it asks for consent. */
   const loadSample = async () => {
@@ -337,17 +372,29 @@ export function Studio() {
     else setShots((current) => (current.length < MAX_SHOTS ? [...current, { presetId: id, prompt: '' }] : current));
   };
 
-  const effects = extensions?.effects ?? [];
-  const selectedEffect = effects.find((effect) => effect.id === effectId) ?? effects[0];
-  const askConsent = tab === 'effects' && needsConsent(upload, 'effect');
+  const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
+  // In the showcase the wall offers on a sample photo only what was rendered on it.
+  const effects = IS_SHOWCASE ? forSample(extensions?.effects ?? [], selectedSample) : (extensions?.effects ?? []);
+  const hooks = HOOKS_READY ? (IS_SHOWCASE ? forSample(extensions?.hooks ?? [], selectedSample) : (extensions?.hooks ?? [])) : [];
+  // The showcase's Text to image: the texts its final sample photos were made from.
+  const sampleTexts = IS_SHOWCASE ? showcaseTexts(showcase?.samples ?? []) : [];
+  // The wall's choice: an effect, or a hook (an edit, then a transition); a two-reference hook needs its outfit.
+  const wallChoice = pickWallChoice(effects, hooks, effectId);
+  const selectedEffect = wallChoice?.kind === 'effect' ? wallChoice.item : undefined;
+  const selectedHook = wallChoice?.kind === 'hook' ? wallChoice.item : undefined;
+  const needsOutfit = selectedHook?.references === 2;
+  const askConsent =
+    tab === 'effects'
+      ? needsConsent(upload, selectedHook ? 'hook' : 'effect', needsOutfit ? outfit : undefined)
+      : tab === 'avatar' && needsConsent(upload, 'avatar');
   // A photo made from a text says what it shows (state adjusted while rendering, when that photo changes).
   const [subjectFor, setSubjectFor] = useState(photoPrompt);
   if (subjectFor !== photoPrompt) {
     setSubjectFor(photoPrompt);
     setSubject(defaultSubject(photoPrompt, selectedEffect?.subjectMax ?? 120));
   }
-  // Another photo asks for consent again.
-  const photoKey = upload.status === 'ready' ? upload.imageRef : null;
+  // Another photo, or another outfit, asks for consent again.
+  const photoKey = [upload, outfit].map((entry) => (entry.status === 'ready' ? entry.imageRef : '')).join('|');
   const [consentFor, setConsentFor] = useState(photoKey);
   if (consentFor !== photoKey) {
     setConsentFor(photoKey);
@@ -355,8 +402,10 @@ export function Studio() {
   }
 
   const ready = upload.status === 'ready' && modelId !== null && !busy;
-  const canGenerate = tab === 'effects'
-    ? upload.status === 'ready' && !busy && selectedEffect !== undefined && (!askConsent || consent)
+  const canGenerate = tab === 'avatar'
+    ? upload.status === 'ready' && !busy && speechText.trim().length > 0 && (!askConsent || consent)
+    : tab === 'effects'
+    ? upload.status === 'ready' && !busy && wallChoice !== undefined && (!askConsent || consent) && (!needsOutfit || outfit.status === 'ready')
     : remix
     ? ready && remix.text.trim().length > 0
     : mode === 'single'
@@ -423,6 +472,11 @@ export function Studio() {
     if (back.prompt !== undefined) setPrompt(back.prompt);
     if (back.shots) setShots(back.shots);
     if (back.effectId) setEffectId(back.effectId);
+    if (back.hookId) setEffectId(back.hookId);
+    if (back.speech) {
+      setSpeechText(back.speech.text);
+      setSpeechLanguage(back.speech.language);
+    }
     setCanvas({ view: 'gallery', before: 'gallery' });
     if (back.remixGenerationId && back.presetId) {
       void openRemix(back.presetId, `/api/generations/${encodeURIComponent(back.remixGenerationId)}/preset`, back.remixGenerationId);
@@ -491,7 +545,7 @@ export function Studio() {
       if (!res.ok) {
         const refusal = (await res.json().catch(() => null)) as Refusal | null;
         // ComfyUI refused a workflow: the server now hides that extension, and so does the Studio.
-        if (refusal?.error === 'workflow-rejected') refreshExtensions();
+        if (hidesExtension(refusal?.error)) refreshExtensions();
         if (onRefused?.(res.status, refusal)) setJob({ status: 'idle' });
         else setJob({ status: 'error', message: t(refusalMessageKey(refusal?.error)) });
         return;
@@ -516,8 +570,14 @@ export function Studio() {
             .then((res) => (res.ok ? (res.json() as Promise<ShowcaseInfo>) : null))
             .catch(() => null)
         : null,
+      // The showcase's arrival clip is an effect's example when it has one (answered in the page).
+      IS_SHOWCASE
+        ? apiFetch('/api/extensions')
+            .then((res) => (res.ok ? (res.json() as Promise<ExtensionsInfo>) : null))
+            .catch(() => null)
+        : null,
     ])
-      .then(([presetList, modelList, info]) => {
+      .then(([presetList, modelList, info, shown]) => {
         setPresets(presetList);
         setModels(modelList.filter((model) => model.kind === 'video'));
         setCatalogModels(modelList);
@@ -529,9 +589,14 @@ export function Studio() {
         if (sample && first && !touched.current) {
           setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef, personal: false });
           setCanvas({ view: 'result', before: 'gallery' });
-          void submit('generation', { presetId: first.id, modelId: first.defaultModel, imageRef: sample.imageRef }).then(
-            (record) => record && setArrivalId(record.id),
-          );
+          // Effects first: the showcase opens on its first effect rendered on this photo, unless the URL asks for another tab.
+          const asked = new URLSearchParams(window.location.search).get('tab');
+          const effect = !asked || asked === 'effects' ? shown?.effects.find((entry) => entry.samples?.includes(sample.id)) : undefined;
+          if (effect) setEffectId(effect.id);
+          const arrival = effect
+            ? submit('job', { imageRef: sample.imageRef, effectId: effect.id }, undefined, '/api/effects')
+            : submit('generation', { presetId: first.id, modelId: first.defaultModel, imageRef: sample.imageRef });
+          void arrival.then((record) => record && setArrivalId(record.id));
         }
       })
       .catch(() => {
@@ -547,7 +612,17 @@ export function Studio() {
     followJob.current = true;
     moveCanvas('generate');
     const userPrompt = prompt.trim() || undefined;
+    if (tab === 'avatar') {
+      const body = { imageRef: upload.imageRef, text: speechText.trim(), language: speechLanguage, ...(askConsent ? { consent } : {}) };
+      void submit('job', body, undefined, '/api/avatars');
+      return;
+    }
     if (tab === 'effects') {
+      if (selectedHook) {
+        const image2 = needsOutfit && outfit.status === 'ready' ? { image2Ref: outfit.imageRef } : {};
+        void submit('job', { imageRef: upload.imageRef, hookId: selectedHook.id, ...image2, ...(askConsent ? { consent } : {}) }, undefined, '/api/hooks');
+        return;
+      }
       if (!selectedEffect) return;
       const body = { imageRef: upload.imageRef, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}) };
       void submit('job', body, undefined, '/api/effects');
@@ -626,10 +701,14 @@ export function Studio() {
         : undefined;
 
   const selectedModel = models.find((model) => model.id === modelId);
-  const estimate = tab === 'effects' ? (selectedEffect?.estimate_s ?? 0) : (selectedModel?.estimate_s['480p'] ?? 0);
+  const estimate =
+    tab === 'avatar'
+      ? (extensions?.estimates.avatar ?? 0)
+      : tab === 'effects'
+        ? (wallChoice?.item.estimate_s ?? 0)
+        : (selectedModel?.estimate_s['480p'] ?? 0);
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
-  const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
   const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
   const sequenceTiles: SequenceTiles = {
     shotsOf: (id) => shots.flatMap((shot, index) => (shot.presetId === id ? [index + 1] : [])),
@@ -650,7 +729,7 @@ export function Studio() {
       ? t(tracked?.kind === 'sequence' ? 'announceFilmReady' : 'announceClipReady')
       : '';
   // The empty monitor plays the move in hand: the preset being remixed, the chosen one, or the last shot added.
-  const moveId = tab === 'effects' ? undefined : remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
+  const moveId = tab === 'effects' || tab === 'avatar' ? undefined : remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
   const movePreset = presets.find((preset) => preset.id === moveId);
   const move = movePreset && {
     id: mode === 'sequence' ? `${shots.length}-${movePreset.id}` : movePreset.id,
@@ -658,16 +737,22 @@ export function Studio() {
     speed: movePreset.speed,
   };
   // The slate under the monitor: the take about to be shot, even once a photo hides the viewfinder.
-  const slateMove = tab === 'effects' ? selectedEffect?.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  const slateMove = tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoice?.item.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  // An avatar lasts as long as its speech: the slate says the estimate, once there is a text.
+  const speechSeconds = estimateSpeech(speechText, speechLanguage);
   const slate = slateMove && [
     slateMove,
-    tab !== 'effects' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
-    t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
+    tab !== 'effects' && tab !== 'avatar' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
+    tab === 'avatar'
+      ? speechSeconds > 0 && t('slateSpec', { s: speechSeconds })
+      : t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
   ].filter(Boolean);
 
-  const effectOfResult = tracked?.kind === 'job' ? effects.find((effect) => effect.id === tracked.record.label.itemId) : undefined;
-  const resultModel: { name: string; license: string } | undefined = effectOfResult
-    ? { name: effectOfResult.modelName, license: effectOfResult.license }
+  const wallItemOfResult = tracked?.kind === 'job' ? [...effects, ...hooks].find((item) => item.id === tracked.record.label.itemId) : undefined;
+  const resultModel: { name: string; license: string } | undefined = wallItemOfResult
+    ? { name: wallItemOfResult.modelName, license: wallItemOfResult.license }
+    : tracked?.kind === 'job' && tracked.record.task === 'avatar'
+      ? extensions?.avatarModel
     : tracked?.kind === 'generation'
       ? models.find((model) => model.id === tracked.record.modelId)
       : tracked?.kind === 'sequence'
@@ -693,13 +778,20 @@ export function Studio() {
         <Composer
           label={t('composerLabel')}
           choice={
-            tab === 'effects' ? (
-              selectedEffect ? (
+            tab === 'avatar' ? (
+              <ChoiceCard
+                name={t('tabAvatar')}
+                kindLabel={t('avatarKind', { s: speechSeconds })}
+                icon="avatar"
+                paused={motionPaused}
+              />
+            ) : tab === 'effects' ? (
+              wallChoice ? (
                 <ChoiceCard
-                  name={selectedEffect.name}
-                  kindLabel={t('effectKind', { s: CLIP_SECONDS })}
-                  previewUrl={selectedEffect.previewUrl}
-                  icon="effect"
+                  name={wallChoice.item.name}
+                  kindLabel={t(wallChoice.kind === 'hook' ? 'hookKind' : 'effectKind', { s: CLIP_SECONDS })}
+                  previewUrl={wallChoice.item.previewUrl}
+                  icon={wallChoice.kind}
                   paused={motionPaused}
                   onChange={() => moveCanvas('change')}
                 />
@@ -738,7 +830,7 @@ export function Studio() {
               disabled={busy}
               onFile={onFile}
               onSample={() => void loadSample()}
-              t2i={!IS_SHOWCASE}
+              t2i={!IS_SHOWCASE || sampleTexts.length > 0}
               edit={extensions?.extensions.includes('edit') ?? false}
               onAtelier={openAtelier}
               showcase={
@@ -761,8 +853,14 @@ export function Studio() {
             </>
           }
           fields={
-            tab === 'effects' ? (
-              selectedEffect && <EffectFields subject={subject} max={selectedEffect.subjectMax} onSubject={setSubject} />
+            tab === 'avatar' ? (
+              <AvatarFields text={speechText} language={speechLanguage} max={300} onText={setSpeechText} onLanguage={setSpeechLanguage} />
+            ) : tab === 'effects' ? (
+              selectedEffect ? (
+                <EffectFields subject={subject} max={selectedEffect.subjectMax} onSubject={setSubject} disabled={IS_SHOWCASE} />
+              ) : needsOutfit ? (
+                <OutfitSource outfit={outfit} disabled={busy} onFile={(file) => void onOutfit(file)} />
+              ) : null
             ) : (
             <>
               {mode === 'single' && !remix && (
@@ -827,6 +925,7 @@ export function Studio() {
                   </div>
                 )}
                 {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
+                {tab === 'effects' && upload.status === 'ready' && needsOutfit && outfit.status !== 'ready' && <p className={styles.hint}>{t('hookNeedsOutfit')}</p>}
               </div>
               {/* Outside the sticky block: on a phone that block stays one button high over the gallery. */}
               {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}
@@ -840,6 +939,14 @@ export function Studio() {
             ateliers.length > 0 &&
             ateliers.map((kind) => (
               <div key={kind} hidden={atelier !== kind}>
+                {IS_SHOWCASE && kind === 't2i' ? (
+                  <ShowcaseTextAtelier
+                    texts={sampleTexts}
+                    model={{ name: 'Z-Image Turbo', license: catalogModels.find((model) => model.id === 'z-image-turbo')?.license ?? 'Apache-2.0' }}
+                    onUse={(photo) => takePhoto(photo, kind)}
+                    onClose={() => closeAtelier(kind)}
+                  />
+                ) : (
                 <PhotoAtelier
                   kind={kind}
                   photo={upload}
@@ -850,17 +957,19 @@ export function Studio() {
                     catalogModels.find((model) => model.id === id)?.license ?? (extensions?.editModel?.id === id ? extensions.editModel.license : undefined)
                   }
                 />
+                )}
               </div>
             ))
           }
           onView={(value) => setCanvas({ view: value, before: value })}
           gallery={
-            tab === 'effects' ? (
+            tab === 'avatar' ? null : tab === 'effects' ? (
               <EffectWall
                 effects={effects}
-                hooks={HOOKS_READY ? (extensions?.hooks ?? []) : []}
-                selectedId={selectedEffect?.id ?? null}
+                hooks={hooks}
+                selectedId={wallChoice?.item.id ?? null}
                 paused={motionPaused}
+                onPause={setMotionPaused}
                 onSelect={setEffectId}
               />
             ) : remix ? (
@@ -896,6 +1005,7 @@ export function Studio() {
                 move={move}
                 announcement={announcement}
                 statusRef={statusRef}
+                stepImageUrl={tracked?.kind === 'job' ? tracked.record.stepImageUrl : undefined}
                 autoPlayResult={!(motionPaused && view?.id === arrivalId)}
                 onFile={onFile}
                 onSample={() => void loadSample()}
@@ -930,10 +1040,15 @@ export function Studio() {
                 <p className={styles.caption} data-testid="result-caption">
                   {succeeded.placeholder
                     ? t('showcasePlaceholderCaption')
-                    : t('showcaseCaption', { model: showcase?.model.name ?? '', license: showcase?.model.license ?? '' })}
+                    : t('showcaseCaption', { model: resultModel?.name ?? showcase?.model.name ?? '', license: resultModel?.license ?? showcase?.model.license ?? '' })}
                 </p>
               )}
               {!IS_SHOWCASE && succeeded && resultModel && <AiCaption modelName={resultModel.name} license={resultModel.license} />}
+              {busy && tracked?.kind === 'job' && tracked.record.stepImageUrl && extensions?.editModel && (
+                <p className={styles.caption} data-testid="end-frame-caption">
+                  {t('hookEndFrame', { model: extensions.editModel.name, license: extensions.editModel.license })}
+                </p>
+              )}
               {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (
@@ -971,6 +1086,18 @@ export function Studio() {
                   </a>
                 </div>
               )}
+              {!IS_SHOWCASE &&
+                (tracked?.kind === 'generation' || tracked?.kind === 'job') &&
+                tracked.record.state === 'succeeded' &&
+                extensions?.upscaleModel &&
+                canUpscale(tracked.record, extensions) && (
+                  <HdPanel
+                    key={tracked.record.id}
+                    path={`/api/${tracked.kind === 'generation' ? 'generations' : 'jobs'}/${encodeURIComponent(tracked.record.id)}/upscale`}
+                    estimate_s={extensions.estimates.upscale ?? 0}
+                    model={extensions.upscaleModel}
+                  />
+                )}
               {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (
@@ -984,6 +1111,14 @@ export function Studio() {
                     </a>
                   )}
                 </div>
+              )}
+              {!IS_SHOWCASE && tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && extensions?.extensions.includes('music') && (
+                <MusicPanel
+                  key={tracked.record.id}
+                  sequenceId={tracked.record.id}
+                  estimate_s={extensions.estimates.music ?? 0}
+                  {...(extensions.musicModel ? { model: extensions.musicModel } : {})}
+                />
               )}
               {/* What the showcase is, in sight whatever the monitor shows. */}
               {showcaseNote && <p className={styles.stageNote}>{showcaseNote}</p>}

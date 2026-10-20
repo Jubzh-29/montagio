@@ -6,6 +6,7 @@ import type { ShowcaseData } from '@montagio/showcase/data';
 import { createShowcaseFetch } from '@/showcase/client';
 import { createShowcaseRouter, type ShowcaseRouter } from '@/showcase/router';
 import { MontageError, type Montage, type MontageJob, type MontageStage } from '@/showcase/types';
+import type { ExtensionsInfo, HistoryItem } from '@/lib/api-types';
 import { repoRoot } from './helpers';
 
 let library: Library;
@@ -48,6 +49,8 @@ function showcaseData(): ShowcaseData {
       { id: 'landscape-a', title: { en: 'Harbour', fr: 'Port' }, aspect: '16:9', url: 'samples/landscape-a.jpg', placeholder: false, credit: 'Z-Image-Turbo' },
     ],
     clips: [clip('crash-push', false), clip('pan-left', true)],
+    effects: [],
+    hooks: [],
     openStack: { ok: true, checkedAt: '2026-10-18T20:00:00.000Z', models: [], violations: [] },
   };
 }
@@ -335,4 +338,62 @@ test('the showcase history holds the clips of this visit only, newest first', as
   // Another visit (a new page) starts empty.
   const next = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
   expect((await call(next, 'GET', '/api/history')).json).toEqual([]);
+});
+
+/** The showcase after the GPU session: Squish and two hooks rendered on the sample. */
+function withExamples(): ShowcaseData {
+  const data = showcaseData();
+  const example = (kind: 'effect' | 'hook', id: string) => ({
+    sample: 'landscape-a',
+    url: `${kind === 'effect' ? 'effects' : 'hooks'}/${id}--landscape-a.mp4`,
+    workflowUrl: `workflows/${kind}-${id}--landscape-a.json`,
+  });
+  const effects = { modelId: 'wan21-i2v-effects', modelName: 'Wan 2.1 I2V (effects)', license: 'Apache-2.0' };
+  const transitions = { modelId: 'wan22-flf2v-transition', modelName: 'Wan 2.2 FLF2V', license: 'Apache-2.0' };
+  data.effects = [{ id: 'squish', name: 'Squish', description: 'squished', ...effects, examples: [example('effect', 'squish')] }];
+  data.hooks = [
+    { id: 'iris-dive', name: 'Iris Dive', description: 'into the eye', ...transitions, references: 1, examples: [example('hook', 'iris-dive')] },
+    // A two-photo hook needs an outfit the showcase cannot take: it stays off.
+    { id: 'wardrobe-swap', name: 'Wardrobe Swap', description: 'new clothes', ...transitions, references: 2, examples: [example('hook', 'wardrobe-swap')] },
+  ];
+  return data;
+}
+
+test('the showcase shows the effects that have an example, with their samples', async () => {
+  const router = createShowcaseRouter(withExamples(), { montage: controllableMontage().montage });
+  const info = (await call(router, 'GET', '/api/extensions')).json as unknown as ExtensionsInfo;
+  expect(info.extensions).toEqual(['effects', 'transitions']);
+  expect(info.effects).toEqual([
+    expect.objectContaining({ id: 'squish', name: 'Squish', samples: ['landscape-a'], modelName: 'Wan 2.1 I2V (effects)', license: 'Apache-2.0', previewUrl: expect.stringMatching(/effects\/squish--landscape-a\.mp4$/) }),
+  ]);
+  expect(info.hooks.map((hook) => hook.id)).toEqual(['iris-dive']);
+});
+
+test('an effect with an example answers a finished job, kept for the visit history', async () => {
+  const router = createShowcaseRouter(withExamples(), { montage: controllableMontage().montage, newId: () => 'job-1' });
+  const created = await call(router, 'POST', '/api/effects', { imageRef: 'samples/landscape-a', effectId: 'squish' });
+  expect(created.status).toBe(201);
+  expect(created.json).toMatchObject({ id: 'job-1', task: 'effect', state: 'succeeded', label: { itemId: 'squish', name: 'Squish' }, outputUrl: expect.stringMatching(/effects\/squish--landscape-a\.mp4$/) });
+  expect((await call(router, 'GET', '/api/jobs/job-1')).json).toEqual(created.json);
+  const hook = await call(router, 'POST', '/api/hooks', { imageRef: 'samples/landscape-a', hookId: 'iris-dive' });
+  expect(hook.json).toMatchObject({ task: 'hook', outputUrl: expect.stringMatching(/hooks\/iris-dive--landscape-a\.mp4$/) });
+  const history = (await call(router, 'GET', '/api/history')).json as unknown as HistoryItem[];
+  expect(history.map((item) => [item.task, item.reprise])).toEqual([
+    ['hook', { tab: 'effects', imageRef: 'samples/landscape-a', personal: false, hookId: 'iris-dive' }],
+    ['effect', { tab: 'effects', imageRef: 'samples/landscape-a', personal: false, effectId: 'squish' }],
+  ]);
+});
+
+test('an effect without an example for this photo: 404 not-in-showcase', async () => {
+  const router = createShowcaseRouter(withExamples(), { montage: controllableMontage().montage });
+  for (const [path, body] of [
+    ['/api/effects', { imageRef: 'samples/landscape-a', effectId: 'explode' }],
+    ['/api/hooks', { imageRef: 'samples/landscape-a', hookId: 'wardrobe-swap' }],
+    ['/api/effects', { imageRef: 'samples/elsewhere', effectId: 'squish' }],
+  ] as const) {
+    expect((await call(router, 'POST', path, body)).json).toEqual({ error: 'not-in-showcase' });
+  }
+  // The info lists the sample texts that Text to image offers.
+  const showcase = (await call(router, 'GET', '/api/showcase')).json as { samples: { prompt?: string }[] };
+  expect(showcase.samples[0]).not.toHaveProperty('prompt');
 });

@@ -8,10 +8,13 @@ export type StudioRestore = {
   photoPrompt?: string;
   presetId?: string;
   effectId?: string;
+  hookId?: string;
   /** What an effect's photo shows. */
   subject?: string;
   /** The scene text of a camera move. */
   prompt?: string;
+  /** What an avatar says, and in which language. */
+  speech?: { text: string; language: 'en' | 'fr' };
   modelId?: string;
   shots?: { presetId: string; prompt: string }[];
   remixGenerationId?: string;
@@ -33,9 +36,11 @@ export function applyReprise(item: HistoryItem): StudioRestore {
   if (reprise.remixGenerationId) restore.remixGenerationId = reprise.remixGenerationId;
   if (reprise.shots) restore.shots = reprise.shots.map((shot) => ({ presetId: shot.presetId, prompt: shot.prompt ?? '' }));
   if (reprise.effectId) restore.effectId = reprise.effectId;
+  if (reprise.hookId) restore.hookId = reprise.hookId;
   if (reprise.prompt) {
-    // The same field means three things: the text a photo was made from, an effect's subject, a scene.
+    // The same field means four things: the text a photo was made from, an effect's subject, an avatar's speech, a scene.
     if (item.kind === 'photo') restore.photoPrompt = reprise.prompt;
+    else if (reprise.tab === 'avatar') restore.speech = { text: reprise.prompt, language: reprise.language ?? 'en' };
     else if (reprise.tab === 'effects') restore.subject = reprise.prompt;
     else restore.prompt = reprise.prompt;
   }

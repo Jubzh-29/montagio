@@ -33,6 +33,7 @@ export function Monitor({
   onRetry,
   statusLabel,
   move,
+  stepImageUrl,
   announcement,
   statusRef,
   autoPlayResult = true,
@@ -46,6 +47,8 @@ export function Monitor({
   onRetry: () => void;
   /** Replaces the default running text, e.g. "Shot 2/3 — 40%". */
   statusLabel?: string;
+  /** A hook's end frame, made by its edit: shown while the clip renders. */
+  stepImageUrl?: string;
   /** The chosen camera move: the empty monitor plays it in its viewfinder. */
   move?: { id: string; poses: string[]; speed: number };
   /** Stage changes for screen readers ("Rendering", "Clip ready"), never the running percentage. */
@@ -78,6 +81,7 @@ export function Monitor({
     generation.status === 'submitting' || (record !== undefined && (record.state === 'queued' || record.state === 'running'));
   const percent = record ? Math.round(record.progress * 100) : 0;
   const result = record?.state === 'succeeded' ? record.outputUrl : undefined;
+  const endFrame = rendering ? stepImageUrl : undefined;
 
   const onDrop = (event: DragEvent) => {
     event.preventDefault();
@@ -112,6 +116,9 @@ export function Monitor({
           playsInline
           controls
         />
+      ) : endFrame ? (
+        // eslint-disable-next-line @next/next/no-img-element -- the end frame the edit just made
+        <img className={styles.monitorMedia} data-dimmed src={endFrame} alt="" data-testid="hook-end-frame" />
       ) : localUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- local object URL preview
         <img

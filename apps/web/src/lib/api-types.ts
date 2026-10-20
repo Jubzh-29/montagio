@@ -44,6 +44,8 @@ export type GenerationRecord = {
   outputUrl?: string;
   error?: string;
   remix?: boolean;
+  /** The delivered clip's frame count (HD takes 121 at most). */
+  frames?: number;
   /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
   workflowUrl?: string;
   /** A showcase clip whose camera move FFmpeg simulated, waiting for the GPU session. */
@@ -68,6 +70,8 @@ export type SequenceSummary = {
   outputUrl?: string;
   verticalUrl?: string;
   error?: string;
+  /** The last music added under the film (POST /api/sequences/:id/music). */
+  music?: { jobId: string };
   /** Showcase: at least one shot is a placeholder clip. */
   placeholder?: boolean;
   /** Showcase: what the in-browser montage is doing while the film is assembling. */
@@ -82,6 +86,8 @@ export type SampleSummary = {
   imageRef: `samples/${string}`;
   url: string;
   placeholder: boolean;
+  /** The text the photo was made from (Z-Image-Turbo), offered by the showcase's Text to image. */
+  prompt?: string;
 };
 
 /** What the static showcase offers (GET /api/showcase, answered in the page). */
@@ -111,6 +117,8 @@ export type EffectSummary = {
   /** The model that renders it and its license, for the caption under the clip. */
   modelName: string;
   license: string;
+  /** Showcase: the sample photos it has an example for. */
+  samples?: string[];
 };
 
 /** A keyframe hook of the wall: an edit makes its end frame, then a transition. */
@@ -122,6 +130,11 @@ export type HookSummary = {
   estimate_s: number;
   /** 2: the hook needs a second photo (an outfit). */
   references: 1 | 2;
+  /** Showcase: the sample photos it has an example for. */
+  samples?: string[];
+  /** The transition model, for the caption under the clip. */
+  modelName: string;
+  license: string;
 };
 
 /** What the Studio may show: the extensions the flag and the GPU dates allow, and the time estimates. */
@@ -129,9 +142,15 @@ export type ExtensionsInfo = {
   extensions: ExtensionId[];
   effects: EffectSummary[];
   hooks: HookSummary[];
-  estimates: { t2i: number; edit?: number };
+  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number };
   /** The photo edit's model, for the caption under an edit (the preset catalogue does not hold it). */
   editModel?: { id: string; name: string; license: string };
+  /** The avatar model, for the caption under a talking avatar. */
+  avatarModel?: { id: string; name: string; license: string };
+  /** The music model, for the caption under a film with music. */
+  musicModel?: { id: string; name: string; license: string };
+  /** The 1080p model, and the longest clip it takes (frames): the HD action shows only up to it. */
+  upscaleModel?: { id: string; name: string; license: string; maxFrames: number };
 };
 
 export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale';
@@ -154,6 +173,8 @@ export type JobSummary = {
   /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
   workflowUrl?: string;
   frames?: number;
+  /** A film's 9:16 cut with music. */
+  verticalUrl?: string;
   /** Showcase: an example still waiting for the GPU session. */
   placeholder?: boolean;
   createdAt: string;
@@ -171,6 +192,8 @@ export type Reprise = {
   effectId?: string;
   hookId?: string;
   prompt?: string;
+  /** The language an avatar speaks. */
+  language?: 'en' | 'fr';
   modelId?: string;
   /** A remixed clip: the remix editor reopens on that generation's preset text. */
   remixGenerationId?: string;

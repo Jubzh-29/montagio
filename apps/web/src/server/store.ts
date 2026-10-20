@@ -21,6 +21,8 @@ export type GenerationRecord = {
   error?: string;
   /** Rendered from a preset edited in the remix editor (its text is in preset.yaml). */
   remix?: true;
+  /** The delivered clip's frame count, read by probe (HD takes 121 at most); absent for a clip delivered before. */
+  frames?: number;
   idempotencyKey: string;
   createdAt: string;
   updatedAt: string;

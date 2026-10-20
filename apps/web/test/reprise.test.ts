@@ -49,6 +49,17 @@ test('an effect gives its subject back', () => {
   expect(applyReprise(effect)).toMatchObject({ tab: 'effects', effectId: 'squish', subject: 'a toy car' });
 });
 
+test('a hook reprise opens the effects tab on that hook', () => {
+  const hook = item({ task: 'hook', reprise: { tab: 'effects', imageRef: 'uploads/p.png', personal: false, hookId: 'iris-dive' } });
+  expect(applyReprise(hook)).toMatchObject({ tab: 'effects', hookId: 'iris-dive', photo: { imageRef: 'uploads/p.png', personal: false } });
+});
+
+test('an avatar reprise brings back its text and language', () => {
+  const avatar = item({ task: 'avatar', reprise: { tab: 'avatar', imageRef: 'uploads/p.png', personal: true, prompt: 'Bonjour à tous', language: 'fr' } });
+  expect(applyReprise(avatar)).toMatchObject({ tab: 'avatar', speech: { text: 'Bonjour à tous', language: 'fr' } });
+  expect(applyReprise(avatar).prompt).toBeUndefined();
+});
+
 test('the filter keeps one kind', () => {
   const items = [item(), item({ key: 'job:j', kind: 'photo' }), item({ key: 'sequence:s', kind: 'film' })];
   expect(historyFilter(items, 'all')).toHaveLength(3);

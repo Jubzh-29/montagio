@@ -48,3 +48,18 @@ test('each shot can carry its own optional text', async ({ page }) => {
   expect(body.shots[0]).toMatchObject({ presetId: 'crash-push', userPrompt: 'a harbour at dawn' });
   expect(body.shots[1]).toMatchObject({ presetId: 'pan-left', userPrompt: 'a harbour at dawn, the fog lifts' });
 });
+
+test('a film gets music: two downloads with sound, the silent ones stay', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.goto('/?tab=film');
+  await page.setInputFiles('input[type=file]', sampleImage);
+  for (const name of ['Crash Push', 'Pan Left']) await page.getByRole('button', { name }).click();
+  await page.getByRole('button', { name: /^Generate film/ }).click();
+  await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /\/media\/data\/sequences\//, { timeout: 60_000 });
+  await page.getByRole('textbox', { name: 'The music' }).fill('tense synth pulse');
+  await page.getByRole('button', { name: /^Add music/ }).click();
+  await expect(page.getByRole('link', { name: 'Download with music' })).toHaveAttribute('href', /\/media\/data\/jobs\/.+\/film\.mp4$/, { timeout: 30_000 });
+  await expect(page.getByRole('link', { name: '9:16 with music' })).toHaveAttribute('href', /film-9x16\.mp4$/);
+  await expect(page.getByRole('link', { name: 'Download film', exact: true })).toHaveAttribute('href', /\/media\/data\/sequences\/.+film\.mp4$/);
+  await expect(page.getByTestId('music-caption')).toHaveText(/ACE-Step/);
+});

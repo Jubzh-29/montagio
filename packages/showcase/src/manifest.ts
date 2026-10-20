@@ -23,6 +23,8 @@ const SampleSchema = z
     title: z.object({ en: z.string().min(1).max(60), fr: z.string().min(1).max(60) }).strict(),
     status: z.enum(['placeholder', 'final']),
     credit: z.string().min(1).max(400),
+    /** The text Z-Image-Turbo made the photo from: the showcase's Text to image offers it. */
+    prompt: z.string().min(1).max(500).optional(),
   })
   .strict();
 
@@ -39,18 +41,34 @@ const ClipSchema = z
   })
   .strict();
 
+/** An effect or a hook rendered on a sample photo in a GPU session, tied like a clip to its seed and workflow. */
+const exampleFields = {
+  sample: kebabId,
+  seed: z.number().int().min(0).max(2 ** 32 - 1),
+  sha256,
+  image_sha256: sha256,
+  workflow_sha256: sha256,
+  rendered_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be a date, YYYY-MM-DD'),
+};
+const EffectExampleSchema = z.object({ effect: kebabId, ...exampleFields }).strict();
+const HookExampleSchema = z.object({ hook: kebabId, ...exampleFields }).strict();
+
 const ManifestSchema = z
   .object({
     schema: z.literal(MANIFEST_SCHEMA),
     model: kebabId,
     samples: z.array(SampleSchema).min(1),
     clips: z.array(ClipSchema).default([]),
+    effects: z.array(EffectExampleSchema).default([]),
+    hooks: z.array(HookExampleSchema).default([]),
   })
   .strict();
 
 export type Manifest = z.infer<typeof ManifestSchema>;
 export type SampleEntry = Manifest['samples'][number];
 export type ClipEntry = Manifest['clips'][number];
+export type EffectExample = Manifest['effects'][number];
+export type HookExample = Manifest['hooks'][number];
 
 export class ManifestError extends Error {
   override name = 'ManifestError';
@@ -90,6 +108,15 @@ export function parseManifest(text: string, source: string): Manifest {
     pairs.add(pair);
     if (!sampleIds.has(clip.sample)) problems.push(`clips.${index}.sample: unknown sample "${clip.sample}"`);
   });
+  for (const [section, entries] of [['effects', manifest.effects.map((entry) => ({ id: entry.effect, sample: entry.sample }))], ['hooks', manifest.hooks.map((entry) => ({ id: entry.hook, sample: entry.sample }))]] as const) {
+    const seen = new Set<string>();
+    entries.forEach((entry, index) => {
+      const pair = `${entry.id} × ${entry.sample}`;
+      if (seen.has(pair)) problems.push(`${section}.${index}: duplicate example ${pair}`);
+      seen.add(pair);
+      if (!sampleIds.has(entry.sample)) problems.push(`${section}.${index}.sample: unknown sample "${entry.sample}"`);
+    });
+  }
   if (problems.length > 0) throw new ManifestError(problems);
   return manifest;
 }
@@ -103,3 +130,6 @@ export async function loadManifest(root: string): Promise<Manifest> {
 export const clipFile = (preset: string, sample: string) => `clips/${preset}--${sample}.mp4`;
 export const verticalFile = (preset: string, sample: string) => `clips/${preset}--${sample}.9x16.mp4`;
 export const workflowFile = (preset: string, sample: string) => `workflows/${preset}--${sample}.json`;
+export const effectFile = (effect: string, sample: string) => `effects/${effect}--${sample}.mp4`;
+export const hookFile = (hook: string, sample: string) => `hooks/${hook}--${sample}.mp4`;
+export const exampleWorkflowFile = (kind: 'effect' | 'hook', id: string, sample: string) => `workflows/${kind}-${id}--${sample}.json`;

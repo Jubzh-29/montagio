@@ -2,7 +2,7 @@ import { validatePreset } from '@montagio/presets/browser';
 import type { ShowcaseData } from '@montagio/showcase/data';
 import { galleryOrder } from '@/lib/gallery-order';
 import { MAX_PRESET_YAML_BYTES } from '@/lib/limits';
-import type { ExtensionsInfo, GenerationRecord, HistoryItem, PresetSummary, SequenceSummary, ShowcaseInfo } from '@/lib/api-types';
+import type { EffectSummary, ExtensionsInfo, GenerationRecord, HistoryItem, HookSummary, JobSummary, PresetSummary, SequenceSummary, ShowcaseInfo } from '@/lib/api-types';
 import { filmTags } from './montage-args';
 import { MontageError, type Montage, type MontageStage } from './types';
 import { BASE_PATH, urlsFor } from './urls';
@@ -16,6 +16,7 @@ const refuse = (error: string, status: number) => json({ error }, status);
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 type Clip = ShowcaseData['clips'][number];
+type ExampleItem = ShowcaseData['effects'][number];
 
 const PROGRESS: Record<MontageStage | 'running', number> = { running: 0.1, 'loading-ffmpeg': 0.3, joining: 0.7 };
 const MIN_SHOTS = 2;
@@ -40,6 +41,11 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
   const clips = new Map(data.clips.map((clip) => [`${clip.preset}|${clip.sample}`, clip]));
   const generations = new Map<string, GenerationRecord>();
   const sequences = new Map<string, { record: SequenceSummary; controller: AbortController }>();
+  // The effects and hooks rendered in the GPU session (a data.json written before has none); a
+  // two-photo hook needs an outfit the showcase cannot take, so it stays off.
+  const effectItems = data.effects ?? [];
+  const hookItems = (data.hooks ?? []).filter((hook) => hook.references === 1);
+  const jobs = new Map<string, JobSummary>();
   // The history of this visit, newest first: nothing is kept once the page is gone.
   let visit: HistoryItem[] = [];
   const presetName = (id: string) => presets.get(id)?.name ?? id;
@@ -70,10 +76,69 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     }
   }
 
-  /** The text-to-image estimate of the core model, as the server gives it. */
+  /** An effect or hook of the wall, its first example looping as its preview. */
+  const summaryOf = (item: ExampleItem) => ({
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    ...(item.examples[0] ? { previewUrl: showcaseUrl(item.examples[0].url) } : {}),
+    estimate_s: 0,
+    modelName: item.modelName,
+    license: item.license,
+    samples: item.examples.map((example) => example.sample),
+  });
+
+  /** What the wall shows: the effects and hooks that have an example, as the server would list them. */
   function extensionsInfo(): ExtensionsInfo {
     const t2i = data.models.find((model) => model.id === 'z-image-turbo')?.estimate_s['720p'] ?? 12;
-    return { extensions: [], effects: [], hooks: [], estimates: { t2i } };
+    const effects: EffectSummary[] = effectItems.map((item) => ({ ...summaryOf(item), subjectMax: 120 }));
+    const hooks: HookSummary[] = hookItems.map((item) => ({ ...summaryOf(item), references: 1 }));
+    return {
+      extensions: [...(effects.length > 0 ? (['effects'] as const) : []), ...(hooks.length > 0 ? (['transitions'] as const) : [])],
+      effects,
+      hooks,
+      estimates: { t2i },
+    };
+  }
+
+  /** An effect or hook "rendered" on a sample: its example, as a finished job kept for the visit's history. */
+  function createExample(kind: 'effect' | 'hook', input: Record<string, unknown>): Response {
+    const items = kind === 'effect' ? effectItems : hookItems;
+    if (items.length === 0) return refuse('extension-disabled', 404);
+    const id = kind === 'effect' ? input.effectId : input.hookId;
+    const item = items.find((entry) => entry.id === id);
+    const sample = sampleOf(input.imageRef);
+    const example = sample && item?.examples.find((entry) => entry.sample === sample.id);
+    if (!item || !sample || !example) return refuse('not-in-showcase', 404);
+    const record: JobSummary = {
+      id: newId(),
+      task: kind,
+      state: 'succeeded',
+      progress: 1,
+      outputUrl: showcaseUrl(example.url),
+      workflowUrl: showcaseUrl(example.workflowUrl),
+      label: { itemId: item.id, name: item.name },
+      modelId: item.modelId,
+      placeholder: false,
+      createdAt: new Date().toISOString(),
+    };
+    jobs.set(record.id, record);
+    visit = [
+      {
+        key: `job:${record.id}`,
+        source: 'job',
+        kind: 'clip',
+        task: kind,
+        name: item.name,
+        modelName: item.modelName,
+        createdAt: record.createdAt,
+        previewUrl: record.outputUrl!,
+        downloadUrl: record.outputUrl!,
+        reprise: { tab: 'effects', imageRef: `samples/${sample.id}`, personal: false, ...(kind === 'effect' ? { effectId: item.id } : { hookId: item.id }) },
+      },
+      ...visit,
+    ];
+    return json(record, 201);
   }
 
   function presetSummaries(): PresetSummary[] {
@@ -100,6 +165,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
         imageRef: `samples/${sample.id}`,
         url: showcaseUrl(sample.url),
         placeholder: sample.placeholder,
+        ...(sample.prompt ? { prompt: sample.prompt } : {}),
       })),
       model: data.model,
       capabilities: { uploads: false, remixRender: false },
@@ -262,7 +328,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     if (method === 'POST' && resource === 'presets' && id === 'validate') return validate(await body(init));
     if (method === 'GET' && resource === 'models') return json(data.models);
     if (method === 'GET' && resource === 'history' && !id) return json(visit);
-    // No extension has a pre-generated example yet (they come with the GPU session S3): none is shown.
+    // The effects and hooks with a pre-generated example (the GPU session S3 renders them).
     if (method === 'GET' && resource === 'extensions' && !id) return json(extensionsInfo());
     if (method === 'GET' && resource === 'open-stack') return json(data.openStack);
     if (method === 'GET' && resource === 'showcase' && !id) return json(info());
@@ -273,9 +339,14 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     if (method === 'POST' && resource === 'uploads') return refuse('showcase-upload', 403);
     // Its sample photos were made from texts in advance: the showcase creates no image.
     if (method === 'POST' && resource === 'images' && !id) return refuse('showcase-t2i', 403);
-    // No extension has an example in the showcase yet: their routes answer as the server answers a hidden one.
-    if (method === 'POST' && !id && (resource === 'edits' || resource === 'effects' || resource === 'hooks' || resource === 'avatars')) {
-      return refuse('extension-disabled', 404);
+    if (method === 'POST' && !id && resource === 'effects') return createExample('effect', await body(init));
+    if (method === 'POST' && !id && resource === 'hooks') return createExample('hook', await body(init));
+    // Edits and avatars have no example in the showcase (spec §3): they answer as the server answers a hidden one.
+    if (method === 'POST' && !id && (resource === 'edits' || resource === 'avatars')) return refuse('extension-disabled', 404);
+    if (resource === 'jobs' && id) {
+      const record = jobs.get(id);
+      if (record && ((method === 'GET' && action === undefined) || (method === 'POST' && action === 'cancel'))) return json(clone(record));
+      return refuse('not-found', 404);
     }
 
     if (resource === 'generations') {

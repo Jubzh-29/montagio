@@ -1,4 +1,4 @@
-import type { EffectPreset, TransitionPreset } from '@montagio/presets';
+import type { EffectPreset, Library, TransitionPreset } from '@montagio/presets';
 import { enabledExtensions, type ExtensionId, type ExtensionModel } from '@montagio/registry';
 import type { EffectSummary, ExtensionsInfo, HookSummary } from '@/lib/api-types';
 import { getEnv } from './env';
@@ -82,6 +82,32 @@ export async function requireExtension(id: ExtensionId): Promise<void> {
 }
 
 /** GET /api/extensions: what the Studio may show, with the wall's tiles and the time estimates. */
+/** The voice and the avatar models of the extension "avatar". */
+export function avatarModels(lib: Library): { voice: ExtensionModel; avatar: ExtensionModel } {
+  const models = [...lib.extensionModels.values()];
+  const voice = models.find((model) => model.task === 'tts');
+  const avatar = models.find((model) => model.task === 'ia2v-talk');
+  if (!voice || !avatar) throw new Error('no tts or ia2v-talk model in registry/extensions');
+  return { voice, avatar };
+}
+
+/** The music model of the extension "music". */
+export function musicModel(lib: Library): ExtensionModel {
+  const model = [...lib.extensionModels.values()].find((entry) => entry.task === 't2a');
+  if (!model) throw new Error('no t2a model in registry/extensions');
+  return model;
+}
+
+/** The 1080p model of the extension "upscale". */
+export function upscaleModel(lib: Library): ExtensionModel {
+  const model = [...lib.extensionModels.values()].find((entry) => entry.task === 'v2v-upscale');
+  if (!model) throw new Error('no v2v-upscale model in registry/extensions');
+  return model;
+}
+
+/** What a caption names of an extension model. */
+const summaryOf = (model: ExtensionModel) => ({ id: model.id, name: model.name, license: model.license });
+
 export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const lib = await getServices().library;
   const { root } = getEnv();
@@ -116,15 +142,29 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
         ...(previewUrl ? { previewUrl } : {}),
         estimate_s: (editModel ? estimateFor(editModel, fast) : 0) + (model ? estimateFor(model, fast) : 0),
         references: preset.end_frame.references,
+        modelName: model?.name ?? preset.models.preferred,
+        license: model?.license ?? '',
       };
     }),
   );
   const t2i = lib.models.get(T2I_MODEL)?.estimate_s['720p'] ?? T2I_FALLBACK_S;
+  const avatar = extensions.includes('avatar') ? avatarModels(lib) : null;
+  const music = extensions.includes('music') ? musicModel(lib) : null;
+  const upscale = extensions.includes('upscale') ? upscaleModel(lib) : null;
   return {
     extensions,
     effects,
     hooks,
-    estimates: { t2i, ...(extensions.includes('edit') && editModel ? { edit: estimateFor(editModel, true) } : {}) },
-    ...(extensions.includes('edit') && editModel ? { editModel: { id: editModel.id, name: editModel.name, license: editModel.license } } : {}),
+    estimates: {
+      t2i,
+      ...(extensions.includes('edit') && editModel ? { edit: estimateFor(editModel, true) } : {}),
+      ...(avatar ? { avatar: estimateFor(avatar.voice, true) + estimateFor(avatar.avatar, true) } : {}),
+      ...(music ? { music: estimateFor(music, true) } : {}),
+      ...(upscale ? { upscale: estimateFor(upscale, true) } : {}),
+    },
+    ...(extensions.includes('edit') && editModel ? { editModel: summaryOf(editModel) } : {}),
+    ...(avatar ? { avatarModel: summaryOf(avatar.avatar) } : {}),
+    ...(music ? { musicModel: summaryOf(music) } : {}),
+    ...(upscale ? { upscaleModel: { ...summaryOf(upscale), maxFrames: upscale.limits.max_input_frames ?? 121 } } : {}),
   };
 }

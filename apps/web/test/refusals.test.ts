@@ -1,6 +1,6 @@
 import en from '@/i18n/en.json';
 import fr from '@/i18n/fr.json';
-import { refusalMessageKey } from '@/lib/refusals';
+import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 
 test('a refusal the user can act on gets its own message, anything else the generic one', () => {
   expect(refusalMessageKey('ffmpeg-missing')).toBe('errorFfmpegMissing');
@@ -54,4 +54,16 @@ test('the photo and effect refusals say what to do, in English and in French', (
     expect(refusalMessageKey(code)).toBe(key);
     for (const dictionary of [en, fr] as Record<string, string>[]) expect(dictionary[key], key).toBeTruthy();
   }
+});
+
+test("an avatar's voice out of the 1 to 15 s the model animates has its own message", () => {
+  expect(refusalMessageKey('speech-too-long')).toBe('avatarTooLong');
+  expect(refusalMessageKey('speech-too-short')).toBe('avatarTooShort');
+});
+
+test('a refusal that hides an extension on the server makes the Studio ask again', () => {
+  expect(hidesExtension('workflow-rejected')).toBe(true);
+  expect(hidesExtension('extension-disabled')).toBe(true);
+  expect(hidesExtension('consent-required')).toBe(false);
+  expect(hidesExtension(undefined)).toBe(false);
 });

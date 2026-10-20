@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from './api';
 import { TERMINAL_STATES, type JobSummary } from './api-types';
+import { hidesExtension } from './refusals';
 import { refreshExtensions } from './use-extensions';
 
 export const POLL_MS = 1000;
@@ -48,6 +49,12 @@ export function useJob(): {
   const job = poll.job;
   const running = job !== null && !TERMINAL_STATES.has(job.state);
 
+  // A step refused while the job ran hides its extension on the server: ask again, so the button goes too.
+  const failedCode = job?.state === 'failed' ? job.error : undefined;
+  useEffect(() => {
+    if (hidesExtension(failedCode)) refreshExtensions();
+  }, [failedCode, job?.id]);
+
   useEffect(() => {
     if (!job || TERMINAL_STATES.has(job.state) || poll.error) return;
     const timer = setTimeout(async () => {
@@ -77,7 +84,7 @@ export function useJob(): {
       if (!res.ok) {
         const answer = (await res.json().catch(() => null)) as { error?: string } | null;
         // ComfyUI refused the workflow, or the server hides the extension: the button that led here goes too.
-        if (answer?.error === 'workflow-rejected' || answer?.error === 'extension-disabled') refreshExtensions();
+        if (hidesExtension(answer?.error)) refreshExtensions();
         setRefusal(answer?.error ?? 'error');
         return;
       }
