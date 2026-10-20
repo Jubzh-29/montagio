@@ -2,6 +2,7 @@ import { validatePreset } from '@montagio/presets/browser';
 import type { ShowcaseData } from '@montagio/showcase/data';
 import { galleryOrder } from '@/lib/gallery-order';
 import { MAX_PRESET_YAML_BYTES } from '@/lib/limits';
+import { EFFECT_ORDER, HOOK_ORDER, wallOrder } from '@/lib/wall-order';
 import type { EffectSummary, ExtensionsInfo, GenerationRecord, HistoryItem, HookSummary, JobSummary, PresetSummary, SequenceSummary, ShowcaseInfo } from '@/lib/api-types';
 import { filmTags } from './montage-args';
 import { MontageError, type Montage, type MontageStage } from './types';
@@ -43,8 +44,9 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
   const sequences = new Map<string, { record: SequenceSummary; controller: AbortController }>();
   // The effects and hooks rendered in the GPU session (a data.json written before has none); a
   // two-photo hook needs an outfit the showcase cannot take, so it stays off.
-  const effectItems = data.effects ?? [];
-  const hookItems = (data.hooks ?? []).filter((hook) => hook.references === 1);
+  // In the Studio's wall order (prepare writes the library's, by file name).
+  const effectItems = wallOrder(data.effects ?? [], EFFECT_ORDER);
+  const hookItems = wallOrder((data.hooks ?? []).filter((hook) => hook.references === 1), HOOK_ORDER);
   const jobs = new Map<string, JobSummary>();
   // The history of this visit, newest first: nothing is kept once the page is gone.
   let visit: HistoryItem[] = [];

@@ -397,3 +397,16 @@ test('an effect without an example for this photo: 404 not-in-showcase', async (
   const showcase = (await call(router, 'GET', '/api/showcase')).json as { samples: { prompt?: string }[] };
   expect(showcase.samples[0]).not.toHaveProperty('prompt');
 });
+
+test("the showcase wall follows the Studio's order, Squish first, whatever the file order", async () => {
+  const data = withExamples();
+  // prepare writes the library's order: file names, Cake-ify before Squish.
+  const cakeify = { ...data.effects[0]!, id: 'cakeify', name: 'Cake-ify', examples: data.effects[0]!.examples.map((e) => ({ ...e, url: 'effects/cakeify--landscape-a.mp4' })) };
+  const figurine = { ...data.hooks[0]!, id: 'figurine', name: 'Figurine' };
+  data.effects = [cakeify, ...data.effects];
+  data.hooks = [figurine, ...data.hooks];
+  const router = createShowcaseRouter(data, { montage: controllableMontage().montage });
+  const info = (await call(router, 'GET', '/api/extensions')).json as unknown as ExtensionsInfo;
+  expect(info.effects.map((effect) => effect.id)).toEqual(['squish', 'cakeify']);
+  expect(info.hooks.map((hook) => hook.id)).toEqual(['iris-dive', 'figurine']);
+});
