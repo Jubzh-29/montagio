@@ -30,6 +30,7 @@ import { Composer } from './Composer';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
 import { Monitor, type GenerationState, type TrackedJob, type UploadState } from './Monitor';
+import { PhotoAtelier, type AtelierPhoto } from './PhotoAtelier';
 import { PhotoSource } from './PhotoSource';
 import { PresetGallery, type SequenceTiles } from './PresetGallery';
 import { RemixEditor, type RemixCheck } from './RemixEditor';
@@ -106,9 +107,14 @@ export function Studio() {
   const tab = pickTab(requestedTab, visibleTabs(extensions));
   const mode: Mode = tab === 'film' ? 'sequence' : 'single';
   const [canvas, setCanvas] = useState<CanvasState>({ view: 'gallery', before: 'gallery' });
+  // The photo atelier (text to image, edit), over the canvas; and the text of a photo made from one.
+  const [atelier, setAtelier] = useState<'t2i' | 'edit' | null>(null);
+  const [photoPrompt, setPhotoPrompt] = useState<string | undefined>(undefined);
   const moveCanvas = (event: CanvasEvent) => setCanvas((current) => nextView(event, current));
   const [presets, setPresets] = useState<PresetSummary[]>([]);
   const [models, setModels] = useState<ModelSummary[]>([]);
+  // Every model of the catalogue (text to image included), for the licenses shown under a result.
+  const [catalogModels, setCatalogModels] = useState<ModelSummary[]>([]);
   const [catalog, setCatalog] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [presetId, setPresetId] = useState<string | null>(null);
   const [shots, setShots] = useState<ShotDraft[]>([]);
@@ -217,6 +223,7 @@ export function Studio() {
       const localUrl = URL.createObjectURL(file);
       localUrlRef.current = localUrl;
       setJob({ status: 'idle' });
+      setPhotoPrompt(undefined);
       setUpload({ status: 'uploading', localUrl });
       const form = new FormData();
       form.set('image', file);
@@ -244,6 +251,7 @@ export function Studio() {
     const token = ++uploadToken.current;
     const localUrl = '/media/demo-assets/images/sample-16x9.png';
     setJob({ status: 'idle' });
+    setPhotoPrompt(undefined);
     setUpload({ status: 'uploading', localUrl });
     const settle = (next: UploadState) => {
       if (token === uploadToken.current) setUpload(next);
@@ -259,10 +267,32 @@ export function Studio() {
   };
 
   /** Showcase: a sample photo stands in for an upload; nothing is sent anywhere. */
+  const openAtelier = (kind: 't2i' | 'edit') => {
+    if (busyRef.current) return;
+    setAtelier(kind);
+    setCanvas((current) => nextView('open-atelier', current));
+  };
+
+  const closeAtelier = () => {
+    setAtelier(null);
+    setCanvas((current) => nextView('close-atelier', current));
+  };
+
+  /** The atelier's image becomes the start photo, as any upload would. */
+  const usePhoto = (photo: AtelierPhoto) => {
+    touched.current = true;
+    ++uploadToken.current;
+    setJob({ status: 'idle' });
+    setUpload({ status: 'ready', localUrl: photo.url, imageRef: photo.imageRef, personal: photo.personal });
+    setPhotoPrompt(photo.prompt);
+    closeAtelier();
+  };
+
   const pickSample = (sample: SampleSummary) => {
     touched.current = true;
     if (busyRef.current) return;
     setJob({ status: 'idle' });
+    setPhotoPrompt(undefined);
     setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef, personal: false });
   };
 
@@ -388,6 +418,7 @@ export function Studio() {
       .then(([presetList, modelList, info]) => {
         setPresets(presetList);
         setModels(modelList.filter((model) => model.kind === 'video'));
+        setCatalogModels(modelList);
         setCatalog('ready');
         setPresetId((current) => current ?? presetList[0]?.id ?? null);
         setModelId((current) => current ?? presetList[0]?.defaultModel ?? null);
@@ -582,8 +613,9 @@ export function Studio() {
               disabled={busy}
               onFile={onFile}
               onSample={() => void loadSample()}
-              t2i={false}
-              edit={false}
+              t2i={!IS_SHOWCASE}
+              edit={extensions?.extensions.includes('edit') ?? false}
+              onAtelier={openAtelier}
               showcase={
                 IS_SHOWCASE
                   ? {
@@ -667,6 +699,19 @@ export function Studio() {
         />
         <Canvas
           view={canvas.view}
+          atelier={
+            atelier && (
+              <PhotoAtelier
+                key={atelier}
+                kind={atelier}
+                photo={upload}
+                estimates={extensions?.estimates ?? { t2i: 12 }}
+                onUse={usePhoto}
+                onClose={closeAtelier}
+                licenseOf={(id) => catalogModels.find((model) => model.id === id)?.license}
+              />
+            )
+          }
           onView={(value) => setCanvas({ view: value, before: value })}
           gallery={
             remix ? (
