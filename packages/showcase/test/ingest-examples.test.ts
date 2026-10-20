@@ -2,6 +2,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AI_METADATA, probe, readTags } from '@montagio/sequence';
+import { runCli } from '../src/cli';
 import { ingestExamples } from '../src/ingest';
 import { loadManifest } from '../src/manifest';
 import { workflowSha256 } from '../src/workflow';
@@ -94,4 +95,13 @@ test('a run made from another photo is skipped, and says why', async () => {
     'effect:karaoke run 1: "karaoke" is not an effect of the library',
     'effect:explode run 1: rendered at 1280x720; the showcase shows 832x480 for landscape-a',
   ]);
+}, FFMPEG_TIMEOUT_MS);
+
+test('--pick does not apply to examples: one smoke folder per call instead', async () => {
+  writeSmoke([{ job: 'effect:squish', model: 'wan21-i2v-effects' }]);
+  const out: string[] = [];
+  const io = { root, out: (line: string) => out.push(line), err: (line: string) => out.push(line) };
+  expect(await runCli(['ingest', '--examples', smoke, '--sample', 'landscape-a', '--pick', 'effect:squish=1'], io)).toBe(2);
+  expect(out.join('\n')).toMatch(/one --out folder per smoke call/);
+  expect(await runCli(['ingest', '--examples', smoke, '--sample', 'landscape-a'], io)).toBe(0);
 }, FFMPEG_TIMEOUT_MS);

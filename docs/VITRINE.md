@@ -192,7 +192,7 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
    npm run showcase -- ingest --examples s3-examples/landscape-a-iris-dive --sample landscape-a
    ```
 
-   `ingest --examples` garde les runs `effect:<id>` et `transition:<hook>` réussis, faits à partir de la bonne photo (`image_sha256` de l'enregistrement d'extension) et à 480p pour son format, les réencode avec la mention « AI-generated », garde leur workflow pour « Ouvrir dans ComfyUI », et écrit les sections `effects` et `hooks` du manifeste. L'édition d'un hook (`hook-edit`) n'est pas un exemple : seul son clip l'est. Plusieurs runs d'un même job : `--pick effect:squish=2`.
+   `ingest --examples` garde les runs `effect:<id>` et `transition:<hook>` réussis, faits à partir de la bonne photo (`image_sha256` de l'enregistrement d'extension) et à 480p pour son format, les réencode avec la mention « AI-generated », garde leur workflow pour « Ouvrir dans ComfyUI », et écrit les sections `effects` et `hooks` du manifeste. L'édition d'un hook (`hook-edit`) n'est pas un exemple : seul son clip l'est. **Un dossier `--out` par appel du smoke** : chaque enregistrement d'extension y porte `run: 1`, et deux appels dans un même dossier y écraseraient le workflow du premier ; `ingest --examples` refuse un dossier qui contient deux fois le même job. Pour choisir entre deux essais d'un effet, refaire l'appel dans un autre dossier et ingérer celui qu'on garde (`--pick` ne sert pas aux exemples).
 5. **Le contrôle** :
 
    ```bash
