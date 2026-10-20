@@ -44,6 +44,19 @@ describe('effect presets (montagio/preset@0.1, capability i2v-effect)', () => {
     expect(() => parseEffectPreset(preset('"A sq41sh squish effect."'), 'p.yaml')).toThrow(/prompt\.template.*\{subject\}/);
   });
 
+  test('an effect defaults to not validated on a GPU and to the 4-step path', () => {
+    const effect = parseEffectPreset(preset(), 'p.yaml');
+    expect(effect.gpu_validated).toBeNull();
+    expect(effect.defaults.fast).toBe(true);
+  });
+
+  test('gpu_validated is a YYYY-MM-DD date, and fast can be turned off', () => {
+    const effect = parseEffectPreset(preset(undefined, 'gpu_validated: 2026-10-22\ndefaults: { fast: false }\n'), 'p.yaml');
+    expect(effect.gpu_validated).toBe('2026-10-22');
+    expect(effect.defaults).toEqual({ duration_s: 5, fast: false });
+    expect(() => parseEffectPreset(preset(undefined, 'gpu_validated: 22/10/2026\n'), 'p.yaml')).toThrow(/gpu_validated/);
+  });
+
   test('an effect lasts 2 to 5 s', () => {
     expect(() => parseEffectPreset(preset(undefined, 'defaults: { duration_s: 6 }\n'), 'p.yaml')).toThrow(/duration_s/);
   });
@@ -53,7 +66,7 @@ describe('effect presets (montagio/preset@0.1, capability i2v-effect)', () => {
   });
 
   test('the six effects of the pack load apart from the camera presets', () => {
-    expect([...lib.effects.keys()].sort()).toEqual(['bullet-time', 'cakeify', 'crash-zoom-in', 'explode', 'orbit-360', 'squish']);
+    expect([...lib.effects.keys()].sort()).toEqual(['cakeify', 'explode', 'frozen-moment', 'full-circle', 'snap-zoom', 'squish']);
     expect([...lib.presets.values()].every((p) => p.capability === 'i2v-camera')).toBe(true);
     expect(lib.presets.has('squish')).toBe(false);
     expect(lib.effectFiles.get('squish')).toBe('presets/effects/squish.yaml');

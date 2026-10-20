@@ -1,10 +1,10 @@
 # Effect LoRA: Remade-AI/Crash-zoom-in (Apache-2.0 in the card metadata, no LICENSE file).
 # The card has no template, only example prompts; this one follows them.
 schema: montagio/preset@0.1
-id: crash-zoom-in
-name: Crash Zoom
+id: snap-zoom
+name: Snap Zoom
 description: A violent zoom rushes in on the subject.
-preview: previews/crash-zoom-in.mp4
+preview: previews/snap-zoom.mp4
 license: CC-BY-4.0
 author: montagio-community
 capability: i2v-effect

@@ -1,9 +1,9 @@
 # A hook of the GPU session S2: the end frame is a macro of the iris, made by the edit.
 schema: montagio/preset@0.1
-id: eyes-in
-name: Eyes In
+id: iris-dive
+name: Iris Dive
 description: The camera dives into the subject's eye until the iris fills the frame.
-preview: previews/eyes-in.mp4
+preview: previews/iris-dive.mp4
 license: CC-BY-4.0
 author: montagio-community
 capability: i2v-transition

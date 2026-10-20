@@ -14,7 +14,7 @@
  *   npm run smoke -w @montagio/infra-runpod -- --dry-run         # compile only, no network
  *   npm run smoke -w @montagio/infra-runpod -- --extension music --duration 12
  *   npm run smoke -w @montagio/infra-runpod -- --extension all --input photo.png --clip clip.mp4 --language fr
- *   npm run smoke -w @montagio/infra-runpod -- --extension effect,hook --input photo.png --hook outfit-morph --input2 outfit.png
+ *   npm run smoke -w @montagio/infra-runpod -- --extension effect,hook --input photo.png --hook wardrobe-swap --input2 outfit.png
  *
  * The SDK only ever talks to --base-url (default: the local proxy). Comfy Cloud
  * and the Router are refused, and no Router method is called.
@@ -96,8 +96,8 @@ Extensions (instead of presets):
   --extension LIST   edit, effect, hook (= hook-edit then transition), voice, avatar, music, upscale (comma list) or "all"
   --input PATH       the photo of edit, effect, hook and avatar (default demo-assets/images/sample-16x9.png)
   --effect LIST      the effects to run, e.g. squish,explode, or "all" (default all)
-  --hook ID          the hook of hook-edit and transition (default eyes-in)
-  --input2 PATH      the second image of a two-reference hook (the outfit of outfit-morph)
+  --hook ID          the hook of hook-edit and transition (default iris-dive)
+  --input2 PATH      the second image of a two-reference hook (the outfit of wardrobe-swap)
   --end PATH         the end frame of a transition run alone; without it, the hook's edit runs first and makes it
   --quality          the edit, the effects and the transition without their 4-step LoRAs (more steps, slower)
   --look LOOK        a look of the edit job: infl8, action or angles

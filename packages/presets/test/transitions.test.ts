@@ -42,6 +42,14 @@ describe('hook presets (montagio/preset@0.1, capability i2v-transition)', () => 
     expect(hook.defaults.duration_s).toBe(5);
   });
 
+  test('a hook defaults to not validated on a GPU and to the 4-step path; a date is YYYY-MM-DD', () => {
+    const hook = parseTransitionPreset(hookYaml(), 'h.yaml');
+    expect(hook.gpu_validated).toBeNull();
+    expect(hook.defaults.fast).toBe(true);
+    expect(parseTransitionPreset(hookYaml(undefined, 'gpu_validated: 2026-10-25\n'), 'h.yaml').gpu_validated).toBe('2026-10-25');
+    expect(() => parseTransitionPreset(hookYaml(undefined, 'gpu_validated: soon\n'), 'h.yaml')).toThrow(/gpu_validated/);
+  });
+
   test('a look must be one of the edit looks', () => {
     expect(() => parseTransitionPreset(hookYaml('  instruction: "x"\n  look: karaoke'), 'h.yaml')).toThrow(/end_frame\.look/);
   });
@@ -51,10 +59,10 @@ describe('hook presets (montagio/preset@0.1, capability i2v-transition)', () => 
   });
 
   test('the four hooks load apart from the camera presets and the effects', () => {
-    expect([...lib.hooks.keys()].sort()).toEqual(['eyes-in', 'figurine', 'ignite', 'outfit-morph']);
-    expect(lib.hookFiles.get('eyes-in')).toBe('presets/transitions/eyes-in.yaml');
-    expect(lib.presets.has('eyes-in')).toBe(false);
-    expect(lib.effects.has('eyes-in')).toBe(false);
+    expect([...lib.hooks.keys()].sort()).toEqual(['figurine', 'ignite', 'iris-dive', 'wardrobe-swap']);
+    expect(lib.hookFiles.get('iris-dive')).toBe('presets/transitions/iris-dive.yaml');
+    expect(lib.presets.has('iris-dive')).toBe(false);
+    expect(lib.effects.has('iris-dive')).toBe(false);
   });
 
   test('a hook on a model of another task, or on an unknown one, is a library problem', async () => {
@@ -64,12 +72,12 @@ describe('hook presets (montagio/preset@0.1, capability i2v-transition)', () => 
       for (const [path, text] of Object.entries(files)) writeFileSync(join(root, path), text);
       return root;
     };
-    const eyes = readFileSync(join(repoRoot, 'presets', 'transitions', 'eyes-in.yaml'), 'utf8');
+    const eyes = readFileSync(join(repoRoot, 'presets', 'transitions', 'iris-dive.yaml'), 'utf8');
     for (const [model, problem] of [
-      ['wan21-i2v-effects', /hook eyes-in: model wan21-i2v-effects runs task i2v-effect, not flf2v/],
-      ['karaoke', /hook eyes-in: unknown transition model "karaoke"/],
+      ['wan21-i2v-effects', /hook iris-dive: model wan21-i2v-effects runs task i2v-effect, not flf2v/],
+      ['karaoke', /hook iris-dive: unknown transition model "karaoke"/],
     ] as const) {
-      const error = await loadLibrary(repoWith({ 'presets/transitions/eyes-in.yaml': eyes.replace('preferred: wan22-flf2v-transition', `preferred: ${model}`) })).catch((e: unknown) => e);
+      const error = await loadLibrary(repoWith({ 'presets/transitions/iris-dive.yaml': eyes.replace('preferred: wan22-flf2v-transition', `preferred: ${model}`) })).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(LibraryError);
       expect((error as LibraryError).problems.join('\n')).toMatch(problem);
     }
@@ -141,20 +149,20 @@ describe('a hook: the end frame by the edit, then the transition', () => {
   const hookEdit = (id: string, inputs: Partial<Parameters<typeof compileHookEdit>[3]> = {}) =>
     compileHookEdit(lib.hooks.get(id)!, edit().model, edit().template, { imageRef: 'start.png', seed: 2, ...inputs }, lib.lock);
 
-  test('eyes-in: the instruction of the hook, no look, no second image', () => {
-    const { workflow } = hookEdit('eyes-in');
-    expect(workflow['151']!.inputs.prompt).toBe(lib.hooks.get('eyes-in')!.end_frame.instruction);
+  test('iris-dive: the instruction of the hook, no look, no second image', () => {
+    const { workflow } = hookEdit('iris-dive');
+    expect(workflow['151']!.inputs.prompt).toBe(lib.hooks.get('iris-dive')!.end_frame.instruction);
     expect(workflow['170']).toBeUndefined();
     expect(workflow['42']).toBeUndefined();
   });
 
-  test('outfit-morph needs the outfit image', () => {
-    expect(() => hookEdit('outfit-morph')).toThrow(/outfit-morph needs a second image/);
-    expect(hookEdit('outfit-morph', { image2Ref: 'uploads/outfit.png' }).workflow['42']!.inputs.image).toBe('uploads/outfit.png');
+  test('wardrobe-swap needs the outfit image', () => {
+    expect(() => hookEdit('wardrobe-swap')).toThrow(/wardrobe-swap needs a second image/);
+    expect(hookEdit('wardrobe-swap', { image2Ref: 'uploads/outfit.png' }).workflow['42']!.inputs.image).toBe('uploads/outfit.png');
   });
 
   test('a hook with one reference image ignores a second one', () => {
-    expect(hookEdit('eyes-in', { image2Ref: 'uploads/outfit.png' }).workflow['42']).toBeUndefined();
+    expect(hookEdit('iris-dive', { image2Ref: 'uploads/outfit.png' }).workflow['42']).toBeUndefined();
   });
 
   test('figurine runs the ACTION look', () => {
@@ -162,7 +170,7 @@ describe('a hook: the end frame by the edit, then the transition', () => {
   });
 
   test("the transition starts on the photo and ends on the edit's output, with the hook's motion", () => {
-    const hook = lib.hooks.get('eyes-in')!;
+    const hook = lib.hooks.get('iris-dive')!;
     const { workflow } = compileHookTransition(hook, flf2v().model, flf2v().template, { imageRef: 'start.png', endRef: 'edit_00001_.png', seed: 2, aspect: '9:16' });
     expect(workflow['68']!.inputs.image).toBe('start.png');
     expect(workflow['62']!.inputs.image).toBe('edit_00001_.png');

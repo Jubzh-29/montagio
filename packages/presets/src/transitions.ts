@@ -76,7 +76,7 @@ export function compileTransition(
 export type HookEditInputs = {
   /** The user's photo: the first frame of the transition. */
   imageRef: string;
-  /** The second image a two-reference hook needs (the outfit of outfit-morph); ignored otherwise. */
+  /** The second image a two-reference hook needs (the outfit of wardrobe-swap); ignored otherwise. */
   image2Ref?: string;
   seed: number;
   fast?: boolean;

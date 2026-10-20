@@ -36,7 +36,7 @@ export type Library = {
   effectFiles: Map<string, string>;
   /** Keyframe transition hooks (presets/transitions/), apart from the camera presets too. */
   hooks: Map<string, TransitionPreset>;
-  /** Repository-relative file of each hook, e.g. "presets/transitions/eyes-in.yaml". */
+  /** Repository-relative file of each hook, e.g. "presets/transitions/iris-dive.yaml". */
   hookFiles: Map<string, string>;
   warnings: string[];
 };

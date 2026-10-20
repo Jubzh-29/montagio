@@ -17,12 +17,12 @@ const base = { language: 'en' as const, duration_s: 10, seed: 7, aspect: '16:9' 
 const files = { input: '/data/photo.png', input2: '/data/outfit.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6 };
 
 test('one job per extension, in the order of the session, each accepted by ComfyUI v0.41.0 once its files are uploaded', () => {
-  const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'outfit-morph' });
+  const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
   expect(jobs.map((job) => [job.tag, job.model.id])).toEqual([
     ['edit', 'qwen-image-edit-2511'],
     ['effect:squish', 'wan21-i2v-effects'],
-    ['hook-edit:outfit-morph', 'qwen-image-edit-2511'],
-    ['transition:outfit-morph', 'wan22-flf2v-transition'],
+    ['hook-edit:wardrobe-swap', 'qwen-image-edit-2511'],
+    ['transition:wardrobe-swap', 'wan22-flf2v-transition'],
     ['voice', 'chatterbox-mtl-voice'],
     ['avatar', 'wan22-s2v-avatar'],
     ['music', 'ace-step15-music'],
@@ -35,7 +35,7 @@ test('one job per extension, in the order of the session, each accepted by Comfy
 });
 
 test('each job uploads the files it reads and nothing else', () => {
-  const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'outfit-morph' });
+  const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
   const uploads = Object.fromEntries(jobs.map((job) => [job.name, job.files]));
   expect(uploads.music).toEqual([]);
   expect(uploads.voice).toEqual([]);
@@ -58,7 +58,7 @@ test('each job uploads the files it reads and nothing else', () => {
 
 test('without a list, every effect of the pack runs, each with its own tag', () => {
   const jobs = extensionJobs(library, { ...base, jobs: ['effect'], input: '/p.png' });
-  expect(jobs.map((job) => job.tag).sort()).toEqual(['effect:bullet-time', 'effect:cakeify', 'effect:crash-zoom-in', 'effect:explode', 'effect:orbit-360', 'effect:squish']);
+  expect(jobs.map((job) => job.tag).sort()).toEqual(['effect:cakeify', 'effect:explode', 'effect:frozen-moment', 'effect:full-circle', 'effect:snap-zoom', 'effect:squish']);
 });
 
 test('the edit job runs a look, so that a GPU session can validate each one', () => {
@@ -73,7 +73,7 @@ test('an unknown look is named, with the known ones', () => {
 });
 
 test('the quality path drops the 4-step LoRAs of the edit, the effects and the transition', () => {
-  const jobs = extensionJobs(library, { ...base, ...files, jobs: ['edit', 'effect', 'transition'], effects: ['squish'], hook: 'eyes-in', fast: false });
+  const jobs = extensionJobs(library, { ...base, ...files, jobs: ['edit', 'effect', 'transition'], effects: ['squish'], hook: 'iris-dive', fast: false });
   expect(jobs.map((job) => job.params.fast)).toEqual([false, false, false]);
 });
 
@@ -88,13 +88,13 @@ test('a job that needs a file not given is refused before anything runs', () => 
   expect(() => extensionJobs(library, { ...base, jobs: ['upscale'] })).toThrow(/--clip/);
   expect(() => extensionJobs(library, { ...base, jobs: ['upscale'], clip: '/c.mp4' })).toThrow(/the upscale job needs the aspect and the frame count of its clip/);
   expect(() => extensionJobs(library, { ...base, jobs: ['avatar'], input: '/p.png' })).toThrow(/--audio/);
-  expect(() => extensionJobs(library, { ...base, jobs: ['transition'], input: '/p.png', hook: 'eyes-in' })).toThrow(/--end/);
-  expect(() => extensionJobs(library, { ...base, jobs: ['hook-edit'], input: '/p.png', hook: 'outfit-morph' })).toThrow(/second image/);
+  expect(() => extensionJobs(library, { ...base, jobs: ['transition'], input: '/p.png', hook: 'iris-dive' })).toThrow(/--end/);
+  expect(() => extensionJobs(library, { ...base, jobs: ['hook-edit'], input: '/p.png', hook: 'wardrobe-swap' })).toThrow(/second image/);
 });
 
 test('an unknown effect or hook is named, with the known ones', () => {
   expect(() => extensionJobs(library, { ...base, jobs: ['effect'], input: '/p.png', effects: ['karaoke'] })).toThrow(/unknown effect "karaoke".*squish/);
-  expect(() => extensionJobs(library, { ...base, jobs: ['hook-edit'], input: '/p.png', hook: 'karaoke' })).toThrow(/unknown hook "karaoke".*eyes-in/);
+  expect(() => extensionJobs(library, { ...base, jobs: ['hook-edit'], input: '/p.png', hook: 'karaoke' })).toThrow(/unknown hook "karaoke".*iris-dive/);
 });
 
 test('each text reaches the job it is given for, the other jobs keep their default', () => {
