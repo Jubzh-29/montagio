@@ -1,4 +1,4 @@
-import { clipFile, ManifestError, parseManifest, verticalFile, workflowFile } from '../src/manifest';
+import { clipFile, effectFile, exampleWorkflowFile, hookFile, ManifestError, parseManifest, verticalFile, workflowFile } from '../src/manifest';
 import { INITIAL_MANIFEST } from './fixtures';
 
 
@@ -58,4 +58,29 @@ test('clipFile, verticalFile and workflowFile follow the canonical names', () =>
   expect(clipFile('crash-push', 'landscape-a')).toBe('clips/crash-push--landscape-a.mp4');
   expect(verticalFile('crash-push', 'landscape-a')).toBe('clips/crash-push--landscape-a.9x16.mp4');
   expect(workflowFile('crash-push', 'landscape-a')).toBe('workflows/crash-push--landscape-a.json');
+});
+
+test('a sample may carry the text that made it', () => {
+  const text = INITIAL_MANIFEST.replace('    status: placeholder\n', '    status: placeholder\n    prompt: a quiet harbour at dawn, fishing boats, soft fog\n');
+  expect(parseManifest(text, 'm.yaml').samples[0]!.prompt).toBe('a quiet harbour at dawn, fishing boats, soft fog');
+  expect(problemsOf(INITIAL_MANIFEST.replace('    status: placeholder\n', "    status: placeholder\n    prompt: ''\n"))).toContainEqual(
+    expect.stringMatching(/^samples\.0\.prompt:/),
+  );
+});
+
+const example = (key: 'effect' | 'hook', id: string, sample: string) =>
+  `  - { ${key}: ${id}, sample: ${sample}, seed: 42, sha256: ${SHA}, image_sha256: ${SHA}, workflow_sha256: ${SHA}, rendered_at: 2026-10-24 }\n`;
+
+test('an effect example needs its sample in the manifest', () => {
+  const text = `${INITIAL_MANIFEST}effects:\n${example('effect', 'squish', 'landscape-a')}${example('effect', 'explode', 'nowhere')}hooks:\n${example('hook', 'iris-dive', 'landscape-a')}${example('hook', 'iris-dive', 'landscape-a')}`;
+  expect(problemsOf(text)).toEqual(['effects.1.sample: unknown sample "nowhere"', 'hooks.1: duplicate example iris-dive × landscape-a']);
+  const ok = parseManifest(`${INITIAL_MANIFEST}effects:\n${example('effect', 'squish', 'landscape-a')}`, 'm.yaml');
+  expect(ok.effects).toEqual([{ effect: 'squish', sample: 'landscape-a', seed: 42, sha256: SHA, image_sha256: SHA, workflow_sha256: SHA, rendered_at: '2026-10-24' }]);
+  expect(ok.hooks).toEqual([]);
+});
+
+test('the examples have canonical names too', () => {
+  expect(effectFile('squish', 'landscape-a')).toBe('effects/squish--landscape-a.mp4');
+  expect(hookFile('iris-dive', 'portrait-a')).toBe('hooks/iris-dive--portrait-a.mp4');
+  expect(exampleWorkflowFile('hook', 'iris-dive', 'portrait-a')).toBe('workflows/hook-iris-dive--portrait-a.json');
 });

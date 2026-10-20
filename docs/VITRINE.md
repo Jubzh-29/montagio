@@ -179,6 +179,20 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
    - écrit leurs entrées dans le manifeste : seed, sha256, empreintes de la photo et du workflow, date.
 
    S'il y a plusieurs runs pour un preset, choisir avec `--pick crash-push=2` (une option `--pick` par preset).
+
+   **Les exemples d'effets et de hooks**, de la même façon : sur le pod, les effets et un hook par appel, un dossier `--out` par appel (Wardrobe Swap demande aussi `--input2`, la photo de la tenue) :
+
+   ```bash
+   npm run smoke -w @montagio/infra-runpod -- --extension effect,hook --hook iris-dive --input demo-assets/showcase/samples/landscape-a.jpg --out s3-examples/landscape-a-iris-dive
+   ```
+
+   puis, sur le PC, après le rapatriement :
+
+   ```bash
+   npm run showcase -- ingest --examples s3-examples/landscape-a-iris-dive --sample landscape-a
+   ```
+
+   `ingest --examples` garde les runs `effect:<id>` et `transition:<hook>` réussis, faits à partir de la bonne photo (`image_sha256` de l'enregistrement d'extension) et à 480p pour son format, les réencode avec la mention « AI-generated », garde leur workflow pour « Ouvrir dans ComfyUI », et écrit les sections `effects` et `hooks` du manifeste. L'édition d'un hook (`hook-edit`) n'est pas un exemple : seul son clip l'est. Plusieurs runs d'un même job : `--pick effect:squish=2`.
 5. **Le contrôle** :
 
    ```bash

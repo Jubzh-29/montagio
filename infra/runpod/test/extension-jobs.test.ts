@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadLibrary, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
-import { EXTENSION_JOBS, extensionJobs, jobTexts, type ExtensionJobOptions } from '../lib/extension-jobs';
+import { EXTENSION_JOBS, extensionJobs, jobTexts, photoFile, type ExtensionJobOptions } from '../lib/extension-jobs';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const info = JSON.parse(readFileSync(new URL('./fixtures/object_info-v0.41.0.json', import.meta.url), 'utf8')) as ObjectInfo;
@@ -54,6 +54,21 @@ test('each job uploads the files it reads and nothing else', () => {
     { node: '52', field: 'image', path: '/data/photo.png' },
     { node: '58', field: 'audio', path: '/data/speech.flac' },
   ]);
+});
+
+test('an extension record carries the sha256 of its photo', () => {
+  // smoke.ts fingerprints the file each job binds to its model's image input: the showcase ingests only runs of its exact sample photo.
+  const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
+  expect(Object.fromEntries(jobs.map((job) => [job.name, photoFile(job)]))).toEqual({
+    edit: '/data/photo.png',
+    effect: '/data/photo.png',
+    'hook-edit': '/data/photo.png',
+    transition: '/data/photo.png',
+    voice: null,
+    avatar: '/data/photo.png',
+    music: null,
+    upscale: null,
+  });
 });
 
 test('without a list, every effect of the pack runs, each with its own tag', () => {

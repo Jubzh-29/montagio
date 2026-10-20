@@ -206,3 +206,11 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
     }
   });
 }
+
+/** The photo a job reads (the file bound to its model's `image` input), or null for a job without one (voice, music, upscale). */
+export function photoFile(job: ExtensionJob): string | null {
+  const binding = job.model.bindings.image;
+  const target = Array.isArray(binding) ? binding[0] : binding;
+  if (!target) return null;
+  return job.files.find((file) => file.node === target.node && file.field === target.field)?.path ?? null;
+}

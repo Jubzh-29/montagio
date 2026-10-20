@@ -27,7 +27,7 @@ import { Comfy, type Job, type WorkflowGraph } from '@comfyorg/sdk';
 import { CAMERA_POSE_VALUES, compileJob, loadLibrary, pickAspect, type ApiWorkflow, type Aspect, type Library, type Resolution } from '@montagio/presets';
 import { probe, probeAudio } from '@montagio/sequence';
 import { imageSize } from 'image-size';
-import { EXTENSION_JOBS, extensionJobs, jobTexts, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
+import { EXTENSION_JOBS, extensionJobs, jobTexts, photoFile, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
 import { imageFingerprint } from './lib/image';
 import { assertLocalBaseUrl, cameraMove, checkWorkflow, comboOptions, guardFetch, VramSampler, type ObjectInfo, type VramStats } from './lib/comfy';
 
@@ -305,6 +305,12 @@ async function main(): Promise<number> {
   return records.every((r) => r.status === 'succeeded' || r.status === 'compiled') ? 0 : 1;
 }
 
+/** The sha256 of the photo an extension job reads, for the showcase's ingest. */
+async function photoSha256(job: ExtensionJob): Promise<string | null> {
+  const photo = photoFile(job);
+  return photo ? (await imageFingerprint(photo)).image_sha256 : null;
+}
+
 /** What runJob fills in, for a preset clip as for an extension job. */
 type RunRecord = Pick<SmokeRecord, 'at' | 'run' | 'status' | 'error' | 'metrics' | 'exec_s' | 'wall_s' | 'vram' | 'outputs'>;
 
@@ -383,6 +389,8 @@ type ExtensionRecord = RunRecord & {
   model: string;
   params: Record<string, unknown>;
   inputs: string[];
+  /** The sha256 of the photo the job read (the showcase ingests only examples of its exact sample photo); null without one. */
+  image_sha256: string | null;
   comfyui_version: string | null;
   gpu: string | null;
   sdk: string;
@@ -504,6 +512,7 @@ async function runExtensions(
       error: null,
       params: job.params,
       inputs: job.files.map((file) => basename(file.path)),
+      image_sha256: await photoSha256(job),
       wall_s: null,
       exec_s: null,
       metrics: null,

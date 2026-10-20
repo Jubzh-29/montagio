@@ -4,13 +4,14 @@
  *
  *   npm run showcase -- verify [--strict]
  *   npm run showcase -- ingest <smoke results folder> --sample <id> [--pick <preset>=<run> ...]
+ *   npm run showcase -- ingest --examples <smoke results folder> --sample <id> [--pick <job>=<run> ...]
  *   npm run showcase -- prepare [--strict] [--out <dir>] [--repo-url <url>]
  *
  * Exit code: 0 when everything is fine, 1 on an error, 2 on a usage error.
  */
 import { isAbsolute, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { IngestError, ingestSmoke } from './ingest';
+import { IngestError, ingestExamples, ingestSmoke } from './ingest';
 import { PrepareError, prepareShowcase } from './prepare';
 import { verifyShowcase } from './verify';
 
@@ -20,6 +21,7 @@ const USAGE = [
   'Usage:',
   '  showcase verify [--strict]',
   '  showcase ingest <smoke results folder> --sample <id> [--pick <preset>=<run> ...]',
+  '  showcase ingest --examples <smoke results folder> --sample <id> [--pick <job>=<run> ...]   (job: effect:<id> or transition:<hook>)',
   '  showcase prepare [--strict] [--out <dir>] [--repo-url <url>]',
 ].join('\n');
 
@@ -62,27 +64,31 @@ async function ingest(args: string[], io: CliIo): Promise<number> {
   const { values, positionals } = parseArgs({
     args,
     allowPositionals: true,
-    options: { sample: { type: 'string' }, pick: { type: 'string', multiple: true } },
+    options: { sample: { type: 'string' }, pick: { type: 'string', multiple: true }, examples: { type: 'boolean', default: false } },
   });
   if (positionals.length !== 1 || !values.sample) {
     io.err(USAGE);
     return 2;
   }
+  // An example's job names its effect, or its hook's transition: effect:squish, transition:iris-dive.
+  const pickPattern = values.examples ? /^((?:effect|transition):[a-z0-9-]+)=(\d+)$/ : /^([a-z0-9-]+)=(\d+)$/;
   const picks: Record<string, number> = {};
   for (const pick of values.pick ?? []) {
-    const match = /^([a-z0-9-]+)=(\d+)$/.exec(pick);
+    const match = pickPattern.exec(pick);
     if (!match) {
-      io.err(`--pick ${pick}: expected <preset>=<run>, e.g. --pick crash-push=2`);
+      io.err(values.examples ? `--pick ${pick}: expected <job>=<run>, e.g. --pick effect:squish=2` : `--pick ${pick}: expected <preset>=<run>, e.g. --pick crash-push=2`);
       return 2;
     }
     picks[match[1]!] = Number(match[2]);
   }
   const folder = isAbsolute(positionals[0]!) ? positionals[0]! : resolve(io.cwd ?? process.cwd(), positionals[0]!);
-  const result = await ingestSmoke(io.root, folder, values.sample, picks);
+  const result = await (values.examples ? ingestExamples : ingestSmoke)(io.root, folder, values.sample, picks);
   for (const line of result.skipped) io.out(`skipped: ${line}`);
   for (const file of result.added) io.out(`added: ${file}`);
   for (const file of result.replaced) io.out(`replaced: ${file}`);
-  io.out(`showcase: ${count(result.added.length + result.replaced.length, 'clip')} ingested for ${values.sample}; run "showcase verify" next`);
+  io.out(
+    `showcase: ${count(result.added.length + result.replaced.length, values.examples ? 'example' : 'clip')} ingested for ${values.sample}; run "showcase verify" next`,
+  );
   return 0;
 }
 
