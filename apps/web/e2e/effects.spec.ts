@@ -46,3 +46,36 @@ test('the wall requests no preview that does not exist', async ({ page }) => {
   await page.waitForLoadState('networkidle');
   expect(missing).toEqual([]);
 });
+
+test('Iris Dive on the sample photo: the end frame, then the clip', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Iris Dive' }).click();
+  await expect(page.getByRole('textbox', { name: /What the photo shows/ })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.getByTestId('hook-end-frame')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('end-frame-caption')).toHaveText(/Qwen-Image-Edit-2511/);
+  await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('ai-caption')).toHaveText(/Wan 2[.]2/);
+});
+
+test('Wardrobe Swap waits for its outfit, and an imported outfit asks for consent', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Wardrobe Swap' }).click();
+  const generate = page.getByRole('button', { name: /^Generate/ });
+  await expect(generate).toBeDisabled();
+  await expect(page.getByText('Add the outfit photo to generate.')).toBeVisible();
+  await page.setInputFiles('#outfit-input', sampleImage);
+  await expect(page.getByTestId('outfit-slot').locator('img')).toBeVisible();
+  await expect(generate).toBeDisabled();
+  await page.getByRole('checkbox', { name: /I am the person in this photo/ }).check();
+  await expect(generate).toBeEnabled();
+});
+
+test('the filter shows hooks only', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Hooks', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Iris Dive' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Squish' })).toHaveCount(0);
+});

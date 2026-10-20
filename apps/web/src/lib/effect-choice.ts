@@ -23,3 +23,19 @@ export function wallFilter<E extends { id: string }, H extends { id: string }>(
     ...(filter === 'effects' ? [] : hooks.map((item) => ({ kind: 'hook' as const, id: item.id, item }))),
   ];
 }
+
+export type WallChoice<E, H> = { kind: 'effect'; item: E } | { kind: 'hook'; item: H };
+
+/** The tile chosen on the Effects wall: the one picked while it is shown, else the first effect, else the first hook. */
+export function pickWallChoice<E extends { id: string }, H extends { id: string }>(
+  effects: E[],
+  hooks: H[],
+  pickedId: string | null,
+): WallChoice<E, H> | undefined {
+  const effect = effects.find((entry) => entry.id === pickedId);
+  if (effect) return { kind: 'effect', item: effect };
+  const hook = hooks.find((entry) => entry.id === pickedId);
+  if (hook) return { kind: 'hook', item: hook };
+  if (effects[0]) return { kind: 'effect', item: effects[0] };
+  return hooks[0] ? { kind: 'hook', item: hooks[0] } : undefined;
+}

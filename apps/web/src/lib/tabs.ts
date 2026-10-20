@@ -11,7 +11,7 @@ export const TAB_ORDER: readonly Tab[] = ['effects', 'camera', 'film', 'avatar']
 export const READY_TABS: ReadonlySet<Tab> = new Set<Tab>(['effects', 'camera', 'film']);
 
 /** Hooks join the Effects wall once their two-step render (edit, then transition) is wired. */
-export const HOOKS_READY = false;
+export const HOOKS_READY = true;
 
 /**
  * The tabs the Studio shows: Effects as soon as one effect or hook is shown (the viral

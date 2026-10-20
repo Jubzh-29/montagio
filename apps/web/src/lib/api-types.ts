@@ -122,6 +122,9 @@ export type HookSummary = {
   estimate_s: number;
   /** 2: the hook needs a second photo (an outfit). */
   references: 1 | 2;
+  /** The transition model, for the caption under the clip. */
+  modelName: string;
+  license: string;
 };
 
 /** What the Studio may show: the extensions the flag and the GPU dates allow, and the time estimates. */

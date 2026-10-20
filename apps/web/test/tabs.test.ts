@@ -6,7 +6,7 @@ const ALL = new Set(TAB_ORDER);
 
 const none: ExtensionsInfo = { extensions: [], effects: [], hooks: [], estimates: { t2i: 12 } };
 const effect = { id: 'squish', name: 'Squish', description: '', estimate_s: 90, subjectMax: 120, modelName: 'Wan 2.1 I2V 480p (effects)', license: 'Apache-2.0' };
-const hook = { id: 'iris-dive', name: 'Iris Dive', description: '', estimate_s: 160, references: 1 as const };
+const hook = { id: 'iris-dive', name: 'Iris Dive', description: '', estimate_s: 160, references: 1 as const, modelName: 'Wan 2.2 FLF2V', license: 'Apache-2.0' };
 
 test('without extensions, camera then film', () => {
   expect(visibleTabs(none)).toEqual(['camera', 'film']);
@@ -48,7 +48,9 @@ test('the Effects tab is built: one shown effect opens it by default', () => {
   expect(visibleTabs({ ...none, extensions: ['effects'], effects: [effect] })).toEqual(['effects', 'camera', 'film']);
 });
 
-test('hooks alone do not open the Effects tab until hooks can be rendered', () => {
-  expect(HOOKS_READY).toBe(false);
-  expect(visibleTabs({ ...none, extensions: ['edit', 'transitions'], hooks: [hook] })).toEqual(['camera', 'film']);
+test('hooks alone open the Effects tab, now that they render', () => {
+  expect(HOOKS_READY).toBe(true);
+  expect(visibleTabs({ ...none, extensions: ['edit', 'transitions'], hooks: [hook] })).toEqual(['effects', 'camera', 'film']);
+  // Before their two-step render existed, the flag kept them off.
+  expect(visibleTabs({ ...none, extensions: ['edit', 'transitions'], hooks: [hook] }, undefined, false)).toEqual(['camera', 'film']);
 });

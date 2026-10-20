@@ -116,6 +116,8 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
         ...(previewUrl ? { previewUrl } : {}),
         estimate_s: (editModel ? estimateFor(editModel, fast) : 0) + (model ? estimateFor(model, fast) : 0),
         references: preset.end_frame.references,
+        modelName: model?.name ?? preset.models.preferred,
+        license: model?.license ?? '',
       };
     }),
   );

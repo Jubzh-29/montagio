@@ -23,7 +23,7 @@ import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { useMotionPaused } from '@/lib/use-motion';
 import { needsConsent } from '@/lib/consent';
-import { defaultSubject } from '@/lib/effect-choice';
+import { defaultSubject, pickWallChoice } from '@/lib/effect-choice';
 import { nextView, tabEvent, type CanvasEvent, type CanvasState, type ShownTab } from '@/lib/studio-view';
 import { HOOKS_READY, pickTab, tabHref, visibleTabs } from '@/lib/tabs';
 import { refreshExtensions, useExtensions } from '@/lib/use-extensions';
@@ -34,6 +34,7 @@ import { ChoiceCard } from './ChoiceCard';
 import { Composer } from './Composer';
 import { ConsentCheck } from './ConsentCheck';
 import { EffectFields } from './EffectFields';
+import { OutfitSource } from './OutfitSource';
 import { EffectWall } from './EffectWall';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
@@ -94,6 +95,22 @@ const SEQUENCE_STATE: Record<SequenceSummary['state'], JobState> = {
   canceled: 'canceled',
 };
 
+/** POST /api/uploads, and what the photo slot shows afterwards. */
+async function sendUpload(file: File, localUrl: string, t: (key: 'errorUpload413' | 'errorUpload415' | 'errorGeneric') => string): Promise<UploadState> {
+  const form = new FormData();
+  form.set('image', file);
+  try {
+    const res = await apiFetch('/api/uploads', { method: 'POST', body: form });
+    if (res.status === 413) return { status: 'error', message: t('errorUpload413') };
+    if (res.status === 415) return { status: 'error', message: t('errorUpload415') };
+    if (!res.ok) return { status: 'error', message: t('errorGeneric') };
+    const result = (await res.json()) as UploadResult;
+    return { status: 'ready', localUrl, imageRef: result.imageRef, personal: result.personal };
+  } catch {
+    return { status: 'error', message: t('errorGeneric') };
+  }
+}
+
 function trackedJob(job: Tracked): TrackedJob {
   if (job.kind === 'generation' || job.kind === 'job') return job.record;
   const { id, progress, outputUrl, error } = job.record;
@@ -123,6 +140,7 @@ export function Studio() {
   const [photoPrompt, setPhotoPrompt] = useState<string | undefined>(undefined);
   // The Effects tab: the effect chosen on the wall, what the photo shows, and the consent box.
   const [effectId, setEffectId] = useState<string | null>(null);
+  const [outfit, setOutfit] = useState<UploadState>({ status: 'idle' });
   const [subject, setSubject] = useState('');
   const [consent, setConsent] = useState(false);
   // History: the latest creations under the result, and the item a "Reuse" link brings back (?from=).
@@ -259,24 +277,22 @@ export function Studio() {
       setJob({ status: 'idle' });
       setPhotoPrompt(undefined);
       setUpload({ status: 'uploading', localUrl });
-      const form = new FormData();
-      form.set('image', file);
-      const settle = (next: UploadState) => {
-        if (token === uploadToken.current) setUpload(next);
-      };
-      try {
-        const res = await apiFetch('/api/uploads', { method: 'POST', body: form });
-        if (res.status === 413) return settle({ status: 'error', message: t('errorUpload413') });
-        if (res.status === 415) return settle({ status: 'error', message: t('errorUpload415') });
-        if (!res.ok) return settle({ status: 'error', message: t('errorGeneric') });
-        const result = (await res.json()) as UploadResult;
-        settle({ status: 'ready', localUrl, imageRef: result.imageRef, personal: result.personal });
-      } catch {
-        settle({ status: 'error', message: t('errorGeneric') });
-      }
+      const next = await sendUpload(file, localUrl, t);
+      if (token === uploadToken.current) setUpload(next);
     },
     [t],
   );
+
+  /** The outfit of a two-reference hook: a second upload, which the start photo does not replace. */
+  const outfitToken = useRef(0);
+  const onOutfit = async (file: File) => {
+    if (busyRef.current) return;
+    const token = ++outfitToken.current;
+    const localUrl = URL.createObjectURL(file);
+    setOutfit({ status: 'uploading', localUrl });
+    const next = await sendUpload(file, localUrl, t);
+    if (token === outfitToken.current) setOutfit(next);
+  };
 
   /** The sample photo, copied by the server: its origin is known, so no effect on it asks for consent. */
   const loadSample = async () => {
@@ -338,16 +354,21 @@ export function Studio() {
   };
 
   const effects = extensions?.effects ?? [];
-  const selectedEffect = effects.find((effect) => effect.id === effectId) ?? effects[0];
-  const askConsent = tab === 'effects' && needsConsent(upload, 'effect');
+  const hooks = HOOKS_READY ? (extensions?.hooks ?? []) : [];
+  // The wall's choice: an effect, or a hook (an edit, then a transition); a two-reference hook needs its outfit.
+  const wallChoice = pickWallChoice(effects, hooks, effectId);
+  const selectedEffect = wallChoice?.kind === 'effect' ? wallChoice.item : undefined;
+  const selectedHook = wallChoice?.kind === 'hook' ? wallChoice.item : undefined;
+  const needsOutfit = selectedHook?.references === 2;
+  const askConsent = tab === 'effects' && needsConsent(upload, selectedHook ? 'hook' : 'effect', needsOutfit ? outfit : undefined);
   // A photo made from a text says what it shows (state adjusted while rendering, when that photo changes).
   const [subjectFor, setSubjectFor] = useState(photoPrompt);
   if (subjectFor !== photoPrompt) {
     setSubjectFor(photoPrompt);
     setSubject(defaultSubject(photoPrompt, selectedEffect?.subjectMax ?? 120));
   }
-  // Another photo asks for consent again.
-  const photoKey = upload.status === 'ready' ? upload.imageRef : null;
+  // Another photo, or another outfit, asks for consent again.
+  const photoKey = [upload, outfit].map((entry) => (entry.status === 'ready' ? entry.imageRef : '')).join('|');
   const [consentFor, setConsentFor] = useState(photoKey);
   if (consentFor !== photoKey) {
     setConsentFor(photoKey);
@@ -356,7 +377,7 @@ export function Studio() {
 
   const ready = upload.status === 'ready' && modelId !== null && !busy;
   const canGenerate = tab === 'effects'
-    ? upload.status === 'ready' && !busy && selectedEffect !== undefined && (!askConsent || consent)
+    ? upload.status === 'ready' && !busy && wallChoice !== undefined && (!askConsent || consent) && (!needsOutfit || outfit.status === 'ready')
     : remix
     ? ready && remix.text.trim().length > 0
     : mode === 'single'
@@ -423,6 +444,7 @@ export function Studio() {
     if (back.prompt !== undefined) setPrompt(back.prompt);
     if (back.shots) setShots(back.shots);
     if (back.effectId) setEffectId(back.effectId);
+    if (back.hookId) setEffectId(back.hookId);
     setCanvas({ view: 'gallery', before: 'gallery' });
     if (back.remixGenerationId && back.presetId) {
       void openRemix(back.presetId, `/api/generations/${encodeURIComponent(back.remixGenerationId)}/preset`, back.remixGenerationId);
@@ -548,6 +570,11 @@ export function Studio() {
     moveCanvas('generate');
     const userPrompt = prompt.trim() || undefined;
     if (tab === 'effects') {
+      if (selectedHook) {
+        const image2 = needsOutfit && outfit.status === 'ready' ? { image2Ref: outfit.imageRef } : {};
+        void submit('job', { imageRef: upload.imageRef, hookId: selectedHook.id, ...image2, ...(askConsent ? { consent } : {}) }, undefined, '/api/hooks');
+        return;
+      }
       if (!selectedEffect) return;
       const body = { imageRef: upload.imageRef, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}) };
       void submit('job', body, undefined, '/api/effects');
@@ -626,7 +653,7 @@ export function Studio() {
         : undefined;
 
   const selectedModel = models.find((model) => model.id === modelId);
-  const estimate = tab === 'effects' ? (selectedEffect?.estimate_s ?? 0) : (selectedModel?.estimate_s['480p'] ?? 0);
+  const estimate = tab === 'effects' ? (wallChoice?.item.estimate_s ?? 0) : (selectedModel?.estimate_s['480p'] ?? 0);
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
   const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
@@ -658,16 +685,16 @@ export function Studio() {
     speed: movePreset.speed,
   };
   // The slate under the monitor: the take about to be shot, even once a photo hides the viewfinder.
-  const slateMove = tab === 'effects' ? selectedEffect?.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  const slateMove = tab === 'effects' ? wallChoice?.item.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
   const slate = slateMove && [
     slateMove,
     tab !== 'effects' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
     t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
   ].filter(Boolean);
 
-  const effectOfResult = tracked?.kind === 'job' ? effects.find((effect) => effect.id === tracked.record.label.itemId) : undefined;
-  const resultModel: { name: string; license: string } | undefined = effectOfResult
-    ? { name: effectOfResult.modelName, license: effectOfResult.license }
+  const wallItemOfResult = tracked?.kind === 'job' ? [...effects, ...hooks].find((item) => item.id === tracked.record.label.itemId) : undefined;
+  const resultModel: { name: string; license: string } | undefined = wallItemOfResult
+    ? { name: wallItemOfResult.modelName, license: wallItemOfResult.license }
     : tracked?.kind === 'generation'
       ? models.find((model) => model.id === tracked.record.modelId)
       : tracked?.kind === 'sequence'
@@ -694,12 +721,12 @@ export function Studio() {
           label={t('composerLabel')}
           choice={
             tab === 'effects' ? (
-              selectedEffect ? (
+              wallChoice ? (
                 <ChoiceCard
-                  name={selectedEffect.name}
-                  kindLabel={t('effectKind', { s: CLIP_SECONDS })}
-                  previewUrl={selectedEffect.previewUrl}
-                  icon="effect"
+                  name={wallChoice.item.name}
+                  kindLabel={t(wallChoice.kind === 'hook' ? 'hookKind' : 'effectKind', { s: CLIP_SECONDS })}
+                  previewUrl={wallChoice.item.previewUrl}
+                  icon={wallChoice.kind}
                   paused={motionPaused}
                   onChange={() => moveCanvas('change')}
                 />
@@ -762,7 +789,11 @@ export function Studio() {
           }
           fields={
             tab === 'effects' ? (
-              selectedEffect && <EffectFields subject={subject} max={selectedEffect.subjectMax} onSubject={setSubject} />
+              selectedEffect ? (
+                <EffectFields subject={subject} max={selectedEffect.subjectMax} onSubject={setSubject} />
+              ) : needsOutfit ? (
+                <OutfitSource outfit={outfit} disabled={busy} onFile={(file) => void onOutfit(file)} />
+              ) : null
             ) : (
             <>
               {mode === 'single' && !remix && (
@@ -827,6 +858,7 @@ export function Studio() {
                   </div>
                 )}
                 {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
+                {tab === 'effects' && upload.status === 'ready' && needsOutfit && outfit.status !== 'ready' && <p className={styles.hint}>{t('hookNeedsOutfit')}</p>}
               </div>
               {/* Outside the sticky block: on a phone that block stays one button high over the gallery. */}
               {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}
@@ -858,8 +890,8 @@ export function Studio() {
             tab === 'effects' ? (
               <EffectWall
                 effects={effects}
-                hooks={HOOKS_READY ? (extensions?.hooks ?? []) : []}
-                selectedId={selectedEffect?.id ?? null}
+                hooks={hooks}
+                selectedId={wallChoice?.item.id ?? null}
                 paused={motionPaused}
                 onSelect={setEffectId}
               />
@@ -896,6 +928,7 @@ export function Studio() {
                 move={move}
                 announcement={announcement}
                 statusRef={statusRef}
+                stepImageUrl={tracked?.kind === 'job' ? tracked.record.stepImageUrl : undefined}
                 autoPlayResult={!(motionPaused && view?.id === arrivalId)}
                 onFile={onFile}
                 onSample={() => void loadSample()}
@@ -934,6 +967,11 @@ export function Studio() {
                 </p>
               )}
               {!IS_SHOWCASE && succeeded && resultModel && <AiCaption modelName={resultModel.name} license={resultModel.license} />}
+              {busy && tracked?.kind === 'job' && tracked.record.stepImageUrl && extensions?.editModel && (
+                <p className={styles.caption} data-testid="end-frame-caption">
+                  {t('hookEndFrame', { model: extensions.editModel.name, license: extensions.editModel.license })}
+                </p>
+              )}
               {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (
