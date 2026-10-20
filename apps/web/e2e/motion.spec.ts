@@ -24,6 +24,22 @@ test('a motion transfer in demo mode: the photo, a reference clip, the rights bo
   await expect(page.getByTestId('motion-no-sound')).toBeVisible();
 });
 
+test('the Motion tab draws no camera move over the photo', async ({ page }) => {
+  const plan = page.locator('[class*="photoPlan"]');
+  const photo = page.locator('img[class*="monitorMedia"]');
+  // On Camera, the move in hand frames the photo: the locator finds it.
+  await page.goto('/?tab=camera');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Monitor', exact: true }).click();
+  await expect(photo).toBeVisible();
+  await expect(plan).toHaveCount(1);
+  // A motion transfer moves the character, not the camera.
+  await page.goto(MOTION);
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await expect(photo).toBeVisible();
+  await expect(plan).toHaveCount(0);
+});
+
 test('without the rights box, Generate stays disabled', async ({ page }) => {
   await page.goto(MOTION);
   await page.getByRole('button', { name: 'Sample', exact: true }).click();

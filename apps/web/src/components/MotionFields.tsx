@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useI18n } from '@/i18n';
 import styles from './studio.module.css';
 
@@ -19,6 +20,7 @@ const TEXT_MAX = 500;
 export function MotionFields({
   video,
   disabled,
+  paused,
   onVideo,
   character,
   action,
@@ -27,6 +29,8 @@ export function MotionFields({
 }: {
   video: MotionVideo;
   disabled: boolean;
+  /** The looping previews are paused (the toggle, or reduced motion): the reference clip too. */
+  paused: boolean;
   onVideo: (file: File) => void;
   character: string;
   action: string;
@@ -34,6 +38,14 @@ export function MotionFields({
   onAction: (value: string) => void;
 }) {
   const { t } = useI18n();
+  const preview = useRef<HTMLVideoElement>(null);
+  const previewUrl = video.status === 'ready' ? video.url : undefined;
+  useEffect(() => {
+    const element = preview.current;
+    if (!element) return;
+    if (paused) element.pause();
+    else element.play().catch(() => undefined);
+  }, [paused, previewUrl]);
   const seconds = (value: number) => Math.round(value * 10) / 10;
   return (
     <>
@@ -43,9 +55,11 @@ export function MotionFields({
         </h2>
         <div className={styles.photoSlot} data-testid="motion-video-slot">
           {video.status === 'ready' ? (
-            <video className={styles.photoThumb} src={video.url} muted loop playsInline autoPlay aria-hidden="true" />
+            <video ref={preview} className={styles.photoThumb} src={video.url} muted loop playsInline aria-hidden="true" />
           ) : (
-            <span className={styles.photoEmpty}>{video.status === 'uploading' ? t('uploading') : t('motionVideoEmpty')}</span>
+            <span className={styles.photoEmpty} role="status">
+              {video.status === 'uploading' ? t('uploading') : t('motionVideoEmpty')}
+            </span>
           )}
           <div className={styles.photoActions}>
             <input

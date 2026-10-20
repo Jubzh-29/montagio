@@ -12,6 +12,8 @@ import { mediaFileFor } from '@/server/generations';
 import { listHistory } from '@/server/history';
 import { readJobWorkflow } from '@/server/jobs';
 import { getServices } from '@/server/services';
+import { videoPath } from '@/server/tasks/files';
+import { MAX_VIDEO_FORM_BYTES } from '@/server/uploads';
 import { params, setupTempData } from './helpers';
 
 setupTempData();
@@ -88,6 +90,29 @@ test('a video under 1 s or not a video: 400 invalid-input', async () => {
   expect((await upload(new File(['x'], 'notes.txt', { type: 'text/plain' }))).status).toBe(415);
 }, 60_000);
 
+test('motion hidden: the video upload refuses before reading the file', async () => {
+  process.env.MONTAGIO_EXTENSIONS = 'edit';
+  const res = await upload(new File([new Uint8Array(8)], 'ref.mp4', { type: 'video/mp4' }));
+  expect(res.status).toBe(404);
+  expect(await res.json()).toEqual({ error: 'extension-disabled' });
+});
+
+test('a body past 50 MB: 413 at the limit, the rest never read', async () => {
+  const chunk = new Uint8Array(1024 * 1024);
+  let sent = 0;
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (sent >= 80 * chunk.byteLength) return controller.close();
+      sent += chunk.byteLength;
+      controller.enqueue(chunk);
+    },
+  });
+  const init = { method: 'POST', headers: { 'content-type': 'multipart/form-data; boundary=x' }, body, duplex: 'half' };
+  const res = await postVideo(new Request('http://localhost/api/uploads/video', init as RequestInit));
+  expect(res.status).toBe(413);
+  expect(sent).toBeLessThanOrEqual(MAX_VIDEO_FORM_BYTES + 2 * chunk.byteLength);
+});
+
 test('a motion transfer without rights: 400 rights-required', async () => {
   const res = await post({ imageRef: await sampleRef(), videoRef: await videoRef() }, 'mo1');
   expect(res.status).toBe(400);
@@ -127,4 +152,9 @@ test('a motion clip comes back on the motion tab', async () => {
   await poll(id);
   const item = (await listHistory()).find((entry) => entry.key === `job:${id}`);
   expect(item).toMatchObject({ kind: 'clip', task: 'motion', reprise: { tab: 'motion', imageRef, videoRef: ref, prompt: 'a knight', motion: 'waves' } });
+  // Its reference clip gone (its meta left behind), Reuse reopens the texts without it.
+  rmSync(videoPath(ref));
+  const again = (await listHistory()).find((entry) => entry.key === `job:${id}`);
+  expect(again?.reprise).toMatchObject({ tab: 'motion', prompt: 'a knight', motion: 'waves' });
+  expect(again?.reprise.videoRef).toBeUndefined();
 }, 60_000);

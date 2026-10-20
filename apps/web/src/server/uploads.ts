@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { pickAspect, type Aspect } from '@montagio/presets';
 import { prepareMotionClip, probe } from '@montagio/sequence';
 import { imageSize } from 'image-size';
+import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { getEnv } from './env';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -85,7 +86,9 @@ export async function readUploadMeta(imageRef: string): Promise<UploadMeta | nul
   }
 }
 
-export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+export { MAX_VIDEO_BYTES };
+/** The multipart body around one video: the file and room for its boundaries and headers. */
+export const MAX_VIDEO_FORM_BYTES = MAX_VIDEO_BYTES + 64 * 1024;
 const VIDEO_TYPES: Record<string, string> = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
 /** The shortest reference clip the motion model animates. */
 const MIN_VIDEO_S = 1;
@@ -118,8 +121,9 @@ export async function saveVideoUpload(file: File): Promise<VideoMeta> {
   await mkdir(dir, { recursive: true });
   const source = join(dir, `${id}.source.${ext}`);
   const out = join(dir, `${id}.mp4`);
-  await writeFile(source, new Uint8Array(await file.arrayBuffer()));
+  const metaFile = join(dir, `${id}.json`);
   try {
+    await writeFile(source, new Uint8Array(await file.arrayBuffer()));
     let sourceDuration_s: number;
     let prepared: Awaited<ReturnType<typeof prepareMotionClip>>;
     try {
@@ -128,10 +132,7 @@ export async function saveVideoUpload(file: File): Promise<VideoMeta> {
     } catch {
       throw new UploadError(400, 'the file is not a readable video');
     }
-    if (!(prepared.duration_s >= MIN_VIDEO_S)) {
-      await rm(out, { force: true });
-      throw new UploadError(400, `a reference video lasts ${MIN_VIDEO_S} s at least`);
-    }
+    if (!(prepared.duration_s >= MIN_VIDEO_S)) throw new UploadError(400, `a reference video lasts ${MIN_VIDEO_S} s at least`);
     const meta: VideoMeta = {
       videoRef: `videos/${id}.mp4`,
       duration_s: prepared.duration_s,
@@ -141,17 +142,23 @@ export async function saveVideoUpload(file: File): Promise<VideoMeta> {
       height: prepared.height,
       aspect: pickAspect(prepared.width, prepared.height),
     };
-    await writeFile(join(dir, `${id}.json`), JSON.stringify(meta));
+    await writeFile(metaFile, JSON.stringify(meta));
     return meta;
+  } catch (error) {
+    // A refused or half-made clip leaves nothing behind: no video without its meta.
+    await Promise.all([rm(out, { force: true }), rm(metaFile, { force: true })]);
+    throw error;
   } finally {
     await rm(source, { force: true });
   }
 }
 
+/** A prepared reference clip, or null when its ref is not one or its clip or meta is gone. */
 export async function readVideoMeta(videoRef: string): Promise<VideoMeta | null> {
   const match = /^videos\/([0-9a-f-]{36})\.mp4$/.exec(videoRef);
   if (!match) return null;
   try {
+    await access(join(videosDir(), `${match[1]}.mp4`));
     return JSON.parse(await readFile(join(videosDir(), `${match[1]}.json`), 'utf8')) as VideoMeta;
   } catch {
     return null;

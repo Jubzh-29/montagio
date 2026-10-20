@@ -15,7 +15,7 @@ export const HOOKS_READY = true;
 
 /**
  * The tabs the Studio shows: Effects as soon as one effect or hook is shown (the viral
- * format opens the Studio), Camera and Film always, Avatar with its extension.
+ * format opens the Studio), Camera and Film always, Avatar and Motion each with its extension.
  */
 export function visibleTabs(info: ExtensionsInfo | null, ready: ReadonlySet<Tab> = READY_TABS, hooksReady = HOOKS_READY): Tab[] {
   const shown = new Set<Tab>(['camera', 'film']);

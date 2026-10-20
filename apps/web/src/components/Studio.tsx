@@ -18,6 +18,7 @@ import {
   type ShowcaseInfo,
   type UploadResult,
 } from '@/lib/api-types';
+import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
@@ -313,6 +314,11 @@ export function Studio() {
   const onMotionVideo = async (file: File) => {
     if (busyRef.current) return;
     const token = ++motionToken.current;
+    // Over the cap, nothing is sent: the server would refuse it after the whole upload.
+    if (file.size > MAX_VIDEO_BYTES) {
+      setMotionVideo({ status: 'error', message: t('motionVideoTooLarge') });
+      return;
+    }
     setMotionVideo({ status: 'uploading' });
     const form = new FormData();
     form.set('video', file);
@@ -513,6 +519,8 @@ export function Studio() {
     if (back.effectId) setEffectId(back.effectId);
     if (back.hookId) setEffectId(back.hookId);
     if (back.motion) {
+      // An upload still on its way must not replace the clip brought back.
+      motionToken.current++;
       setMotionCharacter(back.motion.character);
       setMotionAction(back.motion.action);
       setMotionVideo(back.motion.videoRef ? { status: 'ready', videoRef: back.motion.videoRef, url: `/media/data/uploads/${back.motion.videoRef}` } : { status: 'idle' });
@@ -781,7 +789,8 @@ export function Studio() {
       ? t(tracked?.kind === 'sequence' ? 'announceFilmReady' : 'announceClipReady')
       : '';
   // The empty monitor plays the move in hand: the preset being remixed, the chosen one, or the last shot added.
-  const moveId = tab === 'effects' || tab === 'avatar' ? undefined : remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
+  // Only the tabs that render a camera move have one; the others (effects, avatar, motion) draw none.
+  const moveId = tab !== 'camera' && tab !== 'film' ? undefined : remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
   const movePreset = presets.find((preset) => preset.id === moveId);
   const move = movePreset && {
     id: mode === 'sequence' ? `${shots.length}-${movePreset.id}` : movePreset.id,
@@ -920,6 +929,7 @@ export function Studio() {
               <MotionFields
                 video={motionVideo}
                 disabled={busy}
+                paused={motionPaused}
                 onVideo={(file) => void onMotionVideo(file)}
                 character={motionCharacter}
                 action={motionAction}

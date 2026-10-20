@@ -1,13 +1,26 @@
 import { ensureTools } from '@montagio/sequence';
+import { readBodyBytes } from '@/server/body';
+import { JobError } from '@/server/errors';
+import { requireExtension } from '@/server/extensions';
 import { mediaUrlFor } from '@/server/generations';
 import { videoPath } from '@/server/tasks/files';
-import { saveVideoUpload, UploadError } from '@/server/uploads';
+import { MAX_VIDEO_FORM_BYTES, saveVideoUpload, UploadError } from '@/server/uploads';
 
 /** A reference clip for a motion transfer: prepared once (5 s at most, 16 fps, silent), then its kept length. */
 export async function POST(request: Request) {
+  // Nothing is read, nor FFmpeg started, for an extension this server does not show.
+  try {
+    await requireExtension('motion');
+  } catch (error) {
+    if (error instanceof JobError) return Response.json({ error: error.code }, { status: 404 });
+    throw error;
+  }
+  // The body is read up to the cap, never whole: a 2 GB phone video is cut off at 50 MB.
+  const bytes = await readBodyBytes(request, MAX_VIDEO_FORM_BYTES);
+  if (!bytes) return Response.json({ error: 'videos are limited to 50 MB' }, { status: 413 });
   let form: FormData;
   try {
-    form = await request.formData();
+    form = await new Response(new Uint8Array(bytes), { headers: { 'content-type': request.headers.get('content-type') ?? '' } }).formData();
   } catch {
     return Response.json({ error: 'invalid-input' }, { status: 400 });
   }
