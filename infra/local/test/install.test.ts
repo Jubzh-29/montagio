@@ -408,6 +408,21 @@ test('the local installer leaves the avatar out, whose voice node it does not in
   expect(h.output()).toMatch(/avatar.*infra\/runpod\/bootstrap\.sh/);
 });
 
+test('a full install records the extensions it fetched, never the avatar, for the app to show', async () => {
+  withMusicWeight(5);
+  const h = harness();
+  expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
+  const recorded = readState(h.L.statePath).extensions;
+  expect(recorded).toContain('music');
+  expect(recorded).not.toContain('avatar');
+});
+
+test('with no extension validated, the state records none', async () => {
+  const h = harness();
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+  expect(readState(h.L.statePath).extensions).toEqual([]);
+});
+
 test('an unknown extension is refused before anything runs', async () => {
   withMusicWeight(5);
   const h = harness();

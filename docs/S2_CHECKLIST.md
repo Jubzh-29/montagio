@@ -214,9 +214,9 @@ Dans l'ordre de priorité réorienté. Le détail de ce qu'il faut regarder est 
    Critères, pour chaque clip : le sujet reste reconnaissable, l'effet se lit dès la première seconde, aucun artefact bloquant. Dans `/workspace/logs/comfyui.log`, aucune ligne `lora key not loaded` : sinon, la LoRA 4 étapes de lightx2v n'est pas lue (partie 1 de l'analyse). Dans ce cas, téléchargez la copie que les templates utilisent (`npm run weights -w @montagio/infra-runpod -- --models-dir /workspace/ComfyUI/models --extra loras=https://huggingface.co/Comfy-Org/Wan-Animate-2/resolve/main/loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors`) et comparez dans l'interface en changeant le fichier du node 201. Notez les effets qui cassent en 4 étapes, les grands mouvements surtout (explosion, crash zoom) : ils repasseront en 20 étapes en S3 (`--quality --effect explode`).
 3. **Hooks par images clés** (≈ 30 min) :
    ```bash
-   npm run smoke -w @montagio/infra-runpod -- --extension hook --hook eyes-in --input /workspace/person.png
-   npm run smoke -w @montagio/infra-runpod -- --extension hook --hook outfit-morph --input /workspace/person.png --input2 /workspace/outfit.png
-   npm run smoke -w @montagio/infra-runpod -- --extension hook --hook eyes-in --quality --input /workspace/person.png
+   npm run smoke -w @montagio/infra-runpod -- --extension hook --hook iris-dive --input /workspace/person.png
+   npm run smoke -w @montagio/infra-runpod -- --extension hook --hook wardrobe-swap --input /workspace/person.png --input2 /workspace/outfit.png
+   npm run smoke -w @montagio/infra-runpod -- --extension hook --hook iris-dive --quality --input /workspace/person.png
    ```
    L'édition fait d'abord l'image finale (la macro de l'iris, la personne dans la tenue), puis la transition anime le passage depuis la photo. Regardez d'abord l'image finale dans `s1-results/clips/` : si elle est ratée, la transition le sera aussi. Puis la continuité (pas de saut au milieu, l'identité gardée) et le temps total d'un hook, rechargements compris. Figurine et Ignite sont pour la S3.
 4. **Voix seule** (≈ 5 min) : `npm run smoke -w @montagio/infra-runpod -- --extension voice --text "Bonjour, ceci est un essai." --language fr`. Le node est-il chargé (fin du bootstrap) ? Combien de temps pour la phrase ?
@@ -302,9 +302,9 @@ Presets réglés : ______________________________________________
 Extensions (validée oui / non, temps, VRAM max, remarque) :
   Édition 4 étapes ____ s, 40 étapes ____ s, VRAM ____ Mo, loaded completely / partially, français suivi oui / non : __________
     Looks infl8 ___ action ___ angles ___ (« lora key not loaded » oui / non) : __________
-  Effets lisibles (personne / animal / objet) : squish ___ cakeify ___ explode ___ crash zoom ___ bullet time ___ orbit ___
+  Effets lisibles (personne / animal / objet) : squish ___ cakeify ___ explode ___ snap-zoom ___ frozen-moment ___ full-circle ___
     ____ s par effet, VRAM ____ Mo, « lora key not loaded » oui / non, à repasser en 20 étapes : __________
-  Hooks eyes-in ____ s, outfit-morph ____ s (édition + transition), image finale réussie oui / non, continuité : __________
+  Hooks iris-dive ____ s, wardrobe-swap ____ s (édition + transition), image finale réussie oui / non, continuité : __________
   Voix node chargé oui / non, en ____ s, français : __________
   Avatar 5 s ____ s, 10 s ____ s, VRAM ____ Mo, lèvres : __________, LoRA gardée oui / non
   Musique 10 s ____ s, 60 s ____ s, VRAM ____ Mo, voix entendues oui / non : __________

@@ -22,6 +22,7 @@ import {
   mediaFileFor,
   mediaUrlFor,
 } from './generations';
+import { withLock } from './lock';
 import { getServices } from './services';
 import { readRecord, writeAtomic } from './store';
 import { readUploadMeta, saveUploadFromFile, UploadError } from './uploads';
@@ -71,11 +72,9 @@ const SAFE_ID = /^[A-Za-z0-9-]{1,64}$/;
 // Shared by every route bundle of this process (Next bundles routes separately).
 const holder = globalThis as typeof globalThis & {
   __montagioSequenceCreations?: Map<string, Promise<CreateResult>>;
-  __montagioSequenceLocks?: Map<string, Promise<unknown>>;
   __montagioAssemblies?: Map<string, Promise<void>>;
 };
 const creations = (holder.__montagioSequenceCreations ??= new Map());
-const locks = (holder.__montagioSequenceLocks ??= new Map());
 const assemblies = (holder.__montagioAssemblies ??= new Map());
 
 const sequencesDir = () => join(getEnv().data, 'sequences');
@@ -98,18 +97,6 @@ export async function readSequence(id: string): Promise<SequenceRecord | null> {
   } catch {
     return null;
   }
-}
-
-/** One state transition at a time per sequence, so concurrent polls cannot start a shot twice. */
-function withLock<T>(id: string, work: () => Promise<T>): Promise<T> {
-  const previous = locks.get(id) ?? Promise.resolve();
-  const next = previous.catch(() => undefined).then(work);
-  const settled = next.catch(() => undefined);
-  locks.set(id, settled);
-  void settled.then(() => {
-    if (locks.get(id) === settled) locks.delete(id);
-  });
-  return next;
 }
 
 export async function createSequence(input: CreateSequenceInput): Promise<CreateResult> {

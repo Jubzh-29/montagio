@@ -85,7 +85,11 @@ export function serviceSpecs(input: {
   const local = (port: number, path: string) => `http://127.0.0.1:${port}${path}`;
 
   const appEnv: NodeJS.ProcessEnv = { ...withoutVars(env, ['COMFY_BASE_URL'], input.os), NEXT_TELEMETRY_DISABLED: '1', MONTAGIO_ROOT: input.repoRoot };
-  if (state.mode === 'full') Object.assign(appEnv, { MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: local(ports.proxy, '') });
+  if (state.mode === 'full') {
+    Object.assign(appEnv, { MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: local(ports.proxy, '') });
+    // The app shows only what this install can run: the extensions whose weights it fetched.
+    if (state.extensions) appEnv.MONTAGIO_EXTENSIONS = state.extensions.length > 0 ? state.extensions.join(',') : 'none';
+  }
   else if (state.proxyUrl) Object.assign(appEnv, { MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: state.proxyUrl });
   else appEnv.MONTAGIO_BACKEND = 'demo';
 

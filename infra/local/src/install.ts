@@ -381,6 +381,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
         ports,
         gpuIndex: plan.mode === 'full' ? (pickGpu(facts.gpus)?.index ?? null) : null,
         proxyUrl,
+        extensions: plan.mode === 'full' ? enabled : null,
       }),
     start: () => deps.startAll({ browser: opts.browser }),
   };

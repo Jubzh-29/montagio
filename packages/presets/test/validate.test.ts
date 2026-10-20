@@ -77,7 +77,7 @@ test('the library holds the twelve launch presets of spec §6', () => {
 
 describe('validatePresetFile: the schema and the checks of the capability the file names', () => {
   const effect = () => readFile(join(repoRoot(), 'presets', 'effects', 'squish.yaml'), 'utf8');
-  const hook = () => readFile(join(repoRoot(), 'presets', 'transitions', 'outfit-morph.yaml'), 'utf8');
+  const hook = () => readFile(join(repoRoot(), 'presets', 'transitions', 'wardrobe-swap.yaml'), 'utf8');
   /** The library with model `id`'s max_chars lowered to `max`: the schema's own limits never reach the models'. */
   const withMaxChars = (id: string, max: number): Library => {
     const model = lib.extensionModels.get(id)!;
@@ -137,7 +137,7 @@ describe('validatePresetFile: the schema and the checks of the capability the fi
   });
 
   test('a hook is read with the transition schema', async () => {
-    const r = validatePresetFile((await hook()).replace('motion:', 'moves:'), 'outfit-morph.yaml', lib);
+    const r = validatePresetFile((await hook()).replace('motion:', 'moves:'), 'wardrobe-swap.yaml', lib);
     expect(r.ok).toBe(false);
     expect(!r.ok && r.problems).toEqual(expect.arrayContaining([expect.stringMatching(/^prompt\.moves/), expect.stringMatching(/^prompt\.motion/)]));
   });

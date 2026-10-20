@@ -1,10 +1,10 @@
 # Effect LoRA: Remade-AI/matrix-shot (Apache-2.0 in the card metadata, no LICENSE file).
 # The card has no template; its example prompts start with the trigger and repeat it.
 schema: montagio/preset@0.1
-id: bullet-time
-name: Bullet Time
+id: frozen-moment
+name: Frozen Moment
 description: Time freezes while the camera sweeps around the subject.
-preview: previews/bullet-time.mp4
+preview: previews/frozen-moment.mp4
 license: CC-BY-4.0
 author: montagio-community
 capability: i2v-effect

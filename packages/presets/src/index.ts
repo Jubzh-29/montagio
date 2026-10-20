@@ -23,6 +23,7 @@ export {
   type CompiledParams,
   type JobInputs,
 } from './compile';
+export { compileImage, IMAGE_PROMPT_MAX, type ImageInputs, type ImageParams } from './image';
 export { loadLibrary, LibraryError, type Library } from './library';
 export { validatePreset, validatePresetFile, type PresetFileValidation, type PresetValidation } from './validate';
 export {

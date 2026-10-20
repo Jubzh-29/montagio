@@ -1,9 +1,9 @@
 # A hook of the GPU session S2: image 1 is the person, image 2 the outfit; the edit dresses one in the other.
 schema: montagio/preset@0.1
-id: outfit-morph
-name: Outfit Morph
+id: wardrobe-swap
+name: Wardrobe Swap
 description: The subject's clothes flow into the outfit of a second photo.
-preview: previews/outfit-morph.mp4
+preview: previews/wardrobe-swap.mp4
 license: CC-BY-4.0
 author: montagio-community
 capability: i2v-transition

@@ -160,6 +160,8 @@ Six extensions run models of their own, beyond the camera presets, in their orde
 
 The avatar is left out by this installer for now: its voice runs on a custom node (pinned and patched) that only the GPU session's `infra/runpod/bootstrap.sh` installs. Details: [EXTENSIONS_ANALYSE.md](EXTENSIONS_ANALYSE.md) (in French).
 
+A full install starts the app with the extensions whose weights it fetched, so the Studio shows only what this machine can run. With `--app-only` (the demo, or a remote GPU with `--proxy-url`), or when you start the app yourself, `MONTAGIO_EXTENSIONS` decides what the Studio shows. An effect or a hook also needs its own date in its preset file (`gpu_validated`), unless `MONTAGIO_EXTENSIONS=all`.
+
 ## Troubleshooting
 
 | What you see | What to do |

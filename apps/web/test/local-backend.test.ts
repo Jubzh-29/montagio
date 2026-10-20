@@ -184,3 +184,32 @@ test('a proxy that drops while a sequence renders keeps the sequence running', a
     warned.mockRestore();
   }
 }, 90_000);
+
+test('text to image against the fake proxy: the SaveImage output becomes the start photo', async () => {
+  await fake.close();
+  fake = await startFakeProxy({ autoRun: { clip, image: join(repoRoot, 'demo-assets', 'images', '_default.png') } });
+  process.env.COMFY_BASE_URL = fake.url;
+  resetServicesForTests();
+  const { POST: postImages } = await import('@/app/api/images/route');
+  const { GET: getJob } = await import('@/app/api/jobs/[id]/route');
+  const res = await postImages(
+    new Request('http://localhost/api/images', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'l-img' },
+      body: JSON.stringify({ prompt: 'a lighthouse at dusk', aspect: '9:16' }),
+    }),
+  );
+  expect(res.status).toBe(201);
+  const { id } = (await res.json()) as { id: string };
+  let job: { state: string; outputImageRef?: string } = { state: 'queued' };
+  for (let i = 0; i < 40 && !['succeeded', 'failed'].includes(job.state); i++) {
+    job = await (await getJob(new Request('http://localhost/x'), params({ id }))).json();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  expect(job.state).toBe('succeeded');
+  const sent = [...fake.jobs.values()][0]!.workflow as Record<string, { inputs: Record<string, unknown> }>;
+  expect(sent['13']!.inputs).toMatchObject({ width: 720, height: 1280 });
+  expect(sent['27']!.inputs.text).toBe('a lighthouse at dusk');
+  const photo = readFileSync(join(dataDir(), job.outputImageRef!));
+  expect(photo.subarray(1, 4).toString()).toBe('PNG');
+}, 30_000);

@@ -20,7 +20,18 @@ export type ModelSummary = {
   estimate_s: { '480p': number; '720p'?: number };
 };
 
-export type UploadResult = { imageRef: string; width: number; height: number; aspect: '16:9' | '9:16' | '1:1' };
+/** Where a photo comes from (server/uploads.ts). */
+export type PhotoOrigin = 'upload' | 'sample' | 't2i' | 'edit' | 'frame';
+
+export type UploadResult = {
+  imageRef: string;
+  width: number;
+  height: number;
+  aspect: '16:9' | '9:16' | '1:1';
+  origin: PhotoOrigin;
+  /** The photo is, or derives from, an imported one: an effect on it asks for consent. */
+  personal: boolean;
+};
 
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled';
 
@@ -51,7 +62,7 @@ export const TERMINAL_STATES: ReadonlySet<JobState> = new Set(['succeeded', 'fai
 export type SequenceSummary = {
   id: string;
   state: 'running' | 'assembling' | 'succeeded' | 'failed' | 'canceled';
-  shots: { presetId: string; state: string }[];
+  shots: { presetId: string; state: string; modelId?: string }[];
   currentShot: number;
   progress: number;
   outputUrl?: string;
@@ -82,4 +93,101 @@ export type ShowcaseInfo = {
   /** Some clips are still placeholders (before the GPU session). */
   placeholders: boolean;
   repoUrl: string | null;
+};
+
+/** The six extensions, as registry/extensions.yaml names them. */
+export type ExtensionId = 'edit' | 'effects' | 'transitions' | 'avatar' | 'music' | 'upscale';
+
+/** A one-photo effect of the wall (GET /api/extensions). */
+export type EffectSummary = {
+  id: string;
+  name: string;
+  description: string;
+  /** Absent while the effect has no preview file yet. */
+  previewUrl?: string;
+  estimate_s: number;
+  /** The longest "what the photo shows" the effects model takes. */
+  subjectMax: number;
+  /** The model that renders it and its license, for the caption under the clip. */
+  modelName: string;
+  license: string;
+};
+
+/** A keyframe hook of the wall: an edit makes its end frame, then a transition. */
+export type HookSummary = {
+  id: string;
+  name: string;
+  description: string;
+  previewUrl?: string;
+  estimate_s: number;
+  /** 2: the hook needs a second photo (an outfit). */
+  references: 1 | 2;
+};
+
+/** What the Studio may show: the extensions the flag and the GPU dates allow, and the time estimates. */
+export type ExtensionsInfo = {
+  extensions: ExtensionId[];
+  effects: EffectSummary[];
+  hooks: HookSummary[];
+  estimates: { t2i: number; edit?: number };
+  /** The photo edit's model, for the caption under an edit (the preset catalogue does not hold it). */
+  editModel?: { id: string; name: string; license: string };
+};
+
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale';
+
+/** A photo, effect or chained render (GET /api/jobs/:id). */
+export type JobSummary = {
+  id: string;
+  task: JobTask;
+  state: JobState;
+  progress: number;
+  outputUrl?: string;
+  /** An image output registered as an upload: usable as the start photo. */
+  outputImageRef?: string;
+  personal?: boolean;
+  /** An intermediate image already made (a hook's end frame), shown while the rest renders. */
+  stepImageUrl?: string;
+  label: { itemId?: string; name?: string };
+  modelId: string;
+  error?: string;
+  /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
+  workflowUrl?: string;
+  frames?: number;
+  /** Showcase: an example still waiting for the GPU session. */
+  placeholder?: boolean;
+  createdAt: string;
+};
+
+/** What it takes to make a history item again: the Studio reopens its tab with these (GET /api/history). */
+export type Reprise = {
+  tab: 'effects' | 'camera' | 'film' | 'avatar';
+  imageRef?: string;
+  /** The photo is, or derives from, an imported one: an effect on it asks for consent. */
+  personal?: boolean;
+  /** The start photo is gone (data wiped): the reprise reopens everything but the photo. */
+  photoMissing?: true;
+  presetId?: string;
+  effectId?: string;
+  hookId?: string;
+  prompt?: string;
+  modelId?: string;
+  /** A remixed clip: the remix editor reopens on that generation's preset text. */
+  remixGenerationId?: string;
+  shots?: { presetId: string; prompt?: string }[];
+};
+
+/** One finished creation, newest first (GET /api/history). */
+export type HistoryItem = {
+  /** `${source}:${id}`, unique across the list. */
+  key: string;
+  source: 'generation' | 'sequence' | 'job';
+  kind: 'photo' | 'clip' | 'film';
+  task: 'camera' | 'film' | JobTask;
+  name: string;
+  modelName: string;
+  createdAt: string;
+  previewUrl: string;
+  downloadUrl: string;
+  reprise: Reprise;
 };

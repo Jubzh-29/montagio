@@ -10,10 +10,13 @@ const resultRemix = (page: Page) =>
   page.getByRole('region', { name: 'Monitor' }).getByRole('button', { name: 'Remix preset', exact: true });
 const galleryRemix = (page: Page) => page.locator('aside').getByRole('button', { name: 'Remix preset', exact: true });
 const result = (page: Page) => page.locator('video[data-testid=result]');
+// The canvas shows the wall (presets, or the remix editor in its place) or the monitor, one at a time.
+const showGallery = (page: Page) => page.getByRole('button', { name: 'Gallery', exact: true }).click();
+const showMonitor = (page: Page) => page.getByRole('button', { name: 'Monitor', exact: true }).click();
 
 async function openRemix(page: Page) {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Try with a sample photo' }).click();
+  await page.goto('/?tab=camera');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await page.getByRole('button', { name: 'Remix preset', exact: true }).click();
   const editor = page.getByRole('textbox', { name: 'Preset YAML' });
@@ -39,10 +42,12 @@ test('remix: a past remix reopens with its own text, not in the editor of anothe
   await editor.fill((await editor.inputValue()).replace('speed: 1.5', 'speed: 0.8'));
   await page.getByRole('button', { name: /^Generate remix/ }).click();
   await expect(result(page)).toBeVisible({ timeout: 10_000 });
+  await showGallery(page);
   await page.getByRole('button', { name: 'Back to presets', exact: true }).click();
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await galleryRemix(page).click();
   await expect(editor).toHaveValue(/id: pan-left/);
+  await showMonitor(page);
   await resultRemix(page).click();
   await expect(editor).toHaveValue(/id: crash-push[\s\S]*speed: 0\.8/, FIRST_COMPILE);
   await expect(page.getByRole('heading', { name: 'Remix: Crash Push' })).toBeVisible();
@@ -50,11 +55,12 @@ test('remix: a past remix reopens with its own text, not in the editor of anothe
 });
 
 test('remix: the result asks before replacing unsaved edits of another preset', async ({ page }) => {
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Try with a sample photo' }).click();
+  await page.goto('/?tab=camera');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await page.getByRole('button', { name: /^Generate \(/ }).click();
   await expect(result(page)).toBeVisible({ timeout: 10_000 });
+  await showGallery(page);
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await galleryRemix(page).click();
   const editor = page.getByRole('textbox', { name: 'Preset YAML' });
@@ -66,11 +72,15 @@ test('remix: the result asks before replacing unsaved edits of another preset', 
     questions.push(dialog.message());
     void dialog.dismiss();
   });
+  await showMonitor(page);
   await resultRemix(page).click();
   await expect.poll(() => questions).toEqual([expect.stringMatching(/Pan Left/)]);
+  // Declined: nothing changed, the editor still holds the other preset's edits.
+  await showGallery(page);
   await expect(editor).toHaveValue(/id: pan-left[\s\S]*speed: 0\.3/);
 
   page.once('dialog', (dialog) => void dialog.accept());
+  await showMonitor(page);
   await resultRemix(page).click();
   await expect(editor).toHaveValue(/id: crash-push[\s\S]*speed: 1\.5/);
 });
@@ -116,9 +126,14 @@ test('remix: download the edited YAML', async ({ page }) => {
 
 test('remix: back to presets restores the gallery', async ({ page }) => {
   await openRemix(page);
-  await expect(page.getByRole('button', { name: 'Sequence', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Back to presets', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Crash Push' })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Generate/ })).toHaveText(/^Generate \(/);
-  await expect(page.getByRole('button', { name: 'Sequence', exact: true })).toBeEnabled();
+});
+
+test('remix: the editor belongs to the Camera tab, the Film tab closes it', async ({ page }) => {
+  const editor = await openRemix(page);
+  await page.getByRole('link', { name: 'Film', exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Crash Push' })).toBeVisible();
 });

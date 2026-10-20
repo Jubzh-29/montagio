@@ -299,3 +299,40 @@ test('an unreadable data.json answers 503 and is retried', async () => {
   expect(second.status).toBe(200);
   expect(attempts).toBe(2);
 });
+
+test('the showcase shows no extension before the GPU session', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  const { status, json } = await call(router, 'GET', '/api/extensions');
+  expect(status).toBe(200);
+  expect(json).toEqual({ extensions: [], effects: [], hooks: [], estimates: { t2i: 12 } });
+});
+
+test('the showcase creates no image from a text: 403 showcase-t2i', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  const { status, json } = await call(router, 'POST', '/api/images', { prompt: 'a fox', aspect: '16:9' });
+  expect(status).toBe(403);
+  expect(json).toEqual({ error: 'showcase-t2i' });
+});
+
+test('an extension without examples answers like the server hides it: 404 extension-disabled', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  for (const path of ['/api/edits', '/api/effects', '/api/hooks', '/api/avatars']) {
+    const { status, json } = await call(router, 'POST', path, {});
+    expect([path, status, json]).toEqual([path, 404, { error: 'extension-disabled' }]);
+  }
+});
+
+test('the showcase history holds the clips of this visit only, newest first', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  expect((await call(router, 'GET', '/api/history')).json).toEqual([]);
+  await call(router, 'POST', '/api/generations', { presetId: 'crash-push', imageRef: 'samples/landscape-a' });
+  await call(router, 'POST', '/api/generations', { presetId: 'pan-left', imageRef: 'samples/landscape-a' });
+  const { status, json } = await call(router, 'GET', '/api/history');
+  expect(status).toBe(200);
+  const items = json as unknown as { kind: string; name: string; reprise: Record<string, unknown> }[];
+  expect(items.map((item) => item.name)).toEqual(['Pan Left', 'Crash Push']);
+  expect(items[0]).toMatchObject({ kind: 'clip', reprise: { tab: 'camera', imageRef: 'samples/landscape-a', presetId: 'pan-left' } });
+  // Another visit (a new page) starts empty.
+  const next = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  expect((await call(next, 'GET', '/api/history')).json).toEqual([]);
+});

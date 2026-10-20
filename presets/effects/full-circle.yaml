@@ -2,10 +2,10 @@
 # The card has no template, only example prompts; this one follows them. The native Wan 2.2
 # orbit of ostris (Apache-2.0) is the alternative, on the transitions' weights.
 schema: montagio/preset@0.1
-id: orbit-360
-name: 360 Orbit
+id: full-circle
+name: Full Circle
 description: The camera circles the subject all the way around.
-preview: previews/orbit-360.mp4
+preview: previews/full-circle.mp4
 license: CC-BY-4.0
 author: montagio-community
 capability: i2v-effect

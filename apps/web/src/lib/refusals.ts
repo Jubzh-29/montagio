@@ -14,6 +14,12 @@ const REFUSALS: Record<string, MessageKey> = {
   'model-not-in-showcase': 'errorNotInShowcase',
   'montage-busy': 'errorMontageBusy',
   'ffmpeg-unavailable': 'errorFfmpegUnavailable',
+  // Photos, effects and extensions (server/jobs.ts, server/guards.ts).
+  'blocked-name': 'errorBlockedName',
+  'consent-required': 'errorConsentRequired',
+  'extension-disabled': 'errorExtensionDisabled',
+  'invalid-input': 'errorInvalidInput',
+  'showcase-t2i': 'errorShowcaseT2i',
 };
 
 export function refusalMessageKey(code: string | undefined): MessageKey {

@@ -101,6 +101,18 @@ test('on Windows, no Comfy key or stale base URL reaches the services, whatever 
   expect(specs.find((s) => s.name === 'app')!.env.COMFY_BASE_URL).toBe('http://127.0.0.1:8189');
 });
 
+test('a full install starts the app with the extensions it installed, or none', () => {
+  const app = (state: InstallState, baseEnv: NodeJS.ProcessEnv = {}) => specsOf(state, baseEnv).find((s) => s.name === 'app')!;
+  expect(app({ ...full, extensions: ['edit', 'effects'] }, { MONTAGIO_EXTENSIONS: 'all' }).env.MONTAGIO_EXTENSIONS).toBe('edit,effects');
+  expect(app({ ...full, extensions: [] }).env.MONTAGIO_EXTENSIONS).toBe('none');
+});
+
+test('the app alone, or a state from before the extensions were recorded, keeps the user MONTAGIO_EXTENSIONS', () => {
+  const app = (state: InstallState) => specsOf(state, { MONTAGIO_EXTENSIONS: 'all' }).find((s) => s.name === 'app')!;
+  expect(app({ ...full, mode: 'app-only', extensions: ['edit'] }).env.MONTAGIO_EXTENSIONS).toBe('all');
+  expect(app({ ...full, extensions: null }).env.MONTAGIO_EXTENSIONS).toBe('all');
+});
+
 test('the app alone runs the demo, or a remote proxy', () => {
   const demo = specsOf({ ...full, mode: 'app-only' }, { COMFY_BASE_URL: 'http://stale:1' });
   expect(demo.map((s) => s.name)).toEqual(['app']);

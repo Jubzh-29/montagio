@@ -1,0 +1,195 @@
+/* The History page: a grid of what was made, newest first. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: var(--space-5);
+}
+
+.title {
+  font-size: var(--text-xl);
+  font-weight: 650;
+}
+
+.note {
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+}
+
+.filters {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+
+.filter {
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filter[aria-pressed='true'] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.card:focus-within {
+  border-color: var(--line-strong);
+}
+
+.media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--bg);
+}
+
+.cardText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-3) 0;
+}
+
+.cardName {
+  font-weight: 600;
+}
+
+.cardMeta {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.cardActions {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  color: var(--ink);
+  font-size: var(--text-s);
+  text-decoration: none;
+}
+
+.action:hover {
+  background: var(--surface-2);
+}
+
+.action:focus-visible,
+.filter:focus-visible,
+.recentItem:focus-visible,
+.recentAll:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-6) 0;
+  color: var(--ink-muted);
+}
+
+/* The recent strip under the result. */
+.recent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.recent[inert] {
+  opacity: 0.5;
+}
+
+.recentTitle {
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+  font-weight: 600;
+}
+
+.recentList {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recentItem,
+.recentAll {
+  display: block;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+}
+
+.recentItem img,
+.recentItem video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.recentAll {
+  display: grid;
+  place-items: center;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  text-decoration: none;
+  background: var(--surface);
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: var(--space-4);
+  }
+  .recentList {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (pointer: coarse) {
+  .action,
+  .filter {
+    min-height: 44px;
+  }
+}

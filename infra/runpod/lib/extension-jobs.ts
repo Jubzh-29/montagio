@@ -48,13 +48,13 @@ const DEFAULT_TEXT: Record<'music' | 'edit' | 'voice', string> = {
 };
 
 /** The hook of the GPU session S2 when none is named. */
-export const DEFAULT_HOOK = 'eyes-in';
+export const DEFAULT_HOOK = 'iris-dive';
 
 export type ExtensionJobOptions = {
   jobs: readonly ExtensionJobName[];
   /** The photo of edit, effect, hook and avatar. */
   input?: string;
-  /** The second image of a two-reference hook (the outfit of outfit-morph). */
+  /** The second image of a two-reference hook (the outfit of wardrobe-swap). */
   input2?: string;
   /** The end frame of a transition run on its own (a hook's edit output otherwise). */
   end?: string;
@@ -75,7 +75,7 @@ export type ExtensionJobOptions = {
   aspect: Aspect;
   /** The effect presets to run (every one when absent). */
   effects?: readonly string[];
-  /** The hook of hook-edit and transition (eyes-in when absent). */
+  /** The hook of hook-edit and transition (iris-dive when absent). */
   hook?: string;
   /** The 4-step LoRAs of the edit, the effects and the transition (default), or their quality path. */
   fast?: boolean;
@@ -85,7 +85,7 @@ export type ExtensionJobOptions = {
 
 export type ExtensionJob = {
   name: ExtensionJobName;
-  /** The name, and the effect or hook it runs: "effect:squish", "transition:eyes-in". */
+  /** The name, and the effect or hook it runs: "effect:squish", "transition:iris-dive". */
   tag: string;
   model: ExtensionModel;
   workflow: ApiWorkflow;

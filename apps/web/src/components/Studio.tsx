@@ -1,12 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useI18n } from '@/i18n';
 import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import {
   TERMINAL_STATES,
   type GenerationRecord,
+  type HistoryItem,
   type JobState,
+  type JobSummary,
   type ModelSummary,
   type PresetSummary,
   type SampleSummary,
@@ -15,14 +18,30 @@ import {
   type UploadResult,
 } from '@/lib/api-types';
 import { refusalMessageKey } from '@/lib/refusals';
+import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { useMotionPaused } from '@/lib/use-motion';
+import { needsConsent } from '@/lib/consent';
+import { defaultSubject } from '@/lib/effect-choice';
+import { nextView, tabEvent, type CanvasEvent, type CanvasState, type ShownTab } from '@/lib/studio-view';
+import { HOOKS_READY, pickTab, tabHref, visibleTabs } from '@/lib/tabs';
+import { refreshExtensions, useExtensions } from '@/lib/use-extensions';
 import { useShowcase } from '@/lib/use-showcase';
+import { AiCaption } from './AiCaption';
+import { Canvas } from './Canvas';
+import { ChoiceCard } from './ChoiceCard';
+import { Composer } from './Composer';
+import { ConsentCheck } from './ConsentCheck';
+import { EffectFields } from './EffectFields';
+import { EffectWall } from './EffectWall';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
 import { Monitor, type GenerationState, type TrackedJob, type UploadState } from './Monitor';
+import { PhotoAtelier, type AtelierPhoto } from './PhotoAtelier';
+import { PhotoSource } from './PhotoSource';
 import { PresetGallery, type SequenceTiles } from './PresetGallery';
+import { RecentStrip } from './RecentStrip';
 import { RemixEditor, type RemixCheck } from './RemixEditor';
 import { ShotList } from './ShotList';
 import { ShowcaseFooter } from './ShowcaseFooter';
@@ -40,12 +59,13 @@ type Mode = 'single' | 'sequence';
 /** A shot being composed: its camera move and its own optional text. */
 type ShotDraft = { presetId: string; prompt: string };
 
-/** A render in progress or finished: a single generation or a sequence of shots. */
+/** A render in progress or finished: a single generation, a sequence of shots, or an effect (a job). */
 type Job =
   | { status: 'idle' }
   | { status: 'submitting' }
   | { status: 'tracking'; kind: 'generation'; record: GenerationRecord }
   | { status: 'tracking'; kind: 'sequence'; record: SequenceSummary }
+  | { status: 'tracking'; kind: 'job'; record: JobSummary }
   | { status: 'error'; message: string };
 
 type Tracked = Extract<Job, { status: 'tracking' }>;
@@ -75,25 +95,46 @@ const SEQUENCE_STATE: Record<SequenceSummary['state'], JobState> = {
 };
 
 function trackedJob(job: Tracked): TrackedJob {
-  if (job.kind === 'generation') return job.record;
+  if (job.kind === 'generation' || job.kind === 'job') return job.record;
   const { id, progress, outputUrl, error } = job.record;
   return { id, progress, outputUrl, error, state: SEQUENCE_STATE[job.record.state] };
 }
 
-const endpoint = (job: Tracked) => `/api/${job.kind === 'sequence' ? 'sequences' : 'generations'}/${job.record.id}`;
+const ENDPOINTS: Record<Tracked['kind'], string> = { generation: 'generations', sequence: 'sequences', job: 'jobs' };
+const endpoint = (job: Tracked) => `/api/${ENDPOINTS[job.kind]}/${job.record.id}`;
 
 /** The same job, marked as lost by the server (404). */
 function lostJob(job: Tracked): Job {
-  return job.kind === 'generation'
-    ? { ...job, record: { ...job.record, state: 'failed', error: 'lost' } }
-    : { ...job, record: { ...job.record, state: 'failed', error: 'lost' } };
+  return { ...job, record: { ...job.record, state: 'failed', error: 'lost' } } as Tracked;
 }
 
 export function Studio() {
   const { t } = useI18n();
-  const [mode, setMode] = useState<Mode>('single');
+  // The tab comes from the URL (?tab=), among those the extensions allow; Camera is the single shot, Film the sequence.
+  const extensions = useExtensions();
+  const [requestedTab, setRequestedTab] = useState<string | null>(null);
+  const tab = pickTab(requestedTab, visibleTabs(extensions));
+  const mode: Mode = tab === 'film' ? 'sequence' : 'single';
+  const [canvas, setCanvas] = useState<CanvasState>({ view: 'gallery', before: 'gallery' });
+  // The photo atelier (text to image, edit), over the canvas; and the text of a photo made from one.
+  const [atelier, setAtelier] = useState<'t2i' | 'edit' | null>(null);
+  // The ateliers opened and not closed yet: each stays mounted, out of view, until its Close or its photo is used.
+  const [ateliers, setAteliers] = useState<('t2i' | 'edit')[]>([]);
+  const [photoPrompt, setPhotoPrompt] = useState<string | undefined>(undefined);
+  // The Effects tab: the effect chosen on the wall, what the photo shows, and the consent box.
+  const [effectId, setEffectId] = useState<string | null>(null);
+  const [subject, setSubject] = useState('');
+  const [consent, setConsent] = useState(false);
+  // History: the latest creations under the result, and the item a "Reuse" link brings back (?from=).
+  const [recent, setRecent] = useState<HistoryItem[]>([]);
+  const [from, setFrom] = useState<string | null>(null);
+  const appliedFrom = useRef<string | null>(null);
+  const [repriseNotice, setRepriseNotice] = useState(false);
+  const moveCanvas = (event: CanvasEvent) => setCanvas((current) => nextView(event, current));
   const [presets, setPresets] = useState<PresetSummary[]>([]);
   const [models, setModels] = useState<ModelSummary[]>([]);
+  // Every model of the catalogue (text to image included), for the licenses shown under a result.
+  const [catalogModels, setCatalogModels] = useState<ModelSummary[]>([]);
   const [catalog, setCatalog] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [presetId, setPresetId] = useState<string | null>(null);
   const [shots, setShots] = useState<ShotDraft[]>([]);
@@ -133,7 +174,21 @@ export function Studio() {
     if (remixFocus.current === 'editor') remixTextRef.current?.focus();
     if (remixFocus.current === 'toggle') remixToggleRef.current?.focus();
     remixFocus.current = null;
-  }, [remix]);
+  }, [remix, canvas.view]);
+
+  // A new tab opens on its wall, and the remix editor belongs to the Camera tab (state adjusted while rendering).
+  const shown: ShownTab = { tab, known: extensions !== null };
+  const [shownTab, setShownTab] = useState(shown);
+  if (shownTab.tab !== shown.tab || shownTab.known !== shown.known) {
+    setShownTab(shown);
+    const event = tabEvent(shownTab, shown);
+    if (event) setCanvas((current) => nextView(event, current));
+    if (tab !== 'camera' && remix) setRemix(null);
+  }
+  useEffect(() => {
+    // The film is joined by FFmpeg in the browser: start fetching it now.
+    if (IS_SHOWCASE && tab === 'film') void apiFetch('/api/showcase/preload', { method: 'POST' }).catch(() => undefined);
+  }, [tab]);
 
   const tracked = job.status === 'tracking' ? job : undefined;
   const view = tracked ? trackedJob(tracked) : undefined;
@@ -172,6 +227,18 @@ export function Studio() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracked?.record, pollRetry]);
 
+  // The latest creations, under the result: at the start, and after each render that succeeds.
+  const loadRecent = useCallback(() => {
+    apiFetch('/api/history')
+      .then((res) => jsonOrThrow<HistoryItem[]>(res))
+      .then(setRecent)
+      .catch(() => undefined);
+  }, []);
+  const finishedId = view?.state === 'succeeded' ? view.id : null;
+  useEffect(() => {
+    loadRecent();
+  }, [loadRecent, finishedId]);
+
   const busyRef = useRef(false);
   useEffect(() => {
     busyRef.current = busy;
@@ -190,6 +257,7 @@ export function Studio() {
       const localUrl = URL.createObjectURL(file);
       localUrlRef.current = localUrl;
       setJob({ status: 'idle' });
+      setPhotoPrompt(undefined);
       setUpload({ status: 'uploading', localUrl });
       const form = new FormData();
       form.set('image', file);
@@ -202,7 +270,7 @@ export function Studio() {
         if (res.status === 415) return settle({ status: 'error', message: t('errorUpload415') });
         if (!res.ok) return settle({ status: 'error', message: t('errorGeneric') });
         const result = (await res.json()) as UploadResult;
-        settle({ status: 'ready', localUrl, imageRef: result.imageRef });
+        settle({ status: 'ready', localUrl, imageRef: result.imageRef, personal: result.personal });
       } catch {
         settle({ status: 'error', message: t('errorGeneric') });
       }
@@ -210,18 +278,58 @@ export function Studio() {
     [t],
   );
 
+  /** The sample photo, copied by the server: its origin is known, so no effect on it asks for consent. */
   const loadSample = async () => {
-    const res = await fetch('/media/demo-assets/images/sample-16x9.png');
-    if (!res.ok) return setUpload({ status: 'error', message: t('errorGeneric') });
-    await onFile(new File([await res.blob()], 'sample.png', { type: 'image/png' }));
+    if (busyRef.current) return;
+    touched.current = true;
+    const token = ++uploadToken.current;
+    const localUrl = '/media/demo-assets/images/sample-16x9.png';
+    setJob({ status: 'idle' });
+    setPhotoPrompt(undefined);
+    setUpload({ status: 'uploading', localUrl });
+    const settle = (next: UploadState) => {
+      if (token === uploadToken.current) setUpload(next);
+    };
+    try {
+      const res = await apiFetch('/api/uploads/sample', { method: 'POST' });
+      if (!res.ok) return settle({ status: 'error', message: t('errorGeneric') });
+      const result = (await res.json()) as UploadResult;
+      settle({ status: 'ready', localUrl, imageRef: result.imageRef, personal: result.personal });
+    } catch {
+      settle({ status: 'error', message: t('errorGeneric') });
+    }
   };
 
   /** Showcase: a sample photo stands in for an upload; nothing is sent anywhere. */
+  const openAtelier = (kind: 't2i' | 'edit') => {
+    if (busyRef.current) return;
+    setAtelier(kind);
+    setAteliers((open) => (open.includes(kind) ? open : [...open, kind]));
+    setCanvas((current) => nextView('open-atelier', current));
+  };
+
+  const closeAtelier = (kind: 't2i' | 'edit') => {
+    setAtelier(null);
+    setAteliers((open) => open.filter((entry) => entry !== kind));
+    setCanvas((current) => nextView('close-atelier', current));
+  };
+
+  /** The atelier's image becomes the start photo, as any upload would. */
+  const takePhoto = (photo: AtelierPhoto, kind: 't2i' | 'edit') => {
+    touched.current = true;
+    ++uploadToken.current;
+    setJob({ status: 'idle' });
+    setUpload({ status: 'ready', localUrl: photo.url, imageRef: photo.imageRef, personal: photo.personal });
+    setPhotoPrompt(photo.prompt);
+    closeAtelier(kind);
+  };
+
   const pickSample = (sample: SampleSummary) => {
     touched.current = true;
     if (busyRef.current) return;
     setJob({ status: 'idle' });
-    setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef });
+    setPhotoPrompt(undefined);
+    setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef, personal: false });
   };
 
   const onPreset = (id: string) => {
@@ -229,8 +337,27 @@ export function Studio() {
     else setShots((current) => (current.length < MAX_SHOTS ? [...current, { presetId: id, prompt: '' }] : current));
   };
 
+  const effects = extensions?.effects ?? [];
+  const selectedEffect = effects.find((effect) => effect.id === effectId) ?? effects[0];
+  const askConsent = tab === 'effects' && needsConsent(upload, 'effect');
+  // A photo made from a text says what it shows (state adjusted while rendering, when that photo changes).
+  const [subjectFor, setSubjectFor] = useState(photoPrompt);
+  if (subjectFor !== photoPrompt) {
+    setSubjectFor(photoPrompt);
+    setSubject(defaultSubject(photoPrompt, selectedEffect?.subjectMax ?? 120));
+  }
+  // Another photo asks for consent again.
+  const photoKey = upload.status === 'ready' ? upload.imageRef : null;
+  const [consentFor, setConsentFor] = useState(photoKey);
+  if (consentFor !== photoKey) {
+    setConsentFor(photoKey);
+    setConsent(false);
+  }
+
   const ready = upload.status === 'ready' && modelId !== null && !busy;
-  const canGenerate = remix
+  const canGenerate = tab === 'effects'
+    ? upload.status === 'ready' && !busy && selectedEffect !== undefined && (!askConsent || consent)
+    : remix
     ? ready && remix.text.trim().length > 0
     : mode === 'single'
       ? ready && presetId !== null
@@ -254,12 +381,18 @@ export function Studio() {
     }
     remixFocus.current = 'editor';
     setRemix(next);
+    // The editor takes the wall's place in the canvas.
+    setCanvas((current) => nextView('change', current));
   };
 
   /** The result's "Remix preset": back to the editor if it holds this generation's preset, else open it there. */
   const remixResult = async (record: GenerationRecord) => {
     const action = resultRemixAction(remix, record);
-    if (action === 'focus') return remixTextRef.current?.focus();
+    if (action === 'focus') {
+      // The editor is on the canvas's wall side: show it, then the focus effect moves there.
+      remixFocus.current = 'editor';
+      return setCanvas((current) => nextView('change', current));
+    }
     if (action === 'confirm' && !window.confirm(t('remixReplace', { name: remix?.baseName ?? '' }))) return;
     await openRemix(record.presetId, presetTextUrl(record), record.remix ? record.id : undefined);
   };
@@ -268,6 +401,50 @@ export function Studio() {
     remixFocus.current = 'toggle';
     setRemix(null);
   };
+
+  /** A history item's "Reuse": its tab, photo, choice and texts come back, ready to render again. */
+  const restore = (item: HistoryItem) => {
+    const back = applyReprise(item);
+    touched.current = true;
+    ++uploadToken.current;
+    setJob({ status: 'idle' });
+    if (back.photo) {
+      const sample = showcase?.samples.find((entry) => entry.imageRef === back.photo!.imageRef);
+      setUpload({ status: 'ready', localUrl: sample?.url ?? `/media/data/${back.photo.imageRef}`, imageRef: back.photo.imageRef, personal: back.photo.personal });
+    } else {
+      setUpload({ status: 'idle' });
+    }
+    setRepriseNotice(back.notice === 'photo-missing');
+    setPhotoPrompt(back.photoPrompt);
+    setSubjectFor(back.photoPrompt);
+    setSubject(back.subject ?? defaultSubject(back.photoPrompt, 120));
+    if (back.presetId) setPresetId(back.presetId);
+    if (back.modelId && models.some((model) => model.id === back.modelId)) setModelId(back.modelId);
+    if (back.prompt !== undefined) setPrompt(back.prompt);
+    if (back.shots) setShots(back.shots);
+    if (back.effectId) setEffectId(back.effectId);
+    setCanvas({ view: 'gallery', before: 'gallery' });
+    if (back.remixGenerationId && back.presetId) {
+      void openRemix(back.presetId, `/api/generations/${encodeURIComponent(back.remixGenerationId)}/preset`, back.remixGenerationId);
+    }
+    // The link did its work: the address keeps the tab only.
+    window.history.replaceState(null, '', tabHref(back.tab));
+  };
+
+  useEffect(() => {
+    // A Reuse that comes during a render waits for its end: replacing the Studio now would orphan that render.
+    if (!from || catalog !== 'ready' || busy || appliedFrom.current === from) return;
+    appliedFrom.current = from;
+    apiFetch('/api/history')
+      .then((res) => jsonOrThrow<HistoryItem[]>(res))
+      .then((items) => {
+        const item = items.find((entry) => entry.key === from);
+        if (item) restore(item);
+      })
+      .catch(() => undefined);
+    // restore reads the catalogue, which is ready here; the item to bring back is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from, catalog, busy]);
 
   const checkRemix = async () => {
     if (!remix) return;
@@ -301,17 +478,20 @@ export function Studio() {
     kind: Tracked['kind'],
     body: unknown,
     onRefused?: (status: number, refusal: Refusal | null) => boolean,
+    path?: string,
   ): Promise<Tracked['record'] | undefined> => {
     submitting.current = true;
     setJob({ status: 'submitting' });
     try {
-      const res = await apiFetch(kind === 'sequence' ? '/api/sequences' : '/api/generations', {
+      const res = await apiFetch(path ?? (kind === 'sequence' ? '/api/sequences' : '/api/generations'), {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
         body: JSON.stringify(body),
       });
       if (!res.ok) {
         const refusal = (await res.json().catch(() => null)) as Refusal | null;
+        // ComfyUI refused a workflow: the server now hides that extension, and so does the Studio.
+        if (refusal?.error === 'workflow-rejected') refreshExtensions();
         if (onRefused?.(res.status, refusal)) setJob({ status: 'idle' });
         else setJob({ status: 'error', message: t(refusalMessageKey(refusal?.error)) });
         return;
@@ -340,13 +520,15 @@ export function Studio() {
       .then(([presetList, modelList, info]) => {
         setPresets(presetList);
         setModels(modelList.filter((model) => model.kind === 'video'));
+        setCatalogModels(modelList);
         setCatalog('ready');
         setPresetId((current) => current ?? presetList[0]?.id ?? null);
         setModelId((current) => current ?? presetList[0]?.defaultModel ?? null);
         const sample = info?.samples[0];
         const first = presetList[0];
         if (sample && first && !touched.current) {
-          setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef });
+          setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef, personal: false });
+          setCanvas({ view: 'result', before: 'gallery' });
           void submit('generation', { presetId: first.id, modelId: first.defaultModel, imageRef: sample.imageRef }).then(
             (record) => record && setArrivalId(record.id),
           );
@@ -363,7 +545,14 @@ export function Studio() {
   const generate = () => {
     if (submitting.current || !canGenerate || upload.status !== 'ready') return;
     followJob.current = true;
+    moveCanvas('generate');
     const userPrompt = prompt.trim() || undefined;
+    if (tab === 'effects') {
+      if (!selectedEffect) return;
+      const body = { imageRef: upload.imageRef, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}) };
+      void submit('job', body, undefined, '/api/effects');
+      return;
+    }
     if (remix) {
       const { text, baseId } = remix;
       const model = modelId;
@@ -375,7 +564,9 @@ export function Studio() {
         } else {
           return false;
         }
-        remixTextRef.current?.focus();
+        // Generate moved the canvas to the monitor: bring the editor back with its reason, then the focus effect moves there.
+        remixFocus.current = 'editor';
+        moveCanvas('change');
         return true;
       }).then((record) => {
         // This editor now holds that generation's remix: the result's "Remix preset" leads back here.
@@ -435,7 +626,7 @@ export function Studio() {
         : undefined;
 
   const selectedModel = models.find((model) => model.id === modelId);
-  const estimate = selectedModel?.estimate_s['480p'] ?? 0;
+  const estimate = tab === 'effects' ? (selectedEffect?.estimate_s ?? 0) : (selectedModel?.estimate_s['480p'] ?? 0);
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
   const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
@@ -459,7 +650,7 @@ export function Studio() {
       ? t(tracked?.kind === 'sequence' ? 'announceFilmReady' : 'announceClipReady')
       : '';
   // The empty monitor plays the move in hand: the preset being remixed, the chosen one, or the last shot added.
-  const moveId = remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
+  const moveId = tab === 'effects' ? undefined : remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
   const movePreset = presets.find((preset) => preset.id === moveId);
   const move = movePreset && {
     id: mode === 'sequence' ? `${shots.length}-${movePreset.id}` : movePreset.id,
@@ -467,143 +658,54 @@ export function Studio() {
     speed: movePreset.speed,
   };
   // The slate under the monitor: the take about to be shot, even once a photo hides the viewfinder.
-  const slateMove = remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  const slateMove = tab === 'effects' ? selectedEffect?.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
   const slate = slateMove && [
     slateMove,
-    selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
+    tab !== 'effects' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
     t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
   ].filter(Boolean);
 
+  const effectOfResult = tracked?.kind === 'job' ? effects.find((effect) => effect.id === tracked.record.label.itemId) : undefined;
+  const resultModel: { name: string; license: string } | undefined = effectOfResult
+    ? { name: effectOfResult.modelName, license: effectOfResult.license }
+    : tracked?.kind === 'generation'
+      ? models.find((model) => model.id === tracked.record.modelId)
+      : tracked?.kind === 'sequence'
+        ? (models.find((model) => model.id === tracked.record.shots[0]?.modelId) ?? selectedModel)
+        : undefined;
+
   return (
     <>
-      <Header recording={busy} />
+      <Suspense fallback={null}>
+        <TabParam
+          onTab={(value) => {
+            if (value !== null) touched.current = true;
+            setRequestedTab(value);
+          }}
+          onFrom={setFrom}
+        />
+      </Suspense>
+      <Header recording={busy} current={tab} />
       <main className={styles.studio} data-motion={motionPaused ? 'paused' : 'playing'}>
         <h1 className="visually-hidden">
           {t('appName')} — {t('tagline')}
         </h1>
-        <section className={styles.stage} aria-label={t('monitor')}>
-          <Monitor
-            upload={upload}
-            generation={monitorState}
-            move={move}
-            announcement={announcement}
-            statusRef={statusRef}
-            autoPlayResult={!(motionPaused && view?.id === arrivalId)}
-            onFile={onFile}
-            onSample={loadSample}
-            onCancel={cancel}
-            onRetry={() => setJob({ status: 'idle' })}
-            statusLabel={statusLabel}
-            showcase={
-              IS_SHOWCASE
-                ? {
-                    samples: showcase?.samples ?? [],
-                    selectedId: selectedSample,
-                    onPick: pickSample,
-                    uploads: capabilities.uploads,
-                    onOtherSample: () => {
-                      if (busyRef.current) return;
-                      setJob({ status: 'idle' });
-                      setUpload({ status: 'idle' });
-                    },
-                    onRefusedFile: () => setJob({ status: 'error', message: t('errorShowcaseUpload') }),
-                  }
-                : undefined
-            }
-          />
-          {slate && (
-            <p className={styles.slate}>
-              {slate.map((part, index) => (
-                <span key={index}>{part}</span>
-              ))}
-            </p>
-          )}
-          {IS_SHOWCASE && succeeded && (
-            <p className={styles.caption} data-testid="result-caption">
-              {succeeded.placeholder
-                ? t('showcasePlaceholderCaption')
-                : t('showcaseCaption', { model: showcase?.model.name ?? '', license: showcase?.model.license ?? '' })}
-            </p>
-          )}
-          {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
-            <div className={styles.actions} ref={actionsRef}>
-              {tracked.record.outputUrl && (
-                <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.presetId}.mp4`}>
-                  {t('download')}
-                </a>
-              )}
-              <a
-                className={styles.buttonSecondary}
-                href={tracked.record.workflowUrl ?? `/api/workflows/${tracked.record.id}`}
-                download={`montagio-${tracked.record.presetId}.json`}
-              >
-                {t('openInComfy')}
-                <span className={styles.fileTag}>.json</span>
-              </a>
-              <button
-                type="button"
-                className={styles.buttonSecondary}
-                onClick={() => void remixResult(tracked.record)}
-              >
-                {t('remix')}
-              </button>
-            </div>
-          )}
-          {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
-            <div className={styles.actions} ref={actionsRef}>
-              {tracked.record.outputUrl && (
-                <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download="montagio-film.mp4">
-                  {t('downloadFilm')}
-                </a>
-              )}
-              {tracked.record.verticalUrl && (
-                <a className={styles.buttonSecondary} href={tracked.record.verticalUrl} download="montagio-film-9x16.mp4">
-                  {t('downloadVertical')}
-                </a>
-              )}
-            </div>
-          )}
-          {/* What the showcase is, in sight whatever the monitor shows. */}
-          {showcaseNote && <p className={styles.stageNote}>{showcaseNote}</p>}
-        </section>
-
-        <aside className={styles.panel}>
-          <div className={styles.modes} role="group" aria-label={t('modeLabel')}>
-            {(['single', 'sequence'] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                className={styles.mode}
-                aria-pressed={mode === value}
-                disabled={busy || remix !== null}
-                onClick={() => {
-                  touched.current = true;
-                  setMode(value);
-                  // The film is joined by FFmpeg in the browser: start fetching it now.
-                  if (IS_SHOWCASE && value === 'sequence') void apiFetch('/api/showcase/preload', { method: 'POST' }).catch(() => undefined);
-                }}
-              >
-                {value === 'single' ? t('modeSingle') : t('modeSequence')}
-              </button>
-            ))}
-          </div>
-          {remix ? (
-            <RemixEditor
-              baseId={remix.baseId}
-              baseName={remix.baseName}
-              text={remix.text}
-              original={remix.original}
-              check={remix.checkModel === undefined || remix.checkModel === modelId ? remix.check : undefined}
-              textareaRef={remixTextRef}
-              onChange={(text) => setRemix((current) => current && { ...current, text, check: undefined })}
-              onCheck={checkRemix}
-              onReset={() => setRemix((current) => current && { ...current, text: current.original, check: undefined })}
-              onClose={closeRemix}
-            />
-          ) : (
-            <>
-              {/* The shots come first: what each tile adds stays in sight. */}
-              {mode === 'sequence' && (
+        <Composer
+          label={t('composerLabel')}
+          choice={
+            tab === 'effects' ? (
+              selectedEffect ? (
+                <ChoiceCard
+                  name={selectedEffect.name}
+                  kindLabel={t('effectKind', { s: CLIP_SECONDS })}
+                  previewUrl={selectedEffect.previewUrl}
+                  icon="effect"
+                  paused={motionPaused}
+                  onChange={() => moveCanvas('change')}
+                />
+              ) : null
+            ) : mode === 'sequence' && !remix ? (
+              <>
                 <ShotList
                   shots={shots}
                   presets={presets}
@@ -614,8 +716,167 @@ export function Studio() {
                   }
                   promptsDisabled={IS_SHOWCASE}
                 />
+                {IS_SHOWCASE && <p className={styles.hint}>{t('showcaseSequenceNote')}</p>}
+              </>
+            ) : movePreset ? (
+              <ChoiceCard
+                name={remix ? t('remixTitle', { name: remix.baseName }) : movePreset.name}
+                kindLabel={t('choiceCamera', { s: CLIP_SECONDS })}
+                previewUrl={remix ? undefined : movePreset.previewUrl}
+                poses={movePreset.poses}
+                speed={movePreset.speed}
+                icon="camera"
+                paused={motionPaused}
+                onChange={() => moveCanvas('change')}
+              />
+            ) : null
+          }
+          photo={
+            <>
+            <PhotoSource
+              upload={upload}
+              disabled={busy}
+              onFile={onFile}
+              onSample={() => void loadSample()}
+              t2i={!IS_SHOWCASE}
+              edit={extensions?.extensions.includes('edit') ?? false}
+              onAtelier={openAtelier}
+              showcase={
+                IS_SHOWCASE
+                  ? {
+                      samples: showcase?.samples ?? [],
+                      selectedId: selectedSample,
+                      onPick: pickSample,
+                      uploads: capabilities.uploads,
+                      onRefusedFile: () => setJob({ status: 'error', message: t('errorShowcaseUpload') }),
+                    }
+                  : undefined
+              }
+            />
+            {repriseNotice && upload.status === 'idle' && (
+              <p className={styles.hint} role="status">
+                {t('repriseNoPhoto')}
+              </p>
+            )}
+            </>
+          }
+          fields={
+            tab === 'effects' ? (
+              selectedEffect && <EffectFields subject={subject} max={selectedEffect.subjectMax} onSubject={setSubject} />
+            ) : (
+            <>
+              {mode === 'single' && !remix && (
+                <button
+                  ref={remixToggleRef}
+                  type="button"
+                  className={styles.buttonSecondary}
+                  aria-expanded={false}
+                  disabled={presetId === null}
+                  onClick={() => presetId && openRemix(presetId)}
+                >
+                  {t('remix')}
+                </button>
               )}
-              {mode === 'sequence' && IS_SHOWCASE && <p className={styles.hint}>{t('showcaseSequenceNote')}</p>}
+              <ModelPicker
+                models={models}
+                loading={catalog === 'loading'}
+                selectedId={modelId}
+                onSelect={setModelId}
+                onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
+              />
+              <div className={styles.panelSection}>
+                <label htmlFor="scene-prompt" className={styles.sectionTitle}>
+                  {t('prompt')}
+                </label>
+                <textarea
+                  id="scene-prompt"
+                  className={styles.prompt}
+                  rows={2}
+                  maxLength={500}
+                  placeholder={t('promptPlaceholder')}
+                  value={prompt}
+                  disabled={IS_SHOWCASE}
+                  aria-describedby={IS_SHOWCASE ? 'scene-local' : undefined}
+                  onChange={(event) => setPrompt(event.target.value)}
+                />
+                {IS_SHOWCASE && (
+                  <p id="scene-local" className={styles.hint}>
+                    {t('showcasePromptLocal')}
+                  </p>
+                )}
+              </div>
+            </>
+            )
+          }
+          consent={askConsent ? <ConsentCheck id="effect-consent" checked={consent} onChange={setConsent} /> : undefined}
+          generate={
+            <>
+              <div className={styles.generateBlock}>
+                {primaryLabel ? (
+                  <button type="button" className={styles.buttonPrimary} disabled={!canGenerate} onClick={generate}>
+                    {t(primaryLabel, { s: mode === 'sequence' && !remix ? filmEstimate : estimate })}
+                  </button>
+                ) : (
+                  <div className={styles.showcaseNote} role="note">
+                    <p>{t('showcaseRemixNote')}</p>
+                    {repoUrl && (
+                      <a className={styles.buttonSecondary} href={repoUrl} rel="noreferrer">
+                        {t('showcaseRunLocally')}
+                      </a>
+                    )}
+                  </div>
+                )}
+                {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
+              </div>
+              {/* Outside the sticky block: on a phone that block stays one button high over the gallery. */}
+              {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}
+            </>
+          }
+        />
+        <Canvas
+          view={canvas.view}
+          recent={<RecentStrip items={recent} inert={busy} />}
+          atelier={
+            ateliers.length > 0 &&
+            ateliers.map((kind) => (
+              <div key={kind} hidden={atelier !== kind}>
+                <PhotoAtelier
+                  kind={kind}
+                  photo={upload}
+                  estimates={extensions?.estimates ?? { t2i: 12 }}
+                  onUse={(photo) => takePhoto(photo, kind)}
+                  onClose={() => closeAtelier(kind)}
+                  licenseOf={(id) =>
+                    catalogModels.find((model) => model.id === id)?.license ?? (extensions?.editModel?.id === id ? extensions.editModel.license : undefined)
+                  }
+                />
+              </div>
+            ))
+          }
+          onView={(value) => setCanvas({ view: value, before: value })}
+          gallery={
+            tab === 'effects' ? (
+              <EffectWall
+                effects={effects}
+                hooks={HOOKS_READY ? (extensions?.hooks ?? []) : []}
+                selectedId={selectedEffect?.id ?? null}
+                paused={motionPaused}
+                onSelect={setEffectId}
+              />
+            ) : remix ? (
+              <RemixEditor
+                baseId={remix.baseId}
+                baseName={remix.baseName}
+                text={remix.text}
+                original={remix.original}
+                check={remix.checkModel === undefined || remix.checkModel === modelId ? remix.check : undefined}
+                textareaRef={remixTextRef}
+                onChange={(text) => setRemix((current) => current && { ...current, text, check: undefined })}
+                onCheck={checkRemix}
+                onReset={() => setRemix((current) => current && { ...current, text: current.original, check: undefined })}
+                onClose={closeRemix}
+              />
+            ) : (
               <PresetGallery
                 presets={presets}
                 catalog={catalog}
@@ -625,70 +886,129 @@ export function Studio() {
                 sequence={mode === 'sequence' ? sequenceTiles : undefined}
                 onSelect={onPreset}
               />
-            </>
-          )}
-          {mode === 'single' && !remix && (
-            <button
-              ref={remixToggleRef}
-              type="button"
-              className={styles.buttonSecondary}
-              aria-expanded={false}
-              disabled={presetId === null}
-              onClick={() => presetId && openRemix(presetId)}
-            >
-              {t('remix')}
-            </button>
-          )}
-          <ModelPicker
-            models={models}
-            loading={catalog === 'loading'}
-            selectedId={modelId}
-            onSelect={setModelId}
-            onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
-          />
-          <div className={styles.panelSection}>
-            <label htmlFor="scene-prompt" className={styles.sectionTitle}>
-              {t('prompt')}
-            </label>
-            <textarea
-              id="scene-prompt"
-              className={styles.prompt}
-              rows={2}
-              maxLength={500}
-              placeholder={t('promptPlaceholder')}
-              value={prompt}
-              disabled={IS_SHOWCASE}
-              aria-describedby={IS_SHOWCASE ? 'scene-local' : undefined}
-              onChange={(event) => setPrompt(event.target.value)}
-            />
-            {IS_SHOWCASE && (
-              <p id="scene-local" className={styles.hint}>
-                {t('showcasePromptLocal')}
-              </p>
-            )}
-          </div>
-          <div className={styles.generateBlock}>
-            {primaryLabel ? (
-              <button type="button" className={styles.buttonPrimary} disabled={!canGenerate} onClick={generate}>
-                {t(primaryLabel, { s: mode === 'sequence' && !remix ? filmEstimate : estimate })}
-              </button>
-            ) : (
-              <div className={styles.showcaseNote} role="note">
-                <p>{t('showcaseRemixNote')}</p>
-                {repoUrl && (
-                  <a className={styles.buttonSecondary} href={repoUrl} rel="noreferrer">
-                    {t('showcaseRunLocally')}
+            )
+          }
+          result={
+            <>
+              <Monitor
+                upload={upload}
+                generation={monitorState}
+                move={move}
+                announcement={announcement}
+                statusRef={statusRef}
+                autoPlayResult={!(motionPaused && view?.id === arrivalId)}
+                onFile={onFile}
+                onSample={() => void loadSample()}
+                onCancel={cancel}
+                onRetry={() => setJob({ status: 'idle' })}
+                statusLabel={statusLabel}
+                showcase={
+                  IS_SHOWCASE
+                    ? {
+                        samples: showcase?.samples ?? [],
+                        selectedId: selectedSample,
+                        onPick: pickSample,
+                        uploads: capabilities.uploads,
+                        onOtherSample: () => {
+                          if (busyRef.current) return;
+                          setJob({ status: 'idle' });
+                          setUpload({ status: 'idle' });
+                        },
+                        onRefusedFile: () => setJob({ status: 'error', message: t('errorShowcaseUpload') }),
+                      }
+                    : undefined
+                }
+              />
+              {slate && (
+                <p className={styles.slate}>
+                  {slate.map((part, index) => (
+                    <span key={index}>{part}</span>
+                  ))}
+                </p>
+              )}
+              {IS_SHOWCASE && succeeded && (
+                <p className={styles.caption} data-testid="result-caption">
+                  {succeeded.placeholder
+                    ? t('showcasePlaceholderCaption')
+                    : t('showcaseCaption', { model: showcase?.model.name ?? '', license: showcase?.model.license ?? '' })}
+                </p>
+              )}
+              {!IS_SHOWCASE && succeeded && resultModel && <AiCaption modelName={resultModel.name} license={resultModel.license} />}
+              {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
+                <div className={styles.actions} ref={actionsRef}>
+                  {tracked.record.outputUrl && (
+                    <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.presetId}.mp4`}>
+                      {t('download')}
+                    </a>
+                  )}
+                  <a
+                    className={styles.buttonSecondary}
+                    href={tracked.record.workflowUrl ?? `/api/workflows/${tracked.record.id}`}
+                    download={`montagio-${tracked.record.presetId}.json`}
+                  >
+                    {t('openInComfy')}
+                    <span className={styles.fileTag}>.json</span>
                   </a>
-                )}
-              </div>
-            )}
-            {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
-          </div>
-          {/* Outside the sticky block: on a phone that block stays one button high over the gallery. */}
-          {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}
-        </aside>
+                  <button type="button" className={styles.buttonSecondary} onClick={() => void remixResult(tracked.record)}>
+                    {t('remix')}
+                  </button>
+                </div>
+              )}
+              {tracked?.kind === 'job' && tracked.record.state === 'succeeded' && (
+                <div className={styles.actions} ref={actionsRef}>
+                  {tracked.record.outputUrl && (
+                    <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.label.itemId ?? tracked.record.task}.mp4`}>
+                      {t('download')}
+                    </a>
+                  )}
+                  <a
+                    className={styles.buttonSecondary}
+                    href={tracked.record.workflowUrl ?? `/api/workflows/${tracked.record.id}`}
+                    download={`montagio-${tracked.record.label.itemId ?? tracked.record.task}.json`}
+                  >
+                    {t('openInComfy')}
+                    <span className={styles.fileTag}>.json</span>
+                  </a>
+                </div>
+              )}
+              {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
+                <div className={styles.actions} ref={actionsRef}>
+                  {tracked.record.outputUrl && (
+                    <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download="montagio-film.mp4">
+                      {t('downloadFilm')}
+                    </a>
+                  )}
+                  {tracked.record.verticalUrl && (
+                    <a className={styles.buttonSecondary} href={tracked.record.verticalUrl} download="montagio-film-9x16.mp4">
+                      {t('downloadVertical')}
+                    </a>
+                  )}
+                </div>
+              )}
+              {/* What the showcase is, in sight whatever the monitor shows. */}
+              {showcaseNote && <p className={styles.stageNote}>{showcaseNote}</p>}
+            </>
+          }
+        />
       </main>
       <ShowcaseFooter />
     </>
   );
+}
+
+/** Reads ?tab= in its own Suspense boundary: the rest of the Studio prerenders without the URL. */
+function TabParam({ onTab, onFrom }: { onTab: (tab: string | null) => void; onFrom: (key: string | null) => void }) {
+  const params = useSearchParams();
+  const tab = params.get('tab');
+  const from = params.get('from');
+  useEffect(() => {
+    onTab(tab);
+    // onTab is a new function on every render of the Studio; the URL's tab is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+  useEffect(() => {
+    onFrom(from);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from]);
+  return null;
 }

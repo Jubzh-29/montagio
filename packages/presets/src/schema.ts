@@ -95,6 +95,9 @@ export const PresetSchema = z
 
 export type Preset = z.infer<typeof PresetSchema>;
 
+/** A YYYY-MM-DD date, as in registry/extensions.yaml. */
+const gpuDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected a YYYY-MM-DD date');
+
 /**
  * A one-photo effect (`capability: i2v-effect`, in presets/effects/): a LoRA of the effects
  * model, the trigger it was trained on, and a prompt template whose {subject} the user fills
@@ -122,10 +125,16 @@ export const EffectPresetSchema = z
       })
       .strict(),
     defaults: z
-      .object({ duration_s: z.number().int().min(2).max(5).default(5) })
+      .object({
+        duration_s: z.number().int().min(2).max(5).default(5),
+        /** true: the 4-step distillation LoRA; false: the full path, for a preset the 4 steps damage. */
+        fast: z.boolean().default(true),
+      })
       .strict()
-      .default({ duration_s: 5 }),
+      .default({ duration_s: 5, fast: true }),
     models: z.object({ preferred: kebabId }).strict(),
+    /** The day a GPU session validated this preset; the app hides it while null (the cut rule of 25/10). */
+    gpu_validated: gpuDate.nullable().default(null),
   })
   .strict()
   .superRefine((preset, ctx) => {
@@ -170,10 +179,16 @@ export const TransitionPresetSchema = z
       })
       .strict(),
     defaults: z
-      .object({ duration_s: z.number().int().min(2).max(5).default(5) })
+      .object({
+        duration_s: z.number().int().min(2).max(5).default(5),
+        /** true: the 4-step distillation LoRA; false: the full path, for a preset the 4 steps damage. */
+        fast: z.boolean().default(true),
+      })
       .strict()
-      .default({ duration_s: 5 }),
+      .default({ duration_s: 5, fast: true }),
     models: z.object({ preferred: kebabId }).strict(),
+    /** The day a GPU session validated this preset; the app hides it while null (the cut rule of 25/10). */
+    gpu_validated: gpuDate.nullable().default(null),
   })
   .strict();
 

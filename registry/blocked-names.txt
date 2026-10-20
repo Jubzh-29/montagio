@@ -1,0 +1,122 @@
+# Names Montagio refuses in a text-to-image prompt, an edit instruction, an effect's subject or
+# an avatar's text (400 blocked-name). A good-faith guardrail against faking well-known people,
+# not a complete filter: it cannot know every name, and it cannot see who is in a photo.
+# One name per line; case and accents do not matter; whole words only. Lines starting with # are comments.
+
+# Heads of state and government, political figures
+Joe Biden
+Donald Trump
+Kamala Harris
+Barack Obama
+Michelle Obama
+Hillary Clinton
+Bill Clinton
+Emmanuel Macron
+Brigitte Macron
+Marine Le Pen
+Olaf Scholz
+Angela Merkel
+Friedrich Merz
+Keir Starmer
+Rishi Sunak
+Boris Johnson
+Giorgia Meloni
+Pedro Sanchez
+Justin Trudeau
+Mark Carney
+Vladimir Putin
+Volodymyr Zelensky
+Xi Jinping
+Narendra Modi
+Recep Tayyip Erdogan
+Benjamin Netanyahu
+Kim Jong Un
+Lula da Silva
+Javier Milei
+Pope Francis
+Pope Leo
+King Charles
+Prince William
+Kate Middleton
+Prince Harry
+Meghan Markle
+
+# Business and technology
+Elon Musk
+Jeff Bezos
+Mark Zuckerberg
+Bill Gates
+Tim Cook
+Sundar Pichai
+Satya Nadella
+Sam Altman
+Jensen Huang
+Warren Buffett
+Bernard Arnault
+
+# Music
+Taylor Swift
+Beyonce
+Rihanna
+Drake
+Kanye West
+Ariana Grande
+Billie Eilish
+Lady Gaga
+Ed Sheeran
+Justin Bieber
+Selena Gomez
+Shakira
+Dua Lipa
+Bad Bunny
+Eminem
+Snoop Dogg
+Madonna
+Celine Dion
+Aya Nakamura
+
+# Film and television
+Tom Cruise
+Brad Pitt
+Angelina Jolie
+Leonardo DiCaprio
+Scarlett Johansson
+Jennifer Lawrence
+Margot Robbie
+Zendaya
+Tom Holland
+Dwayne Johnson
+Keanu Reeves
+Johnny Depp
+Will Smith
+Morgan Freeman
+Meryl Streep
+Emma Watson
+Timothee Chalamet
+Ryan Reynolds
+Oprah Winfrey
+Kim Kardashian
+Kylie Jenner
+Omar Sy
+Marion Cotillard
+
+# Sport
+Cristiano Ronaldo
+Lionel Messi
+Kylian Mbappe
+Neymar
+Zinedine Zidane
+LeBron James
+Michael Jordan
+Serena Williams
+Roger Federer
+Rafael Nadal
+Novak Djokovic
+Lewis Hamilton
+Usain Bolt
+Simone Biles
+Tiger Woods
+Antoine Griezmann
+Victor Wembanyama
+Teddy Riner
+Leon Marchand

@@ -17,7 +17,9 @@ export {
   SequenceToolError,
   SHOWCASE_COLOUR,
   SHOWCASE_X264,
+  tagAudio,
   tagClip,
   type ZoompanExpr,
 } from './ffmpeg';
-export { metadataArgs, PLACEHOLDER_METADATA, type VideoTags } from './tags';
+export { AI_AUDIO_METADATA, AI_IMAGE_METADATA, metadataArgs, PLACEHOLDER_METADATA, type VideoTags } from './tags';
+export { ImageTagError, readImageTags, tagImage } from './image-tags';

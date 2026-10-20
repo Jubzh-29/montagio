@@ -2,7 +2,7 @@ import { validatePreset } from '@montagio/presets/browser';
 import type { ShowcaseData } from '@montagio/showcase/data';
 import { galleryOrder } from '@/lib/gallery-order';
 import { MAX_PRESET_YAML_BYTES } from '@/lib/limits';
-import type { GenerationRecord, PresetSummary, SequenceSummary, ShowcaseInfo } from '@/lib/api-types';
+import type { ExtensionsInfo, GenerationRecord, HistoryItem, PresetSummary, SequenceSummary, ShowcaseInfo } from '@/lib/api-types';
 import { filmTags } from './montage-args';
 import { MontageError, type Montage, type MontageStage } from './types';
 import { BASE_PATH, urlsFor } from './urls';
@@ -40,6 +40,9 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
   const clips = new Map(data.clips.map((clip) => [`${clip.preset}|${clip.sample}`, clip]));
   const generations = new Map<string, GenerationRecord>();
   const sequences = new Map<string, { record: SequenceSummary; controller: AbortController }>();
+  // The history of this visit, newest first: nothing is kept once the page is gone.
+  let visit: HistoryItem[] = [];
+  const presetName = (id: string) => presets.get(id)?.name ?? id;
   let assembling: string | null = null;
   let filmUrls: string[] = [];
 
@@ -65,6 +68,12 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     } catch {
       return {};
     }
+  }
+
+  /** The text-to-image estimate of the core model, as the server gives it. */
+  function extensionsInfo(): ExtensionsInfo {
+    const t2i = data.models.find((model) => model.id === 'z-image-turbo')?.estimate_s['720p'] ?? 12;
+    return { extensions: [], effects: [], hooks: [], estimates: { t2i } };
   }
 
   function presetSummaries(): PresetSummary[] {
@@ -125,6 +134,21 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       placeholder: shot.clip.placeholder,
     };
     generations.set(record.id, record);
+    visit = [
+      {
+        key: `generation:${record.id}`,
+        source: 'generation',
+        kind: 'clip',
+        task: 'camera',
+        name: presetName(input.presetId),
+        modelName: data.model.name,
+        createdAt: new Date().toISOString(),
+        previewUrl: record.outputUrl!,
+        downloadUrl: record.outputUrl!,
+        reprise: { tab: 'camera', imageRef: input.imageRef, personal: false, presetId: input.presetId, modelId: data.model.id },
+      },
+      ...visit,
+    ];
     return json(record, 201);
   }
 
@@ -179,6 +203,22 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
         record.state = 'succeeded';
         record.progress = 1;
         delete record.stage;
+        // Only the last film's blobs are alive: the older films leave the history with them.
+        visit = [
+          {
+            key: `sequence:${record.id}`,
+            source: 'sequence',
+            kind: 'film',
+            task: 'film',
+            name: record.shots.map((shot) => presetName(shot.presetId)).join(' → '),
+            modelName: data.model.name,
+            createdAt: new Date().toISOString(),
+            previewUrl: filmUrls[0]!,
+            downloadUrl: filmUrls[0]!,
+            reprise: { tab: 'film', imageRef: String(input.imageRef), personal: false, shots: record.shots.map((shot) => ({ presetId: shot.presetId })) },
+          },
+          ...visit.filter((item) => item.kind !== 'film'),
+        ];
       })
       .catch((error: unknown) => {
         if (!stillOurs()) return;
@@ -221,6 +261,9 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     }
     if (method === 'POST' && resource === 'presets' && id === 'validate') return validate(await body(init));
     if (method === 'GET' && resource === 'models') return json(data.models);
+    if (method === 'GET' && resource === 'history' && !id) return json(visit);
+    // No extension has a pre-generated example yet (they come with the GPU session S3): none is shown.
+    if (method === 'GET' && resource === 'extensions' && !id) return json(extensionsInfo());
     if (method === 'GET' && resource === 'open-stack') return json(data.openStack);
     if (method === 'GET' && resource === 'showcase' && !id) return json(info());
     if (method === 'POST' && resource === 'showcase' && id === 'preload') {
@@ -228,6 +271,12 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       return new Response(null, { status: 204 });
     }
     if (method === 'POST' && resource === 'uploads') return refuse('showcase-upload', 403);
+    // Its sample photos were made from texts in advance: the showcase creates no image.
+    if (method === 'POST' && resource === 'images' && !id) return refuse('showcase-t2i', 403);
+    // No extension has an example in the showcase yet: their routes answer as the server answers a hidden one.
+    if (method === 'POST' && !id && (resource === 'edits' || resource === 'effects' || resource === 'hooks' || resource === 'avatars')) {
+      return refuse('extension-disabled', 404);
+    }
 
     if (resource === 'generations') {
       if (method === 'POST' && !id) return createGeneration(await body(init));

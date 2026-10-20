@@ -2,8 +2,8 @@
 
 Le 19/10, l'utilisateur a choisi d'ajouter à Montagio quatre extensions (musique, upscale HD, édition d'image, avatar parlant). Le même jour, il les a réorientées vers les « hooks » viraux d'une photo, d'après le rapport du 19/10 sur les fonctions virales du concurrent (dossier `reports/`, à côté du dépôt) : ce qui manque à Montagio, ce sont des effets d'une photo, de trois secondes, nommés et rejouables. Ordre de priorité retenu :
 1. **Édition d'image** (Qwen-Image-Edit-2511) : la photo modifiée par une instruction, en 4 étapes avec la LoRA Lightning, avec trois « looks » (gonflé, figurine, angle de vue) et une seconde image. Elle fait aussi l'image finale des transitions.
-2. **Pack de 6 effets** : Squish, Cake-ify, Explode, Crash Zoom, Bullet Time et 360 Orbit, des LoRA de Remade-AI sur Wan 2.1 I2V 480p.
-3. **Transitions par images clés** : l'édition fait l'image finale, Wan 2.2 FLF2V anime le passage. Hooks : Eyes In et Outfit Morph en S2, Figurine et Ignite (embrasement) en S3.
+2. **Pack de 6 effets** : Squish, Cake-ify, Explode, Snap Zoom, Frozen Moment et Full Circle, des LoRA de Remade-AI sur Wan 2.1 I2V 480p.
+3. **Transitions par images clés** : l'édition fait l'image finale, Wan 2.2 FLF2V anime le passage. Hooks : Iris Dive et Wardrobe Swap en S2, Figurine et Ignite (embrasement) en S3.
 4. **Avatar parlant** : Wan 2.2 S2V et sa voix Chatterbox, gardés à la validation du plan révisé.
 5. **Musique des films** (ACE-Step 1.5), mixée sous le film 16:9 et sa coupe 9:16.
 6. **Upscale HD** (SeedVR2) : sans lien avec la viralité, plusieurs minutes par clip, c'est le premier candidat à la coupe.
@@ -115,7 +115,7 @@ Les workflows partent des templates officiels de [Comfy-Org/workflow_templates](
 
 - Template `templates/video_wan2_2_14B_flf2v.json` (cœur), chemin 4 étapes : les deux experts (haut et bas bruit) avec leur LoRA lightx2v, deux `KSamplerAdvanced` coupés à l'étape 2, shift 5. Le chemin 20 étapes du template (cfg 4, coupure à l'étape 10, shift 8) est celui de `fast: false`. Dans le groupe 4 étapes du template, les images de début et de fin sont inversées : corrigé.
 - `WanFirstLastFrameToVideo` (`comfy_extras/nodes_wan.py:188`) : une longueur de 4n+1 images ; les deux images sont recadrées au centre à la taille demandée ; Wan 2.2 n'a pas besoin de CLIP vision.
-- Les hooks sont des presets `capability: i2v-transition`, rangés dans `presets/transitions/` : l'instruction d'édition qui fait l'image finale, un look éventuel, une seconde image pour Outfit Morph, et le mouvement entre les deux images. Un hook fait deux jobs : l'édition, puis la transition de la photo vers la sortie de l'édition.
+- Les hooks sont des presets `capability: i2v-transition`, rangés dans `presets/transitions/` : l'instruction d'édition qui fait l'image finale, un look éventuel, une seconde image pour Wardrobe Swap, et le mouvement entre les deux images. Un hook fait deux jobs : l'édition, puis la transition de la photo vers la sortie de l'édition.
 - Earth Zoom Out n'est pas dans cette branche. Le template `templates-6-key-frames` enchaîne cinq FLF2V par sous-graphes et les assemble avec `BatchImagesNode` (cœur), sans retirer les images de jonction, et l'enregistre à 24 fps alors que Wan 2.2 14B est à 16 fps.
 
 ### Voix de l'avatar : Chatterbox Multilingual V3, un node tiers épinglé et patché
@@ -253,7 +253,7 @@ Pour la règle du 25/10 au soir, il suffit de dater `gpu_validated` des extensio
 |---|---|---|
 | 1. Édition | **prête** | la VRAM juste (19,1 Gio de poids en fp8, encodeur déchargé) ; la Lightning qui abîme une instruction fine ; les looks sur des photos réelles ; 32 Go à télécharger ; le recadrage de 4 % |
 | 2. Effets | **prêts sur le papier** | des LoRA entraînées sur Wan 2.1 480p, à vérifier sur le fp8 ; les 4 étapes qui écrasent les grands mouvements (explosion, crash zoom, que la carte de Lightning signale) ; le format de clés de la LoRA lightx2v ; la preuve de licence faible des LoRA de Remade |
-| 3. Transitions | **risquées** | aucune preuve publique qu'Eyes In ou Outfit Morph par images clés vaut une LoRA dédiée ; deux familles de modèles par hook, donc des rechargements ; 31 Go de plus |
+| 3. Transitions | **risquées** | aucune preuve publique qu'Iris Dive ou Wardrobe Swap par images clés vaut une LoRA dédiée ; deux familles de modèles par hook, donc des rechargements ; 31 Go de plus |
 | 4. Avatar | **risquée** | la LoRA 4 étapes, faite pour le texte vers vidéo et pas pour S2V (perte de dynamique, pas de guidage audio à cfg 1), sans laquelle il faut une heure pour 15 s ; la vidéo ne part pas de la photo ; le français, non documenté ; la voix, un node tiers patché, `torchaudio` 2.11 sur torch 2.14.1, une voix intégrée anglaise ; 16 fps |
 | 5. Musique | **prête** | des voix malgré `[Instrumental]` ; la qualité d'un morceau de 10 s coupé à 5 ; un LM lent sans vLLM ; un VAE fp16 qui sature |
 | 6. Upscale HD | **prête, premier candidat à la coupe** | aucun lien avec la viralité ; ≈ 6 à 9 min pour 10 s ; une sur-netteté sur des clips IA, que le README de SeedVR2 signale (à comparer à un simple lanczos) ; des coutures entre morceaux ; l'int8 lent sur le repli cu128 ; 10 à 18 Go de RAM hôte |
@@ -266,7 +266,7 @@ Dans l'ordre de priorité. Les commandes sont dans [S2_CHECKLIST.md](S2_CHECKLIS
 
 1. **Édition** : « loaded completely » ou « partially » dans le journal ; temps en 4 étapes (Lightning) et en 40 ; une instruction en français ; les looks INFL8 et ACTION sur une photo ; recadrage contre `ImageScaleToTotalPixels`.
 2. **Effets** : les 6 effets sur 3 photos (une personne, un animal, un objet), en 4 étapes ; sujet reconnaissable et effet lisible dès la première seconde ; aucun avertissement `lora key not loaded` (LoRA lightx2v) ; pic de VRAM ; les effets à grand mouvement qui cassent en 4 étapes repassent en 20 en S3.
-3. **Transitions** : Eyes In et Outfit Morph de bout en bout (édition, puis transition) ; la continuité entre la photo et l'image finale ; 4 contre 20 étapes ; le temps d'un hook, rechargements compris.
+3. **Transitions** : Iris Dive et Wardrobe Swap de bout en bout (édition, puis transition) ; la continuité entre la photo et l'image finale ; 4 contre 20 étapes ; le temps d'un hook, rechargements compris.
 4. **Voix** : `import torchaudio, s3tokenizer` sur torch 2.14.1 ; une génération en anglais et en français (`cfg_weight` 0) ; un texte court sans « hmm » ; aucune connexion sortante avec `HF_HUB_OFFLINE` ; régénérer la fixture `ChatterboxMTLTTS` depuis le `/object_info` du pod.
 5. **Avatar** : LoRA 4 étapes contre 20 étapes (synchronisation des lèvres, temps) ; `ImageFromBatch.batch_index` 1, 3 ou 4 ; anglais et français ; `ref_motion` = la photo ; coutures à 5 et 10 s ; pic de VRAM.
 6. **Musique**, en fond : temps et VRAM pour 10 et 60 s, juste après un rendu Wan 14B ; aucune voix ; un film de 5 s mixé.
@@ -300,7 +300,7 @@ En mode local, le drapeau ne suffit pas : l'installeur laisse l'avatar de côté
 | `POST /api/generations/[id]/upscale` | clip terminé → 1080p |
 | `POST /api/edits` (`imageRef`, `instruction`) | photo éditée, enregistrée comme un nouvel envoi (`imageRef`) et utilisable comme photo de départ |
 | `POST /api/effects` (`imageRef`, `effectId`, `subject`) | un effet du pack sur la photo ; `GET /api/effects` les liste, avec leur aperçu |
-| `POST /api/hooks` (`imageRef`, `hookId`, `image2Ref` pour Outfit Morph) | job d'édition, puis job de transition sur sa sortie ; `GET /api/hooks` les liste |
+| `POST /api/hooks` (`imageRef`, `hookId`, `image2Ref` pour Wardrobe Swap) | job d'édition, puis job de transition sur sa sortie ; `GET /api/hooks` les liste |
 | `POST /api/avatars` (`imageRef`, `text`, `language`) | job voix, puis job avatar sur la durée lue par `probeAudio` |
 | `GET /api/extensions/jobs/[id]`, `POST …/cancel` | état et annulation |
 
@@ -311,7 +311,7 @@ Codes d'erreur stables, comme l'existant : `extension-disabled`, `invalid-input`
 - Clip terminé : « HD 1080p ».
 - Photo de départ : « Modifier la photo » (instruction), avec aperçu avant/après et « Utiliser cette photo ».
 - Galerie « Effets » : 6 cartes avec leur aperçu ; un champ « Ce que montre la photo » (le sujet), prérempli.
-- Galerie « Hooks » : Eyes In et Outfit Morph (avec « Ajouter la tenue », une seconde photo), puis Figurine et Ignite après la S3 ; l'image finale s'affiche avant la vidéo.
+- Galerie « Hooks » : Iris Dive et Wardrobe Swap (avec « Ajouter la tenue », une seconde photo), puis Figurine et Ignite après la S3 ; l'image finale s'affiche avant la vidéo.
 - Onglet « Avatar » : photo, texte (300 caractères, avec un compteur), langue EN/FR, et la durée estimée.
 - Chaque bouton disparaît quand son extension est masquée.
 

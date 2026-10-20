@@ -54,6 +54,34 @@
   white-space: nowrap;
 }
 
+/* The creation tabs: plain words, the current one underlined like a slate mark. */
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-right: auto;
+  min-width: 0;
+}
+
+.tab {
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink-muted);
+  font-size: var(--text-m);
+  font-weight: 550;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out);
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab[aria-current='page'] {
+  color: var(--ink);
+  border-bottom-color: var(--rec);
+}
+
 .tools {
   display: flex;
   align-items: center;
@@ -129,6 +157,12 @@
 
 /* Touch screens: the language buttons and the badge are thumb-sized. */
 @media (pointer: coarse) {
+  .tab {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
   .lang {
     min-height: 44px;
     min-width: 44px;
@@ -138,9 +172,27 @@
   }
 }
 
+@media (max-width: 1100px) {
+  .tagline {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   .header {
+    flex-wrap: wrap;
     padding: var(--space-3) var(--space-4);
+  }
+  /* The tabs take a row of their own under the brand and the tools. */
+  .tabs {
+    order: 3;
+    width: 100%;
+    margin-right: 0;
+    overflow-x: auto;
+  }
+  .tab {
+    flex: 1 0 auto;
+    text-align: center;
   }
   .tagline {
     display: none;
