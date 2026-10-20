@@ -79,3 +79,25 @@ export async function addRenderedClip(
   );
   return file;
 }
+
+/**
+ * Put an effect or hook example on landscape-a as `ingest --examples` would: the presets of
+ * effects and hooks in the root, the clip normalized and tagged, its workflow, its manifest entry.
+ */
+export async function addExample(root: string, raw: string, kind: 'effect' | 'hook', id: string, seed = 42): Promise<string> {
+  for (const folder of ['effects', 'transitions']) cpSync(join(repoRoot, 'presets', folder), join(root, 'presets', folder), { recursive: true });
+  const folder = kind === 'effect' ? 'effects' : 'hooks';
+  const file = showcasePath(root, folder, `${id}--landscape-a.mp4`);
+  mkdirSync(join(file, '..'), { recursive: true });
+  await normalizeClip(raw, file, { width: 832, height: 480, fps: 16, tags: AI_METADATA });
+  const workflow = { '1': { class_type: 'Marker', inputs: { example: `${kind}:${id}` } } };
+  mkdirSync(showcasePath(root, 'workflows'), { recursive: true });
+  writeFileSync(showcasePath(root, 'workflows', `${kind}-${id}--landscape-a.json`), `${JSON.stringify(workflow, null, 2)}\n`);
+  const manifestPath = showcasePath(root, 'manifest.yaml');
+  const section = kind === 'effect' ? 'effects' : 'hooks';
+  let text = readFileSync(manifestPath, 'utf8');
+  const entry = `  - { ${kind}: ${id}, sample: landscape-a, seed: ${seed}, sha256: ${sha256Of(file)}, image_sha256: ${sha256Of(showcasePath(root, 'samples', 'landscape-a.jpg'))}, workflow_sha256: ${workflowSha256(workflow)}, rendered_at: 2026-10-24 }\n`;
+  text = text.includes(`${section}:\n`) ? text.replace(`${section}:\n`, `${section}:\n${entry}`) : `${text}${section}:\n${entry}`;
+  writeFileSync(manifestPath, text);
+  return file;
+}

@@ -3,6 +3,16 @@ import type { OpenStackReport } from '@montagio/check-open-stack';
 import type { ApiWorkflow, Aspect } from '@montagio/presets';
 import type { LockEntry, ModelEntry } from '@montagio/registry';
 
+/** An effect or a hook of the showcase, with the sample photos it was rendered on. */
+export type ShowcaseExampleItem = {
+  id: string;
+  name: string;
+  description: string;
+  modelName: string;
+  license: string;
+  examples: { sample: string; url: string; workflowUrl: string }[];
+};
+
 /**
  * Everything the static showcase needs, written by `showcase prepare` to
  * public/showcase/data.json. URLs are relative to the showcase folder
@@ -20,7 +30,11 @@ export type ShowcaseData = {
   models: { id: string; name: string; kind: 'video' | 'image'; tier: 'quality' | 'fast'; license: string; estimate_s: { '480p': number; '720p'?: number } }[];
   /** What validatePreset needs, as Map entries. */
   library: { models: [string, ModelEntry][]; templates: [string, ApiWorkflow][]; lock: [string, LockEntry][] };
-  samples: { id: string; title: { en: string; fr: string }; aspect: Aspect; url: string; placeholder: boolean; credit: string }[];
+  /** `prompt`: the text the photo was made from, offered by the showcase's Text to image. */
+  samples: { id: string; title: { en: string; fr: string }; aspect: Aspect; url: string; placeholder: boolean; credit: string; prompt?: string }[];
   clips: { preset: string; sample: string; url: string; verticalUrl: string; workflowUrl: string; placeholder: boolean }[];
+  /** The effects and hooks rendered on a sample in a GPU session; one without an example is not listed. */
+  effects: ShowcaseExampleItem[];
+  hooks: (ShowcaseExampleItem & { references: 1 | 2 })[];
   openStack: OpenStackReport;
 };

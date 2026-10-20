@@ -48,6 +48,8 @@ function showcaseData(): ShowcaseData {
       { id: 'landscape-a', title: { en: 'Harbour', fr: 'Port' }, aspect: '16:9', url: 'samples/landscape-a.jpg', placeholder: false, credit: 'Z-Image-Turbo' },
     ],
     clips: [clip('crash-push', false), clip('pan-left', true)],
+    effects: [],
+    hooks: [],
     openStack: { ok: true, checkedAt: '2026-10-18T20:00:00.000Z', models: [], violations: [] },
   };
 }

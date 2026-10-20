@@ -17,7 +17,7 @@ import {
   SHOWCASE_X264,
 } from '@montagio/sequence';
 import type { ShowcaseData } from './data';
-import { loadManifest, SHOWCASE_DIR } from './manifest';
+import { effectFile, exampleWorkflowFile, hookFile, loadManifest, SHOWCASE_DIR } from './manifest';
 import { motionKeyframes, toZoompan } from './motion';
 import { planClips, type PlannedClip } from './plan';
 import { sha256File, verifyShowcase } from './verify';
@@ -146,6 +146,33 @@ export async function prepareShowcase(
     await writeFile(workflowPath, `${JSON.stringify(workflow, null, 2)}\n`);
   }
 
+  // The effect and hook examples, copied as ingest wrote them, with their workflows.
+  const exampleUrls = new Map<string, { sample: string; url: string; workflowUrl: string }[]>();
+  for (const [kind, entries] of [
+    ['effect', manifest.effects.map((entry) => ({ id: entry.effect, entry }))],
+    ['hook', manifest.hooks.map((entry) => ({ id: entry.hook, entry }))],
+  ] as const) {
+    for (const { id, entry } of entries) {
+      const file = kind === 'effect' ? effectFile(id, entry.sample) : hookFile(id, entry.sample);
+      const workflowUrl = exampleWorkflowFile(kind, id, entry.sample);
+      await ensure(file, hash('example', entry.sha256), (path) => copyFile(join(showcaseDir, file), path));
+      await ensure(workflowUrl, hash('example-workflow', entry.workflow_sha256), (path) => copyFile(join(showcaseDir, workflowUrl), path));
+      const key = `${kind}:${id}`;
+      exampleUrls.set(key, [...(exampleUrls.get(key) ?? []), { sample: entry.sample, url: file, workflowUrl }]);
+    }
+  }
+  const exampleItem = (kind: 'effect' | 'hook', preset: { id: string; name: string; description: string; models: { preferred: string } }) => {
+    const model = library.extensionModels.get(preset.models.preferred);
+    return {
+      id: preset.id,
+      name: preset.name,
+      description: preset.description,
+      modelName: model?.name ?? preset.models.preferred,
+      license: model?.license ?? '',
+      examples: exampleUrls.get(`${kind}:${preset.id}`) ?? [],
+    };
+  };
+
   // The browser joins a sample's clips (and their 9:16 cuts) with -c copy: prove it works here first.
   for (const sample of manifest.samples) {
     const items = planned.filter((item) => item.sample.id === sample.id);
@@ -192,6 +219,7 @@ export async function prepareShowcase(
       url: sample.file,
       placeholder: sample.status === 'placeholder',
       credit: sample.credit,
+      ...(sample.prompt ? { prompt: sample.prompt } : {}),
     })),
     clips: planned.map((item) => ({
       preset: item.preset.id,
@@ -201,6 +229,10 @@ export async function prepareShowcase(
       workflowUrl: item.workflow,
       placeholder: item.rendered === null,
     })),
+    effects: [...library.effects.values()].map((preset) => exampleItem('effect', preset)).filter((item) => item.examples.length > 0),
+    hooks: [...library.hooks.values()]
+      .map((preset) => ({ ...exampleItem('hook', preset), references: preset.end_frame.references }))
+      .filter((item) => item.examples.length > 0),
     openStack,
   };
   await writeFile(join(outDir, 'data.json'), `${JSON.stringify(data)}\n`);
