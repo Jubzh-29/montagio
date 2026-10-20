@@ -59,3 +59,10 @@ test('hooks alone open the Effects tab, now that they render', () => {
   // Before their two-step render existed, the flag kept them off.
   expect(visibleTabs({ ...none, extensions: ['edit', 'transitions'], hooks: [hook] }, undefined, false)).toEqual(['camera', 'film']);
 });
+
+test('motion announced by the server opens no tab until its screen is built', () => {
+  // GET /api/extensions lists motion with MONTAGIO_EXTENSIONS=all since the engine landed (20/10).
+  const info = { ...none, extensions: ['effects', 'avatar', 'motion'] as const, effects: [effect] };
+  expect(visibleTabs({ ...info, extensions: [...info.extensions] })).toEqual(['effects', 'camera', 'film', 'avatar']);
+  expect(pickTab('motion', visibleTabs({ ...info, extensions: [...info.extensions] }))).toBe('effects');
+});
