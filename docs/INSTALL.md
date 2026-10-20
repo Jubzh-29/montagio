@@ -160,7 +160,9 @@ Six extensions run models of their own, beyond the camera presets, in their orde
 
 The avatar is left out by this installer for now: its voice runs on a custom node (pinned and patched) that only the GPU session's `infra/runpod/bootstrap.sh` installs. Details: [EXTENSIONS_ANALYSE.md](EXTENSIONS_ANALYSE.md) (in French).
 
-A full install starts the app with the extensions whose weights it fetched, so the Studio shows only what this machine can run. With `--app-only` (the demo, or a remote GPU with `--proxy-url`), or when you start the app yourself, `MONTAGIO_EXTENSIONS` decides what the Studio shows. An effect or a hook also needs its own date in its preset file (`gpu_validated`), unless `MONTAGIO_EXTENSIONS=all`.
+A full install starts the app with the extensions whose weights it fetched, so the Studio shows only what this machine can run. With `--app-only` (the demo, or a remote GPU with `--proxy-url`), or when you start the app yourself, `MONTAGIO_EXTENSIONS` decides what the Studio shows. An effect or a hook also needs its own date in its preset file (`gpu_validated`), unless `MONTAGIO_EXTENSIONS=all`. `--extensions all` at install time fetches every weight but starts the app with that list, not with `all`: undated effects and hooks stay hidden until you start the app with `MONTAGIO_EXTENSIONS=all`.
+
+What each shown extension adds to the Studio: `edit`, the Edit button of the start photo; `effects`, the Effects tab and its wall; `transitions`, the hooks on that wall; `avatar`, the Avatar tab; `music`, "Add music" under a finished film; `upscale`, "HD 1080p" under a finished clip of 121 frames at most. A workflow ComfyUI refuses (a missing node or file) hides its extension until the app restarts, and the log says which.
 
 ## Troubleshooting
 

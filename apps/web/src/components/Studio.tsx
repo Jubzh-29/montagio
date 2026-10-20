@@ -6,6 +6,7 @@ import { useI18n } from '@/i18n';
 import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import {
   TERMINAL_STATES,
+  type ExtensionsInfo,
   type GenerationRecord,
   type HistoryItem,
   type JobState,
@@ -561,8 +562,14 @@ export function Studio() {
             .then((res) => (res.ok ? (res.json() as Promise<ShowcaseInfo>) : null))
             .catch(() => null)
         : null,
+      // The showcase's arrival clip is an effect's example when it has one (answered in the page).
+      IS_SHOWCASE
+        ? apiFetch('/api/extensions')
+            .then((res) => (res.ok ? (res.json() as Promise<ExtensionsInfo>) : null))
+            .catch(() => null)
+        : null,
     ])
-      .then(([presetList, modelList, info]) => {
+      .then(([presetList, modelList, info, shown]) => {
         setPresets(presetList);
         setModels(modelList.filter((model) => model.kind === 'video'));
         setCatalogModels(modelList);
@@ -574,9 +581,14 @@ export function Studio() {
         if (sample && first && !touched.current) {
           setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef, personal: false });
           setCanvas({ view: 'result', before: 'gallery' });
-          void submit('generation', { presetId: first.id, modelId: first.defaultModel, imageRef: sample.imageRef }).then(
-            (record) => record && setArrivalId(record.id),
-          );
+          // Effects first: the showcase opens on its first effect rendered on this photo, unless the URL asks for another tab.
+          const asked = new URLSearchParams(window.location.search).get('tab');
+          const effect = !asked || asked === 'effects' ? shown?.effects.find((entry) => entry.samples?.includes(sample.id)) : undefined;
+          if (effect) setEffectId(effect.id);
+          const arrival = effect
+            ? submit('job', { imageRef: sample.imageRef, effectId: effect.id }, undefined, '/api/effects')
+            : submit('generation', { presetId: first.id, modelId: first.defaultModel, imageRef: sample.imageRef });
+          void arrival.then((record) => record && setArrivalId(record.id));
         }
       })
       .catch(() => {
@@ -1019,7 +1031,7 @@ export function Studio() {
                 <p className={styles.caption} data-testid="result-caption">
                   {succeeded.placeholder
                     ? t('showcasePlaceholderCaption')
-                    : t('showcaseCaption', { model: showcase?.model.name ?? '', license: showcase?.model.license ?? '' })}
+                    : t('showcaseCaption', { model: resultModel?.name ?? showcase?.model.name ?? '', license: resultModel?.license ?? showcase?.model.license ?? '' })}
                 </p>
               )}
               {!IS_SHOWCASE && succeeded && resultModel && <AiCaption modelName={resultModel.name} license={resultModel.license} />}

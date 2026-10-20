@@ -223,16 +223,15 @@ async function withSquishExample(page: Page) {
   });
 }
 
-test('an effect example plays on its sample photo, and only there', async ({ page }) => {
+test('with an effect example, the showcase opens on it, and offers it only on its photo', async ({ page }) => {
   const problems = watchRequests(page);
   await withSquishExample(page);
   await page.goto('/');
-  await arrival(page);
-  await page.getByRole('link', { name: 'Effects', exact: true }).click();
-  await page.getByRole('button', { name: 'Squish' }).click();
-  await page.getByRole('button', { name: /^(Show clip|Generate)/ }).click();
+  // Effects first: the showcase opens on its first effect's example, captioned with that effect's model.
+  await expect(page.getByRole('link', { name: 'Effects', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(result(page)).toHaveAttribute('src', /\/showcase\/clips\/pan-left--landscape-a\.mp4$/);
-  await expect(page.getByTestId('ai-caption').or(page.getByTestId('result-caption'))).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Squish' })).toBeVisible();
+  await expect(page.getByTestId('result-caption')).toHaveText(/Wan 2[.]1 I2V 480p [(]effects[)]/);
   // Another sample photo has no example: the wall offers nothing there.
   await page.getByRole('button', { name: 'Other sample photo' }).click();
   await page.getByRole('button', { name: /Placeholder portrait A/ }).click();
