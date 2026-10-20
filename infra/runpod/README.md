@@ -9,6 +9,8 @@ Scripts that turn a rented GPU pod (RTX 4090, 24 GB) into a Montagio backend: Co
 | `smoke.ts` | Compiles presets with `@montagio/presets`, submits them through `@comfyorg/sdk` to the proxy, downloads the clips, and records wall time, execution time and peak VRAM in `s1-results/smoke.jsonl`. |
 | `versions.env` | Every pinned version and checksum. |
 
+Without a rented pod, [`infra/modal`](../modal/README.md) builds the same install as a Modal image (the functions of `bootstrap.sh`, these versions) and runs `fetch-weights.ts` and `smoke.ts` unchanged, on an L4 and two volumes.
+
 ```bash
 bash infra/runpod/bootstrap.sh --expose-ui
 source /workspace/montagio.env

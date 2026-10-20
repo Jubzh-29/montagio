@@ -27,6 +27,110 @@ Les outils sont dans [`infra/runpod/`](../infra/runpod/README.md) :
 
 Tout ce qui sort de la session va dans `s1-results/`. Le nom est resté celui de la S1 ; le dossier est ignoré par git. Le tout part dans une archive à télécharger avant d'éteindre le pod.
 
+## Sur Modal, sans location (choix du 20/10)
+
+Le 20/10, vous avez choisi Modal plutôt qu'un pod loué : l'offre Starter inclut 30 $ de calcul par mois. Le parcours Runpod (parties 0 à 7) reste une alternative. L'outillage est dans [`infra/modal/`](../infra/modal/README.md) : la même installation (`bootstrap.sh`, `versions.env`), les mêmes `fetch-weights.ts` et `smoke.ts`. Les critères à regarder et la fiche (partie 8) ne changent pas.
+
+**Ce qui change :**
+- **Pas de terminal sur le GPU** : le client Modal refuse `modal shell` sous Windows. Chaque étape est une commande `modal run`, lancée depuis le PC ; son conteneur s'arrête seul à la fin.
+- **GPU L4** (24 Go, comme la RTX 4090), environ trois fois plus lente : chaque rendu prend plus de temps et coûte davantage. On mesure le premier rendu, puis on recale le budget.
+- **Rien à éteindre** à la fin : `modal app list` doit seulement ne plus montrer `montagio-s2`.
+- **Budget** : arrêt vers 25 $ cumulés sur le mois, S2 et S3 comprises. Suivi sur modal.com → Settings → Usage & Billing.
+
+| Étape | Coût estimé (L4 ≈ 1,10 à 1,30 $/h avec son CPU et sa mémoire) |
+|---|---|
+| M1. Image et contrôle | ≈ 0,50 $ |
+| M2. Poids (206 Go, sans GPU) | ≈ 0,30 $ ; le stockage est gratuit jusqu'à 1 Tio |
+| M3. Parties 5.1 à 5.3 | ≈ 2,50 à 3,50 $ |
+| M3. Parties 6.1, 6.2 et 6.7 | ≈ 5 à 6 $ |
+| M3. Partie 6.8 | ≈ 4 à 5 $ |
+| **Total de la S2** | **≈ 13 à 15 $** |
+
+### M0. Une fois, sur le PC
+
+1. Créez le compte Modal (connexion GitHub ou Google). C'est à vous de le faire.
+2. Ajoutez un moyen de paiement : Modal en exige un pour utiliser un GPU. Puis, dans **Settings → Usage & Billing** :
+   - **usage limit** : 30 $ ;
+   - **spend limit** : 0 $.
+
+   Modal arrête alors tout travail que les crédits offerts ne couvrent plus.
+3. Installez l'outil Modal dans un environnement Python propre au projet, hors du dépôt (PowerShell, depuis `montagio/`) :
+   ```powershell
+   py -3.12 -m venv ..\.venv-modal
+   ..\.venv-modal\Scripts\python -m pip install -r infra\modal\requirements.txt
+   ```
+4. Connectez-vous : `..\.venv-modal\Scripts\modal.exe setup`. Le navigateur s'ouvre pour l'authentification, et le jeton est écrit dans `~\.modal.toml`.
+5. Envoyez les photos et les vidéos dans le volume des résultats. Chaque fichier de `inputs/` est vu comme `/workspace/<nom>` dans les conteneurs, donc les chemins de la checklist restent valables. L'avatar lit `face.png` : une copie de `person.png` suffit.
+   ```powershell
+   ..\.venv-modal\Scripts\modal.exe volume put montagio-results start.png inputs/start.png
+   ```
+   Faites de même pour `person.png`, `face.png`, `animal.png`, `object.png`, `outfit.png`, `character.png`, `dance.mp4` et `gesture.mp4`.
+
+Dans la suite, `modal` désigne `..\.venv-modal\Scripts\modal.exe`, lancé depuis `montagio/`.
+
+### M1. Image et contrôle (partie 3)
+
+```bash
+modal run infra/modal/montagio_s2.py::check
+```
+
+La première fois, Modal construit l'image : 15 à 25 min, dont l'installation sur une L4, car `bootstrap.sh` vérifie que torch voit CUDA. Ensuite, ce contrôle prend quelques minutes. Les attendus sont ceux de la partie 3 :
+- les lignes `GPU:` et `torch 2.14.1+cu130` ;
+- `Montagio node pack: …` ;
+- `<n> node classes loaded, 0 partner node(s)` ;
+- `node 5 shows text: 33` et `node 8 shows text: 33` ;
+- les tests du node, tous verts.
+
+Le contrôle écrit aussi `s1-results/object_info-chatterbox.json` (partie 6.8, étape 9) et `s1-results/env/`.
+
+### M2. Poids (partie 4)
+
+```bash
+modal run --detach infra/modal/montagio_s2.py::weights --args "--extensions none"
+modal run --detach infra/modal/montagio_s2.py::weights
+```
+
+- La première commande prend les poids des presets (70 Go).
+- La seconde prend tout le reste. Elle peut tourner pendant les premiers rendus, car les poids des presets sont déjà là et elle ne fait que les revérifier.
+- Le téléchargement se fait dans Modal, pas sur le PC, avec le même contrôle sha256. Le rapport est dans `s1-results/weights-report.json`.
+
+### M3. Rendus (parties 5, 6 et 6.8)
+
+Chaque `npm run smoke -w @montagio/infra-runpod -- <arguments>` de la checklist devient :
+```bash
+modal run --detach infra/modal/montagio_s2.py::smoke --args "<arguments>" --label <nom>
+```
+
+- **Les sorties** vont dans `runs/<date>-<nom>/` du volume : `smoke.jsonl`, `clips/`, et `logs/comfyui.log` (c'est là que se cherche `lora key not loaded`). Pour les récupérer sur le PC et les juger :
+  ```bash
+  modal volume get montagio-results runs/<dossier> .
+  ```
+- **Plusieurs rendus à la fois**, un conteneur chacun (4 au plus), pour le même coût :
+  ```bash
+  modal run --detach infra/modal/montagio_s2.py::batch --common "--image /workspace/start.png" --jobs "--preset crash-push,slow-push,pan-left,pan-right; --preset tilt-up,tilt-down,pull-back-reveal,rise-and-push; --preset drift-left-push,pull-back-tilt-up,push-and-settle,breathing" --label presets
+  ```
+- **Une image éditée à animer** (partie 6.8, étape 1) : donnez son chemin dans le volume, `/results/runs/<dossier>/clips/<image>.png`.
+
+Ordre adapté à la L4 et au budget :
+1. Partie 5.1, `--runs 2`. Le temps mesuré recale le reste du budget.
+2. Partie 5.2 (720p), une seule fois, et seulement si un rendu en 480p prend moins de 30 min.
+3. Partie 5.3 (5B).
+4. Partie 6.2, en `batch`.
+5. Partie 6.1 allégée, `--camera-pose "Zoom In" --camera-speed 0.5,3`, puis la partie 6.7. Les presets couvrent déjà les poses à la vitesse 1.
+6. Partie 6.8, dans l'ordre, en groupant les jobs par modèle.
+
+**Hors de ce parcours, ou facultatif :**
+- Les vérifications faites à la main dans l'interface : la partie 5.4 (Z-Image), les parties 6.4 et 6.6, les variantes de l'avatar et de l'upscale. Elles passent par `modal run infra/modal/montagio_s2.py::ui`, s'il reste du budget. **L'URL du tunnel est publique et ComfyUI n'a pas de mot de passe** : gardez-la pour vous, et arrêtez la fonction (Ctrl+C) dès que vous avez fini, car le GPU est facturé pendant ce temps.
+- La partie 6.5 (Séquence dans le Studio) : pas sur Modal pour l'instant, car le Studio demanderait un tunnel public vers le proxy.
+- L'essai de l'installeur local (encadré de la partie 7) : il ne s'applique pas à Modal.
+
+### M4. Fin de session
+
+1. `modal app list` : plus aucune app `montagio-s2` en cours.
+2. `modal volume get montagio-results / s2-modal` : tout récupérer sur le PC, puis vérifier que les clips s'ouvrent.
+3. Notez la dépense de Usage & Billing dans la fiche.
+4. Gardez le volume `montagio-weights` jusqu'à la S3 : il est gratuit sous 1 Tio. Le supprimer ensuite (`modal volume delete montagio-weights`) est votre décision.
+
 ## Déroulé en un coup d'œil
 
 | Étape | Durée | GPU facturé |
@@ -192,7 +296,7 @@ Faites un rendu de `roll_cw` à 0,3 avec `--camera-pose "ClockWise (CW)" --camer
 
 ### 6.8 Les extensions (≈ 3 h 30 à 4 h)
 
-Dans l'ordre de priorité réorienté. Le détail de ce qu'il faut regarder est dans [EXTENSIONS_ANALYSE.md](EXTENSIONS_ANALYSE.md), partie 7. Chaque commande note temps, VRAM et sortie dans `s1-results/smoke.jsonl`, et range la sortie dans `s1-results/clips/`. Il faut `ffprobe` pour l'avatar : `apt-get install -y ffmpeg`. Groupez les jobs par modèle : chaque changement de famille recharge des poids. Préparez trois photos dont vous avez les droits : une personne de face (`/workspace/person.png`), un animal (`animal.png`), un objet (`object.png`), plus une tenue sur fond neutre (`outfit.png`).
+Dans l'ordre de priorité réorienté. Le détail de ce qu'il faut regarder est dans [EXTENSIONS_ANALYSE.md](EXTENSIONS_ANALYSE.md), partie 7. Chaque commande note temps, VRAM et sortie dans `s1-results/smoke.jsonl`, et range la sortie dans `s1-results/clips/`. Il faut `ffprobe` pour l'avatar : `apt-get install -y ffmpeg`. Groupez les jobs par modèle : chaque changement de famille recharge des poids. Préparez trois photos dont vous avez les droits : une personne de face (`/workspace/person.png`, et une copie en `face.png` pour l'avatar), un animal (`animal.png`), un objet (`object.png`), plus une tenue sur fond neutre (`outfit.png`).
 
 1. **Édition** (≈ 20 min) :
    ```bash
