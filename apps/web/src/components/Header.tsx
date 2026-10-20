@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { useI18n, type Lang } from '@/i18n';
 import { apiFetch, jsonOrThrow } from '@/lib/api';
 import type { OpenStackReport } from '@/lib/api-types';
+import { tabHref, visibleTabs, type Tab } from '@/lib/tabs';
+import { useExtensions } from '@/lib/use-extensions';
 import styles from './header.module.css';
 
 function OpenStackBadge() {
@@ -52,7 +54,24 @@ function LanguageToggle() {
   );
 }
 
-export function Header({ recording = false }: { recording?: boolean }) {
+const TAB_LABELS = { effects: 'tabEffects', camera: 'tabCamera', film: 'tabFilm', avatar: 'tabAvatar' } as const;
+
+/** The creation tabs, as links: the Studio reads the tab from the URL. */
+function Tabs({ current }: { current?: Tab | 'history' }) {
+  const { t } = useI18n();
+  const tabs = visibleTabs(useExtensions());
+  return (
+    <nav className={styles.tabs} aria-label={t('tabsLabel')}>
+      {tabs.map((tab) => (
+        <Link key={tab} href={tabHref(tab)} className={styles.tab} aria-current={current === tab ? 'page' : undefined}>
+          {t(TAB_LABELS[tab])}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+export function Header({ recording = false, current }: { recording?: boolean; current?: Tab | 'history' }) {
   const { t } = useI18n();
   return (
     <header className={styles.header}>
@@ -61,6 +80,7 @@ export function Header({ recording = false }: { recording?: boolean }) {
         <span className={styles.wordmark}>{t('appName')}</span>
         <span className={styles.tagline}>{t('tagline')}</span>
       </Link>
+      <Tabs current={current} />
       <div className={styles.tools}>
         <OpenStackBadge />
         <LanguageToggle />

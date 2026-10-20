@@ -110,5 +110,11 @@
   "showcaseSourcePending": "Lien du code source ajouté à la publication",
   "showcaseRunLocally": "L'installer chez soi",
   "showcasePlaceholderBadge": "provisoire",
-  "showcasePlaceholderNote": "Certains clips sont encore provisoires : FFmpeg simule leur mouvement en attendant le rendu de la session GPU."
+  "showcasePlaceholderNote": "Certains clips sont encore provisoires : FFmpeg simule leur mouvement en attendant le rendu de la session GPU.",
+  "tabsLabel": "Création",
+  "tabEffects": "Effets",
+  "tabCamera": "Caméra",
+  "tabFilm": "Film",
+  "tabAvatar": "Avatar",
+  "tabHistory": "Historique"
 }

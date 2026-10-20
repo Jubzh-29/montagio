@@ -110,5 +110,11 @@
   "showcaseSourcePending": "Source link added at release",
   "showcaseRunLocally": "Run it yourself",
   "showcasePlaceholderBadge": "placeholder",
-  "showcasePlaceholderNote": "Some clips are still placeholders: FFmpeg simulates their camera move until the GPU session renders them."
+  "showcasePlaceholderNote": "Some clips are still placeholders: FFmpeg simulates their camera move until the GPU session renders them.",
+  "tabsLabel": "Creation",
+  "tabEffects": "Effects",
+  "tabCamera": "Camera",
+  "tabFilm": "Film",
+  "tabAvatar": "Avatar",
+  "tabHistory": "History"
 }
