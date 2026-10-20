@@ -2,8 +2,11 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { GET as getHistory } from '@/app/api/history/route';
 import type { HistoryItem } from '@/lib/api-types';
+import { POST as postGenerations } from '@/app/api/generations/route';
+import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import { HISTORY_LIMIT, listHistory } from '@/server/history';
-import { setupTempData } from './helpers';
+import { jobs } from '@/server/jobs';
+import { generationRequest, setupTempData } from './helpers';
 
 const dataDir = setupTempData();
 
@@ -73,6 +76,16 @@ test('shots of a film are not listed apart', async () => {
     reprise: { tab: 'film', imageRef: `uploads/${PHOTO}.png`, shots: [{ presetId: 'crash-push', prompt: 'a harbour' }, { presetId: 'pan-left' }] },
   });
 });
+
+test('a render nobody polls any more (the Studio was left mid-render) is finished when the history is read', async () => {
+  process.env.MONTAGIO_DEMO_DURATION_MS = '0';
+  const { imageRef } = (await (await postSampleUpload()).json()) as { imageRef: string };
+  const clip = (await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'k-left-clip'))).json()) as { id: string; state: string };
+  const image = await jobs.create('t2i', { prompt: 'a lighthouse at dusk', aspect: '16:9' }, 'k-left-image');
+  expect(clip.state).not.toBe('succeeded');
+  expect(image.record.state).not.toBe('succeeded');
+  expect(keys(await listHistory())).toEqual(expect.arrayContaining([`generation:${clip.id}`, `job:${image.record.id}`]));
+}, 30_000);
 
 test('failed and canceled items are left out', async () => {
   write('generations', generation('g-ok', 1));

@@ -135,6 +135,8 @@ test('GET /api/extensions describes the wall: effects first in their order, hook
   });
   expect(body.hooks.find((hook) => hook.id === 'wardrobe-swap')?.references).toBe(2);
   expect(body.estimates).toEqual({ t2i: 12, edit: 25 });
+  // The edit's caption names its model and license, which the preset catalogue does not hold.
+  expect(body.editModel).toEqual({ id: 'qwen-image-edit-2511', name: expect.stringMatching(/^Qwen-Image-Edit-2511/), license: 'Apache-2.0' });
 });
 
 test('a preview file that exists gets its URL, a missing one none', async () => {

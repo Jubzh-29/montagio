@@ -125,5 +125,6 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     effects,
     hooks,
     estimates: { t2i, ...(extensions.includes('edit') && editModel ? { edit: estimateFor(editModel, true) } : {}) },
+    ...(extensions.includes('edit') && editModel ? { editModel: { id: editModel.id, name: editModel.name, license: editModel.license } } : {}),
   };
 }

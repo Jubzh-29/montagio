@@ -130,6 +130,8 @@ export type ExtensionsInfo = {
   effects: EffectSummary[];
   hooks: HookSummary[];
   estimates: { t2i: number; edit?: number };
+  /** The photo edit's model, for the caption under an edit (the preset catalogue does not hold it). */
+  editModel?: { id: string; name: string; license: string };
 };
 
 export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale';

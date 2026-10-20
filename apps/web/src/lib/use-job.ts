@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from './api';
 import { TERMINAL_STATES, type JobSummary } from './api-types';
+import { refreshExtensions } from './use-extensions';
 
 export const POLL_MS = 1000;
 export const MAX_POLL_FAILURES = 4;
@@ -75,6 +76,8 @@ export function useJob(): {
       });
       if (!res.ok) {
         const answer = (await res.json().catch(() => null)) as { error?: string } | null;
+        // ComfyUI refused the workflow, or the server hides the extension: the button that led here goes too.
+        if (answer?.error === 'workflow-rejected' || answer?.error === 'extension-disabled') refreshExtensions();
         setRefusal(answer?.error ?? 'error');
         return;
       }

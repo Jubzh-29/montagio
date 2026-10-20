@@ -8,12 +8,15 @@ import styles from './history.module.css';
 
 const SHOWN = 5;
 
-/** Under the result: the last creations, each a way back to it, and the whole history. */
-export function RecentStrip({ items }: { items: HistoryItem[] }) {
+/**
+ * Under the result: the last creations, each a way back to it, and the whole history.
+ * Out of reach (inert) while a render runs: a Reuse would replace it.
+ */
+export function RecentStrip({ items, inert = false }: { items: HistoryItem[]; inert?: boolean }) {
   const { t } = useI18n();
   if (items.length === 0) return null;
   return (
-    <section className={styles.recent} aria-labelledby="recent-title">
+    <section className={styles.recent} aria-labelledby="recent-title" inert={inert} data-testid="recent-strip">
       <h2 id="recent-title" className={styles.recentTitle}>
         {t('historyRecent')}
       </h2>

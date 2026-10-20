@@ -1,10 +1,11 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Library } from '@montagio/presets';
-import type { HistoryItem, Reprise } from '@/lib/api-types';
+import { TERMINAL_STATES, type HistoryItem, type JobState, type Reprise } from '@/lib/api-types';
 import { getEnv } from './env';
+import { getGeneration } from './generations';
 import { jobs, type JobRecord } from './jobs';
-import type { SequenceRecord } from './sequences';
+import { advanceSequence, type SequenceRecord } from './sequences';
 import { getServices } from './services';
 import type { GenerationRecord } from './store';
 import { readUploadMeta } from './uploads';
@@ -31,6 +32,24 @@ async function readRecords<T>(kind: 'generations' | 'sequences'): Promise<T[]> {
       ),
   );
   return records.filter((record): record is Awaited<T> => record !== null) as T[];
+}
+
+/** How far a step can take a render: its state, its progress and, for a film, its shot. */
+const stage = (record: { state: string; progress?: number; currentShot?: number }) => `${record.state}:${record.progress}:${record.currentShot}`;
+
+/**
+ * Renders move on when they are polled, and nobody polls a render the Studio left behind
+ * (the visitor went to History mid-render). Reading the history advances each unfinished
+ * one as far as it goes now, a film one step at a time; one that cannot be read stays as it is.
+ */
+async function caughtUp<T extends { state: string }>(record: T, advance: () => Promise<T | null>): Promise<T> {
+  let current = record;
+  for (let step = 0; step < 8 && !TERMINAL_STATES.has(current.state as JobState); step++) {
+    const next = await advance().catch(() => null);
+    if (!next || stage(next) === stage(current)) return next ?? current;
+    current = next;
+  }
+  return current;
 }
 
 /** The photo to reopen, or the note that it is gone. */
@@ -132,9 +151,12 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
 export async function listHistory(): Promise<HistoryItem[]> {
   const lib = await getServices().library;
   const [generations, sequences, jobRecords] = await Promise.all([
-    readRecords<GenerationRecord>('generations'),
-    readRecords<SequenceRecord>('sequences'),
-    jobs.list(),
+    // A film's shots move on with their film.
+    readRecords<GenerationRecord>('generations').then((records) =>
+      Promise.all(records.map((record) => (SHOT_KEY.test(record.idempotencyKey) ? record : caughtUp(record, () => getGeneration(record.id))))),
+    ),
+    readRecords<SequenceRecord>('sequences').then((records) => Promise.all(records.map((record) => caughtUp(record, () => advanceSequence(record.id))))),
+    jobs.list().then((records) => Promise.all(records.map((record) => caughtUp(record, () => jobs.get(record.id))))),
   ]);
   const items = await Promise.all([
     ...generations

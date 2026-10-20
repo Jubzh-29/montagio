@@ -48,6 +48,16 @@ export function PhotoAtelier({
   const [aspect, setAspect] = useState<(typeof ASPECTS)[number]>('16:9');
   const [look, setLook] = useState<string>('');
   const [consent, setConsent] = useState(false);
+  // Another photo asks for consent again (state adjusted while rendering, when the photo changes).
+  const photoKey = photo.status === 'ready' ? photo.imageRef : null;
+  const [consentFor, setConsentFor] = useState(photoKey);
+  if (consentFor !== photoKey) {
+    setConsentFor(photoKey);
+    setConsent(false);
+  }
+  // An edit shows the photo it started from, even when the visitor loads another one meanwhile.
+  const [source, setSource] = useState<UploadState | null>(null);
+  const before = job && source ? source : photo;
   const askConsent = kind === 'edit' && needsConsent(photo, 'edit');
   const done = job?.state === 'succeeded' && job.outputImageRef && job.outputUrl ? job : null;
   const canStart = text.trim().length > 0 && !busy && (kind === 't2i' || (photo.status === 'ready' && (!askConsent || consent)));
@@ -57,6 +67,7 @@ export function PhotoAtelier({
     if (!canStart) return;
     if (kind === 't2i') void start('/api/images', { prompt: text.trim(), aspect });
     else if (photo.status === 'ready') {
+      setSource(photo);
       void start('/api/edits', { imageRef: photo.imageRef, instruction: text.trim(), ...(look ? { look } : {}), ...(askConsent ? { consent } : {}) });
     }
   };
@@ -142,12 +153,12 @@ export function PhotoAtelier({
         </p>
       )}
 
-      {(done || (kind === 'edit' && photo.status === 'ready')) && (
+      {(done || (kind === 'edit' && before.status === 'ready')) && (
         <div className={styles.atelierImages} data-pair={kind === 'edit'}>
-          {kind === 'edit' && photo.status === 'ready' && (
+          {kind === 'edit' && before.status === 'ready' && (
             <figure>
               {/* eslint-disable-next-line @next/next/no-img-element -- the photo being edited */}
-              <img src={photo.localUrl} alt="" />
+              <img src={before.localUrl} alt="" />
               <figcaption>{t('editBefore')}</figcaption>
             </figure>
           )}
@@ -155,7 +166,10 @@ export function PhotoAtelier({
             <figure>
               {/* eslint-disable-next-line @next/next/no-img-element -- the image just made */}
               <img src={done.outputUrl} alt="" data-testid="atelier-result" />
-              <figcaption>{kind === 'edit' ? t('editAfter') : t('aiCaption', { model: done.label.name ?? done.modelId, license: licenseOf(done.modelId) ?? '?' })}</figcaption>
+              <figcaption data-testid="ai-caption">
+                {kind === 'edit' && `${t('editAfter')} · `}
+                {t('aiCaption', { model: done.label.name ?? done.modelId, license: licenseOf(done.modelId) ?? '?' })}
+              </figcaption>
             </figure>
           )}
         </div>

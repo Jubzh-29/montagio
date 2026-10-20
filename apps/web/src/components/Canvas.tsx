@@ -42,7 +42,8 @@ export function Canvas({
         {result}
         {recent}
       </div>
-      {view === 'atelier' && atelier}
+      {/* Kept mounted out of view too: a tab change or a render does not lose the atelier's text or its image. */}
+      {atelier && <div hidden={view !== 'atelier'}>{atelier}</div>}
     </section>
   );
 }

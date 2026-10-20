@@ -38,3 +38,29 @@ test('the history speaks French', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Historique' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Historique', exact: true })).toHaveAttribute('aria-current', 'page');
 });
+
+async function renderHeld(page: import('@playwright/test').Page) {
+  await makeClip(page);
+  // The next render's polls are held, so it stays running.
+  await page.route('**/api/generations/*', (route) => (route.request().method() === 'GET' ? new Promise(() => undefined) : route.continue()));
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.getByRole('progressbar')).toBeVisible();
+}
+
+test('the recent strip is out of reach while a render runs', async ({ page }) => {
+  await renderHeld(page);
+  await expect(page.getByTestId('recent-strip')).toHaveAttribute('inert', '');
+});
+
+test('a Reuse that comes during a render waits for its end', async ({ page }) => {
+  await renderHeld(page);
+  let reprises = 0;
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/history') reprises++;
+  });
+  await page.locator('a[href*="from="]').first().dispatchEvent('click');
+  await expect(page).toHaveURL(/from=/);
+  await page.waitForTimeout(2000);
+  expect(reprises).toBe(0);
+  await expect(page.getByRole('progressbar')).toBeVisible();
+});

@@ -118,6 +118,8 @@ export function Studio() {
   const [canvas, setCanvas] = useState<CanvasState>({ view: 'gallery', before: 'gallery' });
   // The photo atelier (text to image, edit), over the canvas; and the text of a photo made from one.
   const [atelier, setAtelier] = useState<'t2i' | 'edit' | null>(null);
+  // The ateliers opened and not closed yet: each stays mounted, out of view, until its Close or its photo is used.
+  const [ateliers, setAteliers] = useState<('t2i' | 'edit')[]>([]);
   const [photoPrompt, setPhotoPrompt] = useState<string | undefined>(undefined);
   // The Effects tab: the effect chosen on the wall, what the photo shows, and the consent box.
   const [effectId, setEffectId] = useState<string | null>(null);
@@ -302,22 +304,24 @@ export function Studio() {
   const openAtelier = (kind: 't2i' | 'edit') => {
     if (busyRef.current) return;
     setAtelier(kind);
+    setAteliers((open) => (open.includes(kind) ? open : [...open, kind]));
     setCanvas((current) => nextView('open-atelier', current));
   };
 
-  const closeAtelier = () => {
+  const closeAtelier = (kind: 't2i' | 'edit') => {
     setAtelier(null);
+    setAteliers((open) => open.filter((entry) => entry !== kind));
     setCanvas((current) => nextView('close-atelier', current));
   };
 
   /** The atelier's image becomes the start photo, as any upload would. */
-  const usePhoto = (photo: AtelierPhoto) => {
+  const takePhoto = (photo: AtelierPhoto, kind: 't2i' | 'edit') => {
     touched.current = true;
     ++uploadToken.current;
     setJob({ status: 'idle' });
     setUpload({ status: 'ready', localUrl: photo.url, imageRef: photo.imageRef, personal: photo.personal });
     setPhotoPrompt(photo.prompt);
-    closeAtelier();
+    closeAtelier(kind);
   };
 
   const pickSample = (sample: SampleSummary) => {
@@ -428,7 +432,8 @@ export function Studio() {
   };
 
   useEffect(() => {
-    if (!from || catalog !== 'ready' || appliedFrom.current === from) return;
+    // A Reuse that comes during a render waits for its end: replacing the Studio now would orphan that render.
+    if (!from || catalog !== 'ready' || busy || appliedFrom.current === from) return;
     appliedFrom.current = from;
     apiFetch('/api/history')
       .then((res) => jsonOrThrow<HistoryItem[]>(res))
@@ -439,7 +444,7 @@ export function Studio() {
       .catch(() => undefined);
     // restore reads the catalogue, which is ready here; the item to bring back is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, catalog]);
+  }, [from, catalog, busy]);
 
   const checkRemix = async () => {
     if (!remix) return;
@@ -830,19 +835,23 @@ export function Studio() {
         />
         <Canvas
           view={canvas.view}
-          recent={<RecentStrip items={recent} />}
+          recent={<RecentStrip items={recent} inert={busy} />}
           atelier={
-            atelier && (
-              <PhotoAtelier
-                key={atelier}
-                kind={atelier}
-                photo={upload}
-                estimates={extensions?.estimates ?? { t2i: 12 }}
-                onUse={usePhoto}
-                onClose={closeAtelier}
-                licenseOf={(id) => catalogModels.find((model) => model.id === id)?.license}
-              />
-            )
+            ateliers.length > 0 &&
+            ateliers.map((kind) => (
+              <div key={kind} hidden={atelier !== kind}>
+                <PhotoAtelier
+                  kind={kind}
+                  photo={upload}
+                  estimates={extensions?.estimates ?? { t2i: 12 }}
+                  onUse={(photo) => takePhoto(photo, kind)}
+                  onClose={() => closeAtelier(kind)}
+                  licenseOf={(id) =>
+                    catalogModels.find((model) => model.id === id)?.license ?? (extensions?.editModel?.id === id ? extensions.editModel.license : undefined)
+                  }
+                />
+              </div>
+            ))
           }
           onView={(value) => setCanvas({ view: value, before: value })}
           gallery={
