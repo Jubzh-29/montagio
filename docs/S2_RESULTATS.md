@@ -51,7 +51,14 @@ Diagnostic : **4 clips, une seule variable changée par clip**, même photo, mê
 | **Description de la scène** avant le texte du preset (vitesse 1,5 gardée) | **propre**, avec l'énergie du crash push |
 | Les trois ensemble | propre, presque identique |
 
-**Cause : sans description de ce que montre la photo, le modèle invente au lieu de la suivre.** La vitesse aggrave le défaut ; le négatif ne joue presque pas. Le Studio a déjà un champ de description (`userPrompt`), mais il est facultatif. **À décider : le rendre indispensable**, ou le pré-remplir avec le texte d'une photo issue du texte → image ou d'une photo d'exemple. Sans lui, un utilisateur obtient le clip du premier rendu.
+**Cause : sans description de ce que montre la photo, le modèle invente au lieu de la suivre.** La vitesse aggrave le défaut ; le négatif ne joue presque pas. Le Studio avait déjà un champ de description (`userPrompt`), mais il était facultatif : un utilisateur aurait obtenu le clip du premier rendu.
+
+**Décision de l'utilisateur (21/10) : la description devient indispensable.** Dans les onglets Caméra et Film, et dans l'éditeur de remix, le champ s'appelle « Ce que montre la photo ». Il est pré-rempli :
+- par le texte d'une photo issue du texte → image ;
+- par la description de la photo d'exemple ;
+- dans la vitrine, par le `prompt` de chaque photo du manifeste.
+
+Une photo envoyée arrive sans description : Générer reste grisé tant que le champ est vide, avec un message sous le bouton. La vitrine compile ses clips avec le texte de leur photo, et la S3 les rend avec `smoke --prompt` ([VITRINE.md](VITRINE.md), partie 6).
 
 ## 4. Les presets (12, puis 11)
 
@@ -111,7 +118,7 @@ Les 7 sont **validées** : `gpu_validated: 2026-10-21` dans `registry/extensions
 ## 8. Constats techniques à reprendre
 
 1. **Deux sorties par job** pour l'upscale, la voix et le transfert de mouvement. Le proxy rapporte aussi l'aperçu que renvoie un node de chargement ou le node de la voix. Leur ordre change d'un job à l'autre. L'app choisit la bonne grâce à `outputNode`, mais `smoke.ts` les télécharge toutes, et `smoke.jsonl` ne dit pas laquelle est le résultat.
-2. **Le champ de description du Studio** (partie 3) : à rendre indispensable ou à pré-remplir.
+2. **Le champ de description du Studio** (partie 3) : fait le 21/10, il est indispensable et pré-rempli quand le texte de la photo est connu.
 3. **Iris Dive** : pour le sauver, une image clé intermédiaire (visage, puis gros plan sur l'œil, puis iris), en S3 ou plus tard.
 4. `check-open-stack` sans `--out` ignore le dossier qu'on lui donne et scanne `.` (petit bogue de `tools/check-open-stack/src/cli.ts`).
 
