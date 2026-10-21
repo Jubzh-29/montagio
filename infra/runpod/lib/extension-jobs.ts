@@ -78,6 +78,8 @@ export type ExtensionJobOptions = {
   motionAspect?: Aspect;
   /** The speech of avatar, and its length in seconds (the caller reads it). */
   audio?: string;
+  /** The voice job's sample (mono FLAC, as the app prepares it): the cloned voice. */
+  voice?: string;
   audio_s?: number;
   /** The text of each job that reads one, read by that job only; a job given none keeps its default. */
   text?: Partial<Record<TextJobName, string>>;
@@ -197,8 +199,9 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
         return [{ name, tag: `${name}:${hook.id}`, model, ...job, files: [file('image', photo), file('end_image', end)] }];
       }
       case 'voice': {
-        const job = compileSpeech(model, template, { text: text('voice'), language: opts.language, seed: opts.seed });
-        return [{ name, tag: name, model, ...job, files: [] }];
+        const sample = opts.voice;
+        const job = compileSpeech(model, template, { text: text('voice'), language: opts.language, seed: opts.seed, ...(sample ? { voiceRef: basename(sample) } : {}) });
+        return [{ name, tag: sample ? `${name}:cloned` : name, model, ...job, files: sample ? [file('audio', sample)] : [] }];
       }
       case 'avatar': {
         const photo = need(opts.input, '--input', name);

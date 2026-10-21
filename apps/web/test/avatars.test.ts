@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { probeAudio, readTags } from '@montagio/sequence';
@@ -7,6 +7,7 @@ import { POST as postAvatars } from '@/app/api/avatars/route';
 import { GET as getExtensions } from '@/app/api/extensions/route';
 import { GET as getJob } from '@/app/api/jobs/[id]/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
+import { POST as postVoice } from '@/app/api/uploads/voice/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import type { ExtensionsInfo, JobSummary } from '@/lib/api-types';
 import { mediaFileFor } from '@/server/generations';
@@ -137,4 +138,41 @@ test('an avatar comes back on the avatar tab with its text and language', async 
   await poll(id);
   const item = (await listHistory()).find((entry) => entry.key === `job:${id}`);
   expect(item).toMatchObject({ kind: 'clip', task: 'avatar', reprise: { tab: 'avatar', imageRef, prompt: SPEECH, language: 'fr' } });
+}, 30_000);
+
+/** A voice sample of `seconds`, as a browser sends one (multipart field "audio"). */
+function voiceRequest(seconds: number, type = 'audio/wav'): Request {
+  const dir = mkdtempSync(join(tmpdir(), 'montagio-voice-'));
+  const file = join(dir, 'sample.wav');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `sine=frequency=180:duration=${seconds}`, file]);
+  const form = new FormData();
+  form.append('audio', new File([readFileSync(file)], 'sample.wav', { type }));
+  rmSync(dir, { recursive: true, force: true });
+  return new Request('http://localhost/api/uploads/voice', { method: 'POST', body: form });
+}
+
+test('a voice sample is kept as 20 s of mono FLAC at most; a short or unreadable one is refused', async () => {
+  const long = await postVoice(voiceRequest(25));
+  expect(long.status).toBe(201);
+  const sample = (await long.json()) as { voiceRef: string; duration_s: number };
+  expect(sample.voiceRef).toMatch(/^voices\/[0-9a-f-]{36}\.flac$/);
+  expect(sample.duration_s).toBeCloseTo(20, 0);
+  const probed = await probeAudio(join(process.env.MONTAGIO_DATA!, 'uploads', ...sample.voiceRef.split('/')));
+  expect(probed).toMatchObject({ codec: 'flac', channels: 1, sampleRate: 24000 });
+  expect((await postVoice(voiceRequest(1))).status).toBe(400);
+  expect((await postVoice(voiceRequest(4, 'video/mp4'))).status).toBe(415);
+}, 30_000);
+
+test('an avatar speaks with a voice sample only with its speaker\'s consent', async () => {
+  const { voiceRef } = (await (await postVoice(voiceRequest(6))).json()) as { voiceRef: string };
+  const photo = await sampleRef();
+  expect(await (await post({ imageRef: photo, text: SPEECH, language: 'en', voiceRef }, 'av-voice-1')).json()).toEqual({ error: 'consent-required' });
+  expect(await (await post({ imageRef: photo, text: SPEECH, language: 'en', voiceRef: 'voices/nope.flac', voiceConsent: true }, 'av-voice-2')).json()).toEqual({ error: 'invalid-input' });
+  const res = await post({ imageRef: photo, text: SPEECH, language: 'en', voiceRef, voiceConsent: true }, 'av-voice-3');
+  expect(res.status).toBe(201);
+  const { id } = (await res.json()) as JobSummary;
+  await poll(id);
+  const voice = JSON.parse(readFileSync(mediaFileFor(`/media/data/jobs/${id}/step0.workflow.json`)!, 'utf8')) as Record<string, { inputs: Record<string, unknown> }>;
+  expect(voice['2']!.inputs.audio_prompt).toEqual(['4', 0]);
+  expect(voice['4']!.inputs.audio).toBe(voiceRef);
 }, 30_000);

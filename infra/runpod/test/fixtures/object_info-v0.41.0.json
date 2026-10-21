@@ -1310,7 +1310,8 @@
      {
       "multiselect": false,
       "options": [
-       "speech.flac"
+       "speech.flac",
+       "voice.flac"
       ],
       "audio_upload": true
      }

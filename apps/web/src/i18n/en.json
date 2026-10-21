@@ -346,5 +346,15 @@
   "maskClear": "Clear",
   "maskUploadFailed": "The painted area could not be sent: try again.",
   "photoHd": "HD 2560 px (~{s} s)",
-  "photoHdDownload": "Download the HD photo"
+  "photoHdDownload": "Download the HD photo",
+  "voiceLabel": "Voice",
+  "voiceBuiltIn": "Built-in voice",
+  "voiceMine": "A voice sample",
+  "voiceUpload": "Add a voice sample",
+  "voiceReplace": "Another sample",
+  "voiceHint": "5 to 20 s of clear speech, one speaker, no music: the avatar speaks in that voice.",
+  "voiceUploading": "Preparing the sample…",
+  "voiceFailed": "This file could not be read as a voice sample (3 s at least).",
+  "voiceReady": "Sample ready: {s} s kept.",
+  "voiceConsent": "This is my voice, or the speaker agreed to this use"
 }

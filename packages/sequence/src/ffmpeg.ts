@@ -321,6 +321,25 @@ export async function prepareMotionClip(
 }
 
 /**
+ * A voice sample for the avatar's cloned voice: its first `max_s` seconds (20 by default),
+ * mono at 24 kHz, in FLAC, without any video stream. A file without an audio stream fails
+ * before any encoding. Returns the length kept.
+ */
+export async function prepareVoiceSample(input: string, out: string, opts: { max_s?: number } = {}): Promise<{ duration_s: number }> {
+  const { max_s = 20 } = opts;
+  if (!(await probeAudio(input))) throw new SequenceToolError(`no audio stream in ${input}`);
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    '-i', input,
+    '-map', '0:a:0', '-vn',
+    '-t', String(max_s),
+    '-ac', '1', '-ar', '24000',
+    '-c:a', 'flac', '-f', 'flac', partial,
+  ]);
+  return { duration_s: (await probeAudio(out))?.duration_s ?? 0 };
+}
+
+/**
  * A light copy of a clip for a looping gallery tile: `width` pixels wide and a
  * high CRF, so a dozen tiles cost the visitor a megabyte or two, not twenty.
  */

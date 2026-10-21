@@ -1,5 +1,6 @@
 # Speech for the talking avatar (extension "avatar"): what the avatar says, in English or
-# French, in the model's built-in voice. ComfyUI v0.41.0 has no local text-to-speech node:
+# French, in the model's built-in voice, or in the voice of a sample (node 4, given with the
+# speaker's consent; compileSpeech removes it otherwise). ComfyUI v0.41.0 has no local text-to-speech node:
 # this one comes from wildminder/ComfyUI-Chatterbox, pinned and patched (its HTTP routes
 # removed) by infra/runpod/bootstrap.sh, with ComfyUI kept offline. The weights sit in a
 # pack folder the node reads by name (tts/chatterbox/resembleai-mtl-v3).
@@ -16,6 +17,8 @@ bindings:
   language: { node: "2", field: language }
   seed: { node: "2", field: seed }
   cfg: { node: "2", field: cfg_weight }
+  # the voice sample to speak with: mono FLAC, 20 s at most
+  audio: { node: "4", field: audio }
 output: { node: "3", kind: audio }
 # about 15 s of speech, the longest the avatar animates
 limits: { max_chars: 300 }

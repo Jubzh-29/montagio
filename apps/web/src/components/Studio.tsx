@@ -39,7 +39,7 @@ import { Canvas } from './Canvas';
 import { ChoiceCard } from './ChoiceCard';
 import { Composer } from './Composer';
 import { ConsentCheck } from './ConsentCheck';
-import { AvatarFields } from './AvatarFields';
+import { AvatarFields, BUILT_IN_VOICE, type VoiceChoice } from './AvatarFields';
 import { HdPanel } from './HdPanel';
 import { MotionFields, type MotionVideo } from './MotionFields';
 import { MusicPanel } from './MusicPanel';
@@ -154,6 +154,7 @@ export function Studio() {
   const [outfit, setOutfit] = useState<UploadState>({ status: 'idle' });
   // The Avatar tab: what the photo says, and in which language.
   const [speechText, setSpeechText] = useState('');
+  const [voice, setVoice] = useState<VoiceChoice>(BUILT_IN_VOICE);
   // The spoken language follows the interface's until the visitor picks one.
   const [pickedLanguage, setSpeechLanguage] = useState<'en' | 'fr' | null>(null);
   const speechLanguage = pickedLanguage ?? lang;
@@ -465,7 +466,7 @@ export function Studio() {
   const canGenerate = tab === 'motion'
     ? upload.status === 'ready' && motionVideo.status === 'ready' && rights && !busy
     : tab === 'avatar'
-    ? upload.status === 'ready' && !busy && speechText.trim().length > 0 && (!askConsent || consent)
+    ? upload.status === 'ready' && !busy && speechText.trim().length > 0 && (!askConsent || consent) && (!voice.mine || (voice.voiceRef !== null && voice.consent))
     : tab === 'effects'
     ? upload.status === 'ready' && !busy && wallChoice !== undefined && (!askConsent || consent) && (!needsOutfit || outfit.status === 'ready')
     : remix
@@ -692,7 +693,13 @@ export function Studio() {
       return;
     }
     if (tab === 'avatar') {
-      const body = { imageRef: upload.imageRef, text: speechText.trim(), language: speechLanguage, ...(askConsent ? { consent } : {}) };
+      const body = {
+        imageRef: upload.imageRef,
+        text: speechText.trim(),
+        language: speechLanguage,
+        ...(askConsent ? { consent } : {}),
+        ...(voice.mine && voice.voiceRef ? { voiceRef: voice.voiceRef, voiceConsent: voice.consent } : {}),
+      };
       void submit('job', body, undefined, '/api/avatars');
       return;
     }
@@ -958,7 +965,7 @@ export function Studio() {
                 onAction={setMotionAction}
               />
             ) : tab === 'avatar' ? (
-              <AvatarFields text={speechText} language={speechLanguage} max={300} onText={setSpeechText} onLanguage={setSpeechLanguage} />
+              <AvatarFields text={speechText} language={speechLanguage} max={300} onText={setSpeechText} onLanguage={setSpeechLanguage} voice={voice} onVoice={setVoice} />
             ) : tab === 'effects' ? (
               selectedEffect ? (
                 <EffectFields subject={subject} max={selectedEffect.subjectMax} onSubject={setSubject} disabled={IS_SHOWCASE} />

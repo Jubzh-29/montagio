@@ -346,5 +346,15 @@
   "maskClear": "Effacer",
   "maskUploadFailed": "La zone peinte n'a pas pu être envoyée : réessayez.",
   "photoHd": "HD 2560 px (~{s} s)",
-  "photoHdDownload": "Télécharger la photo HD"
+  "photoHdDownload": "Télécharger la photo HD",
+  "voiceLabel": "Voix",
+  "voiceBuiltIn": "Voix intégrée",
+  "voiceMine": "Un échantillon de voix",
+  "voiceUpload": "Ajouter un échantillon de voix",
+  "voiceReplace": "Un autre échantillon",
+  "voiceHint": "5 à 20 s de parole nette, une seule personne, sans musique : l'avatar parle avec cette voix.",
+  "voiceUploading": "Préparation de l'échantillon…",
+  "voiceFailed": "Ce fichier n'a pas pu être lu comme échantillon de voix (3 s au moins).",
+  "voiceReady": "Échantillon prêt : {s} s gardées.",
+  "voiceConsent": "C'est ma voix, ou la personne qui parle a donné son accord"
 }

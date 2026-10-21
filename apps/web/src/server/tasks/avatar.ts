@@ -6,14 +6,15 @@ import { JobError } from '../errors';
 import { avatarModels, requireExtension } from '../extensions';
 import { assertConsent, assertNoBlockedName } from '../guards';
 import type { TaskDef } from '../jobs';
-import { readUploadMeta } from '../uploads';
-import { extensionFile, uploadPath } from './files';
+import { readUploadMeta, readVoiceMeta } from '../uploads';
+import { extensionFile, uploadPath, voicePath } from './files';
 
 const TEXT_MAX = 300;
 const LANGUAGES = ['en', 'fr'] as const;
 
 /**
- * A photo that speaks: the built-in voice says the text (Chatterbox, no cloning), then
+ * A photo that speaks: the built-in voice, or a voice sample given with its speaker's consent, says
+ * the text (Chatterbox), then
  * Wan 2.2 S2V animates the photo for the length of that voice. The length is known only
  * once the voice exists: past the model's 15 s, the job ends in speech-too-long.
  */
@@ -29,9 +30,17 @@ export const avatarTask: TaskDef = {
     const language = LANGUAGES.find((entry) => entry === body.language);
     if (!language) throw new JobError('invalid-input');
     assertConsent(photo, body.consent);
+    // A voice sample speaks in someone's voice: it needs that person's consent, as a photo of them does.
+    let voiceRef: string | undefined;
+    if (body.voiceRef !== undefined && body.voiceRef !== null) {
+      const sample = typeof body.voiceRef === 'string' ? await readVoiceMeta(body.voiceRef) : null;
+      if (!sample) throw new JobError('invalid-input');
+      if (body.voiceConsent !== true) throw new JobError('consent-required');
+      voiceRef = sample.voiceRef;
+    }
     await assertNoBlockedName(text);
     return {
-      inputs: { imageRef, text, language, personal: photo.personal },
+      inputs: { imageRef, text, language, personal: photo.personal, ...(voiceRef ? { voiceRef } : {}) },
       label: { name: 'Avatar' },
       modelId: avatar.id,
       seed: randomInt(0, 2 ** 32),
@@ -50,8 +59,9 @@ export const avatarTask: TaskDef = {
           const template = lib.extensionTemplates.get(voice.workflow);
           if (!template) throw new Error(`the workflow ${voice.workflow} of ${voice.id} is missing`);
           const language = record.inputs.language === 'fr' ? 'fr' : 'en';
-          const { workflow, output } = compileSpeech(voice, template, { text: String(record.inputs.text), language, seed: record.seed });
-          return { workflow, output, files: [] };
+          const voiceRef = typeof record.inputs.voiceRef === 'string' ? record.inputs.voiceRef : undefined;
+          const { workflow, output } = compileSpeech(voice, template, { text: String(record.inputs.text), language, seed: record.seed, ...(voiceRef ? { voiceRef } : {}) });
+          return { workflow, output, files: voiceRef ? [extensionFile(voice, 'audio', voicePath(voiceRef))] : [] };
         },
       },
       {

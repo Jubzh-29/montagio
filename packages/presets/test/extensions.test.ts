@@ -268,6 +268,18 @@ describe('compileSpeech (Chatterbox Multilingual V3)', () => {
     expect(() => compile({ language: 'de' as 'en' })).toThrow(/language "de".*en or fr/);
   });
 
+  test('without a sample, the voice loader is gone: the built-in voice speaks', () => {
+    const { workflow } = compile();
+    expect(workflow['4']).toBeUndefined();
+    expect(workflow['2']!.inputs.audio_prompt).toBeUndefined();
+  });
+
+  test('a voice sample is loaded and given to the node as its reference', () => {
+    const { workflow } = compile({ voiceRef: 'voices/sample.flac' });
+    expect(workflow['4']!.inputs.audio).toBe('voices/sample.flac');
+    expect(workflow['2']!.inputs.audio_prompt).toEqual(['4', 0]);
+  });
+
   test('square brackets are removed from the text', () => {
     expect(compile({ text: 'Hello [laugh] there [pause]' }).params.text).toBe('Hello laugh there pause');
   });

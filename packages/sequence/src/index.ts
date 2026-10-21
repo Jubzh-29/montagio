@@ -11,6 +11,7 @@ export {
   normalizeClip,
   placeholderClip,
   prepareMotionClip,
+  prepareVoiceSample,
   previewClip,
   probe,
   probeAudio,

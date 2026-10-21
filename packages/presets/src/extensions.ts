@@ -260,11 +260,17 @@ export type SpeechInputs = {
   text: string;
   language: 'en' | 'fr';
   seed: number;
+  /** A voice sample to speak with, given with the speaker's consent; the built-in voice otherwise. */
+  voiceRef?: string;
 };
 
+/** The node of workflows/chatterbox-mtl-voice.api.json that loads a voice sample. */
+const SPEECH_VOICE_NODE = '4';
+
 /**
- * Speech for the talking avatar (Chatterbox Multilingual V3), in its built-in voice: no
- * reference clip, so no cloned voice to consent to, and none left in the node's cache.
+ * Speech for the talking avatar (Chatterbox Multilingual V3), in its built-in voice, or in the
+ * voice of a sample the caller gives with the speaker's consent (the app asks for it). Without
+ * a sample the loader is removed: no reference clip, nothing left in the node's cache.
  * The built-in voice is English: for French, the model card's advice is cfg_weight 0,
  * so its accent does not carry over. Square brackets go (the node reads them as tags);
  * seed 0 means "random" to the node, so it is written as 1.
@@ -275,11 +281,13 @@ export function compileSpeech(
   inputs: SpeechInputs,
 ): ExtensionCompiled<{ text: string; language: 'en' | 'fr'; seed: number; cfg: number }> {
   expectTask(model, 'tts');
+  requireNodes(model, template, [SPEECH_VOICE_NODE]);
   if (inputs.language !== 'en' && inputs.language !== 'fr') throw new CompileError(`language "${inputs.language}" is not spoken here: en or fr`);
   const text = userText(inputs.text.replace(/[[\]]/g, ''), 'text to speak', model);
   const cfg = inputs.language === 'fr' ? 0 : 0.5;
   const seed = Math.max(1, inputs.seed);
-  const workflow = bindExtension(model, template, { text, language: inputs.language, seed, cfg });
+  const workflow = bindExtension(model, template, { text, language: inputs.language, seed, cfg, audio: inputs.voiceRef });
+  if (!inputs.voiceRef) dropNode(workflow, SPEECH_VOICE_NODE);
   return { workflow, output: { ...model.output }, params: { text, language: inputs.language, seed, cfg } };
 }
 

@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { pickAspect, type Aspect } from '@montagio/presets';
-import { prepareMotionClip, probe } from '@montagio/sequence';
+import { prepareMotionClip, prepareVoiceSample, probe } from '@montagio/sequence';
 import { imageSize } from 'image-size';
-import { MAX_VIDEO_BYTES } from '@/lib/limits';
+import { MAX_VIDEO_BYTES, MAX_VOICE_BYTES } from '@/lib/limits';
 import { getEnv } from './env';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -163,6 +163,73 @@ export async function readVideoMeta(videoRef: string): Promise<VideoMeta | null>
   try {
     await access(join(videosDir(), `${match[1]}.mp4`));
     return JSON.parse(await readFile(join(videosDir(), `${match[1]}.json`), 'utf8')) as VideoMeta;
+  } catch {
+    return null;
+  }
+}
+
+export { MAX_VOICE_BYTES };
+export const MAX_VOICE_FORM_BYTES = MAX_VOICE_BYTES + 64 * 1024;
+/** A voice sample shorter than this gives Chatterbox too little of the voice to copy. */
+export const MIN_VOICE_S = 3;
+const VOICE_TYPES: Record<string, string> = {
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/wave': 'wav',
+  'audio/mpeg': 'mp3',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/flac': 'flac',
+  'audio/x-flac': 'flac',
+  'audio/ogg': 'ogg',
+  'audio/webm': 'webm',
+};
+
+export type VoiceMeta = { voiceRef: string; duration_s: number };
+
+const voicesDir = () => join(getEnv().data, 'uploads', 'voices');
+
+/**
+ * A voice sample for the avatar: its first 20 s, mono FLAC at 24 kHz, in the folder of the
+ * uploads. A file that is not readable audio, or shorter than 3 s, is refused and leaves nothing.
+ */
+export async function saveVoiceUpload(file: File): Promise<VoiceMeta> {
+  const ext = VOICE_TYPES[file.type];
+  if (!ext) throw new UploadError(415, 'only WAV, MP3, M4A, FLAC, OGG and WebM audio is accepted');
+  if (file.size > MAX_VOICE_BYTES) throw new UploadError(413, 'voice samples are limited to 10 MB');
+  const id = randomUUID();
+  const dir = voicesDir();
+  await mkdir(dir, { recursive: true });
+  const source = join(dir, `${id}.source.${ext}`);
+  const out = join(dir, `${id}.flac`);
+  const metaFile = join(dir, `${id}.json`);
+  try {
+    await writeFile(source, new Uint8Array(await file.arrayBuffer()));
+    let duration_s: number;
+    try {
+      ({ duration_s } = await prepareVoiceSample(source, out));
+    } catch {
+      throw new UploadError(400, 'the file is not readable audio');
+    }
+    if (!(duration_s >= MIN_VOICE_S)) throw new UploadError(400, `a voice sample lasts ${MIN_VOICE_S} s at least`);
+    const meta: VoiceMeta = { voiceRef: `voices/${id}.flac`, duration_s };
+    await writeFile(metaFile, JSON.stringify(meta));
+    return meta;
+  } catch (error) {
+    await Promise.all([rm(out, { force: true }), rm(metaFile, { force: true })]);
+    throw error;
+  } finally {
+    await rm(source, { force: true });
+  }
+}
+
+/** A prepared voice sample, or null when its ref is not one or its file or meta is gone. */
+export async function readVoiceMeta(voiceRef: string): Promise<VoiceMeta | null> {
+  const match = /^voices\/([0-9a-f-]{36})\.flac$/.exec(voiceRef);
+  if (!match) return null;
+  try {
+    await access(join(voicesDir(), `${match[1]}.flac`));
+    return JSON.parse(await readFile(join(voicesDir(), `${match[1]}.json`), 'utf8')) as VoiceMeta;
   } catch {
     return null;
   }

@@ -81,6 +81,7 @@ const { values: args } = parseArgs({
     clip: { type: 'string' },
     motion: { type: 'string' },
     audio: { type: 'string' },
+    voice: { type: 'string' },
     text: { type: 'string', multiple: true, default: [] },
     language: { type: 'string', default: 'en' },
     duration: { type: 'string', default: '10' },
@@ -123,6 +124,7 @@ Extensions (instead of presets):
   --clip PATH        the clip to upscale (required by upscale)
   --motion PATH      the reference video of the motion transfer (required by motion): its first 5 s are kept, at 16 fps, silent
   --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
+  --voice PATH       voice: speak with this sample (a consented recording, mono FLAC) instead of the built-in voice
   --text [JOB=]TEXT  the edit instruction, the effects' subject, the words to say or the music description (each has
                      a default), for the one job of the run that reads a text; when several do, name it:
                      --text edit=… --text effect=… --text voice=… --text music=… (repeatable)
@@ -541,6 +543,7 @@ async function runExtensions(
     input,
     input2,
     mask,
+    ...(args.voice ? { voice: fromCaller(args.voice) } : {}),
     end: end ?? (args['dry-run'] ? 'end.png' : undefined),
     effects: args.effect === 'all' ? undefined : args.effect.split(',').map((id) => id.trim()),
     hook: args.hook,

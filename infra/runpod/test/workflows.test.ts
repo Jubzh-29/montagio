@@ -13,7 +13,8 @@
  * nodes_latent and nodes_post_processing do not load. LoadVideo lists clip.mp4 and LoadAudio
  * speech.flac, the placeholders of those workflows.
  * ImageToMask and ImageCompositeMasked (the edit's inpaint) come from the same ComfyUI on
- * 2026-10-22; LoadImage lists mask.png, the placeholder of the inpaint mask.
+ * 2026-10-22; LoadImage lists mask.png, the placeholder of the inpaint mask, and LoadAudio
+ * voice.flac, the placeholder of the avatar's voice sample.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -193,6 +194,8 @@ test('the voice job is accepted', () => {
   for (const language of ['en', 'fr'] as const) {
     const { workflow } = compileSpeech(model, library.extensionTemplates.get(model.workflow)!, { text: 'Hello there.', language, seed: 3 });
     expect({ language, problems: checkWorkflow(workflow, info) }).toEqual({ language, problems: [] });
+    const cloned = compileSpeech(model, library.extensionTemplates.get(model.workflow)!, { text: 'Hello there.', language, seed: 3, voiceRef: 'voice.flac' });
+    expect({ language, problems: checkWorkflow(cloned.workflow, info) }).toEqual({ language, problems: [] });
   }
 });
 
