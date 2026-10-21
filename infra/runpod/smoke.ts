@@ -39,6 +39,7 @@ import { prepareMotionClip, probe, probeAudio } from '@montagio/sequence';
 import { imageSize } from 'image-size';
 import { EXTENSION_JOBS, extensionJobs, jobTexts, photoFile, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
 import { imageFingerprint, imagePrompts } from './lib/image';
+import { negativeOverride } from './lib/prompts';
 import { assertLocalBaseUrl, cameraMove, checkWorkflow, comboOptions, guardFetch, VramSampler, type ObjectInfo, type VramStats } from './lib/comfy';
 
 const DEFAULT_PROXY_URL = 'http://127.0.0.1:8189';
@@ -63,6 +64,8 @@ const { values: args } = parseArgs({
     out: { type: 'string' },
     'camera-pose': { type: 'string' },
     'camera-speed': { type: 'string' },
+    prompt: { type: 'string' },
+    negative: { type: 'string' },
     vram: { type: 'string', default: 'auto' },
     'timeout-min': { type: 'string', default: '30' },
     'dry-run': { type: 'boolean', default: false },
@@ -99,6 +102,8 @@ if (args.help) {
   --runs N           runs per preset; the first one includes model loading (default 1)
   --camera-pose P    override the pose: a value, a comma list, or "all" (every value ComfyUI accepts)
   --camera-speed S   override the speed: a number or a comma list, e.g. 0.5,1,2
+  --prompt TEXT      what the photo shows, written before the preset's text (the Studio's description field)
+  --negative TEXT    replace the preset's negative; "wan" = the official Wan templates' default negative
   --out DIR          results folder (default s1-results)
   --vram MODE        auto (nvidia-smi, else /system_stats), comfyui (/system_stats only: use it through an SSH tunnel), none
   --timeout-min N    give up on a job after N minutes (default 30)
@@ -136,6 +141,9 @@ type SmokeRecord = {
   status: string;
   error: unknown;
   camera: { mode: string; pose: string | null; pose_2: string | null; combine: string | null; speed: number | null };
+  /** The texts the model got: the preset's, after --prompt and --negative. */
+  prompt: string;
+  negative: string;
   width: number;
   height: number;
   frames: number;
@@ -180,6 +188,10 @@ async function main(): Promise<number> {
   if (resolution && resolution !== '480p' && resolution !== '720p') throw new Error(`--resolution must be 480p or 720p`);
 
   const library = await loadLibrary(repoRoot);
+  const negative = negativeOverride(args.negative);
+  if ((args.prompt !== undefined || negative !== undefined) && (args.extension || args.t2i.length > 0)) {
+    throw new Error('--prompt and --negative apply to the camera presets, not to --extension or --t2i (use --text)');
+  }
   if (args.extension) return runExtensions(library, target, comfyuiUrl, outDir, timeoutMs);
   if (args.t2i.length > 0) return runImages(library, target, comfyuiUrl, outDir, timeoutMs, resolution);
   const presetIds = args.preset === 'all' ? [...library.presets.keys()] : args.preset.split(',').map((id) => id.trim());
@@ -199,6 +211,7 @@ async function main(): Promise<number> {
     const template = library.templates.get(model.workflow)!;
     const imageBinding = model.bindings.image;
     if (!imageBinding) throw new Error(`model ${model.id} has no image binding`);
+    if (negative !== undefined && !model.bindings.negative) throw new Error(`--negative: model ${model.id} has no negative prompt`);
     return { preset, model, template, imageBinding };
   });
 
@@ -250,10 +263,15 @@ async function main(): Promise<number> {
       const seed = firstSeed + run - 1;
       const { workflow, params } = compileJob(preset, model, template, {
         imageRef: basename(imagePath),
+        ...(args.prompt ? { userPrompt: args.prompt } : {}),
         seed,
         aspect,
         resolution,
       });
+      if (negative !== undefined) {
+        workflow[model.bindings.negative!.node]!.inputs[model.bindings.negative!.field] = negative;
+        params.negative = negative;
+      }
       if (variant.pose !== null) {
         workflow[model.bindings.camera_pose!.node]!.inputs[model.bindings.camera_pose!.field] = variant.pose;
         params.cameraPose = variant.pose;
@@ -273,6 +291,8 @@ async function main(): Promise<number> {
         status: 'compiled',
         error: null,
         camera: { mode: params.cameraMode, pose: params.cameraPose, pose_2: params.cameraPose2, combine: params.cameraCombine, speed: params.cameraSpeed },
+        prompt: params.prompt,
+        negative: params.negative,
         width: params.width,
         height: params.height,
         frames: params.frames,
