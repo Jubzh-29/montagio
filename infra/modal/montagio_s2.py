@@ -15,6 +15,8 @@ From the repository root, with the modal CLI of the project's venv:
   modal run --detach infra/modal/montagio_s2.py::smoke --args "--image /workspace/start.png --runs 2"
   modal run --detach infra/modal/montagio_s2.py::batch --common "--image /workspace/start.png" \
       --jobs "--preset crash-push,slow-push;--preset tilt-up,tilt-down"     one container per job, in parallel
+  modal run --detach infra/modal/montagio_s2.py::series --jobs "--extension edit;--extension edit --look infl8" \
+      --label edit                                                          one container, the jobs in a row
   modal run infra/modal/montagio_s2.py::cmd --cmd "…"                          any command, services started
 
 Every function stops on its own when its work is done. There is no long-lived GPU terminal: `modal shell`
@@ -184,6 +186,27 @@ def smoke(args: str, label: str = "smoke") -> int:
     _keep_logs(out)
     print(f"results: modal volume get montagio-results {out.removeprefix('/results/')} .", flush=True)
     return code
+
+
+@app.function(**GPU_OPTIONS, timeout=SMOKE_TIMEOUT_S, max_containers=MAX_PARALLEL)
+def series(jobs: str, label: str = "series") -> int:
+    """Several smoke runs one after the other in one container, into one folder: the models stay loaded.
+
+    For jobs on the same model (the checklist groups them so): --jobs "--extension edit --text …; --extension edit --look infl8 …".
+    Returns the number of runs that failed.
+    """
+    items = s2lib.split_jobs(jobs)
+    out = s2lib.run_dir(label)
+    commands = [s2lib.smoke_command(item, out) for item in items]  # a bad argument fails before the GPU starts
+    _start_services()
+    failed = 0
+    for index, command in enumerate(commands, 1):
+        print(f"\n[{index}/{len(commands)}] $ {command}", flush=True)
+        if _sh(command) != 0:
+            failed += 1
+    _keep_logs(out)
+    print(f"results: modal volume get montagio-results {out.removeprefix('/results/')} .", flush=True)
+    return failed
 
 
 @app.function(**GPU_OPTIONS, timeout=CMD_TIMEOUT_S)
