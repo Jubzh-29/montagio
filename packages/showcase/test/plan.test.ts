@@ -25,7 +25,7 @@ test('plans every preset for every sample, rendered or not', () => {
   expect(manifest.samples).toHaveLength(2);
   const planned = planClips(manifest, library);
   expect(planned).toHaveLength(library.presets.size * 2);
-  expect(library.presets.size).toBe(12);
+  expect(library.presets.size).toBe(11);
   const rendered = planned.filter((clip) => clip.rendered !== null);
   expect(rendered).toHaveLength(1);
   expect(rendered[0]).toMatchObject({

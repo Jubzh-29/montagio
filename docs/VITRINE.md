@@ -143,7 +143,7 @@ Le préfixe sert pour toutes les URL de la vitrine (`apps/web/src/showcase/urls.
 
 ## 6. Procédure S3 (24–25/10) : remplacer les clips provisoires
 
-Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur la photo pour imiter le mouvement du preset. La page le dit, et le fichier porte l'étiquette `Montagio showcase placeholder`, jamais `AI-generated`. La S3 remplace les photos, puis les 36 clips (12 presets × 3 photos, modèle Wan 2.2 Fun Camera).
+Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur la photo pour imiter le mouvement du preset. La page le dit, et le fichier porte l'étiquette `Montagio showcase placeholder`, jamais `AI-generated`. La S3 remplace les photos, puis les 33 clips (11 presets × 3 photos, modèle Wan 2.2 Fun Camera).
 
 1. **Les photos** :
    - Générer trois images avec Z-Image-Turbo (Apache-2.0) : deux en 16:9 et une en 9:16. Pas de visage réel, contenu SFW.
@@ -151,13 +151,16 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
    - Dans `demo-assets/showcase/manifest.yaml`, compléter pour chaque photo :
      - `title` en anglais et en français ;
      - `credit` : modèle, seed, prompt ;
+     - `prompt` : le texte exact donné à Z-Image-Turbo. Il sert aussi de description de la photo pour chaque preset (étape 2), et la vitrine l'affiche dans le champ « Ce que montre la photo » ;
      - `status: final`.
    - Une taille d'environ 1664×960 (ou 960×1664) suffit.
 2. **Les clips**, sur le pod, une photo à la fois et un dossier `--out` par appel :
 
    ```bash
-   npm run smoke -w @montagio/infra-runpod -- --preset all --image demo-assets/showcase/samples/landscape-a.jpg --out s3-results/landscape-a
+   npm run smoke -w @montagio/infra-runpod -- --preset all --image demo-assets/showcase/samples/landscape-a.jpg --prompt "<le prompt de landscape-a, mot pour mot>" --out s3-results/landscape-a
    ```
+
+   **`--prompt` est indispensable** : sans la description de la photo avant le texte du preset, Fun Camera invente ce qu'il ne voit pas et le clip devient fantôme ([S2_RESULTATS.md](S2_RESULTATS.md), partie 3). Copier le `prompt` du manifeste mot pour mot : `ingest` écarte un rendu fait avec un autre texte, car son workflow ne serait pas celui de la vitrine.
 
    Pour goûter plusieurs seeds, ajouter `--runs 2` : la seed augmente de 1 à chaque run. `smoke.jsonl` note désormais la photo de départ (`image`, `image_sha256`).
 3. **Rapatrier avant d'éteindre le pod** : les rendus sont payés, il ne faut pas les perdre. Sur le pod, archiver les résultats **et** les photos :
@@ -174,7 +177,7 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
    ```
 
    `ingest` :
-   - garde les rendus réussis, faits sur le bon modèle, à partir de la bonne photo, avec la caméra du preset, et à sa taille et sa durée pour ce format. Un rendu `--resolution 720p` est donc écarté (ligne `skipped:`), au lieu d'être réduit en silence ;
+   - garde les rendus réussis, faits sur le bon modèle, à partir de la bonne photo, avec la caméra du preset, avec le texte de la photo avant celui du preset, et à sa taille et sa durée pour ce format. Un rendu `--resolution 720p` est donc écarté (ligne `skipped:`), au lieu d'être réduit en silence ;
    - les réencode dans l'encodage commun de la vitrine, avec la mention « AI-generated » ;
    - écrit leurs entrées dans le manifeste : seed, sha256, empreintes de la photo et du workflow, date.
 

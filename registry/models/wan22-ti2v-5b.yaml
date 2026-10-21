@@ -20,6 +20,8 @@ limits:
   resolutions: [480p, 720p]
   fps: [24]
   max_duration_s: 5
+# GPU seconds on an RTX 4090. Session S2, on an L4 (about half as fast): 190 s at 480p with the
+# model loading, 508 s at 720p (121 frames at 24 fps)
 estimate_s:
-  480p: 45
-  720p: 110
+  480p: 95
+  720p: 250

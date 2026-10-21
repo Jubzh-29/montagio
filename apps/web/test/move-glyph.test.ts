@@ -3,6 +3,7 @@ import { glyphMotion, photoTarget, GLYPH_EXTENT, FRAME_HALF } from '@/lib/move-g
 /** The camera moves of the library presets (presets/*.yaml). */
 const LIBRARY: [string, string[], number][] = [
   ['breathing', ['zoom_in', 'zoom_out'], 0.2],
+  ['crane-up', ['pan_up'], 2],
   ['crash-push', ['zoom_in'], 1.5],
   ['drift-left-push', ['pan_left', 'zoom_in'], 0.8],
   ['pan-left', ['pan_left'], 1],
@@ -12,8 +13,6 @@ const LIBRARY: [string, string[], number][] = [
   ['push-and-settle', ['zoom_in', 'static'], 0.7],
   ['rise-and-push', ['pan_up', 'zoom_in'], 1],
   ['slow-push', ['zoom_in'], 0.6],
-  ['tilt-down', ['pan_down'], 0.8],
-  ['tilt-up', ['pan_up'], 0.8],
 ];
 
 const centerX = (m: ReturnType<typeof glyphMotion>) => m.target.left + m.target.width / 2;

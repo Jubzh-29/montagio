@@ -1,0 +1,24 @@
+# Checked on a GPU in session S2 (2026-10-21, L4): clean once a description of the photo comes before this text (docs/S2_RESULTATS.md).
+# Note: "Pan Up" of WanCameraEmbedding moves the camera up (a crane), it does not tilt it. Session S2: barely visible at
+# speed 0.8, a clear rise at 2; so the preset that was "Tilt Up" became "Crane Up", and "Tilt Down" left the library.
+schema: montagio/preset@0.1
+id: crane-up
+name: Crane Up
+description: Rises like a crane to reveal what lies above the subject.
+preview: previews/crane-up.mp4
+license: CC-BY-4.0
+author: montagio-community
+capability: i2v-camera
+camera:
+  poses: [pan_up]
+  speed: 2
+prompt:
+  suffix: "camera cranes up, rising smoothly to reveal what lies above, smooth cinematic motion"
+  negative: "blurry, distorted, warped faces, extra limbs, flicker, low quality"
+defaults:
+  duration_s: 5
+  resolution: 480p
+  fps: 16
+models:
+  preferred: wan22-i2v-a14b-fun-camera
+  fallback: wan22-ti2v-5b

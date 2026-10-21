@@ -336,7 +336,7 @@ describe('downloads and catalog', () => {
   test('presets come in gallery order: the families of spec §6, Crash Push first', async () => {
     const list = (await (await getPresets()).json()) as { id: string }[];
     expect(list.map((preset) => preset.id)).toEqual([
-      'crash-push', 'slow-push', 'pull-back-reveal', 'pan-left', 'pan-right', 'tilt-up', 'tilt-down',
+      'crash-push', 'slow-push', 'pull-back-reveal', 'pan-left', 'pan-right', 'crane-up',
       'rise-and-push', 'drift-left-push', 'pull-back-tilt-up', 'push-and-settle', 'breathing',
     ]);
   });

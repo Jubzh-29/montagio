@@ -17,3 +17,5 @@ prompt:
   subject: subject
 models:
   preferred: wan21-i2v-effects
+# Validated on a GPU in session S2 (L4, 4 steps): docs/S2_RESULTATS.md.
+gpu_validated: 2026-10-21

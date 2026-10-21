@@ -1,6 +1,6 @@
-# Draft (plan 2b): provisional name and settings, tuned in GPU session S2.
+# Checked on a GPU in session S2 (2026-10-21, L4): clean once a description of the photo comes before this text (docs/S2_RESULTATS.md).
 # Note: the two moves run together, through the Montagio Camera Embedding node (comfy-nodes); a preset with one move keeps the core WanCameraEmbedding.
-# Note: "Pan Up" / "Pan Down" of WanCameraEmbedding move the camera (translation) rather than rotate it; GPU session S2 decides how a tilt renders (see docs/S1_ANALYSE.md).
+# Note: "Pan Up" moves the camera up (a crane), it does not tilt it. Session S2: Fun Camera renders vertical moves weakly, the pull back carries this shot.
 schema: montagio/preset@0.1
 id: pull-back-tilt-up
 name: Pull Back & Tilt Up

@@ -1,0 +1,4 @@
+# The modal CLI and SDK for infra/modal, in a virtual environment of its own (not the system Python):
+#   py -3.12 -m venv ..\.venv-modal            (Windows; python3.12 -m venv ../.venv-modal elsewhere)
+#   ..\.venv-modal\Scripts\python -m pip install -r infra\modal\requirements.txt
+modal==1.6.2

@@ -16,6 +16,8 @@ limits:
   resolutions: [480p, 720p]
   fps: [16]
   max_duration_s: 1
+# GPU seconds on an RTX 4090. Session S2, on an L4 (about half as fast): 9.1 to 9.6 s warm at
+# 1280x720, 45 s with the models loading
 estimate_s:
-  480p: 6
-  720p: 12
+  480p: 3
+  720p: 5

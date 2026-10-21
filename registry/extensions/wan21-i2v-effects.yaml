@@ -35,6 +35,6 @@ bindings:
 output: { node: "56", kind: video }
 # max_chars bounds the subject a user types ("red toy car")
 limits: { max_duration_s: 5, max_chars: 120 }
-# GPU seconds for 5 s at 832x480 on an RTX 4090 with the 4-step LoRA (estimate: 1 to 2 min,
-# about 8 min at 20 steps without it; S2 measures both)
-estimate_s: 120
+# GPU seconds for 5 s at 832x480 on an RTX 4090 with the 4-step LoRA. Session S2, on an L4 (about
+# half as fast): 156 s warm for each of the 6 effects, 175 to 184 s with the models loading
+estimate_s: 80

@@ -24,11 +24,22 @@ import { basename, extname, isAbsolute, join, relative, resolve } from 'node:pat
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { Comfy, type Job, type WorkflowGraph } from '@comfyorg/sdk';
-import { CAMERA_POSE_VALUES, compileJob, loadLibrary, pickAspect, type ApiWorkflow, type Aspect, type Library, type Resolution } from '@montagio/presets';
+import {
+  CAMERA_POSE_VALUES,
+  compileImage,
+  compileJob,
+  loadLibrary,
+  pickAspect,
+  type ApiWorkflow,
+  type Aspect,
+  type Library,
+  type Resolution,
+} from '@montagio/presets';
 import { prepareMotionClip, probe, probeAudio } from '@montagio/sequence';
 import { imageSize } from 'image-size';
 import { EXTENSION_JOBS, extensionJobs, jobTexts, photoFile, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
-import { imageFingerprint } from './lib/image';
+import { imageFingerprint, imagePrompts } from './lib/image';
+import { negativeOverride } from './lib/prompts';
 import { assertLocalBaseUrl, cameraMove, checkWorkflow, comboOptions, guardFetch, VramSampler, type ObjectInfo, type VramStats } from './lib/comfy';
 
 const DEFAULT_PROXY_URL = 'http://127.0.0.1:8189';
@@ -53,6 +64,8 @@ const { values: args } = parseArgs({
     out: { type: 'string' },
     'camera-pose': { type: 'string' },
     'camera-speed': { type: 'string' },
+    prompt: { type: 'string' },
+    negative: { type: 'string' },
     vram: { type: 'string', default: 'auto' },
     'timeout-min': { type: 'string', default: '30' },
     'dry-run': { type: 'boolean', default: false },
@@ -70,6 +83,7 @@ const { values: args } = parseArgs({
     text: { type: 'string', multiple: true, default: [] },
     language: { type: 'string', default: 'en' },
     duration: { type: 'string', default: '10' },
+    t2i: { type: 'string', multiple: true, default: [] },
     help: { type: 'boolean', default: false },
   },
 });
@@ -88,6 +102,8 @@ if (args.help) {
   --runs N           runs per preset; the first one includes model loading (default 1)
   --camera-pose P    override the pose: a value, a comma list, or "all" (every value ComfyUI accepts)
   --camera-speed S   override the speed: a number or a comma list, e.g. 0.5,1,2
+  --prompt TEXT      what the photo shows, written before the preset's text (the Studio's description field)
+  --negative TEXT    replace the preset's negative; "wan" = the official Wan templates' default negative
   --out DIR          results folder (default s1-results)
   --vram MODE        auto (nvidia-smi, else /system_stats), comfyui (/system_stats only: use it through an SSH tunnel), none
   --timeout-min N    give up on a job after N minutes (default 30)
@@ -109,7 +125,11 @@ Extensions (instead of presets):
                      a default), for the one job of the run that reads a text; when several do, name it:
                      --text edit=… --text effect=… --text voice=… --text music=… (repeatable)
   --language en|fr   the language of the voice (default en)
-  --duration S       music: the length of the film it goes under (default 10)`);
+  --duration S       music: the length of the film it goes under (default 10)
+
+Text to image (instead of presets), the app's t2i model (Z-Image-Turbo):
+  --t2i NAME[@ASPECT]=TEXT   one image per --t2i (repeatable), 16:9 unless @9:16 or @1:1, at --resolution
+                             (720p by default), seeds from --seed; saved as clips/<date>__t2i-NAME__<model>__r1.png`);
   process.exit(0);
 }
 
@@ -121,6 +141,9 @@ type SmokeRecord = {
   status: string;
   error: unknown;
   camera: { mode: string; pose: string | null; pose_2: string | null; combine: string | null; speed: number | null };
+  /** The texts the model got: the preset's, after --prompt and --negative. */
+  prompt: string;
+  negative: string;
   width: number;
   height: number;
   frames: number;
@@ -165,7 +188,12 @@ async function main(): Promise<number> {
   if (resolution && resolution !== '480p' && resolution !== '720p') throw new Error(`--resolution must be 480p or 720p`);
 
   const library = await loadLibrary(repoRoot);
+  const negative = negativeOverride(args.negative);
+  if ((args.prompt !== undefined || negative !== undefined) && (args.extension || args.t2i.length > 0)) {
+    throw new Error('--prompt and --negative apply to the camera presets, not to --extension or --t2i (use --text)');
+  }
   if (args.extension) return runExtensions(library, target, comfyuiUrl, outDir, timeoutMs);
+  if (args.t2i.length > 0) return runImages(library, target, comfyuiUrl, outDir, timeoutMs, resolution);
   const presetIds = args.preset === 'all' ? [...library.presets.keys()] : args.preset.split(',').map((id) => id.trim());
   const { width: imageWidth, height: imageHeight } = imageSize(await readFile(imagePath));
   const aspect = pickAspect(imageWidth, imageHeight);
@@ -183,6 +211,7 @@ async function main(): Promise<number> {
     const template = library.templates.get(model.workflow)!;
     const imageBinding = model.bindings.image;
     if (!imageBinding) throw new Error(`model ${model.id} has no image binding`);
+    if (negative !== undefined && !model.bindings.negative) throw new Error(`--negative: model ${model.id} has no negative prompt`);
     return { preset, model, template, imageBinding };
   });
 
@@ -234,10 +263,15 @@ async function main(): Promise<number> {
       const seed = firstSeed + run - 1;
       const { workflow, params } = compileJob(preset, model, template, {
         imageRef: basename(imagePath),
+        ...(args.prompt ? { userPrompt: args.prompt } : {}),
         seed,
         aspect,
         resolution,
       });
+      if (negative !== undefined) {
+        workflow[model.bindings.negative!.node]!.inputs[model.bindings.negative!.field] = negative;
+        params.negative = negative;
+      }
       if (variant.pose !== null) {
         workflow[model.bindings.camera_pose!.node]!.inputs[model.bindings.camera_pose!.field] = variant.pose;
         params.cameraPose = variant.pose;
@@ -257,6 +291,8 @@ async function main(): Promise<number> {
         status: 'compiled',
         error: null,
         camera: { mode: params.cameraMode, pose: params.cameraPose, pose_2: params.cameraPose2, combine: params.cameraCombine, speed: params.cameraSpeed },
+        prompt: params.prompt,
+        negative: params.negative,
         width: params.width,
         height: params.height,
         frames: params.frames,
@@ -384,8 +420,35 @@ async function runJob(
   }
 }
 
+/**
+ * The SDK client on the proxy, and what ComfyUI says about itself; nothing in a dry run. The SDK
+ * takes no base URL argument and falls back to Comfy Cloud when COMFY_BASE_URL is blank: set it
+ * explicitly, and never forward a cloud key.
+ */
+async function connect(
+  target: { base: string; url: URL },
+  comfyuiUrl: string | null,
+): Promise<{ client: Comfy | null; objectInfo: ObjectInfo | null; comfyuiVersion: string | null; gpu: string | null }> {
+  if (args['dry-run']) return { client: null, objectInfo: null, comfyuiVersion: null, gpu: null };
+  process.env.COMFY_BASE_URL = target.base;
+  delete process.env.COMFY_API_KEY;
+  const guarded = guardFetch(target.url);
+  const client = new Comfy({ fetch: guarded, clientInfo: 'montagio-smoke/0.1' });
+  const health = await guarded(`${target.base}/api/v2/health`);
+  if (!health.ok) throw new Error(`comfy-api-proxy health check failed: HTTP ${health.status}`);
+  if (!comfyuiUrl) return { client, objectInfo: null, comfyuiVersion: null, gpu: null };
+  const stats = await getJson<{ system?: { comfyui_version?: string }; devices?: { name?: string }[] }>(`${comfyuiUrl}/system_stats`);
+  return {
+    client,
+    objectInfo: await getJson<ObjectInfo>(`${comfyuiUrl}/object_info`),
+    comfyuiVersion: stats.system?.comfyui_version ?? null,
+    gpu: stats.devices?.[0]?.name ?? null,
+  };
+}
+
 type ExtensionRecord = RunRecord & {
-  kind: 'extension';
+  /** "image": a text-to-image job of --t2i, which the showcase's ingest leaves out. */
+  kind: 'extension' | 'image';
   /** The job and the effect or hook it runs, e.g. "effect:squish". */
   job: string;
   model: string;
@@ -501,24 +564,7 @@ async function runExtensions(
   await mkdir(join(outDir, 'workflows'), { recursive: true });
   await mkdir(join(outDir, 'clips'), { recursive: true });
 
-  let client: Comfy | null = null;
-  let objectInfo: ObjectInfo | null = null;
-  let comfyuiVersion: string | null = null;
-  let gpu: string | null = null;
-  if (!args['dry-run']) {
-    process.env.COMFY_BASE_URL = target.base;
-    delete process.env.COMFY_API_KEY;
-    const guarded = guardFetch(target.url);
-    client = new Comfy({ fetch: guarded, clientInfo: 'montagio-smoke/0.1' });
-    const health = await guarded(`${target.base}/api/v2/health`);
-    if (!health.ok) throw new Error(`comfy-api-proxy health check failed: HTTP ${health.status}`);
-    if (comfyuiUrl) {
-      const stats = await getJson<{ system?: { comfyui_version?: string }; devices?: { name?: string }[] }>(`${comfyuiUrl}/system_stats`);
-      comfyuiVersion = stats.system?.comfyui_version ?? null;
-      gpu = stats.devices?.[0]?.name ?? null;
-      objectInfo = await getJson<ObjectInfo>(`${comfyuiUrl}/object_info`);
-    }
-  }
+  const { client, objectInfo, comfyuiVersion, gpu } = await connect(target, comfyuiUrl);
 
   const records: ExtensionRecord[] = [];
   const run = async (job: ExtensionJob): Promise<ExtensionRecord> => {
@@ -588,6 +634,83 @@ async function runExtensions(
   }
 
   console.log('\njob                      model                       status            wall s  exec s  peak VRAM MiB');
+  for (const r of records) {
+    console.log(
+      `${r.job.padEnd(24)} ${r.model.padEnd(27)} ${r.status.padEnd(17)} ` +
+        `${String(r.wall_s ?? '-').padStart(6)}  ${String(r.exec_s ?? '-').padStart(6)}  ${String(r.vram?.peakMiB ?? '-').padStart(13)}`,
+    );
+  }
+  console.log(`\nresults: ${relative(callerDir, outDir) || '.'}${args['dry-run'] ? ' (dry run: workflows only)' : '/smoke.jsonl'}`);
+  return records.every((r) => r.status === 'succeeded' || r.status === 'compiled') ? 0 : 1;
+}
+
+/**
+ * Text to image (--t2i): the test photos of a GPU session, made by the app's t2i model through
+ * the same compiler as the Studio, each timed with its peak VRAM (checklist part 5.4).
+ */
+async function runImages(
+  library: Library,
+  target: { base: string; url: URL },
+  comfyuiUrl: string | null,
+  outDir: string,
+  timeoutMs: number,
+  resolution: Resolution | undefined,
+): Promise<number> {
+  const prompts = imagePrompts(args.t2i);
+  const model = args.model ? library.models.get(args.model) : [...library.models.values()].find((m) => m.capabilities.includes('t2i'));
+  if (!model || !model.capabilities.includes('t2i')) throw new Error(`no text-to-image model${args.model ? ` "${args.model}"` : ''} in the registry`);
+  const template = library.templates.get(model.workflow)!;
+  const firstSeed = Number.parseInt(args.seed, 10) || 0;
+  // Compile everything first: a text too long fails before any GPU second is spent.
+  const jobs = prompts.map((prompt, index) => ({
+    prompt,
+    ...compileImage(model, template, { prompt: prompt.text, seed: firstSeed + index, aspect: prompt.aspect, ...(resolution ? { resolution } : {}) }),
+  }));
+  await mkdir(join(outDir, 'workflows'), { recursive: true });
+  await mkdir(join(outDir, 'clips'), { recursive: true });
+  const { client, objectInfo, comfyuiVersion, gpu } = await connect(target, comfyuiUrl);
+
+  const records: ExtensionRecord[] = [];
+  for (const { prompt, workflow, params } of jobs) {
+    const tag = `t2i-${prompt.name}__${model.id}`;
+    await writeFile(join(outDir, 'workflows', `${tag}.api.json`), `${JSON.stringify(workflow, null, 2)}\n`);
+    const record: ExtensionRecord = {
+      kind: 'image',
+      at: new Date().toISOString(),
+      job: `t2i:${prompt.name}`,
+      model: model.id,
+      run: 1,
+      status: 'compiled',
+      error: null,
+      params,
+      inputs: [],
+      image_sha256: null,
+      wall_s: null,
+      exec_s: null,
+      metrics: null,
+      vram: null,
+      outputs: [],
+      comfyui_version: comfyuiVersion,
+      gpu,
+      sdk: SDK_VERSION,
+      base_url: target.base,
+    };
+    console.log(`\n▶ t2i:${prompt.name} on ${model.id}: ${params.width}x${params.height}, seed ${params.seed}`);
+    if (client) {
+      const problems = objectInfo ? checkWorkflow(workflow, objectInfo) : [];
+      if (problems.length > 0) {
+        record.status = 'preflight-failed';
+        record.error = problems;
+        for (const problem of problems) console.error(`  ✗ ${problem}`);
+      } else {
+        await runJob(client, workflow, [], comfyuiUrl, timeoutMs, record, outDir, tag);
+      }
+      await appendFile(join(outDir, 'smoke.jsonl'), `${JSON.stringify(record)}\n`);
+    }
+    records.push(record);
+  }
+
+  console.log('\nimage                    model                       status            wall s  exec s  peak VRAM MiB');
   for (const r of records) {
     console.log(
       `${r.job.padEnd(24)} ${r.model.padEnd(27)} ${r.status.padEnd(17)} ` +

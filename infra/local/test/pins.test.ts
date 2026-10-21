@@ -11,6 +11,7 @@ import {
   readExtensions,
   readLock,
   readVersions,
+  installDefaultExtensions,
   selectExtensions,
   weightsFor,
   type LockWeight,
@@ -131,6 +132,35 @@ describe('selectExtensions agrees with enabledExtensions', () => {
   test('an unknown extension is refused by both', () => {
     expect(() => enabledExtensions(registryExtensions(text, 'e.yaml'), 'music,karaoke')).toThrow(/karaoke/);
     expect(() => selectExtensions(parseExtensionsConfig(text), 'music,karaoke')).toThrow(/karaoke/);
+  });
+});
+
+describe('installDefaultExtensions: a plain install takes the effects pack, once a GPU session validated it', () => {
+  const config = (effects: string, music: string) =>
+    parseExtensionsConfig(
+      [
+        'schema: montagio/extensions@0.1',
+        'extensions:',
+        '  - id: edit',
+        '    priority: 1',
+        '    gpu_validated: 2026-10-21',
+        '  - id: effects',
+        '    priority: 2',
+        `    gpu_validated: ${effects}`,
+        '  - id: music',
+        '    priority: 5',
+        `    gpu_validated: ${music}`,
+        '',
+      ].join('\n'),
+    );
+  test('the effects pack alone, even when other extensions are validated too', () => {
+    expect(installDefaultExtensions(config('2026-10-21', '2026-10-21'))).toEqual(['effects']);
+  });
+  test('nothing while the effects pack is not validated, whatever else is', () => {
+    expect(installDefaultExtensions(config('null', '2026-10-21'))).toEqual([]);
+  });
+  test("the repository's registry: the effects pack (session S2 validated the seven)", () => {
+    expect(installDefaultExtensions(readExtensions(repoRoot))).toEqual(['effects']);
   });
 });
 

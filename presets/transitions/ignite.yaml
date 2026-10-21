@@ -13,3 +13,5 @@ prompt:
   motion: "Flames catch on the subject and spread until it is engulfed in fire, embers rising, the framing unchanged."
 models:
   preferred: wan22-flf2v-transition
+# Validated on a GPU in session S3 (L4, on the sample car photo): docs/S2_RESULTATS.md, part S3.
+gpu_validated: 2026-10-21

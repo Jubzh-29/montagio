@@ -1,4 +1,4 @@
-# Draft (plan 2b): provisional name and settings, tuned in GPU session S2.
+# Checked on a GPU in session S2 (2026-10-21, L4): clean once a description of the photo comes before this text (docs/S2_RESULTATS.md).
 schema: montagio/preset@0.1
 id: pull-back-reveal
 name: Pull Back Reveal

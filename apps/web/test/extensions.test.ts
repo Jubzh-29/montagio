@@ -15,7 +15,7 @@ import {
 } from '@/server/extensions';
 import { presetPreviewUrl } from '@/server/gallery';
 import { getServices, resetServicesForTests } from '@/server/services';
-import { params, repoRoot, setupTempData } from './helpers';
+import { params, repoRoot, setupTempData, undateLibrary } from './helpers';
 
 setupTempData();
 
@@ -63,10 +63,18 @@ function dateExtensions(root: string, ...ids: string[]): void {
 
 const info = async () => (await (await getExtensions()).json()) as ExtensionsInfo;
 
-test('unset flag: nothing is dated yet, nothing is shown', async () => {
+test('unset flag: nothing dated, nothing shown', async () => {
+  libraryCopy(undateLibrary);
   expect(await visibleExtensions()).toEqual([]);
   expect(await visibleEffects()).toEqual([]);
-  expect(await info()).toEqual({ extensions: [], effects: [], hooks: [], estimates: { t2i: 12 } });
+  expect(await info()).toEqual({ extensions: [], effects: [], hooks: [], estimates: { t2i: 5 } });
+});
+
+test('unset flag: the dates of GPU sessions S2 and S3 show the seven extensions, the six effects, Wardrobe Swap and Ignite', async () => {
+  expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion']);
+  expect(await visibleEffects()).toHaveLength(6);
+  // Iris Dive failed its transition in S2, Figurine barely changed the photo in S3: undated, so hidden.
+  expect((await visibleHooks()).map((hook) => hook.id)).toEqual(['wardrobe-swap', 'ignite']);
 });
 
 test('all shows the seven extensions, every effect and every hook', async () => {
@@ -77,7 +85,10 @@ test('all shows the seven extensions, every effect and every hook', async () => 
 });
 
 test('a listed extension shows only its dated presets', async () => {
-  libraryCopy((root) => datePreset(root, 'effects/squish.yaml'));
+  libraryCopy((root) => {
+    undateLibrary(root);
+    datePreset(root, 'effects/squish.yaml');
+  });
   process.env.MONTAGIO_EXTENSIONS = 'effects';
   expect((await visibleEffects()).map((effect) => effect.id)).toEqual(['squish']);
   expect(await visibleHooks()).toEqual([]);
@@ -85,6 +96,7 @@ test('a listed extension shows only its dated presets', async () => {
 
 test('by default, a dated extension shows its dated presets only', async () => {
   libraryCopy((root) => {
+    undateLibrary(root);
     dateExtensions(root, 'effects');
     datePreset(root, 'effects/squish.yaml');
     datePreset(root, 'effects/explode.yaml');
@@ -132,17 +144,20 @@ test('GET /api/extensions describes the wall: effects first in their order, hook
     subjectMax: expect.any(Number),
     modelName: expect.stringMatching(/Wan 2.1/),
     license: 'Apache-2.0',
+    previewUrl: '/media/presets/effects/previews/squish.mp4',
   });
   expect(body.hooks.find((hook) => hook.id === 'wardrobe-swap')?.references).toBe(2);
   // A hook's clip is captioned with the transition model, as an effect's with the effects model.
   expect(body.hooks[0]).toMatchObject({ modelName: expect.stringMatching(/Wan 2.2/), license: 'Apache-2.0' });
-  expect(body.estimates).toEqual({ t2i: 12, edit: 25, avatar: 510, music: 20, upscale: 240, motion: 240 }); // avatar: voice 30 + avatar 480
+  expect(body.estimates).toEqual({ t2i: 5, edit: 15, avatar: 255, music: 15, upscale: 215, motion: 205 }); // avatar: voice 15 + avatar 240
   // The edit's caption names its model and license, which the preset catalogue does not hold.
   expect(body.editModel).toEqual({ id: 'qwen-image-edit-2511', name: expect.stringMatching(/^Qwen-Image-Edit-2511/), license: 'Apache-2.0' });
 });
 
 test('a preview file that exists gets its URL, a missing one none', async () => {
   const root = libraryCopy((dir) => {
+    // the repository's previews, replaced by Squish's alone
+    rmSync(join(dir, 'presets', 'effects', 'previews'), { recursive: true, force: true });
     mkdirSync(join(dir, 'presets', 'effects', 'previews'), { recursive: true });
     writeFileSync(join(dir, 'presets', 'effects', 'previews', 'squish.mp4'), 'clip');
   });

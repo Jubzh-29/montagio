@@ -14,3 +14,5 @@ prompt:
   motion: "The person's clothes transform smoothly into the new outfit, the fabric flowing and reshaping, while the pose, the face and the background stay the same."
 models:
   preferred: wan22-flf2v-transition
+# Validated on a GPU in session S2 (L4, 4 steps): docs/S2_RESULTATS.md.
+gpu_validated: 2026-10-21

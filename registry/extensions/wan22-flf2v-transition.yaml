@@ -30,5 +30,6 @@ bindings:
 output: { node: "61", kind: video }
 limits: { min_duration_s: 2, max_duration_s: 5, max_chars: 300 }
 # GPU seconds for 5 s at 832x480 on an RTX 4090 with the 4-step LoRAs (the template measures
-# 71 to 108 s at 640x640 on an RTX 4090D; about 9 min at 20 steps without them; S2 measures it)
-estimate_s: 110
+# 71 to 108 s at 640x640 on an RTX 4090D). Session S2, on an L4 (about half as fast): 134 to 157 s;
+# 1,084 s at 20 steps without the LoRAs
+estimate_s: 75

@@ -19,5 +19,6 @@ bindings:
 output: { node: "3", kind: audio }
 # about 15 s of speech, the longest the avatar animates
 limits: { max_chars: 300 }
-# GPU seconds for 15 s of speech on an RTX 4090 (estimate: 7 to 12 s warm, plus loading)
-estimate_s: 30
+# GPU seconds for 15 s of speech on an RTX 4090. Session S2, on an L4 (about half as fast):
+# 2.5 to 5.2 s warm for 3 to 4 s of speech, 14 s with the model loading
+estimate_s: 15

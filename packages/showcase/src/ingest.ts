@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, posix } from 'node:path';
-import { compileJob, dimensionsFor, loadLibrary, type ApiWorkflow, type CompiledParams, type Preset } from '@montagio/presets';
+import { dirname, join } from 'node:path';
+import { dimensionsFor, loadLibrary, type ApiWorkflow, type CompiledParams, type Preset } from '@montagio/presets';
 import { AI_METADATA, normalizeClip } from '@montagio/sequence';
 import { isMap, isSeq, parseDocument, YAMLSeq } from 'yaml';
 import {
@@ -16,7 +16,7 @@ import {
   type HookExample,
 } from './manifest';
 import { sha256File } from './verify';
-import { showcaseWorkflow, workflowSha256 } from './workflow';
+import { showcaseJob, showcaseWorkflow, workflowSha256 } from './workflow';
 
 /** The part of a smoke.jsonl record (infra/runpod/smoke.ts) that ingest reads. */
 type SmokeRecord = {
@@ -34,6 +34,8 @@ type SmokeRecord = {
   outputs: string[];
   image?: string;
   image_sha256?: string;
+  /** The text the model got: the photo's (--prompt), then the preset's. */
+  prompt?: string;
 };
 
 export type IngestResult = { added: string[]; replaced: string[]; skipped: string[] };
@@ -63,9 +65,10 @@ const sameCamera = (a: SmokeRecord['camera'] | undefined, b: ReturnType<typeof c
 /**
  * Bring the clips of a GPU session into the showcase: the successful runs of
  * `smoke.ts` made from `sampleId`'s exact photo, on the manifest's model, with
- * the preset's own camera. Each clip is re-encoded in the showcase encoding with
- * the AI-generated mention, and its manifest entry ties it to its seed and to the
- * workflow that rendered it. `picks` chooses among several runs of one preset.
+ * the preset's own camera and the photo's text before the preset's. Each clip
+ * is re-encoded in the showcase encoding with the AI-generated mention, and its
+ * manifest entry ties it to its seed and to the workflow that rendered it.
+ * `picks` chooses among several runs of one preset.
  */
 export async function ingestSmoke(
   root: string,
@@ -99,13 +102,17 @@ export async function ingestSmoke(
     } else if (record.model !== manifest.model) {
       skipped.push(`${label}: rendered on ${record.model}, the showcase shows ${manifest.model}`);
     } else {
-      const { params } = compileJob(preset, model, template, { imageRef: posix.basename(sample.file), seed: record.seed, aspect: sample.aspect });
+      const { params } = showcaseJob(library, manifest, preset, sample, record.seed);
       const expected = cameraOf(params);
       if (!sameCamera(record.camera, expected)) {
         skipped.push(`${label}: its camera ${JSON.stringify(record.camera)} is not the preset's ${JSON.stringify(expected)}`);
       } else if (format(record) !== format(params)) {
         // A --resolution 720p render, say: normalizing would shrink it, and its workflow would not be the showcase's.
         skipped.push(`${label}: rendered at ${format(record)}; the preset makes ${format(params)} for ${sample.id}`);
+      } else if (record.prompt !== params.prompt) {
+        // Rendered without the photo's text (smoke --prompt), the clip is the ghost of the first GPU render;
+        // with another text, its workflow is not the one the manifest would vouch for.
+        skipped.push(`${label}: rendered from the text ${JSON.stringify(record.prompt ?? null)}; the showcase compiles ${JSON.stringify(params.prompt)} for ${sample.id}`);
       } else if (!record.outputs?.[0]) {
         skipped.push(`${label}: no output file`);
       } else {

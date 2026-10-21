@@ -22,7 +22,7 @@ import {
 import { basename, dirname, join } from 'node:path';
 import { decide, evaluate, pickGpu, pickPython, pickTorch, type Check, type Decision, type Mode, type Ports } from './checks.ts';
 import { npmInvocation, nextBin, tsxCli, type Capture, type Stream } from './exec.ts';
-import { readExtensions, readLock, readVersions, selectExtensions, weightsFor, type LockWeight } from './pins.ts';
+import { installDefaultExtensions, readExtensions, readLock, readVersions, selectExtensions, weightsFor, type LockWeight } from './pins.ts';
 import {
   buildPlan,
   buildStamp,
@@ -53,7 +53,7 @@ export type InstallOptions = {
   dryRun: boolean;
   start: boolean;
   browser: boolean;
-  /** --extensions: whose weights to fetch besides the camera presets'; null or absent reads MONTAGIO_EXTENSIONS, then "validated". */
+  /** --extensions: whose weights to fetch besides the camera presets'; null or absent reads MONTAGIO_EXTENSIONS, then the effects pack if validated. */
   extensions?: string | null;
 };
 
@@ -170,7 +170,9 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
   const versions = readVersions(repoRoot);
   let enabled: string[];
   try {
-    enabled = selectExtensions(readExtensions(repoRoot), opts.extensions ?? env.MONTAGIO_EXTENSIONS);
+    const flag = opts.extensions ?? env.MONTAGIO_EXTENSIONS;
+    const config = readExtensions(repoRoot);
+    enabled = flag?.trim() ? selectExtensions(config, flag) : installDefaultExtensions(config);
   } catch (error) {
     deps.log(`error: ${(error as Error).message}`);
     return 2;
