@@ -53,7 +53,7 @@ It talks to a running Montagio app over the app's HTTP API, the same one the Stu
 | `upscale_to_1080p` | an HD 1080p copy of a finished clip |
 | `get_job` | a render's state by id; `wait: true` follows it to its end |
 | `list_history` | what this Montagio has made, newest first |
-| `get_workflow` | the ComfyUI workflow (API JSON) behind a clip or an image, returned or saved to a path |
+| `get_workflow` | the ComfyUI workflow (API JSON) behind a clip or an image, returned, or saved as a new file in `MONTAGIO_MCP_OUT` |
 
 Every tool that takes a photo accepts either `imageRef` or `path` (a local file, uploaded first). A render blocks until it is done and returns the absolute URL of its file, its id, the time estimate the app gives, and, when `MONTAGIO_MCP_OUT` is set, the local path of the downloaded file. The default wait is 30 minutes, `timeoutMinutes` changes it per call; past it, the render goes on in the app and `get_job` with `wait: true` picks it up.
 

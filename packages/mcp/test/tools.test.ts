@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -200,17 +200,26 @@ describe('MCP tools', () => {
     expect(String(data.message)).toContain(BASE_URL);
   });
 
-  it('get_workflow saves the ComfyUI JSON into a folder, under the app\'s file name', async () => {
+  it('get_workflow saves the ComfyUI JSON into the output folder, never over a file, never elsewhere', async () => {
     const workflow = { '3': { class_type: 'KSampler', inputs: {} } };
     const app = fakeFetch(() =>
-      Response.json(workflow, { headers: { 'content-disposition': 'attachment; filename="montagio-crash-push-g1.json"' } }),
+      Response.json(workflow, { headers: { 'content-disposition': 'attachment; filename="../../montagio-crash-push-g1.json"' } }),
     );
-    client = await connect(testConfig(), { fetch: app.fetch });
-    const { isError, data } = await callTool(client, 'get_workflow', { id: 'g1', savePath: dir });
-
-    expect(isError).toBe(false);
-    expect(data.path).toBe(join(dir, 'montagio-crash-push-g1.json'));
-    expect(JSON.parse(await readFile(data.path as string, 'utf8'))).toEqual(workflow);
+    client = await connect({ ...testConfig(), outDir: dir }, { fetch: app.fetch });
+    const first = await callTool(client, 'get_workflow', { id: 'g1', save: true });
+    expect(first.isError).toBe(false);
+    expect(first.data.path).toBe(join(await realpath(dir), 'montagio-crash-push-g1.json'));
+    expect(JSON.parse(await readFile(first.data.path as string, 'utf8'))).toEqual(workflow);
+    const second = await callTool(client, 'get_workflow', { id: 'g1', save: true });
+    expect(second.data.path).toBe(join(await realpath(dir), 'montagio-crash-push-g1-1.json'));
     expect(app.calls[0]!.path).toBe('/api/workflows/g1');
+  });
+
+  it('get_workflow refuses to save without an output folder', async () => {
+    const app = fakeFetch(() => Response.json({}, { headers: { 'content-disposition': 'attachment; filename="w.json"' } }));
+    client = await connect(testConfig(), { fetch: app.fetch });
+    const { isError, data } = await callTool(client, 'get_workflow', { id: 'g1', save: true });
+    expect(isError).toBe(true);
+    expect(data.error).toBe('no-output-folder');
   });
 });

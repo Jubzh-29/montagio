@@ -1,5 +1,5 @@
-import { mkdir, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { mkdir, realpath, writeFile } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { CallToolResult, ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
@@ -643,24 +643,36 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
     {
       title: 'Get the ComfyUI workflow',
       description:
-        'Get the ComfyUI workflow (API format JSON) behind a clip or an image, to open, inspect or tweak it in ComfyUI. With savePath it is ' +
-        'written there (a file path, or an existing folder) and the path is returned; without it the JSON itself is returned.',
+        'Get the ComfyUI workflow (API format JSON) behind a clip or an image, to open, inspect or tweak it in ComfyUI. With save: true it is ' +
+        'written as a new .json file in the output folder (MONTAGIO_MCP_OUT) and the path is returned; otherwise the JSON itself is returned.',
       inputSchema: {
         id: z.string().min(1).describe('The id of the clip or image (returned by the tool that made it, or from list_history).'),
-        savePath: z.string().min(1).optional().describe('Where to write the JSON: a file path, or an existing folder (the app\'s file name is used).'),
+        save: z.boolean().optional().describe('Write the JSON into the output folder (MONTAGIO_MCP_OUT) instead of returning it. Never overwrites a file.'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
     async (args) =>
       guard(async () => {
         const { workflow, filename } = await client.workflow(args.id);
-        if (!args.savePath) return { id: args.id, filename, workflow };
-        let target = resolve(args.savePath);
-        const existing = await stat(target).catch(() => null);
-        if (existing?.isDirectory()) target = join(target, filename);
-        await mkdir(dirname(target), { recursive: true });
-        await writeFile(target, `${JSON.stringify(workflow, null, 2)}\n`);
-        return { id: args.id, filename, path: target };
+        if (!args.save) return { id: args.id, filename, workflow };
+        // Writes go to the output folder only, as a new .json file: a tool call never chooses where on disk it writes.
+        const outDir = client.config.outDir;
+        if (!outDir) {
+          throw new ToolFailure('no-output-folder', 'Set MONTAGIO_MCP_OUT to save files; without it, call get_workflow without save to get the JSON.');
+        }
+        await mkdir(outDir, { recursive: true });
+        const folder = await realpath(outDir);
+        const stem = basename(filename).replace(/\.json$/i, '').replace(/[^A-Za-z0-9._-]/g, '_').replace(/^\.+/, '') || 'workflow';
+        for (let n = 0; n < 100; n++) {
+          const target = join(folder, `${stem}${n > 0 ? `-${n}` : ''}.json`);
+          try {
+            await writeFile(target, `${JSON.stringify(workflow, null, 2)}\n`, { flag: 'wx' });
+            return { id: args.id, filename, path: target };
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+          }
+        }
+        throw new ToolFailure('save-failed', `The output folder already holds 100 files named ${stem}*.json.`);
       }),
   );
 }
