@@ -57,11 +57,14 @@ function LanguageToggle() {
 const TAB_LABELS = { effects: 'tabEffects', camera: 'tabCamera', film: 'tabFilm', avatar: 'tabAvatar', motion: 'tabMotion' } as const;
 
 /** The creation tabs, as links: the Studio reads the tab from the URL. */
-function Tabs({ current }: { current?: Tab | 'history' }) {
+function Tabs({ current }: { current?: Tab | 'history' | 'explore' }) {
   const { t } = useI18n();
   const tabs = visibleTabs(useExtensions());
   return (
     <nav className={styles.tabs} aria-label={t('tabsLabel')}>
+      <Link href="/explore" className={styles.tab} aria-current={current === 'explore' ? 'page' : undefined}>
+        {t('tabExplore')}
+      </Link>
       {tabs.map((tab) => (
         <Link key={tab} href={tabHref(tab)} className={styles.tab} aria-current={current === tab ? 'page' : undefined}>
           {t(TAB_LABELS[tab])}
@@ -74,11 +77,11 @@ function Tabs({ current }: { current?: Tab | 'history' }) {
   );
 }
 
-export function Header({ recording = false, current }: { recording?: boolean; current?: Tab | 'history' }) {
+export function Header({ recording = false, current }: { recording?: boolean; current?: Tab | 'history' | 'explore' }) {
   const { t } = useI18n();
   return (
     <header className={styles.header}>
-      <Link href="/" className={styles.brand}>
+      <Link href="/explore" className={styles.brand}>
         <span className={styles.rec} data-recording={recording} aria-hidden="true" />
         <span className={styles.wordmark}>{t('appName')}</span>
         <span className={styles.tagline}>{t('tagline')}</span>

@@ -1,0 +1,232 @@
+/* The Explore page: the clips first, then a door to every tool. */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5) var(--space-7);
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 720px;
+}
+
+.title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.lead {
+  color: var(--ink-muted);
+  font-size: var(--text-l);
+  line-height: 1.45;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-m);
+  font-weight: 650;
+  text-decoration: none;
+  transition: background var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out);
+}
+
+.primary {
+  min-height: 48px;
+  padding: 0 var(--space-5);
+  background: var(--rec);
+  color: oklch(1 0 0);
+  font-size: var(--text-m);
+}
+
+.primary:hover {
+  background: var(--rec-hover);
+}
+
+.secondary {
+  min-height: 38px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-s);
+}
+
+.secondary:hover {
+  background: var(--surface-2);
+  border-color: var(--ink-faint);
+}
+
+.primary:focus-visible,
+.secondary:focus-visible,
+.feature:focus-visible,
+.tool:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+  font-weight: 600;
+}
+
+.toolButton {
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toolButton:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+/* Featured formats: three wide clips. */
+.featured {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
+
+.feature,
+.tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.media {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color var(--dur) var(--ease-out);
+}
+
+.feature:hover .media,
+.tool:hover .media {
+  border-color: var(--line-strong);
+}
+
+.video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.icon {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 2rem;
+}
+
+.cardText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cardName {
+  font-size: var(--text-m);
+  font-weight: 650;
+}
+
+.feature .cardName {
+  font-size: var(--text-l);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cardDescription {
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+  line-height: 1.45;
+}
+
+/* Every tool: smaller tiles. */
+.tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-5) var(--space-4);
+}
+
+.stack {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--ok-soft);
+}
+
+.stackText {
+  max-width: 760px;
+  font-size: var(--text-m);
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .page {
+    gap: var(--space-6);
+    padding: var(--space-5) var(--space-4) var(--space-6);
+  }
+  .title {
+    font-size: 1.75rem;
+  }
+  .featured {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (pointer: coarse) {
+  .toolButton {
+    min-height: 44px;
+  }
+}
