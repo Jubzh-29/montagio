@@ -140,3 +140,24 @@ Les décisions qui suivent ont été prises pour donner à Montagio les meilleur
   - `--extensions all` les prend toutes, `--extensions none` garde les presets seuls ;
   - le défaut respecte la règle de coupe : il ne prend le pack d'effets que si une session GPU l'a validé.
 - **La description de la photo** devient indispensable ou pré-remplie dans le Studio : une session y travaille.
+
+## 11. S3 : premiers résultats (21/10)
+
+Avancée au 21/10 au soir, sur la même L4 et les mêmes réglages : 480p et la description de la photo partout.
+
+**Exemples de la vitrine**
+- Les **6 effets**, sur la voiture et sur la personne fictive en ciré jaune : tous lisibles. Cake-ify sur la voiture donne des tranches de gâteau propres. Snap Zoom sur la personne finit sur un gros plan net du visage.
+- ✅ **Ignite** : les flammes prennent sur la voiture puis l'engloutissent, le cadre ne bouge pas. Le hook est daté (`gpu_validated: 2026-10-21`) : il apparaît sur le mur.
+- ❌ **Figurine** : le look ACTION change à peine la personne, et le clip ressemble à la photo de départ. Le hook reste sans date, donc masqué.
+
+**Les 33 clips de la vitrine** (11 presets sur 3 photos)
+- 18 sont rendus : les 11 presets sur le port, et 7 sur la voiture.
+- L'app Modal s'est arrêtée à 19:38 (heure de Paris), avant les 15 derniers : les 4 derniers presets sur la voiture et les 11 sur la personne. La cause reste à confirmer sur le tableau de bord de Modal.
+- **Sur le port**, Crash Push, Slow Push, Push & Settle et Rise & Push dépassent le bateau au lieu de s'arrêter dessus. Crane Up y fait un bateau fantôme.
+- **Sur la voiture**, Slow Push, Pull Back Reveal, Pan Left, Pan Right et Crane Up sont nets. Crash Push, lui, fait sortir la voiture du cadre.
+
+**Aperçus de la galerie**
+
+Les fichiers `previews/*.mp4` existent désormais : 11 presets, 6 effets, Wardrobe Swap et Ignite, soit 19 fichiers.
+- **Format** : H.264 muet, 832×480 (480×832 pour la personne), environ 6 Mo en tout.
+- **Choix du clip** : le meilleur de chaque preset entre le port et la voiture. Pour les effets, le chien en peluche de la S2 (Squish, Frozen Moment), la voiture (Explode, Cake-ify) et la personne (Snap Zoom, Full Circle).

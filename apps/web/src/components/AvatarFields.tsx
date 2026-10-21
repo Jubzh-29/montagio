@@ -53,7 +53,7 @@ export function AvatarFields({
         ))}
       </div>
       <p id="avatar-duration" className={styles.hint}>
-        {t('avatarDuration', { s: seconds })}
+        {seconds > 0 && t('avatarDuration', { s: seconds })}
       </p>
       {hint && (
         <p className={styles.hint} role="status">

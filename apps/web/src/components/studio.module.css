@@ -1333,10 +1333,11 @@
   color: var(--ink);
 }
 
-/* Canvas views: the wall or the monitor. */
+/* Canvas views: the wall or the monitor; also any switch of two or three equal options, on one line. */
 .canvasViews {
   display: inline-grid;
-  grid-template-columns: 1fr 1fr;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
   align-self: flex-start;
   border: 1px solid var(--line);
   border-radius: var(--radius-m);
@@ -1377,6 +1378,7 @@
   border-radius: var(--radius-l);
   background: var(--surface);
   overflow: hidden;
+  isolation: isolate;
 }
 
 .choiceMedia > .glyph {
@@ -1390,6 +1392,8 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* a portrait preview in this wide card: keep the upper part, where the face usually is */
+  object-position: 50% 30%;
 }
 
 .choiceIcon {
@@ -1405,6 +1409,7 @@
   font-weight: 650;
   letter-spacing: 0.02em;
   text-shadow: 0 1px 8px oklch(0 0 0 / 0.6);
+  z-index: 1;
 }
 
 .choiceMeta {
@@ -1602,6 +1607,7 @@
   border-radius: var(--radius-l);
   background: var(--surface);
   overflow: hidden;
+  isolation: isolate;
   cursor: pointer;
   transition: border-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
 }
@@ -1644,6 +1650,17 @@
   text-align: left;
   text-transform: uppercase;
   text-shadow: 0 1px 10px oklch(0 0 0 / 0.7);
+  z-index: 1;
+}
+
+/* Over a preview, a dark fade under the name keeps it legible on a bright frame. */
+.choiceMedia:has(> video)::after,
+.wallTile:has(> video)::after {
+  content: '';
+  position: absolute;
+  inset: 55% 0 0;
+  background: linear-gradient(to bottom, transparent, oklch(0 0 0 / 0.7));
+  pointer-events: none;
 }
 
 @media (max-width: 480px) {

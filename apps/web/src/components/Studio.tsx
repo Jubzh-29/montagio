@@ -874,7 +874,7 @@ export function Studio() {
             ) : tab === 'avatar' ? (
               <ChoiceCard
                 name={t('tabAvatar')}
-                kindLabel={t('avatarKind', { s: speechSeconds })}
+                kindLabel={speechSeconds > 0 ? t('avatarKind', { s: speechSeconds }) : t('tabAvatar')}
                 icon="avatar"
                 paused={motionPaused}
               />

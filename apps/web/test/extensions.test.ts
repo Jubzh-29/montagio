@@ -70,11 +70,11 @@ test('unset flag: nothing dated, nothing shown', async () => {
   expect(await info()).toEqual({ extensions: [], effects: [], hooks: [], estimates: { t2i: 5 } });
 });
 
-test('unset flag: the dates of GPU session S2 show the seven extensions, the six effects and Wardrobe Swap alone', async () => {
+test('unset flag: the dates of GPU sessions S2 and S3 show the seven extensions, the six effects, Wardrobe Swap and Ignite', async () => {
   expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion']);
   expect(await visibleEffects()).toHaveLength(6);
-  // Iris Dive failed its transition in S2, Figurine and Ignite wait for S3: undated, so hidden.
-  expect((await visibleHooks()).map((hook) => hook.id)).toEqual(['wardrobe-swap']);
+  // Iris Dive failed its transition in S2, Figurine barely changed the photo in S3: undated, so hidden.
+  expect((await visibleHooks()).map((hook) => hook.id)).toEqual(['wardrobe-swap', 'ignite']);
 });
 
 test('all shows the seven extensions, every effect and every hook', async () => {
@@ -144,6 +144,7 @@ test('GET /api/extensions describes the wall: effects first in their order, hook
     subjectMax: expect.any(Number),
     modelName: expect.stringMatching(/Wan 2.1/),
     license: 'Apache-2.0',
+    previewUrl: '/media/presets/effects/previews/squish.mp4',
   });
   expect(body.hooks.find((hook) => hook.id === 'wardrobe-swap')?.references).toBe(2);
   // A hook's clip is captioned with the transition model, as an effect's with the effects model.
@@ -155,6 +156,8 @@ test('GET /api/extensions describes the wall: effects first in their order, hook
 
 test('a preview file that exists gets its URL, a missing one none', async () => {
   const root = libraryCopy((dir) => {
+    // the repository's previews, replaced by Squish's alone
+    rmSync(join(dir, 'presets', 'effects', 'previews'), { recursive: true, force: true });
     mkdirSync(join(dir, 'presets', 'effects', 'previews'), { recursive: true });
     writeFileSync(join(dir, 'presets', 'effects', 'previews', 'squish.mp4'), 'clip');
   });
