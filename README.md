@@ -31,14 +31,15 @@ Once Montagio runs on your machine, any MCP client (a desktop assistant, an IDE,
 
 ## What you can make
 
-The Studio has one tab per kind of creation: Effects, Camera, Film, Avatar, Motion, and a History page.
+The app opens on **Explore**, the clips it makes and a door to every tool. The Studio has one tab per kind of creation: Effects, Camera, Film, Avatar, Motion; then come a **Characters** page and a History page.
 
 | Feature | What it does | Model (license) |
 |---|---|---|
 | **Camera** | A photo and one of 11 camera presets give a 5 s clip. You describe what the photo shows, so the model follows the photo instead of inventing it. | Wan 2.2 Fun Camera 14B (Apache-2.0); a **Fast** mode on Wan 2.2 TI2V 5B (Apache-2.0) |
 | **Film** | Two or three camera moves in a row: each shot starts on the last frame of the previous one. The film keeps the photo's shape (16:9, 9:16 or 1:1) and always comes with a 9:16 cut for vertical feeds. | the same |
 | **Remix** | Edit a preset's YAML in the Studio, check it line by line, render it, download it. "Open in ComfyUI" downloads the exact workflow of any clip. | — |
-| **Text to image** | No photo? Write one. | Z-Image-Turbo (Apache-2.0) |
+| **Text to image** | No photo? Write one, and set the shot like a cinema studio: camera, lens, film, light and palette chips add fixed phrases to the text (no brand names). | Z-Image-Turbo (Apache-2.0) |
+| **Characters** | Make a fictional character once from a type and a few words, save it, then its **photodump**: the same character in the scenes you pick. Any picture opens Camera, Effects, Avatar or Motion with it as the start photo, its description filled in. A character is never a photo of someone: only pictures made from a text here, and edits of them, qualify. | Z-Image-Turbo and Qwen-Image-Edit-2511 (Apache-2.0) |
 | **History** | Every photo, clip and film, with download and reuse. | — |
 
 The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan Right and Crane Up, plus five presets with two moves. Rise & Push, Drift Left Push and Pull Back & Tilt Up run both moves at once; Push & Settle and Breathing run one after the other. The core ComfyUI node takes a single move, so the two-move presets go through a node of the Montagio pack, Montagio Camera Embedding.
@@ -47,15 +48,15 @@ The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan
 
 | Extension | In the Studio | Model (license) |
 |---|---|---|
-| **Photo edit** | "Edit" on the start photo: an instruction in plain words, and three looks (inflated, figurine, angle of view) | Qwen-Image-Edit-2511 with a 4-step Lightning LoRA (Apache-2.0) |
+| **Photo edit** | "Edit" on the start photo: an instruction in plain words, three looks (inflated, figurine, angle of view), ready-made **relights** (golden hour, neon night, studio…), and **inpaint**: paint what changes, the rest of the photo stays pixel for pixel | Qwen-Image-Edit-2511 with a 4-step Lightning LoRA (Apache-2.0) |
 | **Six one-photo effects** | the Effects wall: Squish, Cake-ify, Explode, Snap Zoom, Frozen Moment, Full Circle | Wan 2.1 I2V 480p (Apache-2.0) with effect LoRAs by Remade-AI (Apache-2.0) |
 | **Hooks** | a keyframe transition: the edit makes the end frame, the video model animates the way there. Wardrobe Swap, which takes an outfit photo too, and Ignite are validated. | Wan 2.2 FLF2V (Apache-2.0) |
-| **Talking avatar** | the Avatar tab: a photo and a text (English or French) give a talking clip | Wan 2.2 S2V (Apache-2.0), voice by Chatterbox Multilingual (MIT) |
+| **Talking avatar** | the Avatar tab: a photo and a text (English or French) give a talking clip, in the built-in voice or in a **voice sample** given with its speaker's consent | Wan 2.2 S2V (Apache-2.0), voice by Chatterbox Multilingual (MIT) |
 | **Music** | "Add music" under a finished film, mixed into the film and its 9:16 cut | ACE-Step 1.5 (MIT) |
-| **HD 1080p** | "HD 1080p" under a finished clip | SeedVR2 3B (Apache-2.0) |
+| **HD** | "HD 1080p" under a finished clip; "HD 2560 px" on a photo of the atelier or of a character | SeedVR2 3B (Apache-2.0) |
 | **Motion transfer** | the Motion tab: the character of a photo moves like a reference video of up to 5 s | Wan2.2-Animate-2, distilled (Apache-2.0) |
 
-An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
+Relight, inpaint, the HD photo and the voice sample were added on 2026-10-22 on these same models and weights: their workflows pass a real ComfyUI v0.41.0, and their renders wait for the next GPU session. An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
 
 ## Proof, measured
 
@@ -86,7 +87,7 @@ What the session taught, and changed:
 
 - **The photo's description is required.** Without a text saying what the photo shows, Fun Camera invents and the clip turns ghostly: the diagnosis changed one variable per clip, and the description alone fixed it. The Studio now asks for it, and fills it in whenever the photo's text is known.
 - **HD goes through the upscale.** 480p followed by SeedVR2 gives 1080p about three times faster than rendering 720p natively.
-- **Honest limits.** Fun Camera handles push-ins, pull-backs and side moves well, and vertical moves and rotation poorly: Tilt Up became Crane Up, Tilt Down and a Dutch angle were dropped. Two hooks stay hidden: Iris Dive until it gets an intermediate keyframe, Figurine because its change is barely visible. The avatar's built-in voice is male, whatever the face. Motion transfer needs a photo framed like the reference video.
+- **Honest limits.** Fun Camera handles push-ins, pull-backs and side moves well, and vertical moves and rotation poorly: Tilt Up became Crane Up, Tilt Down and a Dutch angle were dropped. Two hooks stay hidden: Iris Dive until it gets an intermediate keyframe, Figurine because its change is barely visible. The avatar's built-in voice is male, whatever the face: a consented voice sample replaces it. Motion transfer needs a photo framed like the reference video.
 
 ## How it works
 
@@ -107,7 +108,7 @@ flowchart LR
 | Folder | What |
 |---|---|
 | [apps/web](apps/web) | the Studio and its server routes |
-| [packages](packages) | the preset compiler, the model registry, the ComfyUI adapter, the film assembly (FFmpeg), the showcase builder |
+| [packages](packages) | the preset compiler, the model registry, the ComfyUI adapter, the film assembly (FFmpeg), the showcase builder, the [MCP server](packages/mcp/README.md) |
 | [presets](presets) | the camera presets, [effects](presets/effects) and [hooks](presets/transitions), in YAML |
 | [registry](registry) | the models, the extensions and the weights lock |
 | [workflows](workflows) | the ComfyUI workflows, in API format |
@@ -159,15 +160,15 @@ Montagio covers a one-click studio's main ground today. The next steps follow th
 | Area | In Montagio today | Next, with the open model planned |
 |---|---|---|
 | Image | text to image with Z-Image-Turbo | Qwen-Image-2512 (Apache-2.0) for higher-quality stills |
-| Photo edit | Qwen-Image-Edit-2511, three looks | more looks and relighting as Apache-2.0 LoRAs on Edit-2511 |
-| Consistent character | identity kept by the edit, zero-shot | a character LoRA trained in the app with recorded consent (Z-Image or Qwen-Image); Phantom (Apache-2.0) for video |
+| Photo edit | Qwen-Image-Edit-2511, three looks, relights, inpaint | more looks and finer relighting as Apache-2.0 LoRAs on Edit-2511 |
+| Consistent character | the Characters page and its photodump, identity kept by the edit, zero-shot | a character LoRA trained in the app with recorded consent (Z-Image or Qwen-Image); Phantom (Apache-2.0) for video |
 | Camera moves | 11 presets on Wan 2.2 Fun Camera | orbits and bullet time from keyframes (Edit-2511 viewpoints, then Wan 2.2 FLF2V); VACE (Apache-2.0); a camera LoRA trained on synthetic renders |
 | Effects and hooks | 6 effects, the Wardrobe Swap and Ignite hooks | Iris Dive with an intermediate keyframe, a stronger Figurine, Earth Zoom Out in five keyframes; then an Apache-2.0 Earth Zoom Out LoRA trained on Montagio's own keyframe chains |
 | Talking avatar | Wan 2.2 S2V, up to 15 s | longer takes with LongCat-Video-Avatar (MIT); the avatar in the local installer |
-| Voice | Chatterbox Multilingual, built-in voice | Qwen3-TTS (Apache-2.0); voice cloning from a consented reference sample |
+| Voice | Chatterbox Multilingual, built-in voice or a consented voice sample | Qwen3-TTS (Apache-2.0) |
 | Music and sound | ACE-Step 1.5, instrumental | songs with lyrics on ACE-Step 1.5; foley waits for a permissive model, as none passes the rule yet |
 | Motion transfer | Animate-2 distilled, 5 s | longer clips; dance driven by the film's music (Wan-Dancer, once its license is read) |
-| Finishing | SeedVR2 HD 1080p | frame interpolation (RIFE) and background removal (BiRefNet), both pending a license check at the source |
+| Finishing | SeedVR2: HD 1080p clips, HD 2560 px photos | frame interpolation (RIFE) and background removal (BiRefNet), both pending a license check at the source |
 | Director | — | an open LLM of the Qwen3 family (Apache-2.0) that turns a short script into a shot list of presets; Qwen3-VL to describe an uploaded photo for you |
 | Sharing and provenance | visible "AI-generated" label | C2PA manifests (c2pa-python, Apache-2.0); the node pack on the Comfy Registry; a community preset library |
 | Running elsewhere | a remote GPU through `--app-only --proxy-url`, the Modal tooling | a container image; one adapter that runs these same open weights on any rented GPU |
