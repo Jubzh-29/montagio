@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { AVATAR_DEFAULT_PROMPT, compileAvatar, compileEdit, compileMusic, compileSpeech, compileUpscale, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
+import { AVATAR_DEFAULT_PROMPT, compileAvatar, compileEdit, compileImageUpscale, compileMusic, compileSpeech, compileUpscale, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -117,6 +117,28 @@ describe('compileUpscale (SeedVR2 3B)', () => {
   test('the shipped workflow cuts the clip in chunks of 33 frames with an overlap of 3', () => {
     const chunk = upscale().template['99']!.inputs;
     expect(chunk).toMatchObject({ chunking_mode: 'manual', 'chunking_mode.frames_per_chunk': 33, temporal_overlap: 3 });
+  });
+});
+
+describe('compileImageUpscale (SeedVR2 on one frame)', () => {
+  test('a photo goes to 2560 px on its long side, in its own aspect', () => {
+    const { model, template } = extension('seedvr2-image-upscale');
+    const sizes = (['16:9', '9:16', '1:1'] as Aspect[]).map((aspect) => {
+      const { workflow, output, params } = compileImageUpscale(model, template, { imageRef: 'start.png', aspect, seed: 2 });
+      expect(workflow['41']!.inputs.image).toBe('start.png');
+      expect(output).toEqual({ node: '9', kind: 'image' });
+      return [params.width, params.height];
+    });
+    expect(sizes).toEqual([
+      [2560, 1440],
+      [1440, 2560],
+      [2048, 2048],
+    ]);
+  });
+
+  test('it runs on its own task only', () => {
+    const video = extension('seedvr2-upscale');
+    expect(() => compileImageUpscale(video.model, video.template, { imageRef: 'x.png', aspect: '16:9', seed: 1 })).toThrow(/i2i-upscale/);
   });
 });
 

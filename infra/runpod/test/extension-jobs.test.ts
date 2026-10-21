@@ -27,6 +27,7 @@ test('one job per extension, in the order of the session, each accepted by Comfy
     ['avatar', 'wan22-s2v-avatar'],
     ['music', 'ace-step15-music'],
     ['upscale', 'seedvr2-upscale'],
+    ['upscale-image', 'seedvr2-image-upscale'],
     ['motion', 'wan-animate2-motion'],
   ]);
   for (const job of jobs) {
@@ -41,6 +42,7 @@ test('each job uploads the files it reads and nothing else', () => {
   expect(uploads.music).toEqual([]);
   expect(uploads.voice).toEqual([]);
   expect(uploads.upscale).toEqual([{ node: '73', field: 'file', path: '/data/clip.mp4' }]);
+  expect(uploads['upscale-image']).toEqual([{ node: '41', field: 'image', path: '/data/photo.png' }]);
   expect(uploads.motion).toEqual([
     { node: '189', field: 'image', path: '/data/photo.png' },
     { node: '240', field: 'file', path: '/data/motion.mp4' },
@@ -73,6 +75,7 @@ test('an extension record carries the sha256 of its photo', () => {
     avatar: '/data/photo.png',
     music: null,
     upscale: null,
+    'upscale-image': '/data/photo.png',
     motion: '/data/photo.png',
   });
 });

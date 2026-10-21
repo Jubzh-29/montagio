@@ -344,5 +344,7 @@
   "maskBrushMedium": "Moyen",
   "maskBrushLarge": "Grand",
   "maskClear": "Effacer",
-  "maskUploadFailed": "La zone peinte n'a pas pu être envoyée : réessayez."
+  "maskUploadFailed": "La zone peinte n'a pas pu être envoyée : réessayez.",
+  "photoHd": "HD 2560 px (~{s} s)",
+  "photoHdDownload": "Télécharger la photo HD"
 }

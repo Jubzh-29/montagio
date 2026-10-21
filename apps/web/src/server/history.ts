@@ -131,6 +131,7 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
   switch (record.task) {
     case 't2i':
     case 'edit':
+    case 'image-upscale':
       // The photo it made is what comes back: the start photo of the next render.
       return {
         ...base,

@@ -17,7 +17,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { compileAvatar, compileEdit, compileEffect, compileHookEdit, compileHookTransition, compileJob, compileMusic, compileSpeech, compileTransition, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
+import { compileAvatar, compileEdit, compileEffect, compileImageUpscale, compileHookEdit, compileHookTransition, compileJob, compileMusic, compileSpeech, compileTransition, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -150,6 +150,12 @@ test.each([
   const model = library.extensionModels.get('qwen-image-edit-2511')!;
   const inputs = { imageRef: 'start.png', instruction: 'make it night', seed: 3, ...variant };
   const { workflow } = compileEdit(model, library.extensionTemplates.get(model.workflow)!, inputs, library.lock);
+  expect(checkWorkflow(workflow, info)).toEqual([]);
+});
+
+test.each(['16:9', '9:16', '1:1'] as Aspect[])('the HD photo job is accepted (%s)', (aspect) => {
+  const model = library.extensionModels.get('seedvr2-image-upscale')!;
+  const { workflow } = compileImageUpscale(model, library.extensionTemplates.get(model.workflow)!, { imageRef: 'start.png', aspect, seed: 3 });
   expect(checkWorkflow(workflow, info)).toEqual([]);
 });
 

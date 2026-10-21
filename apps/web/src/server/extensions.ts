@@ -106,6 +106,13 @@ export function upscaleModel(lib: Library): ExtensionModel {
   return model;
 }
 
+/** The HD photo model of the extension "upscale". */
+export function imageUpscaleModel(lib: Library): ExtensionModel {
+  const model = [...lib.extensionModels.values()].find((entry) => entry.task === 'i2i-upscale');
+  if (!model) throw new Error('no i2i-upscale model in registry/extensions');
+  return model;
+}
+
 /** What a caption names of an extension model. */
 const summaryOf = (model: ExtensionModel) => ({ id: model.id, name: model.name, license: model.license });
 
@@ -152,6 +159,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const avatar = extensions.includes('avatar') ? avatarModels(lib) : null;
   const music = extensions.includes('music') ? musicModel(lib) : null;
   const upscale = extensions.includes('upscale') ? upscaleModel(lib) : null;
+  const imageUpscale = extensions.includes('upscale') ? imageUpscaleModel(lib) : null;
   const motion = extensions.includes('motion') ? motionModel(lib) : null;
   return {
     extensions,
@@ -163,6 +171,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
       ...(avatar ? { avatar: estimateFor(avatar.voice, true) + estimateFor(avatar.avatar, true) } : {}),
       ...(music ? { music: estimateFor(music, true) } : {}),
       ...(upscale ? { upscale: estimateFor(upscale, true) } : {}),
+      ...(imageUpscale ? { imageUpscale: estimateFor(imageUpscale, true) } : {}),
       ...(motion ? { motion: estimateFor(motion, true) } : {}),
     },
     ...(extensions.includes('edit') && editModel ? { editModel: summaryOf(editModel) } : {}),

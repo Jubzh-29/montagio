@@ -20,6 +20,7 @@ import { refusalMessageKey } from '@/lib/refusals';
 import { useJob } from '@/lib/use-job';
 import { ConsentCheck } from './ConsentCheck';
 import { MaskPainter } from './MaskPainter';
+import { PhotoHd } from './PhotoHd';
 import type { UploadState } from './Monitor';
 import styles from './studio.module.css';
 
@@ -280,6 +281,7 @@ export function PhotoAtelier({
           <button type="button" className={styles.buttonSecondary} onClick={use}>
             {t('photoUse')}
           </button>
+          {estimates.imageUpscale !== undefined && <PhotoHd key={done.id} imageRef={done.outputImageRef!} estimate={estimates.imageUpscale} name={kind} />}
           {kind === 't2i' ? (
             <button type="button" className={styles.buttonGhost} onClick={() => void run()} disabled={!canStart}>
               {t('t2iRetry')}

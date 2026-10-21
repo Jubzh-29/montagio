@@ -23,6 +23,7 @@ import { visibleTabs, type Tab } from '@/lib/tabs';
 import { useExtensions } from '@/lib/use-extensions';
 import { useJob } from '@/lib/use-job';
 import { Header } from './Header';
+import { PhotoHd } from './PhotoHd';
 import { ShowcaseFooter } from './ShowcaseFooter';
 import styles from './characters.module.css';
 import studio from './studio.module.css';
@@ -207,16 +208,17 @@ const ANIMATE: [Tab, MessageKey][] = [
 ];
 
 /** A picture's ways into the Studio: the tab it opens there, with the picture as the start photo. */
-function AnimateLinks({ historyKey, tabs }: { historyKey?: string; tabs: Tab[] }) {
+function AnimateLinks({ historyKey, tabs, imageRef, hdEstimate }: { historyKey?: string; tabs: Tab[]; imageRef: string; hdEstimate?: number }) {
   const { t } = useI18n();
-  if (!historyKey) return null;
   return (
     <div className={styles.animate}>
-      {ANIMATE.filter(([tab]) => tabs.includes(tab)).map(([tab, key]) => (
-        <Link key={tab} className={styles.animateLink} href={`/?tab=${tab}&from=${encodeURIComponent(historyKey)}`}>
-          {t(key)}
-        </Link>
-      ))}
+      {historyKey &&
+        ANIMATE.filter(([tab]) => tabs.includes(tab)).map(([tab, key]) => (
+          <Link key={tab} className={styles.animateLink} href={`/?tab=${tab}&from=${encodeURIComponent(historyKey)}`}>
+            {t(key)}
+          </Link>
+        ))}
+      {hdEstimate !== undefined && <PhotoHd imageRef={imageRef} estimate={hdEstimate} name="character" />}
     </div>
   );
 }
@@ -226,6 +228,7 @@ function CharacterDetail({
   tabs,
   canEdit,
   editEstimate,
+  hdEstimate,
   onChange,
   onDelete,
 }: {
@@ -233,6 +236,8 @@ function CharacterDetail({
   tabs: Tab[];
   canEdit: boolean;
   editEstimate: number;
+  /** The HD photo's estimate, when the upscale extension is shown. */
+  hdEstimate?: number;
   onChange: (character: CharacterSummary) => void;
   onDelete: () => void;
 }) {
@@ -322,14 +327,14 @@ function CharacterDetail({
           {/* eslint-disable-next-line @next/next/no-img-element -- the portrait */}
           <img src={character.imageUrl} alt="" />
           <p className={styles.photoScene}>{t('characterPortrait')}</p>
-          <AnimateLinks historyKey={character.portraitHistoryKey} tabs={tabs} />
+          <AnimateLinks historyKey={character.portraitHistoryKey} tabs={tabs} imageRef={character.imageRef} hdEstimate={hdEstimate} />
         </li>
         {[...character.photos].reverse().map((photo) => (
           <li key={photo.imageRef} className={styles.photo}>
             {/* eslint-disable-next-line @next/next/no-img-element -- a photodump picture */}
             <img src={photo.url} alt="" />
             <p className={styles.photoScene}>{photo.scene}</p>
-            <AnimateLinks historyKey={photo.historyKey} tabs={tabs} />
+            <AnimateLinks historyKey={photo.historyKey} tabs={tabs} imageRef={photo.imageRef} hdEstimate={hdEstimate} />
           </li>
         ))}
       </ul>
@@ -416,6 +421,7 @@ export function CharactersPage() {
                   tabs={visibleTabs(info)}
                   canEdit={Boolean(info?.extensions.includes('edit'))}
                   editEstimate={info?.estimates.edit ?? 15}
+                  {...(info?.estimates.imageUpscale !== undefined ? { hdEstimate: info.estimates.imageUpscale } : {})}
                   onChange={replace}
                   onDelete={() => void remove(selected.id)}
                 />

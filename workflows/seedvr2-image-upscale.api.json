@@ -1,0 +1,15 @@
+{
+  "41": {"class_type": "LoadImage", "inputs": {"image": "start.png"}},
+  "57": {"class_type": "ResizeImageMaskNode", "inputs": {"input": ["41", 0], "resize_type": "scale dimensions", "resize_type.width": 2560, "resize_type.height": 1440, "resize_type.crop": "center", "scale_method": "lanczos"}},
+  "58": {"class_type": "SeedVR2Preprocess", "inputs": {"resized_images": ["57", 0]}},
+  "51": {"class_type": "VAELoader", "inputs": {"vae_name": "seedvr2_ema_vae_fp16.safetensors"}},
+  "52": {"class_type": "UNETLoader", "inputs": {"unet_name": "seedvr2_3b_int8_convrot.safetensors", "weight_dtype": "default"}},
+  "48": {"class_type": "VAEEncodeTiled", "inputs": {"tile_size": 512, "overlap": 128, "temporal_size": 64, "temporal_overlap": 8, "pixels": ["58", 0], "vae": ["51", 0]}},
+  "99": {"class_type": "SeedVR2TemporalChunk", "inputs": {"latent": ["48", 0], "temporal_overlap": 0, "chunking_mode": "manual", "chunking_mode.frames_per_chunk": 1}},
+  "61": {"class_type": "SeedVR2Conditioning", "inputs": {"model": ["52", 0], "vae_conditioning": ["99", 0]}},
+  "54": {"class_type": "KSampler", "inputs": {"seed": 0, "steps": 1, "cfg": 1, "sampler_name": "euler", "scheduler": "simple", "denoise": 1, "model": ["52", 0], "positive": ["61", 0], "negative": ["61", 1], "latent_image": ["99", 0]}},
+  "100": {"class_type": "SeedVR2TemporalMerge", "inputs": {"latents": ["54", 0], "temporal_overlap": ["99", 1]}},
+  "55": {"class_type": "VAEDecodeTiled", "inputs": {"tile_size": 512, "overlap": 128, "temporal_size": 64, "temporal_overlap": 8, "samples": ["100", 0], "vae": ["51", 0]}},
+  "59": {"class_type": "SeedVR2PostProcessing", "inputs": {"images": ["55", 0], "original_resized_images": ["57", 0], "color_correction_method": "lab"}},
+  "9": {"class_type": "SaveImage", "inputs": {"filename_prefix": "montagio/upscale-image", "images": ["59", 0]}}
+}

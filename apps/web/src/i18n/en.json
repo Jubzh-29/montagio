@@ -344,5 +344,7 @@
   "maskBrushMedium": "Medium",
   "maskBrushLarge": "Large",
   "maskClear": "Clear",
-  "maskUploadFailed": "The painted area could not be sent: try again."
+  "maskUploadFailed": "The painted area could not be sent: try again.",
+  "photoHd": "HD 2560 px (~{s} s)",
+  "photoHdDownload": "Download the HD photo"
 }

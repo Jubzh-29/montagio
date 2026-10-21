@@ -158,6 +158,35 @@ export function compileUpscale(
   return { workflow, output: { ...model.output }, params: { width, height, seed: inputs.seed } };
 }
 
+/** The HD size of a photo of each aspect: 2560 px on its long side, never stretched to another shape. */
+export const IMAGE_UPSCALE_TARGETS: Record<Aspect, { width: number; height: number }> = {
+  '16:9': { width: 2560, height: 1440 },
+  '9:16': { width: 1440, height: 2560 },
+  '1:1': { width: 2048, height: 2048 },
+};
+
+export type ImageUpscaleInputs = {
+  /** The photo, as the backend's loader names it once uploaded. */
+  imageRef: string;
+  /** The aspect of the photo, which picks its HD size. */
+  aspect: Aspect;
+  seed: number;
+};
+
+/** A photo to HD (SeedVR2 on one frame): same aspect, resized then restored. */
+export function compileImageUpscale(
+  model: ExtensionModel,
+  template: ApiWorkflow,
+  inputs: ImageUpscaleInputs,
+): ExtensionCompiled<{ width: number; height: number; seed: number }> {
+  expectTask(model, 'i2i-upscale');
+  const target = Object.hasOwn(IMAGE_UPSCALE_TARGETS, inputs.aspect) ? IMAGE_UPSCALE_TARGETS[inputs.aspect] : undefined;
+  if (!target) throw new CompileError(`aspect "${inputs.aspect}" has no HD size: 16:9, 9:16 or 1:1`);
+  const { width, height } = target;
+  const workflow = bindExtension(model, template, { image: inputs.imageRef, width, height, seed: inputs.seed });
+  return { workflow, output: { ...model.output }, params: { width, height, seed: inputs.seed } };
+}
+
 /** The looks of the edit: a LoRA of Qwen-Image-Edit-2511 (its lock entry) and the strength it runs at. */
 export const EDIT_LOOKS = {
   /** systms INFL8: "inflate the <subject>". */

@@ -7,7 +7,7 @@ import { ALLOWED_WEIGHT_LICENSES, EXTENSION_IDS, kebabId, type ExtensionId } fro
  * not camera presets: their entries live in registry/extensions/, apart from registry/models/,
  * so nothing that lists preset models (the Studio, the showcase, compileJob) sees them.
  */
-export const EXTENSION_TASKS = ['t2a', 'v2v-upscale', 'i2i-edit', 'tts', 'ia2v-talk', 'i2v-effect', 'flf2v', 'motion-transfer'] as const;
+export const EXTENSION_TASKS = ['t2a', 'v2v-upscale', 'i2i-upscale', 'i2i-edit', 'tts', 'ia2v-talk', 'i2v-effect', 'flf2v', 'motion-transfer'] as const;
 export type ExtensionTask = (typeof EXTENSION_TASKS)[number];
 
 /** What a job delivers (the same three kinds as @montagio/comfy-adapter, which the registry does not depend on). */
@@ -41,6 +41,7 @@ export type ExtensionBindingKey = (typeof EXTENSION_BINDING_KEYS)[number];
 export const REQUIRED_EXTENSION_BINDINGS: Record<ExtensionTask, ExtensionBindingKey[]> = {
   t2a: ['prompt', 'duration_s', 'seed', 'bpm'],
   'v2v-upscale': ['video', 'width', 'height', 'seed'],
+  'i2i-upscale': ['image', 'width', 'height', 'seed'],
   'i2i-edit': ['image', 'prompt', 'seed'],
   tts: ['text', 'language', 'seed', 'cfg'],
   'ia2v-talk': ['image', 'audio', 'prompt', 'seed', 'width', 'height', 'frames'],
@@ -52,6 +53,7 @@ export const REQUIRED_EXTENSION_BINDINGS: Record<ExtensionTask, ExtensionBinding
 export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
   t2a: 'audio',
   'v2v-upscale': 'video',
+  'i2i-upscale': 'image',
   'i2i-edit': 'image',
   tts: 'audio',
   'ia2v-talk': 'video',

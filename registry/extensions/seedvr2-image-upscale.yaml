@@ -1,0 +1,21 @@
+# HD photo (extension "upscale"): a still image to 2560 px on its long side with SeedVR2, the
+# model of the 1080p clips run on one frame (chunks of one frame, no temporal overlap). The
+# target size is set by the resize before it (scale dimensions, crop center), so the photo
+# keeps its aspect.
+schema: montagio/extension-model@0.1
+id: seedvr2-image-upscale
+name: SeedVR2 3B (HD photo)
+extension: upscale
+task: i2i-upscale
+license: Apache-2.0
+weights: [seedvr2-3b-int8, seedvr2-vae]
+workflow: workflows/seedvr2-image-upscale.api.json
+bindings:
+  image: { node: "41", field: image }
+  width: { node: "57", field: resize_type.width }
+  height: { node: "57", field: resize_type.height }
+  seed: { node: "54", field: seed }
+output: { node: "9", kind: image }
+# GPU seconds for one photo on an RTX 4090, the model loading included: an estimate until a
+# GPU session measures it (one frame of the 81 a 1080p clip takes 215 s for)
+estimate_s: 20
