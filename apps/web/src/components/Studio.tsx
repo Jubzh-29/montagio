@@ -27,6 +27,7 @@ import { useMotionPaused } from '@/lib/use-motion';
 import { needsConsent } from '@/lib/consent';
 import { defaultSubject, forSample, pickWallChoice } from '@/lib/effect-choice';
 import { showcaseTexts } from '@/lib/showcase-t2i';
+import { needsScene, restoredScene, SCENE_MAX, sceneMissing, sceneOf } from '@/lib/scene';
 import { canUpscale } from '@/lib/hd';
 import { estimateSpeech } from '@/lib/speech';
 import { nextView, tabEvent, type CanvasEvent, type CanvasState, type ShownTab } from '@/lib/studio-view';
@@ -287,6 +288,9 @@ export function Studio() {
   useEffect(() => {
     busyRef.current = busy;
   }, [busy]);
+  // The description belongs to the photo it came with, or was written for: a new file empties it.
+  // Typed before any photo came in, it stays for the first one.
+  const sceneOfPhoto = useRef(false);
   const uploadToken = useRef(0);
 
   const onFile = useCallback(
@@ -302,9 +306,13 @@ export function Studio() {
       localUrlRef.current = localUrl;
       setJob({ status: 'idle' });
       setPhotoPrompt(undefined);
+      if (sceneOfPhoto.current) setPrompt('');
+      sceneOfPhoto.current = false;
       setUpload({ status: 'uploading', localUrl });
       const next = await sendUpload(file, localUrl, t);
-      if (token === uploadToken.current) setUpload(next);
+      if (token !== uploadToken.current) return;
+      setUpload(next);
+      if (next.status === 'ready') sceneOfPhoto.current = true;
     },
     [t],
   );
@@ -349,7 +357,7 @@ export function Studio() {
     if (token === outfitToken.current) setOutfit(next);
   };
 
-  /** The sample photo, copied by the server: its origin is known, so no effect on it asks for consent. */
+  /** The sample photo, copied by the server: its origin is known, so no effect on it asks for consent, and what it shows too. */
   const loadSample = async () => {
     if (busyRef.current) return;
     touched.current = true;
@@ -357,6 +365,8 @@ export function Studio() {
     const localUrl = '/media/demo-assets/images/sample-16x9.png';
     setJob({ status: 'idle' });
     setPhotoPrompt(undefined);
+    setPrompt(t('samplePhotoScene'));
+    sceneOfPhoto.current = true;
     setUpload({ status: 'uploading', localUrl });
     const settle = (next: UploadState) => {
       if (token === uploadToken.current) setUpload(next);
@@ -385,13 +395,15 @@ export function Studio() {
     setCanvas((current) => nextView('close-atelier', current));
   };
 
-  /** The atelier's image becomes the start photo, as any upload would. */
+  /** The atelier's image becomes the start photo, as any upload would; one made from a text is described by it. */
   const takePhoto = (photo: AtelierPhoto, kind: 't2i' | 'edit') => {
     touched.current = true;
     ++uploadToken.current;
     setJob({ status: 'idle' });
     setUpload({ status: 'ready', localUrl: photo.url, imageRef: photo.imageRef, personal: photo.personal });
     setPhotoPrompt(photo.prompt);
+    setPrompt(sceneOf(photo.prompt));
+    sceneOfPhoto.current = true;
     closeAtelier(kind);
   };
 
@@ -400,6 +412,8 @@ export function Studio() {
     if (busyRef.current) return;
     setJob({ status: 'idle' });
     setPhotoPrompt(undefined);
+    setPrompt(sceneOf(sample.prompt));
+    sceneOfPhoto.current = true;
     setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef, personal: false });
   };
 
@@ -444,7 +458,10 @@ export function Studio() {
     setRights(false);
   }
 
-  const ready = upload.status === 'ready' && modelId !== null && !busy;
+  // A camera move waits for what the photo shows (lib/scene.ts says why).
+  const askScene = needsScene(tab, IS_SHOWCASE);
+  const missingScene = sceneMissing(tab, IS_SHOWCASE, prompt);
+  const ready = upload.status === 'ready' && modelId !== null && !busy && !missingScene;
   const canGenerate = tab === 'motion'
     ? upload.status === 'ready' && motionVideo.status === 'ready' && rights && !busy
     : tab === 'avatar'
@@ -514,7 +531,9 @@ export function Studio() {
     setSubject(back.subject ?? defaultSubject(back.photoPrompt, 120));
     if (back.presetId) setPresetId(back.presetId);
     if (back.modelId && models.some((model) => model.id === back.modelId)) setModelId(back.modelId);
-    if (back.prompt !== undefined) setPrompt(back.prompt);
+    setPrompt(restoredScene(back));
+    // A photo gone with the data: the description waits for the visitor to add it again.
+    sceneOfPhoto.current = back.photo !== undefined;
     if (back.shots) setShots(back.shots);
     if (back.effectId) setEffectId(back.effectId);
     if (back.hookId) setEffectId(back.hookId);
@@ -640,6 +659,8 @@ export function Studio() {
         const first = presetList[0];
         if (sample && first && !touched.current) {
           setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef, personal: false });
+          setPrompt(sceneOf(sample.prompt));
+          sceneOfPhoto.current = true;
           setCanvas({ view: 'result', before: 'gallery' });
           // Effects first: the showcase opens on its first effect rendered on this photo, unless the URL asks for another tab.
           const asked = new URLSearchParams(window.location.search).get('tab');
@@ -973,13 +994,19 @@ export function Studio() {
                   id="scene-prompt"
                   className={styles.prompt}
                   rows={2}
-                  maxLength={500}
+                  maxLength={SCENE_MAX}
                   placeholder={t('promptPlaceholder')}
                   value={prompt}
                   disabled={IS_SHOWCASE}
-                  aria-describedby={IS_SHOWCASE ? 'scene-local' : undefined}
+                  aria-required={askScene || undefined}
+                  aria-describedby={IS_SHOWCASE ? 'scene-local' : 'scene-why'}
                   onChange={(event) => setPrompt(event.target.value)}
                 />
+                {!IS_SHOWCASE && (
+                  <p id="scene-why" className={styles.hint}>
+                    {t('sceneWhy')}
+                  </p>
+                )}
                 {IS_SHOWCASE && (
                   <p id="scene-local" className={styles.hint}>
                     {t('showcasePromptLocal')}
@@ -1014,6 +1041,7 @@ export function Studio() {
                   </div>
                 )}
                 {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
+                {upload.status === 'ready' && missingScene && <p className={styles.hint}>{t('sceneNeeded')}</p>}
                 {tab === 'effects' && upload.status === 'ready' && needsOutfit && outfit.status !== 'ready' && <p className={styles.hint}>{t('hookNeedsOutfit')}</p>}
                 {tab === 'motion' && upload.status === 'ready' && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('motionNeedsVideo')}</p>}
               </div>

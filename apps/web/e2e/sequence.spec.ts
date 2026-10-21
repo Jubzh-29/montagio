@@ -1,13 +1,17 @@
 import { resolve } from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const sampleImage = resolve(__dirname, '../../../demo-assets/images/sample-16x9.png');
+// A film's moves wait for what the photo shows, like a single move: an uploaded photo comes without it.
+const scene = (page: Page) => page.getByRole('textbox', { name: 'What the photo shows', exact: true });
+const describePhoto = (page: Page) => scene(page).fill('a television test card with colour bars');
 
 test('sequence happy path: three moves, one film, a 9:16 cut', async ({ page }) => {
   test.setTimeout(90_000);
   await page.goto('/?tab=film');
   await page.setInputFiles('input[type=file]', sampleImage);
   for (const name of ['Crash Push', 'Pan Left', 'Slow Push']) await page.getByRole('button', { name }).click();
+  await describePhoto(page);
   await page.getByRole('button', { name: /^Generate film/ }).click();
   await expect(page.getByText(/Shot 1\/3/)).toBeVisible();
   await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /\/media\/data\/sequences\//, {
@@ -17,13 +21,17 @@ test('sequence happy path: three moves, one film, a 9:16 cut', async ({ page }) 
   await expect(page.getByRole('link', { name: 'Download film' })).toHaveAttribute('href', /film\.mp4$/);
 });
 
-test('generate film needs two shots', async ({ page }) => {
+test('generate film needs two shots and what the photo shows', async ({ page }) => {
   await page.goto('/?tab=film');
   await page.setInputFiles('input[type=file]', sampleImage);
   await page.getByRole('button', { name: 'Crash Push' }).click();
+  await describePhoto(page);
   await expect(page.getByRole('button', { name: /^Generate film/ })).toBeDisabled();
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await expect(page.getByRole('button', { name: /^Generate film/ })).toBeEnabled();
+  await scene(page).fill('');
+  await expect(page.getByRole('button', { name: /^Generate film/ })).toBeDisabled();
+  await expect(page.getByText('Describe what the photo shows to generate.')).toBeVisible();
 });
 
 test('a shot can be removed and the list is capped at three', async ({ page }) => {
@@ -40,7 +48,7 @@ test('each shot can carry its own optional text', async ({ page }) => {
   await page.goto('/?tab=film');
   await page.setInputFiles('input[type=file]', sampleImage);
   for (const name of ['Crash Push', 'Pan Left']) await page.getByRole('button', { name }).click();
-  await page.getByLabel('Scene (optional)').fill('a harbour at dawn');
+  await scene(page).fill('a harbour at dawn');
   await page.getByRole('textbox', { name: 'Text for shot 2' }).fill('the fog lifts');
   const request = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/api/sequences'));
   await page.getByRole('button', { name: /^Generate film/ }).click();
@@ -54,6 +62,7 @@ test('a film gets music: two downloads with sound, the silent ones stay', async 
   await page.goto('/?tab=film');
   await page.setInputFiles('input[type=file]', sampleImage);
   for (const name of ['Crash Push', 'Pan Left']) await page.getByRole('button', { name }).click();
+  await describePhoto(page);
   await page.getByRole('button', { name: /^Generate film/ }).click();
   await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /\/media\/data\/sequences\//, { timeout: 60_000 });
   await page.getByRole('textbox', { name: 'The music' }).fill('tense synth pulse');

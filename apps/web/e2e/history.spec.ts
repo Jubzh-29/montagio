@@ -6,7 +6,7 @@ async function makeClip(page: import('@playwright/test').Page) {
   await page.goto(CAMERA);
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await page.getByRole('button', { name: 'Pan Left' }).click();
-  await page.getByRole('textbox', { name: /Scene/ }).fill('a harbour at dawn');
+  await page.getByRole('textbox', { name: 'What the photo shows', exact: true }).fill('a harbour at dawn');
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
 }
@@ -21,7 +21,7 @@ test('a clip made in the studio is in the history and comes back with Reuse', as
   await card.getByRole('link', { name: 'Reuse' }).click();
   await expect(page).toHaveURL(/[?]tab=camera$/);
   await expect(page.getByRole('button', { name: 'Pan Left' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('textbox', { name: /Scene/ })).toHaveValue('a harbour at dawn');
+  await expect(page.getByRole('textbox', { name: 'What the photo shows', exact: true })).toHaveValue('a harbour at dawn');
   await expect(page.getByTestId('photo-slot').locator('img')).toHaveAttribute('src', /\/media\/data\/uploads\//);
 });
 

@@ -14,8 +14,12 @@ test('a text makes the start photo, then a camera move animates it', async ({ pa
   await page.getByRole('button', { name: 'Use this photo', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Create the start photo from a text' })).toHaveCount(0);
   await expect(page.getByTestId('photo-slot').locator('img')).toHaveAttribute('src', /\/media\/data\/uploads\//);
+  // The photo comes described by its own text: the camera move follows it.
+  await expect(page.getByRole('textbox', { name: 'What the photo shows', exact: true })).toHaveValue('a lighthouse at dusk, waves crashing');
   await page.getByRole('button', { name: 'Crash Push' }).click();
+  const body = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/api/generations'));
   await page.getByRole('button', { name: /^Generate/ }).click();
+  expect(((await body).postDataJSON() as { userPrompt?: string }).userPrompt).toBe('a lighthouse at dusk, waves crashing');
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
 });
 

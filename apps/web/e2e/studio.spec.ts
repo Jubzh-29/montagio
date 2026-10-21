@@ -1,15 +1,19 @@
 import { resolve } from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const sampleImage = resolve(__dirname, '../../../demo-assets/images/sample-16x9.png');
 // The camera presets live in the Camera tab; with every extension on, the Studio opens on Effects.
 const CAMERA = '/?tab=camera';
+// A camera move waits for what the photo shows: an uploaded photo comes without it.
+const scene = (page: Page) => page.getByRole('textbox', { name: 'What the photo shows', exact: true });
+const describePhoto = (page: Page) => scene(page).fill('a television test card with colour bars');
 
 test('studio happy path in demo mode', async ({ page }) => {
   await page.goto(CAMERA);
   await expect(page.getByRole('link', { name: /open weights — verified/ })).toBeVisible();
   await page.setInputFiles('input[type=file]', sampleImage);
   await page.getByRole('button', { name: 'Crash Push' }).click();
+  await describePhoto(page);
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.getByRole('progressbar')).toBeVisible();
   await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /\/media\//, { timeout: 15_000 });
@@ -19,12 +23,34 @@ test('studio happy path in demo mode', async ({ page }) => {
   expect((await download).suggestedFilename()).toMatch(/\.json$/);
 });
 
-test('generate stays disabled until an image and a preset are chosen', async ({ page }) => {
+test('generate stays disabled until an image, a preset and what the photo shows are there', async ({ page }) => {
   await page.goto(CAMERA);
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeDisabled();
   await page.setInputFiles('input[type=file]', sampleImage);
   await page.getByRole('button', { name: 'Crash Push' }).click();
+  await expect(page.getByRole('button', { name: /^Generate/ })).toBeDisabled();
+  await expect(page.getByText('Describe what the photo shows to generate.')).toBeVisible();
+  await scene(page).fill('   ');
+  await expect(page.getByRole('button', { name: /^Generate/ })).toBeDisabled();
+  await describePhoto(page);
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeEnabled();
+  await expect(page.getByText('Describe what the photo shows to generate.')).toHaveCount(0);
+});
+
+test('the description goes with the photo: kept when typed first, emptied by a new photo, sent with the move', async ({ page }) => {
+  await page.goto(CAMERA);
+  await expect(scene(page)).toHaveAttribute('aria-required', 'true');
+  await scene(page).fill('a harbour at dawn');
+  await page.setInputFiles('input[type=file]', sampleImage);
+  await expect(page.getByTestId('photo-slot').locator('img')).toBeVisible();
+  await expect(scene(page)).toHaveValue('a harbour at dawn');
+  const body = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/api/generations'));
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  expect(((await body).postDataJSON() as { userPrompt?: string }).userPrompt).toBe('a harbour at dawn');
+  await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
+  await page.setInputFiles('input[type=file]', sampleImage);
+  await expect(scene(page)).toHaveValue('');
+  await expect(page.getByRole('button', { name: /^Generate/ })).toBeDisabled();
 });
 
 test('double click sends a single generation', async ({ page }) => {
@@ -35,6 +61,7 @@ test('double click sends a single generation', async ({ page }) => {
   await page.goto(CAMERA);
   await page.setInputFiles('input[type=file]', sampleImage);
   await page.getByRole('button', { name: 'Crash Push' }).click();
+  await describePhoto(page);
   await page.getByRole('button', { name: /^Generate/ }).dblclick();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
   expect(posts).toBe(1);
@@ -54,17 +81,21 @@ test('open stack page lists three Apache-2.0 models', async ({ page }) => {
   for (const row of await rows.all()) await expect(row).toContainText('Apache-2.0');
 });
 
-test('a sample photo lets a visitor try without their own image', async ({ page }) => {
+test('a sample photo lets a visitor try without their own image, described already', async ({ page }) => {
   await page.goto(CAMERA);
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await expect(scene(page)).toHaveValue(/^a television test card/);
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeEnabled();
+  const body = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/api/generations'));
   await page.getByRole('button', { name: /^Generate/ }).click();
+  expect(((await body).postDataJSON() as { userPrompt?: string }).userPrompt).toMatch(/^a television test card/);
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
 });
 
 test('a generation the server no longer knows ends as lost instead of freezing', async ({ page }) => {
   await page.goto(CAMERA);
   await page.setInputFiles('input[type=file]', sampleImage);
+  await describePhoto(page);
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.getByRole('progressbar')).toBeVisible();
   await page.route(/\/api\/generations\/[^/]+$/, (route) =>
@@ -78,6 +109,7 @@ test('repeated server errors while polling end in an error state', async ({ page
   test.setTimeout(60_000);
   await page.goto(CAMERA);
   await page.setInputFiles('input[type=file]', sampleImage);
+  await describePhoto(page);
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.getByRole('progressbar')).toBeVisible();
   await page.route(/\/api\/generations\/[^/]+$/, (route) => route.fulfill({ status: 502, body: 'Bad Gateway' }));
@@ -101,6 +133,7 @@ test('a slow first upload cannot replace a newer photo', async ({ page }) => {
   await page.setInputFiles('input[type=file]', sampleImage);
   await expect.poll(() => refs.length, { timeout: 10_000 }).toBe(2);
   const newest = refs[0]!; // the second upload answers first
+  await describePhoto(page);
   const body = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/api/generations'));
   await page.getByRole('button', { name: /^Generate/ }).click();
   expect(((await body).postDataJSON() as { imageRef: string }).imageRef).toBe(newest);
@@ -109,6 +142,7 @@ test('a slow first upload cannot replace a newer photo', async ({ page }) => {
 test('the photo cannot be swapped while a render is running', async ({ page }) => {
   await page.goto(CAMERA);
   await page.setInputFiles('input[type=file]', sampleImage);
+  await describePhoto(page);
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.getByRole('progressbar')).toBeVisible();
   await expect(page.locator('input[type=file]')).toBeDisabled();

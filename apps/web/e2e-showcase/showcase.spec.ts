@@ -127,8 +127,8 @@ test('a portrait clip fits the monitor instead of being cropped', async ({ page 
 
 test('disabled controls say why', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByLabel('Scene (optional)')).toBeDisabled();
-  await expect(page.getByText('Scene text applies when you generate locally.')).toBeVisible();
+  await expect(page.getByLabel('What the photo shows', { exact: true })).toBeDisabled();
+  await expect(page.getByText('Locally, you describe your own photo here.')).toBeVisible();
   const fast = page.getByRole('radio', { name: /Wan 2\.2 5B/ });
   await expect(fast).toBeDisabled();
   await expect(page.locator('label', { has: fast })).toContainText('local only');
