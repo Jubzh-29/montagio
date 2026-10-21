@@ -1,4 +1,6 @@
 # A hook of the GPU session S2: the end frame is a macro of the iris, made by the edit.
+# Session S2 (2026-10-21): end frame excellent, but one FLF2V transition from the face to the iris is a cross-fade
+# (4 steps) or grows the iris in the mouth (20 steps). Left undated, so hidden; S3 or later: an intermediate keyframe.
 schema: montagio/preset@0.1
 id: iris-dive
 name: Iris Dive

@@ -67,7 +67,7 @@ def write_repo_tar(root: Path, files: list[tuple[str, int]], dest: Path) -> None
 
 
 def split_jobs(jobs: str) -> list[str]:
-    """`--preset crash-push; --preset tilt-up` → one smoke argument string per container."""
+    """`--preset crash-push; --preset crane-up` → one smoke argument string per container."""
     items = [item.strip() for item in jobs.split(";")]
     items = [item for item in items if item]
     if not items:

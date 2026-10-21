@@ -22,5 +22,7 @@ bindings:
   frames: { node: "96", field: length }
 output: { node: "113", kind: video }
 limits: { min_duration_s: 1, max_duration_s: 15, max_chars: 500 }
-# GPU seconds for 5 to 15 s of speech on an RTX 4090 with the 4-step LoRA (estimate: 3 to 11 min; S2 measures it)
-estimate_s: 480
+# GPU seconds for 5 to 15 s of speech on an RTX 4090 with the 4-step LoRA. Session S2, on an L4
+# (about half as fast): 127 to 145 s for 3 to 4 s of speech (one 77-frame pass), loading included;
+# 15 s takes three passes
+estimate_s: 240

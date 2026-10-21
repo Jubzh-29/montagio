@@ -14,7 +14,7 @@ From the repository root, with the modal CLI of the project's venv:
   modal run infra/modal/montagio_s2.py::check                                  install check on the GPU
   modal run --detach infra/modal/montagio_s2.py::smoke --args "--image /workspace/start.png --runs 2"
   modal run --detach infra/modal/montagio_s2.py::batch --common "--image /workspace/start.png" \
-      --jobs "--preset crash-push,slow-push;--preset tilt-up,tilt-down"     one container per job, in parallel
+      --jobs "--preset crash-push,slow-push;--preset crane-up"     one container per job, in parallel
   modal run --detach infra/modal/montagio_s2.py::series --jobs "--extension edit;--extension edit --look infl8" \
       --label edit                                                          one container, the jobs in a row
   modal run infra/modal/montagio_s2.py::cmd --cmd "…"                          any command, services started
@@ -242,7 +242,7 @@ def ui() -> None:
 def batch(jobs: str, common: str = "", label: str = "batch") -> None:
     """Several smoke runs at once, one container each: same cost, less waiting.
 
-    --jobs "--preset crash-push,slow-push; --preset tilt-up" (separated by ';'), --common added to each.
+    --jobs "--preset crash-push,slow-push; --preset crane-up" (separated by ';'), --common added to each.
     Each container loads its models again (a few minutes): group the short jobs.
     """
     items = s2lib.split_jobs(jobs)

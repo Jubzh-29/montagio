@@ -285,28 +285,29 @@
     "model_pack_name": [
      "COMBO",
      {
+      "default": "resembleai-mtl-v3",
       "multiselect": false,
       "options": [
        "resembleai-mtl-v3"
-      ],
-      "default": "resembleai-mtl-v3"
+      ]
      }
     ],
     "model_version": [
      "COMBO",
      {
+      "default": "t3_mtl23ls_v3.safetensors",
       "multiselect": false,
       "options": [
        "t3_mtl23ls_v3.safetensors",
        "t3_mtl23ls_v2.safetensors",
        "t3_23lang.safetensors"
-      ],
-      "default": "t3_mtl23ls_v3.safetensors"
+      ]
      }
     ],
     "language": [
      "COMBO",
      {
+      "default": "en",
       "multiselect": false,
       "options": [
        "ar",
@@ -332,15 +333,14 @@
        "sw",
        "tr",
        "zh"
-      ],
-      "default": "en"
+      ]
      }
     ],
     "text": [
      "STRING",
      {
-      "multiline": true,
-      "default": "Hello, this is a test of Chatterbox multilingual TTS in ComfyUI."
+      "default": "Hello, this is a test of Chatterbox multilingual TTS in ComfyUI.",
+      "multiline": true
      }
     ],
     "exaggeration": [
@@ -415,44 +415,44 @@
     "device": [
      "COMBO",
      {
+      "default": "default",
       "multiselect": false,
       "options": [
        "default",
        "cpu",
        "auto"
-      ],
-      "default": "default"
+      ]
      }
     ],
     "dtype": [
      "COMBO",
      {
+      "default": "auto",
       "multiselect": false,
       "options": [
        "auto",
        "bf16",
        "fp16",
        "fp32"
-      ],
-      "default": "auto"
+      ]
      }
     ],
     "attention_mode": [
      "COMBO",
      {
+      "default": "sdpa",
       "multiselect": false,
       "options": [
        "eager",
        "sdpa"
-      ],
-      "default": "sdpa"
+      ]
      }
     ],
     "crash_protection_template": [
      "STRING",
      {
-      "multiline": false,
-      "default": "hmm ,, {seg} hmm ,,"
+      "default": "hmm ,, {seg} hmm ,,",
+      "multiline": false
      }
     ]
    },
@@ -486,13 +486,34 @@
     "audio_prompt"
    ]
   },
+  "is_input_list": false,
   "output": [
    "AUDIO"
+  ],
+  "output_is_list": [
+   false
   ],
   "output_name": [
    "audio"
   ],
-  "python_module": "custom_nodes.ComfyUI-Chatterbox"
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "ChatterboxMTLTTS",
+  "display_name": "Chatterbox Multilingual TTS 🌍",
+  "description": "Synthesise speech in 23 languages with the Chatterbox multilingual model, in v1, v2 or v3 -- plus the Single Language Pack finetunes (zh-cmn, es-mx-latam, es-es, pt-br, pt-pt, hi).",
+  "python_module": "custom_nodes.ComfyUI-Chatterbox",
+  "category": "WMNodes/sound/tts",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
  },
  "ConditioningZeroOut": {
   "input": {

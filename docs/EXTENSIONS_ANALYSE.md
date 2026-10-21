@@ -131,7 +131,7 @@ Les workflows partent des templates officiels de [Comfy-Org/workflow_templates](
   - ComfyUI tourne avec `HF_HUB_OFFLINE=1` : sinon un fichier manquant fait télécharger tout le dépôt (13,9 Go) ;
   - ses 5 paquets Python sont installés en `--no-deps --require-hashes` (`infra/runpod/requirements-chatterbox.txt`) ; jamais ses extras (`spacy-pkuseg` télécharge depuis GitHub, `pykakasi` est GPL).
 - **Choix de la v0.1 :** la voix intégrée (anglaise), sans clonage ; en français, `cfg_weight` 0, comme le conseille la carte du modèle. Pas de voix clonée, donc pas de consentement à recueillir, et pas de voix restée dans le cache du node pour le rendu suivant.
-- **Fixture :** la classe `ChatterboxMTLTTS` est écrite d'après `nodes/mtl_node.py` au commit épinglé (aucun ComfyUI local n'a ce node) ; la S2 la régénère depuis le `/object_info` du pod.
+- **Fixture :** la classe `ChatterboxMTLTTS` avait été écrite d'après `nodes/mtl_node.py` au commit épinglé (aucun ComfyUI local n'a ce node). Le 21/10, la S2 l'a remplacée par le vrai `/object_info` de la L4 : les entrées écrites à la main étaient exactes, seules manquaient les métadonnées du node. Il faut la capturer après le téléchargement des poids de la voix, faute de quoi le node ne propose qu'un pack par défaut.
 - **Installeur local :** il laisse l'avatar de côté, avec un message, tant qu'il n'installe pas ce node.
 
 ### Avatar parlant : Wan 2.2 S2V, nodes du cœur
@@ -263,6 +263,8 @@ Pour la règle du 25/10 au soir, il suffit de dater `gpu_validated` des extensio
 Aucune extension n'est « à couper » sans GPU : licences acceptées (celle des effets avec une preuve faible, écrite), nodes du cœur (sauf la voix), workflows validés par un vrai ComfyUI (sauf la voix), et chacune tient en 24 Go sur le papier. La règle du 25/10 tranchera sur les mesures de la S2 et de la S3 ; si la S2 déborde, l'upscale sort en premier.
 
 ## 7. À vérifier en S2
+
+Fait le 21/10 : les mesures et les verdicts sont dans [S2_RESULTATS.md](S2_RESULTATS.md). Les 7 extensions y sont validées ; le hook Iris Dive reste masqué.
 
 Dans l'ordre de priorité. Les commandes sont dans [S2_CHECKLIST.md](S2_CHECKLIST.md), partie 6.8.
 

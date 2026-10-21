@@ -69,7 +69,7 @@ test('an edit of a text-made photo is not personal', async () => {
 });
 
 test('edit hidden by the flag: 404 extension-disabled', async () => {
-  delete process.env.MONTAGIO_EXTENSIONS;
+  process.env.MONTAGIO_EXTENSIONS = 'none';
   const res = await post(postEdits, { imageRef: await sampleRef(), instruction: 'make it snow' }, 'e5');
   expect(res.status).toBe(404);
   expect(await res.json()).toEqual({ error: 'extension-disabled' });

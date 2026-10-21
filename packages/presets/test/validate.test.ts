@@ -68,10 +68,10 @@ test('every repository preset validates against its preferred and fallback model
   }
 });
 
-test('the library holds the twelve launch presets of spec §6', () => {
+test('the library holds the eleven presets kept after GPU session S2', () => {
   expect([...lib.presets.keys()].sort()).toEqual([
-    'breathing', 'crash-push', 'drift-left-push', 'pan-left', 'pan-right', 'pull-back-reveal',
-    'pull-back-tilt-up', 'push-and-settle', 'rise-and-push', 'slow-push', 'tilt-down', 'tilt-up',
+    'breathing', 'crane-up', 'crash-push', 'drift-left-push', 'pan-left', 'pan-right', 'pull-back-reveal',
+    'pull-back-tilt-up', 'push-and-settle', 'rise-and-push', 'slow-push',
   ]);
 });
 

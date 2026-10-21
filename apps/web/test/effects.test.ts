@@ -1,3 +1,6 @@
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { readTags } from '@montagio/sequence';
 import { POST as postEffects } from '@/app/api/effects/route';
 import { GET as getJob } from '@/app/api/jobs/[id]/route';
@@ -6,8 +9,8 @@ import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import type { JobSummary } from '@/lib/api-types';
 import { mediaFileFor } from '@/server/generations';
 import { readJobWorkflow } from '@/server/jobs';
-import { getServices } from '@/server/services';
-import { params, pngFile, setupTempData, uploadRequest } from './helpers';
+import { getServices, resetServicesForTests } from '@/server/services';
+import { params, pngFile, repoRoot, setupTempData, uploadRequest } from './helpers';
 
 setupTempData();
 let flag: string | undefined;
@@ -68,10 +71,22 @@ test('a personal photo without consent: 400 consent-required', async () => {
 });
 
 test('an effect not dated is hidden without all: 404 extension-disabled', async () => {
-  process.env.MONTAGIO_EXTENSIONS = 'effects';
-  const res = await post({ imageRef: await sampleRef(), effectId: 'squish', subject: 'a dog' }, 'fx4');
-  expect(res.status).toBe(404);
-  expect(await res.json()).toEqual({ error: 'extension-disabled' });
+  const imageRef = await sampleRef();
+  // Every effect is dated since GPU session S2: a copy of the library where Squish lost its date.
+  const root = mkdtempSync(join(tmpdir(), 'montagio-fx-root-'));
+  try {
+    for (const dir of ['presets', 'registry', 'workflows']) cpSync(join(repoRoot, dir), join(root, dir), { recursive: true });
+    const squish = join(root, 'presets', 'effects', 'squish.yaml');
+    writeFileSync(squish, readFileSync(squish, 'utf8').replace(/^gpu_validated: .*\n?/m, ''));
+    process.env.MONTAGIO_ROOT = root;
+    resetServicesForTests();
+    process.env.MONTAGIO_EXTENSIONS = 'effects';
+    const res = await post({ imageRef, effectId: 'squish', subject: 'a dog' }, 'fx4');
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'extension-disabled' });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('an unknown effect: 404 extension-disabled', async () => {

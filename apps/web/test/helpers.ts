@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,6 +20,22 @@ export function setupTempData(): () => string {
   // Retries: on Windows a clip FFmpeg just closed can stay locked for a moment.
   afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
   return () => dir;
+}
+
+/**
+ * Remove every GPU date from a copy of the library under `root`, as it was before GPU session S2: the
+ * extensions of registry/extensions.yaml back to null, the effect and hook presets without gpu_validated.
+ * Tests of the cut rule start from there, then date what they need.
+ */
+export function undateLibrary(root: string): void {
+  const config = join(root, 'registry', 'extensions.yaml');
+  writeFileSync(config, readFileSync(config, 'utf8').replace(/gpu_validated: \d{4}-\d{2}-\d{2}/g, 'gpu_validated: null'));
+  for (const folder of ['effects', 'transitions']) {
+    for (const name of readdirSync(join(root, 'presets', folder)).filter((file) => file.endsWith('.yaml'))) {
+      const path = join(root, 'presets', folder, name);
+      writeFileSync(path, readFileSync(path, 'utf8').replace(/^gpu_validated: .*\n?/m, ''));
+    }
+  }
 }
 
 /** Minimal PNG: signature + IHDR chunk, enough for dimension sniffing. */

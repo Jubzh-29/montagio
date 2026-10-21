@@ -71,9 +71,9 @@ def test_repo_tar_changes_with_a_file(repo: Path, tmp_path_factory: pytest.TempP
 
 
 def test_split_jobs() -> None:
-    assert s2lib.split_jobs(" --preset crash-push ;; --preset tilt-up --runs 2; ") == [
+    assert s2lib.split_jobs(" --preset crash-push ;; --preset crane-up --runs 2; ") == [
         "--preset crash-push",
-        "--preset tilt-up --runs 2",
+        "--preset crane-up --runs 2",
     ]
     with pytest.raises(ValueError, match="no job"):
         s2lib.split_jobs(" ; ")

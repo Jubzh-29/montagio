@@ -27,6 +27,6 @@ bindings:
   seed: { node: "169", field: seed }
 output: { node: "9", kind: image }
 limits: { max_chars: 500 }
-# GPU seconds per image on an RTX 4090 with the 4-step LoRA (estimate: 15 to 25 s; about
-# 2 min at 40 steps without it; S2 measures both)
-estimate_s: 25
+# GPU seconds per image on an RTX 4090 with the 4-step LoRA. Session S2, on an L4 (about half
+# as fast): 20 to 25 s warm, 71 s with the models loading; 306 s at 40 steps without the LoRA
+estimate_s: 15

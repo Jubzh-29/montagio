@@ -17,5 +17,6 @@ bindings:
 output: { node: "76", kind: video }
 # 121 frames = 5 s at 24 fps, the longest Wan clip; chunks of 33 frames keep 1080p under 24 GB
 limits: { max_input_frames: 121 }
-# GPU seconds for an 81-frame clip on an RTX 4090 (estimate: 2 to 4 min; S2 measures it)
-estimate_s: 240
+# GPU seconds for an 81-frame clip on an RTX 4090. Session S2, on an L4 (about half as fast):
+# 428 s to 1080p, the model loading included
+estimate_s: 215

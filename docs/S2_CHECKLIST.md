@@ -107,7 +107,7 @@ modal run --detach infra/modal/montagio_s2.py::smoke --args "<arguments>" --labe
   ```
 - **Plusieurs rendus à la fois**, un conteneur chacun (4 au plus), pour le même coût :
   ```bash
-  modal run --detach infra/modal/montagio_s2.py::batch --common "--image /workspace/start.png" --jobs "--preset crash-push,slow-push,pan-left,pan-right; --preset tilt-up,tilt-down,pull-back-reveal,rise-and-push; --preset drift-left-push,pull-back-tilt-up,push-and-settle,breathing" --label presets
+  modal run --detach infra/modal/montagio_s2.py::batch --common "--image /workspace/start.png" --jobs "--preset crash-push,slow-push,pan-left,pan-right; --preset crane-up,pull-back-reveal,rise-and-push; --preset drift-left-push,pull-back-tilt-up,push-and-settle,breathing" --label presets
   ```
 - **Une image éditée à animer** (partie 6.8, étape 1) : donnez son chemin dans le volume, `/results/runs/<dossier>/clips/<image>.png`.
 
@@ -123,6 +123,14 @@ Ordre adapté à la L4 et au budget :
 - Les vérifications faites à la main dans l'interface : la partie 5.4 (Z-Image), les parties 6.4 et 6.6, les variantes de l'avatar et de l'upscale. Elles passent par `modal run infra/modal/montagio_s2.py::ui`, s'il reste du budget. **L'URL du tunnel est publique et ComfyUI n'a pas de mot de passe** : gardez-la pour vous, et arrêtez la fonction (Ctrl+C) dès que vous avez fini, car le GPU est facturé pendant ce temps.
 - La partie 6.5 (Séquence dans le Studio) : pas sur Modal pour l'instant, car le Studio demanderait un tunnel public vers le proxy.
 - L'essai de l'installeur local (encadré de la partie 7) : il ne s'applique pas à Modal.
+
+### Leçons de la S2 du 21/10 (résultats : [S2_RESULTATS.md](S2_RESULTATS.md))
+
+- **Toujours décrire la photo** : `--prompt "<ce que montre la photo>"` sur chaque preset. Sans description, le modèle invente : c'était le fantôme du premier rendu.
+- **Un clip par conteneur** pour les rendus de 19 min (`batch` avec un preset par job). Une préemption fait relancer tout le travail du conteneur ; avec un clip par conteneur, on ne perd que ce clip.
+- **`series`** pour les jobs courts sur un même modèle (l'édition, la musique, la voix) : les modèles ne se chargent qu'une fois.
+- **La définition du node de la voix** (`object_info-chatterbox.json`) se capture après le téléchargement des poids de la voix, avec `cmd` : avant, le node ne propose qu'un pack par défaut.
+- **Deux sorties par job** pour l'upscale, la voix et le transfert de mouvement (un aperçu, puis le résultat), dans un ordre qui varie : prenez le fichier à la bonne taille ou à la bonne durée.
 
 ### M4. Fin de session
 

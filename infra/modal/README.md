@@ -30,7 +30,7 @@ modal run infra/modal/montagio_s2.py::check                                   # 
 modal volume put montagio-results start.png inputs/start.png                  # a photo, seen as /workspace/start.png
 modal run --detach infra/modal/montagio_s2.py::smoke --args "--image /workspace/start.png --runs 2" --label fun-camera
 modal run --detach infra/modal/montagio_s2.py::batch --common "--image /workspace/start.png" \
-  --jobs "--preset crash-push,slow-push,pan-left; --preset pan-right,tilt-up,tilt-down" --label presets
+  --jobs "--preset crash-push,slow-push,pan-left; --preset pan-right,crane-up" --label presets
 modal run infra/modal/montagio_s2.py::cmd --cmd "nvidia-smi"                  # any command, services started
 modal volume get montagio-results runs .                                      # every run, to judge on the PC
 ```
@@ -38,6 +38,8 @@ modal volume get montagio-results runs .                                      # 
 - `smoke` takes the arguments of `npm run smoke -w @montagio/infra-runpod --` from the checklist, and sets `--out` itself, to `/results/runs/<date>-<label>`. It adds `--timeout-min 120` unless you give one: an L4 renders about three times slower than the RTX 4090 the checklist was timed on.
 - `batch` runs several `smoke` calls at once, one container each: the cost is about the same, the wait is shorter. Each container loads its models again, so group short jobs. At most 4 run at once.
 - `ui` opens ComfyUI's interface through a `modal.forward` tunnel, for the checks the checklist does by hand. **ComfyUI has no login, and the URL is public while the function runs.** Keep it to yourself, and stop the function with Ctrl+C as soon as you are done: the GPU is billed meanwhile.
+- `series` runs several `smoke` calls one after the other in one container: the models load once. Use it for short jobs on one model (edits, music, voice).
+- Modal may preempt a container; it then restarts the function with the same input, from the start. Give a long render a container of its own (one preset per `batch` job), so that a preemption costs that clip only.
 - With `--detach`, a run goes on if the PC disconnects. `modal app list` shows what still runs, and `modal app stop montagio-s2` stops it.
 
 `modal shell` is not supported on Windows: the modal client refuses it. A shell is also billed at Sandbox rates, about 3x a function's for CPU and memory. On Linux or macOS, `modal shell infra/modal/montagio_s2.py::cmd` opens one on the same image, GPU and volumes. In Git Bash, set `MSYS_NO_PATHCONV=1`: otherwise a volume path such as `/inputs/start.png` is rewritten into a Windows path.
