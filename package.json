@@ -21,7 +21,8 @@
     "test:modal": "python -m pytest infra/modal -q",
     "check:open-stack": "tsx tools/check-open-stack/src/cli.ts . --out apps/web/public/open-stack-report.json",
     "montagio": "tsx packages/presets/src/montagio.ts",
-    "showcase": "tsx packages/showcase/src/showcase.ts"
+    "showcase": "tsx packages/showcase/src/showcase.ts",
+    "mcp": "tsx packages/mcp/src/server.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
