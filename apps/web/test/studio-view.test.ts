@@ -28,3 +28,11 @@ test('closing the atelier returns to the view before it', () => {
   // Opening it twice keeps the first view to come back to.
   expect(nextView('open-atelier', open)).toEqual(open);
 });
+
+test('a new photo shows on the monitor; from the atelier, closing it returns there', () => {
+  expect(nextView('photo', { view: 'gallery', before: 'gallery' })).toEqual({ view: 'result', before: 'gallery' });
+  // "Use this photo" in the atelier: the photo arrives first, then the atelier closes onto the monitor.
+  const atelier = nextView('photo', { view: 'atelier', before: 'gallery' });
+  expect(atelier).toEqual({ view: 'atelier', before: 'result' });
+  expect(nextView('close-atelier', atelier)).toEqual({ view: 'result', before: 'result' });
+});

@@ -12,6 +12,7 @@ test('studio happy path in demo mode', async ({ page }) => {
   await page.goto(CAMERA);
   await expect(page.getByRole('link', { name: /open weights — verified/ })).toBeVisible();
   await page.setInputFiles('input[type=file]', sampleImage);
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await describePhoto(page);
   await page.getByRole('button', { name: /^Generate/ }).click();
@@ -27,6 +28,7 @@ test('generate stays disabled until an image, a preset and what the photo shows 
   await page.goto(CAMERA);
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeDisabled();
   await page.setInputFiles('input[type=file]', sampleImage);
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeDisabled();
   await expect(page.getByText('Describe what the photo shows to generate.')).toBeVisible();
@@ -60,6 +62,7 @@ test('double click sends a single generation', async ({ page }) => {
   });
   await page.goto(CAMERA);
   await page.setInputFiles('input[type=file]', sampleImage);
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await describePhoto(page);
   await page.getByRole('button', { name: /^Generate/ }).dblclick();
@@ -199,6 +202,7 @@ test('a tab the Studio does not show falls back to the first one', async ({ page
 test('a camera clip gets its HD version', async ({ page }) => {
   await page.goto('/?tab=camera');
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
@@ -214,6 +218,7 @@ test('with no extension shown, no extension button anywhere', async ({ page }) =
   for (const tab of ['Effects', 'Avatar']) await expect(page.getByRole('link', { name: tab, exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });

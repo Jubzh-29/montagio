@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useI18n } from '@/i18n';
+import { useI18n, type MessageKey } from '@/i18n';
 import type { ExtensionsInfo } from '@/lib/api-types';
 import { needsConsent } from '@/lib/consent';
 import { refusalMessageKey } from '@/lib/refusals';
@@ -62,6 +62,18 @@ export function PhotoAtelier({
   const askConsent = kind === 'edit' && needsConsent(photo, 'edit');
   const done = job?.state === 'succeeded' && job.outputImageRef && job.outputUrl ? job : null;
   const canStart = text.trim().length > 0 && !busy && (kind === 't2i' || (photo.status === 'ready' && (!askConsent || consent)));
+  // What a disabled button waits for, said under it: the photo first, then the text, then the consent.
+  const waitingFor: MessageKey | null = busy
+    ? null
+    : kind === 'edit' && photo.status !== 'ready'
+      ? 'editNeedsPhoto'
+      : !text.trim()
+        ? kind === 't2i'
+          ? 't2iNeedsText'
+          : 'editNeedsText'
+        : kind === 'edit' && askConsent && !consent
+          ? 'editNeedsConsent'
+          : null;
   const percent = job ? Math.round(job.progress * 100) : 0;
 
   const run = () => {
@@ -129,7 +141,13 @@ export function PhotoAtelier({
       {askConsent && <ConsentCheck id="atelier-consent" checked={consent} onChange={setConsent} />}
 
       <div className={styles.atelierActions}>
-        <button type="button" className={styles.buttonPrimary} disabled={!canStart} onClick={run}>
+        <button
+          type="button"
+          className={styles.buttonPrimary}
+          disabled={!canStart}
+          aria-describedby={waitingFor ? `atelier-waiting-${kind}` : undefined}
+          onClick={run}
+        >
           {kind === 't2i' ? t('t2iCreate', { s: estimates.t2i }) : t('editApply', { s: estimates.edit ?? 0 })}
         </button>
         {busy && job && (
@@ -138,6 +156,11 @@ export function PhotoAtelier({
           </button>
         )}
       </div>
+      {waitingFor && (
+        <p id={`atelier-waiting-${kind}`} className={styles.hint}>
+          {t(waitingFor)}
+        </p>
+      )}
 
       <p className="visually-hidden" role="status">
         {busy ? t('announceRendering') : done ? t('atelierReady') : ''}

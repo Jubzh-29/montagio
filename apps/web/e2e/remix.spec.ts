@@ -17,6 +17,7 @@ const showMonitor = (page: Page) => page.getByRole('button', { name: 'Monitor', 
 async function openRemix(page: Page) {
   await page.goto('/?tab=camera');
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await showGallery(page);
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await page.getByRole('button', { name: 'Remix preset', exact: true }).click();
   const editor = page.getByRole('textbox', { name: 'Preset YAML' });
@@ -57,6 +58,7 @@ test('remix: a past remix reopens with its own text, not in the editor of anothe
 test('remix: the result asks before replacing unsaved edits of another preset', async ({ page }) => {
   await page.goto('/?tab=camera');
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await showGallery(page);
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await page.getByRole('button', { name: /^Generate \(/ }).click();
   await expect(result(page)).toBeVisible({ timeout: 10_000 });

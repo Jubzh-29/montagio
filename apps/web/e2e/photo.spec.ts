@@ -16,6 +16,9 @@ test('a text makes the start photo, then a camera move animates it', async ({ pa
   await expect(page.getByTestId('photo-slot').locator('img')).toHaveAttribute('src', /\/media\/data\/uploads\//);
   // The photo comes described by its own text: the camera move follows it.
   await expect(page.getByRole('textbox', { name: 'What the photo shows', exact: true })).toHaveValue('a lighthouse at dusk, waves crashing');
+  // The new photo shows on the monitor, its move's frame on it; the moves are one click away.
+  await expect(page.getByRole('button', { name: 'Monitor', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Crash Push' }).click();
   const body = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/api/generations'));
   await page.getByRole('button', { name: /^Generate/ }).click();

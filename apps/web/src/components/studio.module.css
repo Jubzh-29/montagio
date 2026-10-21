@@ -10,6 +10,34 @@
   align-items: start;
 }
 
+/* What Montagio does, then what the tab makes: one row across the composer and the canvas. */
+.intro {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.promise {
+  font-size: var(--text-xl);
+  font-weight: 650;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.lede {
+  max-width: 75ch;
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+}
+
+/* On a phone the promise stays two lines high, above the work. */
+@media (max-width: 640px) {
+  .promise {
+    font-size: var(--text-l);
+  }
+}
+
 /* The canvas: the wall of previews, or the monitor and its result. */
 .stage {
   display: flex;

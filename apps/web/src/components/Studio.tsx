@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useI18n } from '@/i18n';
+import { useI18n, type MessageKey } from '@/i18n';
 import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import {
   TERMINAL_STATES,
@@ -31,7 +31,7 @@ import { needsScene, restoredScene, SCENE_MAX, sceneMissing, sceneOf } from '@/l
 import { canUpscale } from '@/lib/hd';
 import { estimateSpeech } from '@/lib/speech';
 import { nextView, tabEvent, type CanvasEvent, type CanvasState, type ShownTab } from '@/lib/studio-view';
-import { HOOKS_READY, pickTab, tabHref, visibleTabs } from '@/lib/tabs';
+import { HOOKS_READY, pickTab, tabHref, visibleTabs, type Tab } from '@/lib/tabs';
 import { refreshExtensions, useExtensions } from '@/lib/use-extensions';
 import { useShowcase } from '@/lib/use-showcase';
 import { AiCaption } from './AiCaption';
@@ -135,6 +135,15 @@ const endpoint = (job: Tracked) => `/api/${ENDPOINTS[job.kind]}/${job.record.id}
 function lostJob(job: Tracked): Job {
   return { ...job, record: { ...job.record, state: 'failed', error: 'lost' } } as Tracked;
 }
+
+/** Under the promise: what each tab makes, in one line. */
+const TAB_LEDES: Record<Tab, MessageKey> = {
+  effects: 'ledeEffects',
+  camera: 'ledeCamera',
+  film: 'ledeFilm',
+  avatar: 'ledeAvatar',
+  motion: 'ledeMotion',
+};
 
 export function Studio() {
   const { t, lang } = useI18n();
@@ -453,6 +462,14 @@ export function Studio() {
   // The rights box is for this photo and this clip: another one asks again.
   const rightsKey = `${upload.status === 'ready' ? upload.imageRef : ''}|${motionVideo.status === 'ready' ? motionVideo.videoRef : ''}`;
   const [rightsFor, setRightsFor] = useState(rightsKey);
+  // A new photo on Camera shows on the monitor, with the dashed frame of where the chosen move ends:
+  // the cause and effect that would otherwise wait behind the Monitor button.
+  const startPhoto = upload.status === 'ready' ? upload.imageRef : null;
+  const [photoShown, setPhotoShown] = useState(startPhoto);
+  if (photoShown !== startPhoto) {
+    setPhotoShown(startPhoto);
+    if (startPhoto && tab === 'camera') setCanvas((current) => nextView('photo', current));
+  }
   if (rightsFor !== rightsKey) {
     setRightsFor(rightsKey);
     setRights(false);
@@ -858,9 +875,13 @@ export function Studio() {
       </Suspense>
       <Header recording={busy} current={tab} />
       <main className={styles.studio} data-motion={motionPaused ? 'paused' : 'playing'}>
-        <h1 className="visually-hidden">
-          {t('appName')} — {t('tagline')}
-        </h1>
+        {/* What Montagio does, then what this tab makes: the first thing read, above the composer and the canvas. */}
+        <div className={styles.intro}>
+          <h1 className={styles.promise}>{t('promise')}</h1>
+          <p className={styles.lede} data-testid="tab-lede">
+            {t(TAB_LEDES[tab])}
+          </p>
+        </div>
         <Composer
           label={t('composerLabel')}
           choice={
@@ -974,10 +995,16 @@ export function Studio() {
                   className={styles.buttonSecondary}
                   aria-expanded={false}
                   disabled={presetId === null}
+                  aria-describedby="remix-hint"
                   onClick={() => presetId && openRemix(presetId)}
                 >
                   {t('remix')}
                 </button>
+              )}
+              {mode === 'single' && !remix && (
+                <p id="remix-hint" className={styles.hint}>
+                  {t('remixHint')}
+                </p>
               )}
               <ModelPicker
                 models={models}

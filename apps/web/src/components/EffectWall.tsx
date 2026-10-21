@@ -94,6 +94,8 @@ export function EffectWall({
           ))}
         </div>
       )}
+      {/* The two kinds of the wall, said once where they are filtered. */}
+      {hooks.length > 0 && <p className={styles.hint}>{t('hooksHint')}</p>}
       <div className={styles.wall}>
         {tiles.map((tile) => (
           <WallTile

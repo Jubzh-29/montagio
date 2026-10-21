@@ -5,6 +5,7 @@ const CAMERA = '/?tab=camera';
 async function makeClip(page: import('@playwright/test').Page) {
   await page.goto(CAMERA);
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await page.getByRole('textbox', { name: 'What the photo shows', exact: true }).fill('a harbour at dawn');
   await page.getByRole('button', { name: /^Generate/ }).click();
