@@ -356,5 +356,6 @@
   "voiceUploading": "Préparation de l'échantillon…",
   "voiceFailed": "Ce fichier n'a pas pu être lu comme échantillon de voix (3 s au moins).",
   "voiceReady": "Échantillon prêt : {s} s gardées.",
-  "voiceConsent": "C'est ma voix, ou la personne qui parle a donné son accord"
+  "voiceConsent": "C'est ma voix, ou la personne qui parle a donné son accord",
+  "photoCharacter": "Personnage"
 }

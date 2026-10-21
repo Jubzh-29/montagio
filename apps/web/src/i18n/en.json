@@ -356,5 +356,6 @@
   "voiceUploading": "Preparing the sample…",
   "voiceFailed": "This file could not be read as a voice sample (3 s at least).",
   "voiceReady": "Sample ready: {s} s kept.",
-  "voiceConsent": "This is my voice, or the speaker agreed to this use"
+  "voiceConsent": "This is my voice, or the speaker agreed to this use",
+  "photoCharacter": "Character"
 }

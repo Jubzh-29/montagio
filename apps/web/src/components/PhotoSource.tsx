@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, type DragEvent } from 'react';
 import { useI18n } from '@/i18n';
 import type { SampleSummary } from '@/lib/api-types';
@@ -107,6 +108,12 @@ export function PhotoSource({
             <button type="button" className={styles.buttonSecondary} onClick={() => onAtelier('edit')} disabled={disabled || upload.status !== 'ready'}>
               {t('photoEdit')}
             </button>
+          )}
+          {/* A saved character's pictures come back here from the Characters page, in this tab. */}
+          {!showcase && t2i && (
+            <Link href="/characters" className={styles.buttonSecondary}>
+              {t('photoCharacter')}
+            </Link>
           )}
         </div>
       </div>
