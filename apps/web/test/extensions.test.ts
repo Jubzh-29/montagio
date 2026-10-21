@@ -148,7 +148,7 @@ test('GET /api/extensions describes the wall: effects first in their order, hook
   expect(body.hooks.find((hook) => hook.id === 'wardrobe-swap')?.references).toBe(2);
   // A hook's clip is captioned with the transition model, as an effect's with the effects model.
   expect(body.hooks[0]).toMatchObject({ modelName: expect.stringMatching(/Wan 2.2/), license: 'Apache-2.0' });
-  expect(body.estimates).toEqual({ t2i: 5, edit: 15, avatar: 255, music: 15, upscale: 215 }); // avatar: voice 15 + avatar 240
+  expect(body.estimates).toEqual({ t2i: 5, edit: 15, avatar: 255, music: 15, upscale: 215, motion: 205 }); // avatar: voice 15 + avatar 240
   // The edit's caption names its model and license, which the preset catalogue does not hold.
   expect(body.editModel).toEqual({ id: 'qwen-image-edit-2511', name: expect.stringMatching(/^Qwen-Image-Edit-2511/), license: 'Apache-2.0' });
 });

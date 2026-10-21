@@ -34,7 +34,7 @@ test('a hidden or unknown tab in the URL falls back to the first visible one', (
 
 test('tabHref builds the query, in the order of TAB_ORDER', () => {
   expect(tabHref('camera')).toBe('/?tab=camera');
-  expect(TAB_ORDER).toEqual(['effects', 'camera', 'film', 'avatar']);
+  expect(TAB_ORDER).toEqual(['effects', 'camera', 'film', 'avatar', 'motion']);
 });
 
 test('a tab whose screen is not built yet stays hidden, whatever the extensions say', () => {
@@ -58,4 +58,11 @@ test('hooks alone open the Effects tab, now that they render', () => {
   expect(visibleTabs({ ...none, extensions: ['edit', 'transitions'], hooks: [hook] })).toEqual(['effects', 'camera', 'film']);
   // Before their two-step render existed, the flag kept them off.
   expect(visibleTabs({ ...none, extensions: ['edit', 'transitions'], hooks: [hook] }, undefined, false)).toEqual(['camera', 'film']);
+});
+
+test('motion shows its tab once its screen is built', () => {
+  expect(READY_TABS.has('motion')).toBe(true);
+  const info = { ...none, extensions: ['effects', 'avatar', 'motion'] as const, effects: [effect] };
+  expect(visibleTabs({ ...info, extensions: [...info.extensions] })).toEqual(['effects', 'camera', 'film', 'avatar', 'motion']);
+  expect(visibleTabs({ ...none, extensions: ['effects'], effects: [effect] })).not.toContain('motion');
 });

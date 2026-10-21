@@ -8,7 +8,7 @@ import { jobs, type JobRecord } from './jobs';
 import { advanceSequence, readSequence, type SequenceRecord } from './sequences';
 import { getServices } from './services';
 import type { GenerationRecord } from './store';
-import { readUploadMeta } from './uploads';
+import { readUploadMeta, readVideoMeta } from './uploads';
 
 export const HISTORY_LIMIT = 200;
 /** A shot of a film is a generation of its own: its idempotency key says so. */
@@ -187,6 +187,21 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
         task: 'music',
         name: parent ? `${parent.name} ♪` : base.name,
         reprise: parent?.reprise ?? { tab: 'film' },
+      };
+    }
+    case 'motion': {
+      const videoRef = typeof record.inputs.videoRef === 'string' ? record.inputs.videoRef : '';
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'motion',
+        reprise: {
+          tab: 'motion',
+          ...(await photo(typeof record.inputs.imageRef === 'string' ? record.inputs.imageRef : undefined)),
+          ...((await readVideoMeta(videoRef)) ? { videoRef } : {}),
+          ...(record.inputs.character ? { prompt: String(record.inputs.character) } : {}),
+          ...(record.inputs.motion ? { motion: String(record.inputs.motion) } : {}),
+        },
       };
     }
     case 'upscale': {

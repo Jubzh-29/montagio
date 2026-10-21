@@ -13,6 +13,8 @@ export type StudioRestore = {
   subject?: string;
   /** The scene text of a camera move. */
   prompt?: string;
+  /** A motion transfer's reference clip (when it is still there) and its two texts. */
+  motion?: { videoRef?: string; character: string; action: string };
   /** What an avatar says, and in which language. */
   speech?: { text: string; language: 'en' | 'fr' };
   modelId?: string;
@@ -38,11 +40,15 @@ export function applyReprise(item: HistoryItem): StudioRestore {
   if (reprise.effectId) restore.effectId = reprise.effectId;
   if (reprise.hookId) restore.hookId = reprise.hookId;
   if (reprise.prompt) {
-    // The same field means four things: the text a photo was made from, an effect's subject, an avatar's speech, a scene.
+    // The same field means five things: the text a photo was made from, an effect's subject, an
+    // avatar's speech, a motion's character (below, with the clip), a scene.
     if (item.kind === 'photo') restore.photoPrompt = reprise.prompt;
     else if (reprise.tab === 'avatar') restore.speech = { text: reprise.prompt, language: reprise.language ?? 'en' };
     else if (reprise.tab === 'effects') restore.subject = reprise.prompt;
-    else restore.prompt = reprise.prompt;
+    else if (reprise.tab !== 'motion') restore.prompt = reprise.prompt;
+  }
+  if (reprise.tab === 'motion') {
+    restore.motion = { ...(reprise.videoRef ? { videoRef: reprise.videoRef } : {}), character: reprise.prompt ?? '', action: reprise.motion ?? '' };
   }
   return restore;
 }

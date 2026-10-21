@@ -14,3 +14,8 @@ export function extensionFile(model: ExtensionModel, key: ExtensionBindingKey, p
 export function uploadPath(imageRef: string): string {
   return join(getEnv().data, ...imageRef.split('/'));
 }
+
+/** The file behind a reference clip's videoRef ("videos/<id>.mp4"), under MONTAGIO_DATA/uploads. */
+export function videoPath(videoRef: string): string {
+  return join(getEnv().data, 'uploads', ...videoRef.split('/'));
+}

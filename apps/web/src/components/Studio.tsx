@@ -18,6 +18,7 @@ import {
   type ShowcaseInfo,
   type UploadResult,
 } from '@/lib/api-types';
+import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
@@ -39,6 +40,7 @@ import { Composer } from './Composer';
 import { ConsentCheck } from './ConsentCheck';
 import { AvatarFields } from './AvatarFields';
 import { HdPanel } from './HdPanel';
+import { MotionFields, type MotionVideo } from './MotionFields';
 import { MusicPanel } from './MusicPanel';
 import { ShowcaseTextAtelier } from './ShowcaseTextAtelier';
 import { EffectFields } from './EffectFields';
@@ -154,6 +156,11 @@ export function Studio() {
   // The spoken language follows the interface's until the visitor picks one.
   const [pickedLanguage, setSpeechLanguage] = useState<'en' | 'fr' | null>(null);
   const speechLanguage = pickedLanguage ?? lang;
+  // The Motion tab: the reference clip (prepared at upload), what the character looks like and does, the rights box.
+  const [motionVideo, setMotionVideo] = useState<MotionVideo>({ status: 'idle' });
+  const [motionCharacter, setMotionCharacter] = useState('');
+  const [motionAction, setMotionAction] = useState('');
+  const [rights, setRights] = useState(false);
   const [subject, setSubject] = useState('');
   const [consent, setConsent] = useState(false);
   // History: the latest creations under the result, and the item a "Reuse" link brings back (?from=).
@@ -302,6 +309,35 @@ export function Studio() {
     [t],
   );
 
+  /** The reference clip of a motion transfer: prepared by the server (5 s, 16 fps, silent), its kept length shown. */
+  const motionToken = useRef(0);
+  const onMotionVideo = async (file: File) => {
+    if (busyRef.current) return;
+    const token = ++motionToken.current;
+    // Over the cap, nothing is sent: the server would refuse it after the whole upload.
+    if (file.size > MAX_VIDEO_BYTES) {
+      setMotionVideo({ status: 'error', message: t('motionVideoTooLarge') });
+      return;
+    }
+    setMotionVideo({ status: 'uploading' });
+    const form = new FormData();
+    form.set('video', file);
+    let next: MotionVideo;
+    try {
+      const res = await apiFetch('/api/uploads/video', { method: 'POST', body: form });
+      if (res.status === 413) next = { status: 'error', message: t('motionVideoTooLarge') };
+      else if (res.status === 503) next = { status: 'error', message: t('errorFfmpegMissing') };
+      else if (!res.ok) next = { status: 'error', message: t('motionVideoRefused') };
+      else {
+        const meta = (await res.json()) as { videoRef: string; url: string; duration_s: number; sourceDuration_s: number };
+        next = { status: 'ready', videoRef: meta.videoRef, url: meta.url, duration_s: meta.duration_s, sourceDuration_s: meta.sourceDuration_s };
+      }
+    } catch {
+      next = { status: 'error', message: t('errorGeneric') };
+    }
+    if (token === motionToken.current) setMotionVideo(next);
+  };
+
   /** The outfit of a two-reference hook: a second upload, which the start photo does not replace. */
   const outfitToken = useRef(0);
   const onOutfit = async (file: File) => {
@@ -400,9 +436,18 @@ export function Studio() {
     setConsentFor(photoKey);
     setConsent(false);
   }
+  // The rights box is for this photo and this clip: another one asks again.
+  const rightsKey = `${upload.status === 'ready' ? upload.imageRef : ''}|${motionVideo.status === 'ready' ? motionVideo.videoRef : ''}`;
+  const [rightsFor, setRightsFor] = useState(rightsKey);
+  if (rightsFor !== rightsKey) {
+    setRightsFor(rightsKey);
+    setRights(false);
+  }
 
   const ready = upload.status === 'ready' && modelId !== null && !busy;
-  const canGenerate = tab === 'avatar'
+  const canGenerate = tab === 'motion'
+    ? upload.status === 'ready' && motionVideo.status === 'ready' && rights && !busy
+    : tab === 'avatar'
     ? upload.status === 'ready' && !busy && speechText.trim().length > 0 && (!askConsent || consent)
     : tab === 'effects'
     ? upload.status === 'ready' && !busy && wallChoice !== undefined && (!askConsent || consent) && (!needsOutfit || outfit.status === 'ready')
@@ -473,6 +518,13 @@ export function Studio() {
     if (back.shots) setShots(back.shots);
     if (back.effectId) setEffectId(back.effectId);
     if (back.hookId) setEffectId(back.hookId);
+    if (back.motion) {
+      // An upload still on its way must not replace the clip brought back.
+      motionToken.current++;
+      setMotionCharacter(back.motion.character);
+      setMotionAction(back.motion.action);
+      setMotionVideo(back.motion.videoRef ? { status: 'ready', videoRef: back.motion.videoRef, url: `/media/data/uploads/${back.motion.videoRef}` } : { status: 'idle' });
+    }
     if (back.speech) {
       setSpeechText(back.speech.text);
       setSpeechLanguage(back.speech.language);
@@ -612,6 +664,12 @@ export function Studio() {
     followJob.current = true;
     moveCanvas('generate');
     const userPrompt = prompt.trim() || undefined;
+    if (tab === 'motion') {
+      if (motionVideo.status !== 'ready') return;
+      const texts = { ...(motionCharacter.trim() ? { character: motionCharacter.trim() } : {}), ...(motionAction.trim() ? { motion: motionAction.trim() } : {}) };
+      void submit('job', { imageRef: upload.imageRef, videoRef: motionVideo.videoRef, ...texts, rights: true }, undefined, '/api/motion');
+      return;
+    }
     if (tab === 'avatar') {
       const body = { imageRef: upload.imageRef, text: speechText.trim(), language: speechLanguage, ...(askConsent ? { consent } : {}) };
       void submit('job', body, undefined, '/api/avatars');
@@ -702,7 +760,9 @@ export function Studio() {
 
   const selectedModel = models.find((model) => model.id === modelId);
   const estimate =
-    tab === 'avatar'
+    tab === 'motion'
+      ? (extensions?.estimates.motion ?? 0)
+      : tab === 'avatar'
       ? (extensions?.estimates.avatar ?? 0)
       : tab === 'effects'
         ? (wallChoice?.item.estimate_s ?? 0)
@@ -729,7 +789,8 @@ export function Studio() {
       ? t(tracked?.kind === 'sequence' ? 'announceFilmReady' : 'announceClipReady')
       : '';
   // The empty monitor plays the move in hand: the preset being remixed, the chosen one, or the last shot added.
-  const moveId = tab === 'effects' || tab === 'avatar' ? undefined : remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
+  // Only the tabs that render a camera move have one; the others (effects, avatar, motion) draw none.
+  const moveId = tab !== 'camera' && tab !== 'film' ? undefined : remix ? remix.baseId : mode === 'single' ? presetId : shots.at(-1)?.presetId;
   const movePreset = presets.find((preset) => preset.id === moveId);
   const move = movePreset && {
     id: mode === 'sequence' ? `${shots.length}-${movePreset.id}` : movePreset.id,
@@ -737,13 +798,15 @@ export function Studio() {
     speed: movePreset.speed,
   };
   // The slate under the monitor: the take about to be shot, even once a photo hides the viewfinder.
-  const slateMove = tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoice?.item.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  const slateMove = tab === 'motion' ? t('tabMotion') : tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoice?.item.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
   // An avatar lasts as long as its speech: the slate says the estimate, once there is a text.
   const speechSeconds = estimateSpeech(speechText, speechLanguage);
   const slate = slateMove && [
     slateMove,
-    tab !== 'effects' && tab !== 'avatar' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
-    tab === 'avatar'
+    tab !== 'effects' && tab !== 'avatar' && tab !== 'motion' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
+    tab === 'motion'
+      ? motionVideo.status === 'ready' && motionVideo.duration_s !== undefined && t('slateSpec', { s: Math.round(motionVideo.duration_s * 10) / 10 })
+      : tab === 'avatar'
       ? speechSeconds > 0 && t('slateSpec', { s: speechSeconds })
       : t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
   ].filter(Boolean);
@@ -753,6 +816,8 @@ export function Studio() {
     ? { name: wallItemOfResult.modelName, license: wallItemOfResult.license }
     : tracked?.kind === 'job' && tracked.record.task === 'avatar'
       ? extensions?.avatarModel
+    : tracked?.kind === 'job' && tracked.record.task === 'motion'
+      ? extensions?.motionModel
     : tracked?.kind === 'generation'
       ? models.find((model) => model.id === tracked.record.modelId)
       : tracked?.kind === 'sequence'
@@ -778,7 +843,14 @@ export function Studio() {
         <Composer
           label={t('composerLabel')}
           choice={
-            tab === 'avatar' ? (
+            tab === 'motion' ? (
+              <ChoiceCard
+                name={t('tabMotion')}
+                kindLabel={t('motionKind', { s: motionVideo.status === 'ready' && motionVideo.duration_s !== undefined ? Math.round(motionVideo.duration_s * 10) / 10 : 5 })}
+                icon="motion"
+                paused={motionPaused}
+              />
+            ) : tab === 'avatar' ? (
               <ChoiceCard
                 name={t('tabAvatar')}
                 kindLabel={t('avatarKind', { s: speechSeconds })}
@@ -853,7 +925,18 @@ export function Studio() {
             </>
           }
           fields={
-            tab === 'avatar' ? (
+            tab === 'motion' ? (
+              <MotionFields
+                video={motionVideo}
+                disabled={busy}
+                paused={motionPaused}
+                onVideo={(file) => void onMotionVideo(file)}
+                character={motionCharacter}
+                action={motionAction}
+                onCharacter={setMotionCharacter}
+                onAction={setMotionAction}
+              />
+            ) : tab === 'avatar' ? (
               <AvatarFields text={speechText} language={speechLanguage} max={300} onText={setSpeechText} onLanguage={setSpeechLanguage} />
             ) : tab === 'effects' ? (
               selectedEffect ? (
@@ -906,7 +989,13 @@ export function Studio() {
             </>
             )
           }
-          consent={askConsent ? <ConsentCheck id="effect-consent" checked={consent} onChange={setConsent} /> : undefined}
+          consent={
+            tab === 'motion' ? (
+              <ConsentCheck id="motion-rights" label="motionRights" checked={rights} onChange={setRights} />
+            ) : askConsent ? (
+              <ConsentCheck id="effect-consent" checked={consent} onChange={setConsent} />
+            ) : undefined
+          }
           generate={
             <>
               <div className={styles.generateBlock}>
@@ -926,6 +1015,7 @@ export function Studio() {
                 )}
                 {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
                 {tab === 'effects' && upload.status === 'ready' && needsOutfit && outfit.status !== 'ready' && <p className={styles.hint}>{t('hookNeedsOutfit')}</p>}
+                {tab === 'motion' && upload.status === 'ready' && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('motionNeedsVideo')}</p>}
               </div>
               {/* Outside the sticky block: on a phone that block stays one button high over the gallery. */}
               {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}
@@ -963,7 +1053,7 @@ export function Studio() {
           }
           onView={(value) => setCanvas({ view: value, before: value })}
           gallery={
-            tab === 'avatar' ? null : tab === 'effects' ? (
+            tab === 'avatar' || tab === 'motion' ? null : tab === 'effects' ? (
               <EffectWall
                 effects={effects}
                 hooks={hooks}
@@ -1044,6 +1134,11 @@ export function Studio() {
                 </p>
               )}
               {!IS_SHOWCASE && succeeded && resultModel && <AiCaption modelName={resultModel.name} license={resultModel.license} />}
+              {succeeded && tracked?.kind === 'job' && tracked.record.task === 'motion' && (
+                <p className={styles.caption} data-testid="motion-no-sound">
+                  {t('motionNoSound')}
+                </p>
+              )}
               {busy && tracked?.kind === 'job' && tracked.record.stepImageUrl && extensions?.editModel && (
                 <p className={styles.caption} data-testid="end-frame-caption">
                   {t('hookEndFrame', { model: extensions.editModel.name, license: extensions.editModel.license })}

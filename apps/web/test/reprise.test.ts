@@ -60,6 +60,12 @@ test('an avatar reprise brings back its text and language', () => {
   expect(applyReprise(avatar).prompt).toBeUndefined();
 });
 
+test('a motion reprise reopens the motion tab with its texts', () => {
+  const motion = item({ task: 'motion', reprise: { tab: 'motion', imageRef: 'uploads/p.png', personal: true, videoRef: 'videos/v.mp4', prompt: 'a knight', motion: 'waves' } });
+  expect(applyReprise(motion)).toMatchObject({ tab: 'motion', motion: { videoRef: 'videos/v.mp4', character: 'a knight', action: 'waves' } });
+  expect(applyReprise(motion).prompt).toBeUndefined();
+});
+
 test('the filter keeps one kind', () => {
   const items = [item(), item({ key: 'job:j', kind: 'photo' }), item({ key: 'sequence:s', kind: 'film' })];
   expect(historyFilter(items, 'all')).toHaveLength(3);
