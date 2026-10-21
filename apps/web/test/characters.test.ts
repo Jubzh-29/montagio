@@ -71,6 +71,10 @@ test('a character is never a photo of someone: imported, sample and unknown phot
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: 'invalid-input' });
   }
+  // An edit carries the mark of its source: an edit of a sample is no character either.
+  const edit = await postEdits(request({ imageRef: sample, instruction: 'make it snow' }, 'c-edit-sample'));
+  const edited = await poll(((await edit.json()) as JobSummary).id);
+  expect((await save({ name: 'X', type: 'everyday', description: 'someone', imageRef: edited.outputImageRef })).status).toBe(400);
   const unknown = await save({ name: 'X', type: 'everyday', description: 'someone', imageRef: 'uploads/nope.png' });
   expect(await unknown.json()).toEqual({ error: 'unknown-image' });
 });

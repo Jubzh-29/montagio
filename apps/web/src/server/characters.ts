@@ -63,12 +63,15 @@ const text = (value: unknown, max: number): string | null => {
   return trimmed.length > 0 && trimmed.length <= max ? trimmed : null;
 };
 
-/** A photo of this machine that shows no real person: made from a text, or an edit of such a photo. */
+/**
+ * A photo of this machine that shows no real person: made from a text, or edits of such a photo only
+ * (the edit carries the mark on from its source; an edit of a sample, a frame or an import has none).
+ */
 async function assertFictionalPhoto(imageRef: unknown): Promise<string> {
   if (typeof imageRef !== 'string') throw new JobError('invalid-input');
   const meta = await readUploadMeta(imageRef);
   if (!meta) throw new JobError('unknown-image');
-  if (meta.personal || (meta.origin !== 't2i' && meta.origin !== 'edit')) throw new JobError('invalid-input');
+  if (meta.personal || meta.fictional !== true) throw new JobError('invalid-input');
   return imageRef;
 }
 

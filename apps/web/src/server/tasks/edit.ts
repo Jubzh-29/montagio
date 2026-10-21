@@ -37,7 +37,7 @@ export const editTask: TaskDef = {
     assertConsent(photo, body.consent);
     await assertNoBlockedName(instruction, scene);
     return {
-      inputs: { imageRef, instruction, look, personal: photo.personal, ...(scene ? { scene } : {}) },
+      inputs: { imageRef, instruction, look, personal: photo.personal, ...(photo.fictional ? { fictional: true } : {}), ...(scene ? { scene } : {}) },
       label: { ...(look ? { itemId: look } : {}), name: model.name },
       modelId: model.id,
       seed: randomInt(0, 2 ** 32),
@@ -67,5 +67,5 @@ export const editTask: TaskDef = {
     },
   ],
 
-  imageOrigin: async (record) => ({ origin: 'edit', personal: record.inputs.personal === true }),
+  imageOrigin: async (record) => ({ origin: 'edit', personal: record.inputs.personal === true, ...(record.inputs.fictional === true ? { fictional: true } : {}) }),
 };

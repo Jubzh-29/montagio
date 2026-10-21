@@ -43,5 +43,5 @@ export const t2iTask: TaskDef = {
     },
   ],
 
-  imageOrigin: async () => ({ origin: 't2i', personal: false }),
+  imageOrigin: async () => ({ origin: 't2i', personal: false, fictional: true }),
 };

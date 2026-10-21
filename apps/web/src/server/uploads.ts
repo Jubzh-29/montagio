@@ -18,8 +18,11 @@ const SNIFFED: Record<string, string> = { png: 'png', jpg: 'jpg', webp: 'webp' }
 
 /** Where a photo comes from: what decides whether an effect on it asks for consent. */
 export type PhotoOrigin = 'upload' | 'sample' | 't2i' | 'edit' | 'frame';
-/** `personal`: the photo is, or derives from, a photo someone imported (it may show a real person). */
-export type Provenance = { origin: PhotoOrigin; personal: boolean };
+/**
+ * `personal`: the photo is, or derives from, a photo someone imported (it may show a real person).
+ * `fictional`: the photo was made from a text here, or is an edit of such a photo only: what a character may be made of.
+ */
+export type Provenance = { origin: PhotoOrigin; personal: boolean; fictional?: true };
 
 export type UploadMeta = { imageRef: string; width: number; height: number; aspect: Aspect } & Provenance;
 
