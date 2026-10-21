@@ -7,7 +7,7 @@ import { emptyState, type InstallState } from '../src/state.ts';
 
 const realRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const versions = readVersions(realRoot);
-// The weights a default install fetches: the camera presets', not those of the extensions (none validated yet).
+// The camera presets' weights alone (a plain install adds the effects pack: install.test.ts).
 const lock = weightsFor(readLock(realRoot), []);
 const repoRoot = 'C:\\Users\\a b\\repo dir';
 const L = layout('C:\\Users\\a b\\Install Dir', 'windows');

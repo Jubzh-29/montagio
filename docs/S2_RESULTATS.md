@@ -17,7 +17,7 @@ Les `estimate_s` du registre, exprimés pour une RTX 4090, sont donc les mesures
 | Poids des presets (65 Gio), puis ceux des extensions (128 Gio) | ≈ 45 min | sans GPU ; 4 téléchargements en parallèle pour les extensions |
 | Rendus : presets, diagnostic, extensions, 5B et 720p | ≈ 5 h de temps réel | jusqu'à 5 conteneurs L4 à la fois |
 
-- **Dépense relevée dans Usage & Billing :** 8,04 $ vers 14 h 25, et ____ $ en fin de session.
+- **Dépense relevée dans Usage & Billing :** 8,04 $ vers 14 h 25, et **12,94 $ en fin de session** (estimation de départ : 13 à 15 $).
 - **Coût d'un clip de 5 s :** environ 0,35 à 0,40 $ en 480p avec Fun Camera, de l'ordre de 0,05 $ pour un effet ou une édition.
 - **Préemption :** Modal a préempté un conteneur au milieu d'un rendu. Il relance alors le travail en entier, ce qui aurait fait recalculer les clips déjà finis. D'où la règle retenue : **un clip par conteneur** pour les rendus longs.
 
@@ -124,7 +124,19 @@ Les 7 sont **validées** : `gpu_validated: 2026-10-21` dans `registry/extensions
 
 ## 9. Pour la S3 (24–25/10)
 
-- Le budget restant sur les 30 $ du mois : ____ $.
+- Le budget restant sur les 30 $ du mois : environ 12 $ avant l'arrêt fixé à 25 $, 17 $ avant 30 $. Pour en tirer le plus : rendre en 480p, avec la description de la photo, puis passer les clips choisis à l'upscale 1080p (voir la partie 10).
 - Les aperçus des 11 presets (`previews/*.mp4`) et les clips de la vitrine, avec la description de la photo.
 - Hooks Figurine et Ignite ; Iris Dive avec une image clé intermédiaire, si le temps le permet.
 - Un rendu à refaire : le look « angles » de l'édition, avec une vue arrière.
+
+## 10. Décisions prises après la session (21/10)
+
+Les décisions qui suivent ont été prises pour donner à Montagio les meilleures chances au concours.
+
+- **La HD passe par l'upscale, pas par le 720p.** Le Studio rend déjà en 480p, la résolution des presets : il ne propose pas de 720p. La HD y est le bouton « HD 1080p » (SeedVR2). Cet enchaînement donne du 1080p environ trois fois plus vite qu'un rendu natif en 720p : environ 565 + 215 s sur une RTX 4090, contre environ 2 165 s. Les clips de la vitrine et de la démo (S3) suivent le même chemin.
+- **L'installation locale prend par défaut les presets et le pack d'effets**, environ 91 Go de poids :
+  - les effets sont l'extension la plus partageable, et l'une des plus légères ;
+  - prendre les sept par défaut (environ 185 Go) ferait échouer bien des installations sur le contrôle du disque ;
+  - `--extensions all` les prend toutes, `--extensions none` garde les presets seuls ;
+  - le défaut respecte la règle de coupe : il ne prend le pack d'effets que si une session GPU l'a validé.
+- **La description de la photo** devient indispensable ou pré-remplie dans le Studio : une session y travaille.
