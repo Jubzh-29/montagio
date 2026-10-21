@@ -66,4 +66,23 @@ describe('open-stack report', () => {
     writeFileSync(file, JSON.stringify(report(false)));
     expect(await read(root)).toEqual(report(false));
   });
+
+  test('a report an older check wrote (models without their function) is not served: the repository is scanned', async () => {
+    const root = rootWithoutReport();
+    let scans = 0;
+    const fresh: OpenStackReport = {
+      ...report(true),
+      models: [{ id: 'z-image-turbo', name: 'Z-Image Turbo', function: 'photo', license: 'Apache-2.0', weights: [] }],
+    };
+    const read = createOpenStackReader(async () => {
+      scans += 1;
+      return fresh;
+    });
+    const file = join(root, 'apps', 'web', 'public', 'open-stack-report.json');
+    mkdirSync(join(file, '..'), { recursive: true });
+    writeFileSync(file, JSON.stringify({ ...report(true), models: [{ id: 'z-image-turbo', license: 'Apache-2.0', weights: [] }] }));
+
+    expect(await read(root)).toEqual(fresh);
+    expect(scans).toBe(1);
+  });
 });

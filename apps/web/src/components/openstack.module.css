@@ -59,10 +59,20 @@
   margin-top: var(--space-3);
 }
 
+/* One grid for every section: the columns line up from Camera moves down to Motion transfer. */
 .table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: var(--text-s);
+}
+
+.table thead th:nth-child(1) {
+  width: 32%;
+}
+
+.table thead th:nth-child(2) {
+  width: 14%;
 }
 
 .table th,
@@ -150,13 +160,19 @@ a.weightId:hover {
   text-decoration-color: currentColor;
 }
 
+/* Size and licence in two mono columns of their own, so the figures line up under each other. */
 .weightMeta {
-  display: flex;
+  display: grid;
   flex: none;
+  grid-template-columns: 8ch 10ch;
   gap: var(--space-3);
   color: var(--ink-muted);
   font-family: var(--font-mono);
   white-space: nowrap;
+}
+
+.weightMeta > :first-child {
+  text-align: right;
 }
 
 .violations {
@@ -214,9 +230,24 @@ a.weightId:hover {
     padding-left: var(--space-3);
     border-left: 1px solid var(--line);
   }
-  /* A long weight id takes its own line, its size and licence under it. */
+  /* Every weight on two lines, the same way: its id, then its size and licence. */
   .weights li {
-    flex-wrap: wrap;
-    gap: var(--space-1) var(--space-3);
+    flex-direction: column;
+    gap: 2px;
+  }
+  .weightMeta {
+    grid-template-columns: auto auto;
+    justify-content: start;
+  }
+  .weightMeta > :first-child {
+    text-align: left;
+  }
+  /* The header holds two rows on a phone: the linked row lands below both. */
+  .table tbody tr {
+    scroll-margin-top: var(--space-7);
+  }
+  /* The linked row keeps its text off its frame. */
+  .table tbody tr[data-target='true'] {
+    padding-inline: var(--space-3);
   }
 }

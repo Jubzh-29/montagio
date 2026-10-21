@@ -54,7 +54,8 @@ export function OpenStack() {
   useEffect(() => {
     const row = targetRow.current;
     if (!row) return;
-    row.scrollIntoView({ block: 'center' });
+    // From its top, under the header (the page's scroll-padding): a model with many weights is taller than a phone.
+    row.scrollIntoView({ block: 'start' });
     row.focus({ preventScroll: true });
   }, [report, target]);
 
@@ -135,7 +136,7 @@ export function OpenStack() {
                                   <span className={styles.weightId}>{weight.id}</span>
                                 )}
                                 <span className={styles.weightMeta}>
-                                  {weight.bytes !== undefined && <span>{t('sizeGb', { size: gigabytes(weight.bytes) })}</span>}
+                                  <span>{weight.bytes !== undefined ? t('sizeGb', { size: gigabytes(weight.bytes) }) : ''}</span>
                                   <span>{weight.license}</span>
                                 </span>
                               </li>
