@@ -151,8 +151,9 @@ Avancée au 21/10 au soir, sur la même L4 et les mêmes réglages : 480p et la 
 - ❌ **Figurine** : le look ACTION change à peine la personne, et le clip ressemble à la photo de départ. Le hook reste sans date, donc masqué.
 
 **Les 33 clips de la vitrine** (11 presets sur 3 photos)
-- 18 sont rendus : les 11 presets sur le port, et 7 sur la voiture.
-- L'app Modal s'est arrêtée à 19:38 (heure de Paris), avant les 15 derniers : les 4 derniers presets sur la voiture et les 11 sur la personne. La cause reste à confirmer sur le tableau de bord de Modal.
+- Les 33 sont rendus en trois lots : 18, puis 11, puis 4. Ils sont ingérés dans la vitrine avec 12 exemples d'effets (voiture et personne) et Ignite, et `showcase verify --strict` finit sur 0 erreur.
+- **Sur la personne**, les 11 presets gardent l'identité, la marche et la pluie ; Crane Up y ressemble plutôt à une avancée.
+- **Piège de `batch`** : c'est le PC qui distribue les jobs (`starmap` dans le `local_entrypoint`), même avec `--detach`. Si le client local tombe, Modal annule tous les jobs en cours, et les rendus presque finis sont perdus. Deux causes ont été vues : le jeton qui expire au bout d'environ 2 h (19:38), puis une coupure réseau (22:19). Pour un lot de plus de 2 h, il faudrait que la distribution des jobs se fasse côté Modal.
 - **Sur le port**, Crash Push, Slow Push, Push & Settle et Rise & Push dépassent le bateau au lieu de s'arrêter dessus. Crane Up y fait un bateau fantôme.
 - **Sur la voiture**, Slow Push, Pull Back Reveal, Pan Left, Pan Right et Crane Up sont nets. Crash Push, lui, fait sortir la voiture du cadre.
 
