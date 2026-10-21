@@ -40,8 +40,9 @@ Options:
   --app-port N       install: app port (default 3000)
   --no-start         install: do not start Montagio at the end
   --no-browser       install, start: do not open the browser
-  --extensions LIST  install: the extensions whose weights to fetch: validated (default, those a GPU session
-                     validated), all, none, or a list such as music,edit
+  --extensions LIST  install: the extensions whose weights to fetch besides the camera presets': all (the seven,
+                     about 114 GB more), validated (those a GPU session validated), none, or a list such as
+                     music,edit. Default: the effects pack (about 21 GB), once a GPU session validated it
 
 Environment:
   MONTAGIO_EXTENSIONS     install: the default of --extensions (the app reads it too)
@@ -62,7 +63,7 @@ export type CliOptions = {
   proxyUrl: string | null;
   demo: boolean;
   ports: Partial<Ports>;
-  /** --extensions; null leaves it to MONTAGIO_EXTENSIONS, then "validated". */
+  /** --extensions; null leaves it to MONTAGIO_EXTENSIONS, then the effects pack if a GPU session validated it. */
   extensions: string | null;
 };
 

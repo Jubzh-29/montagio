@@ -215,6 +215,17 @@ export function selectExtensions(config: ExtensionPin[], flag: string | null | u
   return known.filter((id) => asked.includes(id));
 }
 
+/**
+ * What a plain `install` (no --extensions, no MONTAGIO_EXTENSIONS) fetches besides the camera presets: the
+ * effects pack, the most shareable extension and one of the lightest (about 21 GB), once a GPU session
+ * validated it. The seven together weigh about 114 GB more; `--extensions all` (or `validated`) takes them.
+ */
+export const INSTALL_DEFAULT_EXTENSIONS: readonly string[] = ['effects'];
+
+export function installDefaultExtensions(config: ExtensionPin[]): string[] {
+  return selectExtensions(config, 'validated').filter((id) => INSTALL_DEFAULT_EXTENSIONS.includes(id));
+}
+
 /** The weights of the camera presets, plus those of the extensions in `enabled`. */
 export function weightsFor(lock: LockWeight[], enabled: readonly string[]): LockWeight[] {
   return lock.filter((weight) => !weight.extension || enabled.includes(weight.extension));

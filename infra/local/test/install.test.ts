@@ -417,6 +417,22 @@ test('a full install records the extensions it fetched, never the avatar, for th
   expect(recorded).not.toContain('avatar');
 });
 
+test('a plain install fetches the effects pack once it is validated, not the other validated extensions', async () => {
+  withMusicWeight(5);
+  writeFileSync(
+    join(repo, 'registry', 'models.lock.yaml'),
+    readFileSync(join(repo, 'registry', 'models.lock.yaml'), 'utf8') +
+      `  - id: tiny-effect\n    file: tiny_effect.safetensors\n    url: https://huggingface.co/Comfy-Org/x/resolve/main/split_files/vae/tiny_effect.safetensors\n` +
+      `    sha256: ${'b'.repeat(64)}\n    size: 5\n    license: Apache-2.0\n    source: https://huggingface.co/x/y\n    extension: effects\n`,
+  );
+  const config = join(repo, 'registry', 'extensions.yaml');
+  writeFileSync(config, readFileSync(config, 'utf8').replace(/gpu_validated: null/g, 'gpu_validated: 2026-10-21'));
+  const h = harness();
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+  expect(fetchedIds(h.calls).sort()).toEqual(['tiny-effect', 'tiny-te', 'tiny-vae']);
+  expect(readState(h.L.statePath).extensions).toEqual(['effects']);
+});
+
 test('with no extension validated, the state records none', async () => {
   const h = harness();
   expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
