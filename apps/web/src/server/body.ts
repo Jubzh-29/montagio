@@ -1,4 +1,5 @@
 export type JsonBody = { ok: true; value: unknown } | { ok: false; reason: 'too-large' | 'invalid-json' };
+export type FormBody = { ok: true; form: FormData } | { ok: false; reason: 'too-large' | 'invalid-form' };
 
 /**
  * Read a request body, but never more than `maxBytes`: a body past the cap is refused (null)
@@ -35,5 +36,20 @@ export async function readJsonBody(request: Request, maxBytes: number, opts: { a
     return { ok: true, value: JSON.parse(bytes.toString('utf8')) };
   } catch {
     return { ok: false, reason: 'invalid-json' };
+  }
+}
+
+/**
+ * Read a form body (a multipart upload) of `maxBytes` at most (see readBodyBytes):
+ * request.formData() would hold the whole body in memory before any size is checked.
+ */
+export async function readFormBody(request: Request, maxBytes: number): Promise<FormBody> {
+  const bytes = await readBodyBytes(request, maxBytes);
+  if (!bytes) return { ok: false, reason: 'too-large' };
+  try {
+    const headers = { 'content-type': request.headers.get('content-type') ?? '' };
+    return { ok: true, form: await new Response(new Uint8Array(bytes), { headers }).formData() };
+  } catch {
+    return { ok: false, reason: 'invalid-form' };
   }
 }

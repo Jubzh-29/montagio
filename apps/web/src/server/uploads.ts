@@ -8,6 +8,8 @@ import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { getEnv } from './env';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+/** The multipart body around one image: the file and room for its boundaries and headers. */
+export const MAX_UPLOAD_FORM_BYTES = MAX_UPLOAD_BYTES + 64 * 1024;
 const EXTENSIONS: Record<string, 'png' | 'jpg' | 'webp'> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',

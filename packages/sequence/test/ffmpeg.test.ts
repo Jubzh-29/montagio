@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -14,6 +16,7 @@ import {
   normalizeClip,
   placeholderClip,
   PLACEHOLDER_METADATA,
+  prepareMotionClip,
   previewClip,
   probe,
   probeAudio,
@@ -313,5 +316,41 @@ describe('mixMusic and the 9:16 cut with music', () => {
 
   test('probeAudio is null for a silent clip', async () => {
     expect(await probeAudio(clipA)).toBeNull();
+  }, FFMPEG_TEST_TIMEOUT_MS);
+});
+
+describe('prepareMotionClip and what the clip sent carries', () => {
+  // A phone writes where it filmed into the clip: it must not reach ComfyUI.
+  const phoneClip = join(dir, 'phone.mov');
+
+  beforeAll(() => {
+    execFileSync('ffmpeg', [
+      '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=640x360:rate=30', '-t', '1',
+      '-metadata', 'location=+48.8566+002.3522/', '-pix_fmt', 'yuv420p', phoneClip,
+    ]);
+  }, FIXTURES_TIMEOUT_MS);
+
+  test('the prepared clip drops the location of the clip sent', async () => {
+    expect(await readTags(phoneClip)).toMatchObject({ location: '+48.8566+002.3522/' });
+    const prepared = join(dir, 'motion.mp4');
+    await prepareMotionClip(phoneClip, prepared);
+    expect(Object.keys(await readTags(prepared)).filter((key) => key.startsWith('location'))).toEqual([]);
+  }, FFMPEG_TEST_TIMEOUT_MS);
+
+  test('a URL given as the clip is never fetched: local files only', async () => {
+    let requests = 0;
+    const server = createServer((_, res) => {
+      requests += 1;
+      res.statusCode = 404;
+      res.end();
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    try {
+      const { port } = server.address() as AddressInfo;
+      await expect(prepareMotionClip(`http://127.0.0.1:${port}/clip.mp4`, join(dir, 'remote.mp4'))).rejects.toThrow(SequenceToolError);
+      expect(requests).toBe(0);
+    } finally {
+      await new Promise((done) => server.close(done));
+    }
   }, FFMPEG_TEST_TIMEOUT_MS);
 });
