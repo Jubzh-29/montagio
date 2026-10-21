@@ -74,11 +74,26 @@ test('french toggle', async ({ page }) => {
   await expect(page.getByRole('link', { name: /open weights — vérifié/ })).toBeVisible();
 });
 
-test('open stack page lists three Apache-2.0 models', async ({ page }) => {
+test('the open stack page lists every model by what it makes, each Apache-2.0 or MIT', async ({ page }) => {
   await page.goto('/open-stack');
+  for (const name of [/^Camera/, /^Effects$/, /^Transitions and hooks$/, /^Photo/, /^Avatar$/, /^Music$/, /^HD/, /^Motion/]) {
+    await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
+  }
   const rows = page.locator('[data-testid=model-row]');
-  await expect(rows).toHaveCount(3);
-  for (const row of await rows.all()) await expect(row).toContainText('Apache-2.0');
+  await expect(rows).toHaveCount(11);
+  for (const row of await rows.all()) await expect(row).toContainText(/Apache-2\.0|MIT/);
+});
+
+test('the caption under a clip links to its model on the open stack page', async ({ page }) => {
+  await page.goto(CAMERA);
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('ai-caption').getByRole('link', { name: 'Wan 2.2 Fun Camera' }).click();
+  await expect(page).toHaveURL(/\/open-stack\/?#model-wan22-i2v-a14b-fun-camera$/);
+  const row = page.locator('#model-wan22-i2v-a14b-fun-camera');
+  await expect(row).toHaveAttribute('data-target', 'true');
+  await expect(row).toBeInViewport();
 });
 
 test('a sample photo lets a visitor try without their own image, described already', async ({ page }) => {

@@ -8,6 +8,7 @@ import { refusalMessageKey } from '@/lib/refusals';
 import { useJob } from '@/lib/use-job';
 import { ConsentCheck } from './ConsentCheck';
 import type { UploadState } from './Monitor';
+import { AiCaption } from './AiCaption';
 import styles from './studio.module.css';
 
 const ASPECTS = ['16:9', '9:16', '1:1'] as const;
@@ -166,10 +167,11 @@ export function PhotoAtelier({
             <figure>
               {/* eslint-disable-next-line @next/next/no-img-element -- the image just made */}
               <img src={done.outputUrl} alt="" data-testid="atelier-result" />
-              <figcaption data-testid="ai-caption">
-                {kind === 'edit' && `${t('editAfter')} · `}
-                {t('aiCaption', { model: done.label.name ?? done.modelId, license: licenseOf(done.modelId) ?? '?' })}
-              </figcaption>
+              <AiCaption
+                as="figcaption"
+                prefix={kind === 'edit' ? `${t('editAfter')} · ` : undefined}
+                model={{ id: done.modelId, name: done.label.name ?? done.modelId, license: licenseOf(done.modelId) ?? '?' }}
+              />
             </figure>
           )}
         </div>

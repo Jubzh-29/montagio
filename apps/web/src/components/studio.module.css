@@ -1281,6 +1281,18 @@
   font-size: var(--text-s);
 }
 
+/* The model's name, a way to its weights and licences on the Open Stack page. */
+.captionLink {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+
+.captionLink:hover {
+  text-decoration-color: currentColor;
+}
+
 .showcaseNote {
   display: flex;
   flex-direction: column;

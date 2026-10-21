@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useI18n } from '@/i18n';
 import { refusalMessageKey } from '@/lib/refusals';
 import { useJob } from '@/lib/use-job';
+import { AiCaption } from './AiCaption';
 import styles from './studio.module.css';
 
 const PROMPT_MAX = 300;
@@ -112,9 +113,7 @@ export function MusicPanel({
             )}
           </div>
           {model && (
-            <p className={styles.caption} data-testid="music-caption">
-              {t('aiCaption', { model: model.name, license: model.license })}
-            </p>
+            <AiCaption testId="music-caption" model={model} />
           )}
         </>
       )}

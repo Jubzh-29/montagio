@@ -125,6 +125,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
         ...(previewUrl ? { previewUrl } : {}),
         estimate_s: model ? estimateFor(model, preset.defaults.fast) : 0,
         subjectMax: model?.limits.max_chars ?? 120,
+        modelId: preset.models.preferred,
         modelName: model?.name ?? preset.models.preferred,
         license: model?.license ?? '',
       };
@@ -143,6 +144,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
         ...(previewUrl ? { previewUrl } : {}),
         estimate_s: (editModel ? estimateFor(editModel, fast) : 0) + (model ? estimateFor(model, fast) : 0),
         references: preset.end_frame.references,
+        modelId: preset.models.preferred,
         modelName: model?.name ?? preset.models.preferred,
         license: model?.license ?? '',
       };

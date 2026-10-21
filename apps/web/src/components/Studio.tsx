@@ -833,8 +833,8 @@ export function Studio() {
   ].filter(Boolean);
 
   const wallItemOfResult = tracked?.kind === 'job' ? [...effects, ...hooks].find((item) => item.id === tracked.record.label.itemId) : undefined;
-  const resultModel: { name: string; license: string } | undefined = wallItemOfResult
-    ? { name: wallItemOfResult.modelName, license: wallItemOfResult.license }
+  const resultModel: { id?: string; name: string; license: string } | undefined = wallItemOfResult
+    ? { id: wallItemOfResult.modelId, name: wallItemOfResult.modelName, license: wallItemOfResult.license }
     : tracked?.kind === 'job' && tracked.record.task === 'avatar'
       ? extensions?.avatarModel
     : tracked?.kind === 'job' && tracked.record.task === 'motion'
@@ -1060,7 +1060,7 @@ export function Studio() {
                 {IS_SHOWCASE && kind === 't2i' ? (
                   <ShowcaseTextAtelier
                     texts={sampleTexts}
-                    model={{ name: 'Z-Image Turbo', license: catalogModels.find((model) => model.id === 'z-image-turbo')?.license ?? 'Apache-2.0' }}
+                    model={{ id: 'z-image-turbo', name: 'Z-Image Turbo', license: catalogModels.find((model) => model.id === 'z-image-turbo')?.license ?? 'Apache-2.0' }}
                     onUse={(photo) => takePhoto(photo, kind)}
                     onClose={() => closeAtelier(kind)}
                   />
@@ -1154,23 +1154,22 @@ export function Studio() {
                   ))}
                 </p>
               )}
-              {IS_SHOWCASE && succeeded && (
+              {IS_SHOWCASE && succeeded?.placeholder && (
                 <p className={styles.caption} data-testid="result-caption">
-                  {succeeded.placeholder
-                    ? t('showcasePlaceholderCaption')
-                    : t('showcaseCaption', { model: resultModel?.name ?? showcase?.model.name ?? '', license: resultModel?.license ?? showcase?.model.license ?? '' })}
+                  {t('showcasePlaceholderCaption')}
                 </p>
               )}
-              {!IS_SHOWCASE && succeeded && resultModel && <AiCaption modelName={resultModel.name} license={resultModel.license} />}
+              {IS_SHOWCASE && succeeded && !succeeded.placeholder && (resultModel ?? showcase?.model) && (
+                <AiCaption text="showcaseCaption" testId="result-caption" model={(resultModel ?? showcase?.model)!} />
+              )}
+              {!IS_SHOWCASE && succeeded && resultModel && <AiCaption model={resultModel} />}
               {succeeded && tracked?.kind === 'job' && tracked.record.task === 'motion' && (
                 <p className={styles.caption} data-testid="motion-no-sound">
                   {t('motionNoSound')}
                 </p>
               )}
               {busy && tracked?.kind === 'job' && tracked.record.stepImageUrl && extensions?.editModel && (
-                <p className={styles.caption} data-testid="end-frame-caption">
-                  {t('hookEndFrame', { model: extensions.editModel.name, license: extensions.editModel.license })}
-                </p>
+                <AiCaption text="hookEndFrame" testId="end-frame-caption" model={extensions.editModel} />
               )}
               {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>

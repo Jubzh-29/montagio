@@ -52,10 +52,21 @@ export type GenerationRecord = {
   placeholder?: boolean;
 };
 
+/** What a model makes, in the order of the Open Stack page (as @montagio/check-open-stack lists them). */
+export type StackFunction = 'camera' | 'effects' | 'transitions' | 'photo' | 'avatar' | 'music' | 'hd' | 'motion';
+
 export type OpenStackReport = {
   ok: boolean;
   checkedAt: string;
-  models: { id: string; license: string; weights: { id: string; license: string }[] }[];
+  /** Every model the Studio can run, grouped by function; `extension` is absent for those every install has. */
+  models: {
+    id: string;
+    name: string;
+    function: StackFunction;
+    license: string;
+    extension?: string;
+    weights: { id: string; license: string; file?: string; bytes?: number; source?: string }[];
+  }[];
   violations: { rule: string; file: string; detail: string }[];
 };
 
@@ -114,7 +125,8 @@ export type EffectSummary = {
   estimate_s: number;
   /** The longest "what the photo shows" the effects model takes. */
   subjectMax: number;
-  /** The model that renders it and its license, for the caption under the clip. */
+  /** The model that renders it and its license, for the caption under the clip (its id links to its Open Stack line). */
+  modelId: string;
   modelName: string;
   license: string;
   /** Showcase: the sample photos it has an example for. */
@@ -133,6 +145,7 @@ export type HookSummary = {
   /** Showcase: the sample photos it has an example for. */
   samples?: string[];
   /** The transition model, for the caption under the clip. */
+  modelId: string;
   modelName: string;
   license: string;
 };

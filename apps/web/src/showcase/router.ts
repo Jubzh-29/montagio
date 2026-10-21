@@ -85,6 +85,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     description: item.description,
     ...(item.examples[0] ? { previewUrl: showcaseUrl(item.examples[0].url) } : {}),
     estimate_s: 0,
+    modelId: item.modelId,
     modelName: item.modelName,
     license: item.license,
     samples: item.examples.map((example) => example.sample),

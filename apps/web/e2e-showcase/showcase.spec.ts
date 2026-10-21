@@ -145,8 +145,10 @@ test('the open stack page loads directly', async ({ page }) => {
   const problems = watchRequests(page);
   await page.goto('/open-stack/');
   const rows = page.locator('[data-testid=model-row]');
-  await expect(rows).toHaveCount(3);
-  for (const row of await rows.all()) await expect(row).toContainText('Apache-2.0');
+  // Every model the jury can see a result of, the effects and hooks included, not only the camera's.
+  await expect(rows).toHaveCount(11);
+  for (const row of await rows.all()) await expect(row).toContainText(/Apache-2\.0|MIT/);
+  await expect(page.locator('#model-wan21-i2v-effects')).toBeVisible();
   // Back to the studio by the header link: a client navigation, no failed prefetch.
   await page.getByRole('link', { name: 'Back to the studio' }).click();
   await expect(page.getByRole('button', { name: /^Show clip/ })).toBeVisible();
@@ -232,6 +234,11 @@ test('with an effect example, the showcase opens on it, and offers it only on it
   await expect(result(page)).toHaveAttribute('src', /\/showcase\/clips\/pan-left--landscape-a\.mp4$/);
   await expect(page.getByRole('region', { name: 'Squish' })).toBeVisible();
   await expect(page.getByTestId('result-caption')).toHaveText(/Wan 2[.]1 I2V 480p [(]effects[)]/);
+  // Its model's name leads to its line of the open stack proof.
+  await expect(page.getByTestId('result-caption').getByRole('link', { name: 'Wan 2.1 I2V 480p (effects)' })).toHaveAttribute(
+    'href',
+    /\/open-stack\/?#model-wan21-i2v-effects$/,
+  );
   // The example is pre-rendered: the subject field says so instead of being ignored.
   await expect(page.getByRole('textbox', { name: /What the photo shows/ })).toBeDisabled();
   await expect(page.getByText('What the photo shows applies when you generate locally.')).toBeVisible();

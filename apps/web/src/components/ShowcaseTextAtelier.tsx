@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useI18n } from '@/i18n';
 import type { AtelierPhoto } from './PhotoAtelier';
+import { AiCaption } from './AiCaption';
 import styles from './studio.module.css';
 
 /**
@@ -16,7 +17,7 @@ export function ShowcaseTextAtelier({
   onClose,
 }: {
   texts: { prompt: string; imageRef: string; url: string }[];
-  model: { name: string; license: string };
+  model: { id?: string; name: string; license: string };
   onUse: (photo: AtelierPhoto) => void;
   onClose: () => void;
 }) {
@@ -47,7 +48,7 @@ export function ShowcaseTextAtelier({
             <figure>
               {/* eslint-disable-next-line @next/next/no-img-element -- a sample photo of the showcase */}
               <img src={chosen.url} alt="" data-testid="atelier-result" />
-              <figcaption data-testid="ai-caption">{t('aiCaption', { model: model.name, license: model.license })}</figcaption>
+              <AiCaption as="figcaption" model={model} />
             </figure>
           </div>
           <div className={styles.atelierActions}>
