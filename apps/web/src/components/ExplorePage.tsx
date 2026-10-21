@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
-import { apiFetch, jsonOrThrow } from '@/lib/api';
+import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import type { ExtensionsInfo, PresetSummary } from '@/lib/api-types';
 import { exploreTools, featuredCards, type ExploreCard } from '@/lib/explore';
 import { useExtensions } from '@/lib/use-extensions';
@@ -64,7 +64,7 @@ export function ExplorePage() {
   }, []);
 
   const featured = featuredCards(presets, info);
-  const tools = exploreTools(presets, info);
+  const tools = exploreTools(presets, info, IS_SHOWCASE);
   return (
     <>
       <Header current="explore" />

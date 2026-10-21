@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useI18n, type Lang } from '@/i18n';
-import { apiFetch, jsonOrThrow } from '@/lib/api';
+import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import type { OpenStackReport } from '@/lib/api-types';
 import { tabHref, visibleTabs, type Tab } from '@/lib/tabs';
 import { useExtensions } from '@/lib/use-extensions';
@@ -57,7 +57,7 @@ function LanguageToggle() {
 const TAB_LABELS = { effects: 'tabEffects', camera: 'tabCamera', film: 'tabFilm', avatar: 'tabAvatar', motion: 'tabMotion' } as const;
 
 /** The creation tabs, as links: the Studio reads the tab from the URL. */
-function Tabs({ current }: { current?: Tab | 'history' | 'explore' }) {
+function Tabs({ current }: { current?: Tab | 'history' | 'explore' | 'characters' }) {
   const { t } = useI18n();
   const tabs = visibleTabs(useExtensions());
   return (
@@ -65,6 +65,12 @@ function Tabs({ current }: { current?: Tab | 'history' | 'explore' }) {
       <Link href="/explore" className={styles.tab} aria-current={current === 'explore' ? 'page' : undefined}>
         {t('tabExplore')}
       </Link>
+      {/* Characters need the local app (text to image, the photo edit): the showcase has neither. */}
+      {!IS_SHOWCASE && (
+        <Link href="/characters" className={styles.tab} aria-current={current === 'characters' ? 'page' : undefined}>
+          {t('tabCharacters')}
+        </Link>
+      )}
       {tabs.map((tab) => (
         <Link key={tab} href={tabHref(tab)} className={styles.tab} aria-current={current === tab ? 'page' : undefined}>
           {t(TAB_LABELS[tab])}
@@ -77,7 +83,7 @@ function Tabs({ current }: { current?: Tab | 'history' | 'explore' }) {
   );
 }
 
-export function Header({ recording = false, current }: { recording?: boolean; current?: Tab | 'history' | 'explore' }) {
+export function Header({ recording = false, current }: { recording?: boolean; current?: Tab | 'history' | 'explore' | 'characters' }) {
   const { t } = useI18n();
   return (
     <header className={styles.header}>

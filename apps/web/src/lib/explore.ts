@@ -56,7 +56,7 @@ export function featuredCards(presets: readonly PresetSummary[], info: Extension
 }
 
 /** Every tool of the app, in the order a first visit discovers them; an extension's tool only when it is shown. */
-export function exploreTools(presets: readonly PresetSummary[], info: ExtensionsInfo | null): ExploreCard[] {
+export function exploreTools(presets: readonly PresetSummary[], info: ExtensionsInfo | null, showcase = false): ExploreCard[] {
   const has = (id: ExtensionsInfo['extensions'][number]) => Boolean(info?.extensions.includes(id));
   const tools: (ExploreCard | false)[] = [
     { id: 'camera', href: tabHref('camera'), name: 'tabCamera', description: 'exploreCameraText', previewUrl: previewOf(presets, 'slow-push'), icon: '◎' },
@@ -69,6 +69,7 @@ export function exploreTools(presets: readonly PresetSummary[], info: Extensions
       icon: '✦',
     },
     { id: 'film', href: tabHref('film'), name: 'tabFilm', description: 'exploreFilmText', previewUrl: previewOf(presets, 'pull-back-reveal'), icon: '▤' },
+    !showcase && { id: 'characters', href: '/characters', name: 'tabCharacters', description: 'exploreCharactersText', icon: '☺' },
     has('avatar') && { id: 'avatar', href: tabHref('avatar'), name: 'tabAvatar', description: 'exploreAvatarText', icon: '◉' },
     has('motion') && { id: 'motion', href: tabHref('motion'), name: 'tabMotion', description: 'exploreMotionText', icon: '⇄' },
     { id: 't2i', href: tabHref('camera'), name: 'exploreT2iName', description: 'exploreT2iText', icon: 'Aa' },

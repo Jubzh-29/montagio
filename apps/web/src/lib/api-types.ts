@@ -157,6 +157,35 @@ export type ExtensionsInfo = {
 
 export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'motion';
 
+import type { CharacterType } from './characters';
+
+export type { CharacterType };
+
+/** A picture of a character: its portrait's edit in a new scene (the photodump). */
+export type CharacterPhotoSummary = {
+  imageRef: string;
+  url: string;
+  /** What the picture shows: the Studio's description when it is animated. */
+  scene: string;
+  /** The history item that brings the picture back in the Studio (?from=). */
+  historyKey?: string;
+  createdAt: string;
+};
+
+/** A saved character (GET /api/characters). */
+export type CharacterSummary = {
+  id: string;
+  name: string;
+  type: CharacterType;
+  description: string;
+  imageRef: string;
+  imageUrl: string;
+  /** The history item that brings the portrait back in the Studio. */
+  portraitHistoryKey?: string;
+  createdAt: string;
+  photos: CharacterPhotoSummary[];
+};
+
 /** A photo, effect or chained render (GET /api/jobs/:id). */
 export type JobSummary = {
   id: string;

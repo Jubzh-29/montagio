@@ -140,6 +140,7 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
           tab: 'camera',
           ...(await photo(record.outputImageRef)),
           ...(record.task === 't2i' && typeof record.inputs.prompt === 'string' ? { prompt: record.inputs.prompt } : {}),
+          ...(record.task === 'edit' && typeof record.inputs.scene === 'string' ? { prompt: record.inputs.scene } : {}),
         },
       };
     case 'effect':

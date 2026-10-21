@@ -1567,7 +1567,8 @@
   color: var(--ink);
 }
 
-.chip[aria-checked='true'] {
+.chip[aria-checked='true'],
+.chip[aria-pressed='true'] {
   border-color: var(--rec);
   background: var(--rec-soft);
   color: var(--ink);

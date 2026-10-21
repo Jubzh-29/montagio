@@ -552,8 +552,8 @@ export function Studio() {
     if (back.remixGenerationId && back.presetId) {
       void openRemix(back.presetId, `/api/generations/${encodeURIComponent(back.remixGenerationId)}/preset`, back.remixGenerationId);
     }
-    // The link did its work: the address keeps the tab only.
-    window.history.replaceState(null, '', tabHref(back.tab));
+    // The link did its work: the address keeps the tab only. A photo goes to the tab the link asked for.
+    window.history.replaceState(null, '', tabHref(item.kind === 'photo' ? tab : back.tab));
   };
 
   useEffect(() => {

@@ -9,6 +9,7 @@ import { readUploadMeta } from '../uploads';
 import { extensionFile, uploadPath } from './files';
 
 const INSTRUCTION_MAX = 500;
+const SCENE_MAX = 500;
 
 function editModel(lib: Library): ExtensionModel {
   const model = [...lib.extensionModels.values()].find((entry) => entry.task === 'i2i-edit');
@@ -31,10 +32,12 @@ export const editTask: TaskDef = {
     if (!instruction || instruction.length > (model.limits.max_chars ?? INSTRUCTION_MAX)) throw new JobError('invalid-input');
     const look = body.look === undefined || body.look === null ? null : EDIT_LOOK_IDS.find((id) => id === body.look);
     if (look === undefined) throw new JobError('invalid-input');
+    // What the result shows, when the caller knows it (a character's photodump): the Studio's description later.
+    const scene = typeof body.scene === 'string' ? body.scene.trim().slice(0, SCENE_MAX) : '';
     assertConsent(photo, body.consent);
-    await assertNoBlockedName(instruction);
+    await assertNoBlockedName(instruction, scene);
     return {
-      inputs: { imageRef, instruction, look, personal: photo.personal },
+      inputs: { imageRef, instruction, look, personal: photo.personal, ...(scene ? { scene } : {}) },
       label: { ...(look ? { itemId: look } : {}), name: model.name },
       modelId: model.id,
       seed: randomInt(0, 2 ** 32),
