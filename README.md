@@ -45,7 +45,7 @@ The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan
 |---|---|---|
 | **Photo edit** | "Edit" on the start photo: an instruction in plain words, and three looks (inflated, figurine, angle of view) | Qwen-Image-Edit-2511 with a 4-step Lightning LoRA (Apache-2.0) |
 | **Six one-photo effects** | the Effects wall: Squish, Cake-ify, Explode, Snap Zoom, Frozen Moment, Full Circle | Wan 2.1 I2V 480p (Apache-2.0) with effect LoRAs by Remade-AI (Apache-2.0) |
-| **Hooks** | a keyframe transition: the edit makes the end frame, the video model animates the way there. Wardrobe Swap, which takes an outfit photo too, is validated. | Wan 2.2 FLF2V (Apache-2.0) |
+| **Hooks** | a keyframe transition: the edit makes the end frame, the video model animates the way there. Wardrobe Swap, which takes an outfit photo too, and Ignite are validated. | Wan 2.2 FLF2V (Apache-2.0) |
 | **Talking avatar** | the Avatar tab: a photo and a text (English or French) give a talking clip | Wan 2.2 S2V (Apache-2.0), voice by Chatterbox Multilingual (MIT) |
 | **Music** | "Add music" under a finished film, mixed into the film and its 9:16 cut | ACE-Step 1.5 (MIT) |
 | **HD 1080p** | "HD 1080p" under a finished clip | SeedVR2 3B (Apache-2.0) |
@@ -82,7 +82,7 @@ What the session taught, and changed:
 
 - **The photo's description is required.** Without a text saying what the photo shows, Fun Camera invents and the clip turns ghostly: the diagnosis changed one variable per clip, and the description alone fixed it. The Studio now asks for it, and fills it in whenever the photo's text is known.
 - **HD goes through the upscale.** 480p followed by SeedVR2 gives 1080p about three times faster than rendering 720p natively.
-- **Honest limits.** Fun Camera handles push-ins, pull-backs and side moves well, and vertical moves and rotation poorly: Tilt Up became Crane Up, Tilt Down and a Dutch angle were dropped. The Iris Dive hook stays hidden until it gets an intermediate keyframe. The avatar's built-in voice is male, whatever the face. Motion transfer needs a photo framed like the reference video.
+- **Honest limits.** Fun Camera handles push-ins, pull-backs and side moves well, and vertical moves and rotation poorly: Tilt Up became Crane Up, Tilt Down and a Dutch angle were dropped. Two hooks stay hidden: Iris Dive until it gets an intermediate keyframe, Figurine because its change is barely visible. The avatar's built-in voice is male, whatever the face. Motion transfer needs a photo framed like the reference video.
 
 ## How it works
 
@@ -158,7 +158,7 @@ Montagio covers a one-click studio's main ground today. The next steps follow th
 | Photo edit | Qwen-Image-Edit-2511, three looks | more looks and relighting as Apache-2.0 LoRAs on Edit-2511 |
 | Consistent character | identity kept by the edit, zero-shot | a character LoRA trained in the app with recorded consent (Z-Image or Qwen-Image); Phantom (Apache-2.0) for video |
 | Camera moves | 11 presets on Wan 2.2 Fun Camera | orbits and bullet time from keyframes (Edit-2511 viewpoints, then Wan 2.2 FLF2V); VACE (Apache-2.0); a camera LoRA trained on synthetic renders |
-| Effects and hooks | 6 effects, the Wardrobe Swap hook | Iris Dive with an intermediate keyframe, Figurine, Ignite, Earth Zoom Out in five keyframes; then an Apache-2.0 Earth Zoom Out LoRA trained on Montagio's own keyframe chains |
+| Effects and hooks | 6 effects, the Wardrobe Swap and Ignite hooks | Iris Dive with an intermediate keyframe, a stronger Figurine, Earth Zoom Out in five keyframes; then an Apache-2.0 Earth Zoom Out LoRA trained on Montagio's own keyframe chains |
 | Talking avatar | Wan 2.2 S2V, up to 15 s | longer takes with LongCat-Video-Avatar (MIT); the avatar in the local installer |
 | Voice | Chatterbox Multilingual, built-in voice | Qwen3-TTS (Apache-2.0); voice cloning from a consented reference sample |
 | Music and sound | ACE-Step 1.5, instrumental | songs with lyrics on ACE-Step 1.5; foley waits for a permissive model, as none passes the rule yet |
