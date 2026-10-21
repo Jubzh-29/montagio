@@ -62,6 +62,8 @@ export type ExtensionJobOptions = {
   input?: string;
   /** The second image of a two-reference hook (the outfit of wardrobe-swap). */
   input2?: string;
+  /** The edit's inpaint mask (white where the photo changes). */
+  mask?: string;
   /** The end frame of a transition run on its own (a hook's edit output otherwise). */
   end?: string;
   /** The clip to upscale, with its aspect and frame count (the caller probes it): its own, never the photo's. */
@@ -158,8 +160,14 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
         const photo = need(opts.input, '--input', name);
         const look = opts.look === undefined ? undefined : EDIT_LOOK_IDS.find((id) => id === opts.look);
         if (opts.look !== undefined && !look) throw new Error(`unknown look "${opts.look}" (known: ${EDIT_LOOK_IDS.join(', ')})`);
-        const job = compileEdit(model, template, { imageRef: basename(photo), instruction: text('edit'), seed: opts.seed, fast, ...(look ? { look } : {}) }, library.lock);
-        return [{ name, tag: name, model, ...job, files: [file('image', photo)] }];
+        const mask = opts.mask;
+        const job = compileEdit(
+          model,
+          template,
+          { imageRef: basename(photo), instruction: text('edit'), seed: opts.seed, fast, ...(look ? { look } : {}), ...(mask ? { maskRef: basename(mask) } : {}) },
+          library.lock,
+        );
+        return [{ name, tag: mask ? `${name}:inpaint` : name, model, ...job, files: [file('image', photo), ...(mask ? [file('mask', mask)] : [])] }];
       }
       case 'effect': {
         const photo = need(opts.input, '--input', name);

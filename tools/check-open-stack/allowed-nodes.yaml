@@ -54,6 +54,10 @@ nodes:
   - { class_type: FluxKontextMultiReferenceLatentMethod, source: comfyui-core, license: GPL-3.0 }
   - { class_type: CFGNorm, source: comfyui-core, license: GPL-3.0 }
   - { class_type: TextEncodeQwenImageEditPlus, source: comfyui-core, license: GPL-3.0 }
+  # Inpaint of the edit (2026-10-22), core of ComfyUI v0.41.0: comfy_extras/nodes_mask.py. The painted mask
+  # (white: what changes) keeps the photo outside it pixel for pixel.
+  - { class_type: ImageToMask, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ImageCompositeMasked, source: comfyui-core, license: GPL-3.0 }
   - { class_type: VAEEncode, source: comfyui-core, license: GPL-3.0 }
   # Extension "avatar" (2026-10-19). Its voice: the one node it uses from wildminder/ComfyUI-Chatterbox
   # (Apache-2.0, vendored chatterbox code MIT), pinned at commit 4597af8f and patched by

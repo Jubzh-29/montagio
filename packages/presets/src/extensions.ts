@@ -169,7 +169,7 @@ export const EDIT_LOOKS = {
 } as const satisfies Record<EditLook, { lock: string; strength: number }>;
 
 /** Nodes of workflows/qwen-image-edit-2511.api.json that compileEdit keeps, removes or rewires. */
-const EDIT_NODES = { look: '170', lightning: '171', image2: '42', sampler: '169' } as const;
+const EDIT_NODES = { look: '170', lightning: '171', image2: '42', sampler: '169', mask: '180', maskChannel: '181', composite: '182', save: '9' } as const;
 /** With the 4-step Lightning LoRA, and without it (the template's values). */
 const EDIT_SAMPLING = { fast: { steps: 4, cfg: 1 }, quality: { steps: 40, cfg: 4 } } as const;
 
@@ -184,6 +184,8 @@ export type EditInputs = {
   look?: EditLook;
   /** A second image the instruction refers to ("wearing the outfit of image 2"). */
   image2Ref?: string;
+  /** Inpaint: a mask painted over the photo, white where it changes; outside it the photo stays as it was. */
+  maskRef?: string;
 };
 
 /**
@@ -204,7 +206,7 @@ export function compileEdit(
   // the Multiple-Angles LoRA reads its trigger first
   const instruction = look === 'angles' && !typed.startsWith('<sks>') ? `<sks> ${typed}` : typed;
   const fast = inputs.fast ?? true;
-  const workflow = bindExtension(model, template, { image: inputs.imageRef, image2: inputs.image2Ref, prompt: instruction, seed: inputs.seed });
+  const workflow = bindExtension(model, template, { image: inputs.imageRef, image2: inputs.image2Ref, mask: inputs.maskRef, prompt: instruction, seed: inputs.seed });
   if (look) {
     const entry = lock.get(EDIT_LOOKS[look].lock);
     if (!entry) throw new CompileError(`the ${look} look needs lock entry ${EDIT_LOOKS[look].lock}`);
@@ -215,6 +217,12 @@ export function compileEdit(
   if (!fast) bypassNode(workflow, EDIT_NODES.lightning);
   Object.assign(workflow[EDIT_NODES.sampler]!.inputs, fast ? EDIT_SAMPLING.fast : EDIT_SAMPLING.quality);
   if (!inputs.image2Ref) dropNode(workflow, EDIT_NODES.image2);
+  if (inputs.maskRef) {
+    // the edited image pasted over the photo through the mask: what the saver writes
+    workflow[EDIT_NODES.save]!.inputs.images = [EDIT_NODES.composite, 0];
+  } else {
+    for (const id of [EDIT_NODES.composite, EDIT_NODES.maskChannel, EDIT_NODES.mask]) dropNode(workflow, id);
+  }
   return { workflow, output: { ...model.output }, params: { instruction, seed: inputs.seed, fast, look } };
 }
 

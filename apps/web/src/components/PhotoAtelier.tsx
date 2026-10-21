@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
+import { apiFetch } from '@/lib/api';
 import type { ExtensionsInfo } from '@/lib/api-types';
 import { needsConsent } from '@/lib/consent';
 import {
@@ -18,6 +19,7 @@ import {
 import { refusalMessageKey } from '@/lib/refusals';
 import { useJob } from '@/lib/use-job';
 import { ConsentCheck } from './ConsentCheck';
+import { MaskPainter } from './MaskPainter';
 import type { UploadState } from './Monitor';
 import styles from './studio.module.css';
 
@@ -59,6 +61,11 @@ export function PhotoAtelier({
   const [aspect, setAspect] = useState<(typeof ASPECTS)[number]>('16:9');
   const [look, setLook] = useState<string>('');
   const [style, setStyle] = useState<StyleSelection>({});
+  // Inpaint: the edit changes only what is painted over the photo.
+  const [inpaint, setInpaint] = useState(false);
+  const [maskPainted, setMaskPainted] = useState(false);
+  const [maskFailed, setMaskFailed] = useState(false);
+  const maskExport = useRef<(() => Promise<Blob | null>) | null>(null);
   const [consent, setConsent] = useState(false);
   // Another photo asks for consent again (state adjusted while rendering, when the photo changes).
   const photoKey = photo.status === 'ready' ? photo.imageRef : null;
@@ -72,18 +79,40 @@ export function PhotoAtelier({
   const before = job && source ? source : photo;
   const askConsent = kind === 'edit' && needsConsent(photo, 'edit');
   const done = job?.state === 'succeeded' && job.outputImageRef && job.outputUrl ? job : null;
-  const canStart = text.trim().length > 0 && !busy && (kind === 't2i' || (photo.status === 'ready' && (!askConsent || consent)));
+  const canStart =
+    text.trim().length > 0 && !busy && (kind === 't2i' || (photo.status === 'ready' && (!askConsent || consent) && (!inpaint || maskPainted)));
   const percent = job ? Math.round(job.progress * 100) : 0;
 
-  const run = () => {
+  /** The painted mask, uploaded like a photo; undefined when nothing is painted, null when the upload failed. */
+  const uploadMask = async (): Promise<string | undefined | null> => {
+    if (!inpaint || !maskPainted) return undefined;
+    const blob = await maskExport.current?.();
+    if (!blob) return undefined;
+    const form = new FormData();
+    form.append('image', new File([blob], 'mask.png', { type: 'image/png' }));
+    const res = await apiFetch('/api/uploads', { method: 'POST', body: form }).catch(() => null);
+    if (!res?.ok) return null;
+    return ((await res.json()) as { imageRef: string }).imageRef;
+  };
+
+  const run = async () => {
     if (!canStart) return;
     if (kind === 't2i') {
       const chosen = styleBody(style);
       void start('/api/images', { prompt: text.trim(), aspect, ...(Object.keys(chosen).length > 0 ? { style: chosen } : {}) });
     }
     else if (photo.status === 'ready') {
+      setMaskFailed(false);
+      const maskRef = await uploadMask();
+      if (maskRef === null) return setMaskFailed(true);
       setSource(photo);
-      void start('/api/edits', { imageRef: photo.imageRef, instruction: text.trim(), ...(look ? { look } : {}), ...(askConsent ? { consent } : {}) });
+      void start('/api/edits', {
+        imageRef: photo.imageRef,
+        instruction: text.trim(),
+        ...(look ? { look } : {}),
+        ...(askConsent ? { consent } : {}),
+        ...(maskRef ? { maskRef } : {}),
+      });
     }
   };
 
@@ -174,13 +203,32 @@ export function PhotoAtelier({
               </button>
             ))}
           </div>
+          <div className={styles.styleRow}>
+            <span className={styles.styleLabel} aria-hidden="true">
+              {t('inpaintLabel')}
+            </span>
+            <button type="button" className={styles.chip} aria-pressed={inpaint} disabled={busy || photo.status !== 'ready'} onClick={() => setInpaint(!inpaint)}>
+              {t('inpaintToggle')}
+            </button>
+          </div>
+          {inpaint && photo.status === 'ready' && (
+            <>
+              <p className={styles.hint}>{t('inpaintHint')}</p>
+              <MaskPainter photoUrl={photo.localUrl} disabled={busy} onPainted={setMaskPainted} exportRef={maskExport} />
+            </>
+          )}
+          {maskFailed && (
+            <p className={styles.photoError} role="alert">
+              {t('maskUploadFailed')}
+            </p>
+          )}
         </>
       )}
 
       {askConsent && <ConsentCheck id="atelier-consent" checked={consent} onChange={setConsent} />}
 
       <div className={styles.atelierActions}>
-        <button type="button" className={styles.buttonPrimary} disabled={!canStart} onClick={run}>
+        <button type="button" className={styles.buttonPrimary} disabled={!canStart} onClick={() => void run()}>
           {kind === 't2i' ? t('t2iCreate', { s: estimates.t2i }) : t('editApply', { s: estimates.edit ?? 0 })}
         </button>
         {busy && job && (
@@ -233,7 +281,7 @@ export function PhotoAtelier({
             {t('photoUse')}
           </button>
           {kind === 't2i' ? (
-            <button type="button" className={styles.buttonGhost} onClick={run} disabled={!canStart}>
+            <button type="button" className={styles.buttonGhost} onClick={() => void run()} disabled={!canStart}>
               {t('t2iRetry')}
             </button>
           ) : (

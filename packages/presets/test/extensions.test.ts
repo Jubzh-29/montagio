@@ -182,6 +182,20 @@ describe('compileEdit (Qwen-Image-Edit-2511)', () => {
     expect(() => compileEdit(edit().model, template, { imageRef: 'start.png', instruction: 'make it night', seed: 4 }, lib.lock)).toThrow(/171/);
   });
 
+  test('without a mask the inpaint nodes are gone and the saver reads the decoded image', () => {
+    const { workflow } = compile();
+    for (const id of ['180', '181', '182']) expect(workflow[id]).toBeUndefined();
+    expect(workflow['9']!.inputs.images).toEqual(['158', 0]);
+  });
+
+  test('a mask pastes the edited image over the photo through it: the saver reads the composite', () => {
+    const { workflow } = compile({ maskRef: 'uploads/mask.png' });
+    expect(workflow['180']!.inputs.image).toBe('uploads/mask.png');
+    expect(workflow['181']!.inputs).toEqual({ image: ['180', 0], channel: 'red' });
+    expect(workflow['182']!.inputs).toMatchObject({ destination: ['160', 0], source: ['158', 0], mask: ['181', 0], x: 0, y: 0 });
+    expect(workflow['9']!.inputs.images).toEqual(['182', 0]);
+  });
+
   test('the instruction goes to the positive encoder only', () => {
     const { workflow, params } = compile({ instruction: '  remove the car  ' });
     expect(workflow['151']!.inputs.prompt).toBe('remove the car');

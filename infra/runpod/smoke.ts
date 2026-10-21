@@ -72,6 +72,7 @@ const { values: args } = parseArgs({
     extension: { type: 'string' },
     input: { type: 'string' },
     input2: { type: 'string' },
+    mask: { type: 'string' },
     end: { type: 'string' },
     effect: { type: 'string', default: 'all' },
     hook: { type: 'string' },
@@ -115,6 +116,7 @@ Extensions (instead of presets):
   --effect LIST      the effects to run, e.g. squish,explode, or "all" (default all)
   --hook ID          the hook of hook-edit and transition (default iris-dive)
   --input2 PATH      the second image of a two-reference hook (the outfit of wardrobe-swap)
+  --mask PATH        edit: inpaint through this mask (white where the photo changes, the photo's size)
   --end PATH         the end frame of a transition run alone; without it, the hook's edit runs first and makes it
   --quality          the edit, the effects and the transition without their 4-step LoRAs (more steps, slower)
   --look LOOK        a look of the edit job: infl8, action or angles
@@ -497,6 +499,7 @@ async function runExtensions(
 
   const input = args.input ? fromCaller(args.input) : join(repoRoot, 'demo-assets', 'images', 'sample-16x9.png');
   const input2 = args.input2 ? fromCaller(args.input2) : undefined;
+  const mask = args.mask ? fromCaller(args.mask) : undefined;
   let end = args.end ? fromCaller(args.end) : undefined;
   const clip = args.clip ? fromCaller(args.clip) : undefined;
   // The photo sizes the jobs that read it; the clip to upscale is probed on its own, so that
@@ -537,6 +540,7 @@ async function runExtensions(
     jobs,
     input,
     input2,
+    mask,
     end: end ?? (args['dry-run'] ? 'end.png' : undefined),
     effects: args.effect === 'all' ? undefined : args.effect.split(',').map((id) => id.trim()),
     hook: args.hook,

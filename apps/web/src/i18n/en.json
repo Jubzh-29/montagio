@@ -334,5 +334,15 @@
   "sceneKitchen": "Home kitchen",
   "sceneRooftop": "Rooftop",
   "sceneStudio": "Photo studio",
-  "sceneSnow": "Snowy forest"
+  "sceneSnow": "Snowy forest",
+  "inpaintLabel": "Inpaint",
+  "inpaintToggle": "Paint what changes",
+  "inpaintHint": "Paint over what should change: only that area is edited, the rest of the photo stays exactly as it is.",
+  "maskCanvasLabel": "Paint over the area to change",
+  "maskBrush": "Brush",
+  "maskBrushSmall": "Small",
+  "maskBrushMedium": "Medium",
+  "maskBrushLarge": "Large",
+  "maskClear": "Clear",
+  "maskUploadFailed": "The painted area could not be sent: try again."
 }

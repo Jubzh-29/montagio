@@ -334,5 +334,15 @@
   "sceneKitchen": "Cuisine",
   "sceneRooftop": "Toit-terrasse",
   "sceneStudio": "Studio photo",
-  "sceneSnow": "Forêt enneigée"
+  "sceneSnow": "Forêt enneigée",
+  "inpaintLabel": "Retouche locale",
+  "inpaintToggle": "Peindre la zone à changer",
+  "inpaintHint": "Peignez ce qui doit changer : seule cette zone est modifiée, le reste de la photo reste identique.",
+  "maskCanvasLabel": "Peindre sur la zone à changer",
+  "maskBrush": "Pinceau",
+  "maskBrushSmall": "Petit",
+  "maskBrushMedium": "Moyen",
+  "maskBrushLarge": "Grand",
+  "maskClear": "Effacer",
+  "maskUploadFailed": "La zone peinte n'a pas pu être envoyée : réessayez."
 }

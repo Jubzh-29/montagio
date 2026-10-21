@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { POST as postEdits } from '@/app/api/edits/route';
 import { POST as postImages } from '@/app/api/images/route';
 import { GET as getJob } from '@/app/api/jobs/[id]/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import type { JobSummary } from '@/lib/api-types';
+import { mediaFileFor } from '@/server/generations';
 import { readUploadMeta } from '@/server/uploads';
 import { params, pngFile, setupTempData, uploadRequest } from './helpers';
 
@@ -38,6 +40,22 @@ async function poll(id: string): Promise<JobSummary> {
 
 const sampleRef = async () => ((await (await postSampleUpload()).json()) as { imageRef: string }).imageRef;
 const importedRef = async () => ((await (await postUpload(uploadRequest(pngFile(1280, 720)))).json()) as { imageRef: string }).imageRef;
+
+test('an inpaint mask is a known upload of the photo\'s shape; the composite is what the edit saves', async () => {
+  const photo = await sampleRef();
+  const unknown = await post(postEdits, { imageRef: photo, instruction: 'make the sky purple', maskRef: 'uploads/nope.png' }, 'e-mask-1');
+  expect(await unknown.json()).toEqual({ error: 'unknown-image' });
+  const portrait = ((await (await postUpload(uploadRequest(pngFile(720, 1280)))).json()) as { imageRef: string }).imageRef;
+  const wrongShape = await post(postEdits, { imageRef: photo, instruction: 'make the sky purple', maskRef: portrait }, 'e-mask-2');
+  expect(await wrongShape.json()).toEqual({ error: 'invalid-input' });
+  const mask = ((await (await postUpload(uploadRequest(pngFile(1280, 720)))).json()) as { imageRef: string }).imageRef;
+  const res = await post(postEdits, { imageRef: photo, instruction: 'make the sky purple', maskRef: mask }, 'e-mask-3');
+  expect(res.status).toBe(201);
+  const done = await poll(((await res.json()) as JobSummary).id);
+  expect(done.state).toBe('succeeded');
+  const workflow = JSON.parse(readFileSync(mediaFileFor(`/media/data/jobs/${done.id}/step0.workflow.json`)!, 'utf8')) as Record<string, { inputs: Record<string, unknown> }>;
+  expect(workflow['9']!.inputs.images).toEqual(['182', 0]);
+});
 
 test('an edit of a sample photo needs no consent and gives an edit upload', async () => {
   const res = await post(postEdits, { imageRef: await sampleRef(), instruction: 'make it snow' }, 'e1');

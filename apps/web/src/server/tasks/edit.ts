@@ -32,12 +32,20 @@ export const editTask: TaskDef = {
     if (!instruction || instruction.length > (model.limits.max_chars ?? INSTRUCTION_MAX)) throw new JobError('invalid-input');
     const look = body.look === undefined || body.look === null ? null : EDIT_LOOK_IDS.find((id) => id === body.look);
     if (look === undefined) throw new JobError('invalid-input');
+    // Inpaint: a mask painted in the browser (white where the photo changes), uploaded like a photo.
+    let maskRef: string | undefined;
+    if (body.maskRef !== undefined && body.maskRef !== null) {
+      const mask = typeof body.maskRef === 'string' ? await readUploadMeta(body.maskRef) : null;
+      if (!mask) throw new JobError('unknown-image');
+      if (mask.aspect !== photo.aspect) throw new JobError('invalid-input');
+      maskRef = mask.imageRef;
+    }
     // What the result shows, when the caller knows it (a character's photodump): the Studio's description later.
     const scene = typeof body.scene === 'string' ? body.scene.trim().slice(0, SCENE_MAX) : '';
     assertConsent(photo, body.consent);
     await assertNoBlockedName(instruction, scene);
     return {
-      inputs: { imageRef, instruction, look, personal: photo.personal, ...(photo.fictional ? { fictional: true } : {}), ...(scene ? { scene } : {}) },
+      inputs: { imageRef, instruction, look, personal: photo.personal, ...(photo.fictional ? { fictional: true } : {}), ...(scene ? { scene } : {}), ...(maskRef ? { maskRef } : {}) },
       label: { ...(look ? { itemId: look } : {}), name: model.name },
       modelId: model.id,
       seed: randomInt(0, 2 ** 32),
@@ -56,13 +64,15 @@ export const editTask: TaskDef = {
         if (!template) throw new Error(`the workflow ${model.workflow} of ${model.id} is missing`);
         const imageRef = String(record.inputs.imageRef);
         const look = (record.inputs.look as EditLook | null) ?? undefined;
+        const maskRef = typeof record.inputs.maskRef === 'string' ? record.inputs.maskRef : undefined;
         const { workflow, output } = compileEdit(
           model,
           template,
-          { imageRef, instruction: String(record.inputs.instruction), seed: record.seed, fast: true, ...(look ? { look } : {}) },
+          { imageRef, instruction: String(record.inputs.instruction), seed: record.seed, fast: true, ...(look ? { look } : {}), ...(maskRef ? { maskRef } : {}) },
           lib.lock,
         );
-        return { workflow, output, files: [extensionFile(model, 'image', uploadPath(imageRef))] };
+        const files = [extensionFile(model, 'image', uploadPath(imageRef)), ...(maskRef ? [extensionFile(model, 'mask', uploadPath(maskRef))] : [])];
+        return { workflow, output, files };
       },
     },
   ],

@@ -2,8 +2,9 @@
 # ("make it night", "remove the car") before it is animated, or the end frame of a
 # keyframe transition. The edited PNG is about 1 megapixel, at one of the 17 sizes of
 # FluxKontextImageScale (16:9 gives 1392x752). The workflow carries the Lightning LoRA
-# (171, 4 steps), a look LoRA (170: INFL8, ACTION or angles) and a second image (42,
-# an outfit to wear); compileEdit removes and rewires those a job does not use.
+# (171, 4 steps), a look LoRA (170: INFL8, ACTION or angles), a second image (42,
+# an outfit to wear) and a painted mask (180 to 182: the inpaint keeps the photo outside it);
+# compileEdit removes and rewires those a job does not use.
 schema: montagio/extension-model@0.1
 id: qwen-image-edit-2511
 name: Qwen-Image-Edit-2511 (photo edit)
@@ -22,6 +23,8 @@ workflow: workflows/qwen-image-edit-2511.api.json
 bindings:
   image: { node: "41", field: image }
   image2: { node: "42", field: image }
+  # the inpaint mask: white where the photo changes
+  mask: { node: "180", field: image }
   # the positive encoder; the negative one (149) keeps an empty prompt, as in the template
   prompt: { node: "151", field: prompt }
   seed: { node: "169", field: seed }

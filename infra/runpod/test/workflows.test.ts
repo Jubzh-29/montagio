@@ -12,6 +12,8 @@
  * kornia (a requirement of ComfyUI that the CPU install lacked) was in its venv: without it,
  * nodes_latent and nodes_post_processing do not load. LoadVideo lists clip.mp4 and LoadAudio
  * speech.flac, the placeholders of those workflows.
+ * ImageToMask and ImageCompositeMasked (the edit's inpaint) come from the same ComfyUI on
+ * 2026-10-22; LoadImage lists mask.png, the placeholder of the inpaint mask.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -143,6 +145,7 @@ test.each([
   ['a look', { look: 'action' as const }],
   ['a look, 40 steps', { look: 'infl8' as const, fast: false }],
   ['two images', { image2Ref: 'start2.png' }],
+  ['an inpaint mask', { maskRef: 'mask.png' }],
 ])('the edit job is accepted: %s', (_, variant) => {
   const model = library.extensionModels.get('qwen-image-edit-2511')!;
   const inputs = { imageRef: 'start.png', instruction: 'make it night', seed: 3, ...variant };

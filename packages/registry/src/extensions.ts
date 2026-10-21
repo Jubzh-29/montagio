@@ -34,6 +34,7 @@ export const EXTENSION_BINDING_KEYS = [
   'lora',
   'lora_strength',
   'motion_prompt',
+  'mask',
 ] as const;
 export type ExtensionBindingKey = (typeof EXTENSION_BINDING_KEYS)[number];
 
