@@ -18,6 +18,10 @@ Montagio is an open-source AI video studio in the spirit of Higgsfield: drop a p
 
 The showcase is a static copy of the real Studio. Pick a sample photo and a camera preset to play a clip pre-rendered with Montagio on open weights, assemble a 2–3 shot film in your browser (FFmpeg compiled to WebAssembly), remix a preset and check it, download its ComfyUI workflow. It renders nothing on a GPU, costs nothing to host and collects nothing. How it is built and published: [docs/VITRINE.md](docs/VITRINE.md) (in French).
 
+### From an MCP client
+
+Once Montagio runs on your machine, any MCP client (a desktop assistant, an IDE, an agent framework) can drive it through a local MCP server: "animate this photo with Crash Push", "make the dog squish", "generate an image, then apply Explode". The server calls the app's own HTTP API, renders nothing itself and keeps the Studio's consent rule. Setup, the client configuration and the 15 tools: [packages/mcp](packages/mcp/README.md).
+
 ## Why Montagio
 
 - **Free and local.** ComfyUI, the proxy and the app listen on `127.0.0.1` only. There is no key, no paid API and no credit to buy, and your photos and clips never leave your machine.
