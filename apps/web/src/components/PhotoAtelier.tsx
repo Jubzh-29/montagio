@@ -4,6 +4,17 @@ import { useState } from 'react';
 import { useI18n } from '@/i18n';
 import type { ExtensionsInfo } from '@/lib/api-types';
 import { needsConsent } from '@/lib/consent';
+import {
+  RELIGHTS,
+  relightInstruction,
+  relightKey,
+  STYLE_CHOICES,
+  STYLE_GROUPS,
+  styleBody,
+  styleChoiceKey,
+  styleGroupKey,
+  type StyleSelection,
+} from '@/lib/image-style';
 import { refusalMessageKey } from '@/lib/refusals';
 import { useJob } from '@/lib/use-job';
 import { ConsentCheck } from './ConsentCheck';
@@ -47,6 +58,7 @@ export function PhotoAtelier({
   const [text, setText] = useState('');
   const [aspect, setAspect] = useState<(typeof ASPECTS)[number]>('16:9');
   const [look, setLook] = useState<string>('');
+  const [style, setStyle] = useState<StyleSelection>({});
   const [consent, setConsent] = useState(false);
   // Another photo asks for consent again (state adjusted while rendering, when the photo changes).
   const photoKey = photo.status === 'ready' ? photo.imageRef : null;
@@ -65,7 +77,10 @@ export function PhotoAtelier({
 
   const run = () => {
     if (!canStart) return;
-    if (kind === 't2i') void start('/api/images', { prompt: text.trim(), aspect });
+    if (kind === 't2i') {
+      const chosen = styleBody(style);
+      void start('/api/images', { prompt: text.trim(), aspect, ...(Object.keys(chosen).length > 0 ? { style: chosen } : {}) });
+    }
     else if (photo.status === 'ready') {
       setSource(photo);
       void start('/api/edits', { imageRef: photo.imageRef, instruction: text.trim(), ...(look ? { look } : {}), ...(askConsent ? { consent } : {}) });
@@ -108,21 +123,58 @@ export function PhotoAtelier({
       </p>
 
       {kind === 't2i' ? (
-        <div className={styles.canvasViews} role="radiogroup" aria-label={t('t2iFormat')}>
-          {ASPECTS.map((value) => (
-            <button key={value} type="button" role="radio" className={styles.mode} aria-checked={aspect === value} disabled={busy} onClick={() => setAspect(value)}>
-              {value}
-            </button>
-          ))}
-        </div>
+        <>
+          <div className={styles.canvasViews} role="radiogroup" aria-label={t('t2iFormat')}>
+            {ASPECTS.map((value) => (
+              <button key={value} type="button" role="radio" className={styles.mode} aria-checked={aspect === value} disabled={busy} onClick={() => setAspect(value)}>
+                {value}
+              </button>
+            ))}
+          </div>
+          <fieldset className={styles.styleSet}>
+            <legend className={styles.sectionTitle}>{t('styleTitle')}</legend>
+            {STYLE_GROUPS.map((group) => (
+              <div key={group} className={styles.styleRow} role="radiogroup" aria-label={t(styleGroupKey(group))}>
+                <span className={styles.styleLabel} aria-hidden="true">
+                  {t(styleGroupKey(group))}
+                </span>
+                {['', ...STYLE_CHOICES[group]].map((choice) => (
+                  <button
+                    key={choice || 'auto'}
+                    type="button"
+                    role="radio"
+                    className={styles.chip}
+                    aria-checked={(style[group] ?? '') === choice}
+                    disabled={busy}
+                    onClick={() => setStyle((current) => ({ ...current, [group]: choice }))}
+                  >
+                    {choice ? t(styleChoiceKey(group, choice)) : t('styleAuto')}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </fieldset>
+        </>
       ) : (
-        <div className={styles.lookChoice} role="radiogroup" aria-label={t('editLook')}>
-          {LOOKS.map(([value, key]) => (
-            <button key={value || 'none'} type="button" role="radio" className={styles.mode} aria-checked={look === value} disabled={busy} onClick={() => setLook(value)}>
-              {t(key)}
-            </button>
-          ))}
-        </div>
+        <>
+          <div className={styles.lookChoice} role="radiogroup" aria-label={t('editLook')}>
+            {LOOKS.map(([value, key]) => (
+              <button key={value || 'none'} type="button" role="radio" className={styles.mode} aria-checked={look === value} disabled={busy} onClick={() => setLook(value)}>
+                {t(key)}
+              </button>
+            ))}
+          </div>
+          <div className={styles.styleRow} role="group" aria-label={t('relightTitle')}>
+            <span className={styles.styleLabel} aria-hidden="true">
+              {t('relightTitle')}
+            </span>
+            {RELIGHTS.map((relight) => (
+              <button key={relight} type="button" className={styles.chip} disabled={busy} onClick={() => setText(relightInstruction(relight))}>
+                {t(relightKey(relight))}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {askConsent && <ConsentCheck id="atelier-consent" checked={consent} onChange={setConsent} />}

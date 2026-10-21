@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { readImageTags } from '@montagio/sequence';
 import { POST as postImages } from '@/app/api/images/route';
 import { GET as getJob } from '@/app/api/jobs/[id]/route';
@@ -69,4 +70,15 @@ test('no idempotency key, 400', async () => {
 test('a text over the limit is cut to 500 characters, not refused', async () => {
   const res = await postImages(imageRequest({ prompt: `a fox ${'x'.repeat(600)}`, aspect: '16:9' }, 'img-4'));
   expect(res.status).toBe(201);
+});
+
+test('the cinematography chips reach the workflow; an unknown choice is refused', async () => {
+  const res = await postImages(imageRequest({ prompt: 'a red fox in the snow', aspect: '16:9', style: { lens: 'anamorphic', light: 'neon' } }, 'img-style'));
+  expect(res.status).toBe(201);
+  const done = await poll(((await res.json()) as JobSummary).id);
+  const workflow = JSON.parse(readFileSync(mediaFileFor(`/media/data/jobs/${done.id}/step0.workflow.json`)!, 'utf8')) as Record<string, { inputs: { text?: string } }>;
+  expect(workflow['27']!.inputs.text).toMatch(/^a red fox in the snow\. anamorphic lens.*neon lights at night/);
+  const refused = await postImages(imageRequest({ prompt: 'a fox', aspect: '16:9', style: { lens: 'fisheye' } }, 'img-style-2'));
+  expect(refused.status).toBe(400);
+  expect(await refused.json()).toEqual({ error: 'invalid-input' });
 });

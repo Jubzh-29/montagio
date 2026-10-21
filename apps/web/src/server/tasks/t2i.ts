@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto';
-import { compileImage, IMAGE_PROMPT_MAX, type Aspect } from '@montagio/presets';
+import { compileImage, IMAGE_PROMPT_MAX, parseImageStyle, type Aspect, type ImageStyle } from '@montagio/presets';
 import { JobError } from '../errors';
 import { assertNoBlockedName } from '../guards';
 import type { TaskDef } from '../jobs';
@@ -13,12 +13,14 @@ export const t2iTask: TaskDef = {
   async prepare(body, lib) {
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim().slice(0, IMAGE_PROMPT_MAX) : '';
     const aspect = ASPECTS.find((value) => value === body.aspect);
-    if (!prompt || !aspect) throw new JobError('invalid-input');
+    // The cinematography chips (camera, lens, film, light, palette): known choices only.
+    const style = parseImageStyle(body.style);
+    if (!prompt || !aspect || !style) throw new JobError('invalid-input');
     await assertNoBlockedName(prompt);
     const model = lib.models.get(T2I_MODEL);
     if (!model) throw new Error(`the core model ${T2I_MODEL} is missing from registry/models`);
     const seed = Number.isInteger(body.seed) && (body.seed as number) >= 0 ? (body.seed as number) : randomInt(0, 2 ** 32);
-    return { inputs: { prompt }, label: { name: model.name }, modelId: model.id, seed, aspect };
+    return { inputs: { prompt, ...(Object.keys(style).length > 0 ? { style } : {}) }, label: { name: model.name }, modelId: model.id, seed, aspect };
   },
 
   steps: (record, lib) => [
@@ -32,6 +34,7 @@ export const t2iTask: TaskDef = {
         if (!template) throw new Error(`the workflow ${model.workflow} of ${model.id} is missing`);
         const { workflow, output } = compileImage(model, template, {
           prompt: String(record.inputs.prompt),
+          style: (record.inputs.style ?? {}) as ImageStyle,
           seed: record.seed,
           aspect: record.aspect ?? '16:9',
         });

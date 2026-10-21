@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseModel } from '@montagio/registry';
-import { CompileError, compileImage, IMAGE_PROMPT_MAX, type ApiWorkflow } from '../src/index';
+import { CompileError, compileImage, IMAGE_PROMPT_MAX, IMAGE_STYLES, parseImageStyle, styledPrompt, type ApiWorkflow } from '../src/index';
 
 const repo = (path: string) => fileURLToPath(new URL(`../../../${path}`, import.meta.url));
 const zimage = parseModel(readFileSync(repo('registry/models/z-image-turbo.yaml'), 'utf8'), 'z-image-turbo.yaml');
@@ -49,4 +49,25 @@ test('the template is not mutated', () => {
   const before = JSON.stringify(template);
   compileImage(zimage, template, { prompt: 'a fox', seed: 9, aspect: '9:16' });
   expect(JSON.stringify(template)).toBe(before);
+});
+
+test('the cinematography chips add their phrases after the text, in group order', () => {
+  const { workflow, params } = compileImage(zimage, template, {
+    prompt: 'a red fox in the snow.',
+    seed: 1,
+    aspect: '16:9',
+    style: { light: 'golden', lens: 'portrait' },
+  });
+  expect(params.prompt).toBe(`a red fox in the snow. ${IMAGE_STYLES.lens.portrait}, ${IMAGE_STYLES.light.golden}.`);
+  expect(workflow['27']!.inputs.text).toBe(params.prompt);
+  expect(styledPrompt('  a fox  ')).toBe('a fox');
+});
+
+test('a style holds known choices only', () => {
+  expect(parseImageStyle(undefined)).toEqual({});
+  expect(parseImageStyle({ camera: 'drone', film: '' })).toEqual({ camera: 'drone' });
+  expect(parseImageStyle({ camera: 'brand-x' })).toBeNull();
+  expect(parseImageStyle({ weather: 'rain' })).toBeNull();
+  expect(parseImageStyle(['drone'])).toBeNull();
+  expect(parseImageStyle({ lens: 'toString' })).toBeNull();
 });
