@@ -26,6 +26,11 @@ jobs:
         env:
           MONTAGIO_REQUIRE_TS_PARITY: '1'
       - run: npm run check:open-stack
+      # The proof the Open Stack page shows, kept with each run: every model, weight file and licence.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: open-stack-report
+          path: apps/web/public/open-stack-report.json
       # The showcase manifest, its sample photos and its rendered clips (sha256, mention, workflow).
       - run: npm run showcase -- verify
 
