@@ -2,6 +2,8 @@
 .studio {
   display: grid;
   grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+  /* The promise's row is its own height: the composer, spanning both rows, gives its extra to the canvas's. */
+  grid-template-rows: auto 1fr;
   gap: var(--space-6);
   width: 100%;
   max-width: 1360px;
@@ -10,9 +12,11 @@
   align-items: start;
 }
 
-/* What Montagio does, then what the tab makes: one row across the composer and the canvas. */
+/* What Montagio does, then what the tab makes: above the canvas, so the composer starts right under
+   the header and its Generate stays above the fold of a laptop screen. */
 .intro {
-  grid-column: 1 / -1;
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -39,6 +43,16 @@
 }
 
 /* The canvas: the wall of previews, or the monitor and its result. */
+.panel {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.stage {
+  grid-column: 2;
+  grid-row: 2;
+}
+
 .stage {
   display: flex;
   flex-direction: column;
@@ -53,7 +67,7 @@
   gap: var(--space-5);
   position: sticky;
   top: var(--header-room);
-  max-height: calc(100dvh - var(--header-room) - var(--space-4));
+  max-height: calc(100dvh - var(--header-room) - var(--space-6));
   overflow-y: auto;
   /* A field focused in the composer lands above its Generate block, not under it. */
   scroll-padding-bottom: var(--generate-room);
@@ -805,6 +819,9 @@
   background: var(--surface);
   resize: vertical;
   transition: border-color var(--dur) var(--ease-out);
+  /* A text field grows with its text (where the browser can), up to about six lines. */
+  field-sizing: content;
+  max-height: 12lh;
 }
 
 .prompt::placeholder {
@@ -895,6 +912,7 @@
 }
 
 .hint {
+  max-width: 70ch;
   color: var(--ink-muted);
   font-size: var(--text-s);
 }
@@ -965,14 +983,17 @@
   border-color: oklch(0.96 0 0 / 0.5);
 }
 
-.buttonGhost:disabled {
-  opacity: 0.5;
+.buttonGhost:disabled,
+.buttonSecondary:disabled,
+.toolButton:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 @media (max-width: 960px) {
   .studio {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
     padding: var(--space-4);
     gap: var(--space-5);
   }
@@ -1001,6 +1022,12 @@
     padding-block: var(--space-3);
   }
   /* The canvas comes first: the effects, the moves or the monitor are seen before the form. */
+  .intro,
+  .panel,
+  .stage {
+    grid-column: auto;
+    grid-row: auto;
+  }
   .intro {
     order: -2;
   }
@@ -1466,7 +1493,7 @@
   place-items: center;
   aspect-ratio: 16 / 9;
   border: 1px solid var(--line);
-  border-radius: var(--radius-l);
+  border-radius: var(--radius-m);
   background: var(--surface);
   overflow: hidden;
   isolation: isolate;
@@ -1896,4 +1923,46 @@
   color: var(--ink-muted);
   font-size: var(--text-xs);
   line-height: 1.4;
+}
+
+/* Quality or Fast, by Generate: two pills with their times, and what the chosen one buys. */
+.modelChoice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  border: 0;
+}
+
+.modelChoice .mode {
+  cursor: pointer;
+}
+
+.modelChoice .mode[data-selected='true'] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.modelChoice .mode:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.modelHintLine {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+/* The model choice: by Generate on a large screen, in the fields on a phone (its bar stays one button high). */
+@media (min-width: 961px) {
+  .modelsInFields {
+    display: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .modelsByGenerate {
+    display: none;
+  }
 }

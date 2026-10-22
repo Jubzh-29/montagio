@@ -75,7 +75,7 @@ export function OpenStack() {
         {report ? (
           <>
             <p className={styles.checked} data-state={report.ok ? 'ok' : 'failed'}>
-              {report.ok ? t('badge') : t('badgeFailed')} · {t('verifiedAt', { date: new Date(report.checkedAt).toLocaleString(locale) })}
+              {report.ok ? t('badge') : t('badgeFailed')} · {t('verifiedAt', { date: new Date(report.checkedAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }) })}
             </p>
             <p className={styles.summary}>
               {t('openStackSummary', { models: report.models.length, files: files.size, size: gigabytes(totalBytes) })}

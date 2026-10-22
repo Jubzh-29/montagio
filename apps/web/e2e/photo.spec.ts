@@ -70,7 +70,7 @@ test('editing an imported photo asks for consent first', async ({ page }) => {
   await apply.click();
   await expect(page.getByTestId('atelier-result')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Before', { exact: true })).toBeVisible();
-  await expect(page.getByTestId('ai-caption')).toHaveText(/^After · AI-generated · Qwen-Image-Edit-2511.*[(]Apache-2[.]0[)]$/);
+  await expect(page.getByTestId('ai-caption')).toHaveText(/^After · Demo render: no model ran here[.] With a GPU, Qwen-Image-Edit-2511.*[(]Apache-2[.]0[)] makes it[.]$/);
 });
 
 test('the sample photo needs no consent to be edited', async ({ page }) => {

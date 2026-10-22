@@ -185,5 +185,6 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     ...(upscale ? { upscaleModel: { ...summaryOf(upscale), maxFrames: upscale.limits.max_input_frames ?? 121 } } : {}),
     ...(motion ? { motionModel: summaryOf(motion) } : {}),
     ...(Object.keys(examples).length > 0 ? { examples } : {}),
+    ...((process.env.MONTAGIO_BACKEND ?? 'demo') === 'demo' ? { demo: true } : {}),
   };
 }

@@ -91,7 +91,8 @@ test('remix: a check result goes away when the model changes', async ({ page }) 
   await openRemix(page);
   await page.getByRole('button', { name: 'Check preset', exact: true }).click();
   await expect(page.getByText('Valid preset: Crash Push')).toBeVisible(FIRST_COMPILE);
-  await page.getByText('Wan 2.2 5B').click();
+  // The model choice sits by Generate on a large screen: Fast, with its time.
+  await page.locator('[class*="generateBlock"]').getByText(/^Fast/).click();
   await expect(page.getByText('Valid preset: Crash Push')).toBeHidden();
 });
 

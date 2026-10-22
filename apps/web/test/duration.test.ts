@@ -1,4 +1,4 @@
-import { formatClock, formatDuration } from '@/lib/duration';
+import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
 
 const nbsp = (text: string) => text.replace(/ /g, ' ');
 
@@ -18,4 +18,14 @@ test('the slate counts like a camera: m:ss, then h:mm:ss', () => {
   expect(formatClock(42.7)).toBe('0:42');
   expect(formatClock(725)).toBe('12:05');
   expect(formatClock(3723)).toBe('1:02:03');
+});
+
+test('the time left follows the progress once there is some, the estimate before', () => {
+  // Nothing measured yet: the estimate, less the time already gone.
+  expect(remainingSeconds(30, 565, 0)).toBe(535);
+  expect(remainingSeconds(30, 565, 0.03)).toBe(535);
+  // Half done in 4 minutes: about 4 more, whatever the estimate said.
+  expect(remainingSeconds(240, 565, 0.5)).toBe(240);
+  expect(remainingSeconds(500, 565, 0.96)).toBeCloseTo(20.8, 1);
+  expect(remainingSeconds(700, 565, 0)).toBe(0);
 });

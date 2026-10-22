@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useI18n } from '@/i18n';
+import { IS_SHOWCASE } from '@/lib/api';
+import { useExtensions } from '@/lib/use-extensions';
 import { stackHref } from '@/lib/open-stack';
 import styles from './studio.module.css';
 
 /** The captions that name a model: each holds `{model}` and `{license}`. */
-type CaptionText = 'aiCaption' | 'showcaseCaption' | 'hookEndFrame';
+type CaptionText = 'aiCaption' | 'demoCaption' | 'showcaseCaption' | 'hookEndFrame';
 
 /**
  * Under every result: what made it, and that it is AI-generated (the AI Act's visible mention).
@@ -28,7 +30,9 @@ export function AiCaption({
   prefix?: string;
 }) {
   const { t } = useI18n();
-  const [before, after = ''] = t(text, { license: model.license }).split('{model}');
+  // Without a GPU (the demo backend) no model made the result: the caption says what would make it.
+  const demo = useExtensions()?.demo === true && !IS_SHOWCASE;
+  const [before, after = ''] = t(demo && text === 'aiCaption' ? 'demoCaption' : text, { license: model.license }).split('{model}');
   return (
     <Tag className={Tag === 'p' ? styles.caption : undefined} data-testid={testId}>
       {prefix}

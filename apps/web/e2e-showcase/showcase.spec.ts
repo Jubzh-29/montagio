@@ -129,9 +129,10 @@ test('disabled controls say why', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByLabel('What the photo shows', { exact: true })).toBeDisabled();
   await expect(page.getByText('Locally, you describe your own photo here.')).toBeVisible();
-  const fast = page.getByRole('radio', { name: /Wan 2\.2 5B/ });
+  // By Generate, the showcase's model choice says Fast is for a local install.
+  const fast = page.locator('[class*="generateBlock"]').getByRole('radio', { name: /^Fast/ });
   await expect(fast).toBeDisabled();
-  await expect(page.locator('label', { has: fast })).toContainText('local only');
+  await expect(page.locator('[class*="generateBlock"] label', { has: page.getByRole('radio', { name: /^Fast/ }) })).toContainText('local only');
 });
 
 test('french texts', async ({ page }) => {

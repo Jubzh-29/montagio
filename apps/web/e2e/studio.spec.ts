@@ -18,7 +18,8 @@ test('studio happy path in demo mode', async ({ page }) => {
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.getByRole('progressbar')).toBeVisible();
   await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /\/media\//, { timeout: 15_000 });
-  await expect(page.getByTestId('ai-caption')).toHaveText(/^AI-generated · .+ [(]Apache-2.0[)]$/);
+  // The demo backend: the caption says no model ran, and names the one that would.
+  await expect(page.getByTestId('ai-caption')).toHaveText(/^Demo render: no model ran here\. With a GPU, .+ [(]Apache-2.0[)] makes it\.$/);
   const download = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Open in ComfyUI' }).click();
   expect((await download).suggestedFilename()).toMatch(/\.json$/);
@@ -74,7 +75,7 @@ test('french toggle', async ({ page }) => {
   await page.goto(CAMERA);
   await page.getByRole('button', { name: 'FR', exact: true }).click();
   await expect(page.getByRole('button', { name: /^Générer/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: /open weights — vérifié/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /poids ouverts — vérifié/ })).toBeVisible();
 });
 
 test('the open stack page lists every model by what it makes, each Apache-2.0 or MIT', async ({ page }) => {

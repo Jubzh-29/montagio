@@ -97,10 +97,10 @@
   transition: background-color 180ms var(--ease-out);
 }
 
-/* The row a result's caption links to: tinted and framed like a selection, once, without motion. */
+/* The row a result's caption links to: lit and framed in ink, not in the red of action and of a failed check. */
 .row[data-target='true'] {
-  background: var(--rec-soft);
-  box-shadow: inset 0 0 0 1px var(--rec);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--ink-muted);
 }
 
 .row:focus-visible {

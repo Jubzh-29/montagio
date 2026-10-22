@@ -20,7 +20,7 @@ import {
 } from '@/lib/api-types';
 import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
-import { formatClock, formatDuration } from '@/lib/duration';
+import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
 import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
@@ -136,6 +136,15 @@ const endpoint = (job: Tracked) => `/api/${ENDPOINTS[job.kind]}/${job.record.id}
 function lostJob(job: Tracked): Job {
   return { ...job, record: { ...job.record, state: 'failed', error: 'lost' } } as Tracked;
 }
+
+/** The sample photo of each tab (demo-assets/images), and the description that comes with it. */
+const SAMPLE_OF_TAB: Record<Tab, { file: string; scene: MessageKey; forTab?: 'effects' | 'avatar' | 'motion' }> = {
+  effects: { file: 'sample-subject.png', scene: 'sampleSubjectScene', forTab: 'effects' },
+  camera: { file: 'sample-16x9.png', scene: 'samplePhotoScene' },
+  film: { file: 'sample-16x9.png', scene: 'samplePhotoScene' },
+  avatar: { file: 'sample-portrait.png', scene: 'samplePortraitScene', forTab: 'avatar' },
+  motion: { file: 'sample-character.png', scene: 'sampleCharacterScene', forTab: 'motion' },
+};
 
 /** Under the promise: what each tab makes, in one line. */
 const TAB_LEDES: Record<Tab, MessageKey> = {
@@ -376,17 +385,22 @@ export function Studio() {
     if (busyRef.current) return;
     touched.current = true;
     const token = ++uploadToken.current;
-    const localUrl = '/media/demo-assets/images/sample-16x9.png';
+    // Each tab has its sample: a subject for an effect, a face for an avatar, a character for a motion.
+    const sample = SAMPLE_OF_TAB[tab];
+    const localUrl = `/media/demo-assets/images/${sample.file}`;
     setJob({ status: 'idle' });
     setPhotoPrompt(undefined);
-    setPrompt(t('samplePhotoScene'));
-    sceneOfPhoto.current = true;
+    // The sample comes described, unless the visitor typed a description before it: theirs stays.
+    if (sceneOfPhoto.current || !prompt.trim()) {
+      setPrompt(t(sample.scene));
+      sceneOfPhoto.current = true;
+    }
     setUpload({ status: 'uploading', localUrl });
     const settle = (next: UploadState) => {
       if (token === uploadToken.current) setUpload(next);
     };
     try {
-      const res = await apiFetch('/api/uploads/sample', { method: 'POST' });
+      const res = await apiFetch(sample.forTab ? `/api/uploads/sample?for=${sample.forTab}` : '/api/uploads/sample', { method: 'POST' });
       if (!res.ok) return settle({ status: 'error', message: t('errorGeneric') });
       const result = (await res.json()) as UploadResult;
       settle({ status: 'ready', localUrl, imageRef: result.imageRef, personal: result.personal });
@@ -838,6 +852,8 @@ export function Studio() {
   const resultShown = succeeded !== undefined && canvas.view === 'result';
   const elapsed_s = clock && clock.take === take ? clock.ms / 1000 : 0;
   const percent = tracked ? Math.round(tracked.record.progress * 100) : 0;
+  // The slate's time left: the progress's pace once there is some, so 96 % no longer reads "~9 min left".
+  const left_s = take ? remainingSeconds(elapsed_s, take.expected_s, tracked?.record.progress ?? 0) : 0;
 
   // The slate's clock: one tick a second while the take rolls.
   useEffect(() => {
@@ -919,7 +935,7 @@ export function Studio() {
     ...(busy && take
       ? [
           t('slateRec', { t: formatClock(elapsed_s) }),
-          take.expected_s - elapsed_s > 20 ? t('slateLeft', { d: formatDuration(take.expected_s - elapsed_s) }) : t('slateFinishing'),
+          left_s > 20 ? t('slateLeft', { d: formatDuration(left_s) }) : t('slateFinishing'),
         ]
       : []),
   ].filter(Boolean);
@@ -1107,12 +1123,14 @@ export function Studio() {
                   </p>
                 )}
               </div>
+              {/* On a phone, the full picker; on a large screen it sits by Generate (below). */}
               <ModelPicker
                 models={models}
                 loading={catalog === 'loading'}
                 selectedId={modelId}
                 onSelect={setModelId}
                 onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
+                className={styles.modelsInFields}
               />
             </>
             )
@@ -1127,6 +1145,18 @@ export function Studio() {
           generate={
             <>
               <div className={styles.generateBlock}>
+                {/* What the time buys, right where it is spent: Quality and Fast with their times. */}
+                {(tab === 'camera' || tab === 'film') && models.length > 1 && (
+                  <ModelPicker
+                    compact
+                    name="model-by-generate"
+                    models={models}
+                    selectedId={modelId}
+                    onSelect={setModelId}
+                    onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
+                    className={styles.modelsByGenerate}
+                  />
+                )}
                 {primaryLabel ? (
                   <button
                     type="button"

@@ -23,3 +23,12 @@ export function formatClock(seconds: number): string {
   if (minutes < 60) return `${minutes}:${s}`;
   return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}:${s}`;
 }
+
+/**
+ * The seconds a render still needs: once it reports some progress (5 % or more), what the time gone
+ * says at that pace; before, the estimate less the time gone. Never below zero.
+ */
+export function remainingSeconds(elapsed_s: number, expected_s: number, progress: number): number {
+  if (progress >= 0.05 && progress < 1) return Math.max(0, (elapsed_s * (1 - progress)) / progress);
+  return Math.max(0, expected_s - elapsed_s);
+}

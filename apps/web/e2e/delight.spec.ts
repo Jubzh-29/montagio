@@ -10,26 +10,28 @@ async function cameraWithSample(page: Page) {
 test('render times read in minutes, and Quality and Fast say what they trade', async ({ page }) => {
   await cameraWithSample(page);
   await expect(page.getByRole('button', { name: /^Generate/ })).toHaveText('Generate (~9 min)');
+  // By Generate, each tier with its time, and what the chosen one buys.
   const picker = page.getByRole('group', { name: 'Model' });
   await expect(picker).toContainText('Follows the move exactly');
+  await expect(picker.getByRole('radio', { name: /^Fast · ~2 min/ })).toBeAttached();
+  await picker.getByRole('radio', { name: /^Fast/ }).check({ force: true });
   await expect(picker).toContainText('Follows the move from its text');
-  await expect(picker).toContainText('~2 min');
 });
 
 test('while a clip renders, the slate counts, the tab title records, and the visitor may leave; then the clip is revealed', async ({ page }) => {
-  // The render is held at 42 % for as long as the test looks at the wait.
+  // The render is held at 2 % (under the 5 % where the time left follows the progress) while the test looks at the wait.
   let hold = true;
   await page.route('**/api/generations/*', async (route) => {
     if (route.request().method() !== 'GET') return route.continue();
     const response = await route.fetch();
     const record = (await response.json()) as Record<string, unknown>;
     if (!hold) return route.fulfill({ response, json: record });
-    return route.fulfill({ response, json: { ...record, state: 'running', progress: 0.42, outputUrl: undefined } });
+    return route.fulfill({ response, json: { ...record, state: 'running', progress: 0.02, outputUrl: undefined } });
   });
   await cameraWithSample(page);
   const title = await page.title();
   await page.getByRole('button', { name: /^Generate/ }).click();
-  await expect(page).toHaveTitle(/^● REC 42\s?%/);
+  await expect(page).toHaveTitle(/^● REC 2\s?%/);
   const slate = page.getByTestId('slate');
   await expect(slate).toContainText(/REC \d+:\d\d/);
   await expect(slate).toContainText('~9 min left');
