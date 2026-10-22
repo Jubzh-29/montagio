@@ -154,7 +154,7 @@ Seven extensions run models of their own, beyond the camera presets, in their or
 | `edit` | 31.9 GB |
 | `effects` | 20.6 GB |
 | `transitions` | 31.0 GB |
-| `avatar` | 21.5 GB |
+| `avatar` | 23.6 GB |
 | `music` | 10.0 GB |
 | `upscale` | 4.0 GB |
 | `motion` | 16.7 GB |

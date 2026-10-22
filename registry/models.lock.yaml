@@ -235,6 +235,30 @@ weights:
     source: https://huggingface.co/ResembleAI/chatterbox
     extension: avatar
     folder: tts/chatterbox/resembleai-mtl-v3
+  # The voice change (ChatterboxVC) opens the pack through the node's classic loader, which also
+  # builds the English TTS: its T3 and its tokenizer join the same folder. The multilingual voice
+  # still picks its own T3 (t3_mtl23ls_v3) and grapheme table by name.
+  - id: chatterbox-t3-en
+    file: t3_cfg.safetensors
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/t3_cfg.safetensors
+    sha256: 914cb1696f47527fe8852ca8f1fe1fa63cb34f76f9c715e84e067b744dd0da81
+    size: 2129653744
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
+  # Kept out of LFS as well: the sha256 was computed on the 25,470-byte file (a tokenizer table,
+  # not weights) on 2026-10-22, and its git blob id matches the one Hugging Face publishes.
+  - id: chatterbox-tokenizer-en
+    file: tokenizer.json
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/tokenizer.json
+    sha256: d71e3a44eabb1784df9a68e9f95b251ecbf1a7af6a9f50835856b2ca9d8c14a5
+    git_sha1: abd07c710243ba89bf1b21780e7c37ddde92334e
+    size: 25470
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
   - id: wan22-s2v-14b-fp8
     file: wan2.2_s2v_14B_fp8_scaled.safetensors
     url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_s2v_14B_fp8_scaled.safetensors

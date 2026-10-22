@@ -98,7 +98,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 ### chatterbox-vc
 
 - Written for Montagio: `ChatterboxVC` from the same pinned `wildminder/ComfyUI-Chatterbox` pack, between two core `LoadAudio` (node 1, the speech; node 4, the voice sample) and `SaveAudioAdvanced` in FLAC. The words and the delivery of the speech stay; only the voice changes, to the sample's.
-- It reads the `resembleai-mtl-v3` pack's S3Gen, voice encoder and conditionals already in the lock (no new weight), runs 10 flow steps with one refinement pass and cuts the speech into 30 s chunks at most (the app keeps 30 s). The watermark is off, as for the avatar's voice.
+- It reads the `resembleai-mtl-v3` pack folder. The node's classic loader builds the English TTS beside the converter, so the folder also holds `t3_cfg.safetensors` and `tokenizer.json` (2.1 GB, MIT, the same Resemble AI repository); the multilingual voice still picks its own T3 by name. It runs 10 flow steps with one refinement pass and cuts the speech into 30 s chunks at most (the app keeps 30 s). The watermark is off, as for the avatar's voice.
 - The app asks for the speaker's consent on the sample, and the rights on a video sent here; the clip comes back with the AI mention.
 
 ### wan22-s2v-avatar
