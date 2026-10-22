@@ -83,8 +83,9 @@ test('the open stack page lists every model by what it makes, each Apache-2.0 or
   for (const name of [/^Camera/, /^Effects$/, /^Transitions and hooks$/, /^Photo/, /^Avatar$/, /^Music$/, /^HD/, /^Motion/]) {
     await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
   }
+  // 13 models: the photo HD and the voice change joined the 11 of the session S2.
   const rows = page.locator('[data-testid=model-row]');
-  await expect(rows).toHaveCount(11);
+  await expect(rows).toHaveCount(13);
   for (const row of await rows.all()) await expect(row).toContainText(/Apache-2\.0|MIT/);
 });
 
@@ -197,7 +198,8 @@ test('a tab is a link: Film opens its wall, the header marks it, the URL keeps i
 
 test('a tab the Studio does not show falls back to the first one', async ({ page }) => {
   await page.goto('/?tab=nowhere');
-  await expect(page.locator('nav').getByRole('link').first()).toHaveAttribute('aria-current', 'page');
+  // The header starts with pages of their own (Explore, Characters, Ads): the Studio's first tab is Effects.
+  await expect(page.locator('nav [aria-current=page]')).toHaveText('Effects');
 });
 
 test('a camera clip gets its HD version', async ({ page }) => {
