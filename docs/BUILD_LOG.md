@@ -153,3 +153,10 @@ UI/UX audit of 21/10 (score 26/40, no P0, three P1): its action plan, one branch
   - The clip comes up from a flash of light; Download is the red button of the result, Generate steps back to an outline while the result shows, and the focus lands on Download as before.
   - Found on the way: the Camera switch to the monitor waited for the upload to end and could undo a Gallery click made meanwhile; it now happens when the photo is chosen.
   - Checked on the laptop, one suite at a time: typecheck, lint, web `npm test` 352/352, the demo e2e 69/70 then the failing test and the specs it touches 33/33 after the fix above, the showcase 14/14; a 20 s demo render in a browser at 1440 px.
+- Lot 4, the phone (`feat/ux-adapt`, on top of lot 3).
+  - Under 960 px the canvas comes before the form (CSS order: the composer keeps its place in the reading order); under 640 px the Effects wall and the camera gallery become one row that scrolls sideways, so a visitor sees the effects on arrival and the photo and Generate stay close.
+  - The tabs scroll sideways and fade out where more of them are (no more "Motic" cut and History out of reach), the current tab scrolled into view; the header is opaque.
+  - Replace photo no longer sits on a finished clip; the Open Stack rows keep their margin.
+  - Each gallery preview has its first frame as a JPEG poster beside it, with "AI-generated" in a JPEG comment like the clips' metadata (`posterFrame`, `npm run previews:posters`, 19 files, 366 KB); `showcase prepare` makes the posters of its previews and examples. No more black tiles while the clips load.
+  - Found on the way: a photo chosen before `/api/extensions` answered switched the guessed Camera tab to the monitor, which then hid the Effects wall; the switch now waits for the tab to settle.
+  - Checked on the laptop, one suite at a time: typecheck, lint, `npm test` web 353, showcase 54 and sequence 40, the demo e2e (72/76, then the four failures and the specs they touch 34/34 after the two fixes above), the showcase 14/14; the Effects and Motion tabs in a browser at 375 px.
