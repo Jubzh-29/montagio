@@ -108,7 +108,7 @@ export function Monitor({
         <video
           key={result}
           data-testid="result"
-          className={styles.monitorMedia}
+          className={`${styles.monitorMedia} ${styles.reveal}`}
           src={result}
           autoPlay={autoPlayResult}
           loop
@@ -158,7 +158,8 @@ export function Monitor({
         </>
       )}
 
-      {localUrl && !result && !rendering && move && <PhotoPlan move={move} aspect={photoAspect} />}
+      {/* While the clip renders, the plan keeps moving over the dimmed photo: the camera is at work. */}
+      {localUrl && !result && !endFrame && move && <PhotoPlan move={move} aspect={photoAspect} rendering={rendering} />}
 
       {localUrl && !rendering && !showcase && (
         <label htmlFor="photo-input" className={`${styles.buttonGhost} ${styles.replace}`}>
@@ -227,7 +228,7 @@ export function Monitor({
  * The chosen move over the user's photo, as on a shot plan: the dashed frame is
  * where the shot ends. A pull back ends wider than the photo: its corners point out.
  */
-function PhotoPlan({ move, aspect }: { move: { id: string; poses: string[]; speed: number }; aspect: number }) {
+function PhotoPlan({ move, aspect, rendering }: { move: { id: string; poses: string[]; speed: number }; aspect: number; rendering: boolean }) {
   const { left, top, width, height, widens } = photoTarget(move.poses, move.speed);
   // Played once when the move changes: the frame travels from the whole photo to where the shot ends.
   const from = {
@@ -237,7 +238,7 @@ function PhotoPlan({ move, aspect }: { move: { id: string; poses: string[]; spee
     '--from-sy': 100 / height,
   };
   return (
-    <div className={styles.photoPlan} style={{ '--aspect': aspect } as CSSProperties} aria-hidden="true">
+    <div className={styles.photoPlan} style={{ '--aspect': aspect } as CSSProperties} data-rendering={rendering || undefined} aria-hidden="true">
       {widens ? (
         <span key={move.id} className={styles.planWiden}>
           {(['tl', 'tr', 'bl', 'br'] as const).map((corner) => (

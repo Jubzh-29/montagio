@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useI18n, type MessageKey } from '@/i18n';
+import { formatDuration } from '@/lib/duration';
 import type { ExtensionsInfo } from '@/lib/api-types';
 import { needsConsent } from '@/lib/consent';
 import { refusalMessageKey } from '@/lib/refusals';
@@ -148,7 +149,7 @@ export function PhotoAtelier({
           aria-describedby={waitingFor ? `atelier-waiting-${kind}` : undefined}
           onClick={run}
         >
-          {kind === 't2i' ? t('t2iCreate', { s: estimates.t2i }) : t('editApply', { s: estimates.edit ?? 0 })}
+          {kind === 't2i' ? t('t2iCreate', { d: formatDuration(estimates.t2i) }) : t('editApply', { d: formatDuration(estimates.edit ?? 0) })}
         </button>
         {busy && job && (
           <button type="button" className={styles.buttonGhost} onClick={() => void cancel()}>

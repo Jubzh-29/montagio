@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useI18n } from '@/i18n';
+import { formatDuration } from '@/lib/duration';
 import { refusalMessageKey } from '@/lib/refusals';
 import { useJob } from '@/lib/use-job';
 import { AiCaption } from './AiCaption';
@@ -76,7 +77,7 @@ export function MusicPanel({
       />
       <div className={styles.actions}>
         <button type="button" className={styles.buttonPrimary} disabled={!canStart} onClick={run}>
-          {t('musicAdd', { s: estimate_s })}
+          {t('musicAdd', { d: formatDuration(estimate_s) })}
         </button>
         {busy && job && (
           <button type="button" className={styles.buttonGhost} onClick={() => void cancel()}>

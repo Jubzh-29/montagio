@@ -239,6 +239,45 @@
   --dy: -12px;
 }
 
+/* While the clip renders, the plan travels again and again, from the whole photo to where the shot ends. */
+.photoPlan[data-rendering='true'] .planTarget {
+  animation: plan-in 2.4s var(--ease-camera) infinite alternate both;
+}
+
+.photoPlan[data-rendering='true'] .planArrow {
+  animation: plan-out 2.4s var(--ease-camera) infinite alternate both;
+}
+
+.studio[data-motion='paused'] .photoPlan[data-rendering='true'] .planTarget,
+.studio[data-motion='paused'] .photoPlan[data-rendering='true'] .planArrow {
+  animation: none;
+}
+
+/* The clip comes up like a print under the enlarger: from a flash of light to its own exposure. */
+.reveal {
+  animation: reveal 600ms var(--ease-out) both;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    filter: brightness(1.8);
+    transform: scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: reveal-fade 240ms linear both;
+  }
+}
+
+@keyframes reveal-fade {
+  from {
+    opacity: 0;
+  }
+}
+
 @keyframes plan-out {
   from {
     transform: translate(var(--dx), var(--dy));
@@ -371,6 +410,27 @@
   color: var(--ink-muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+}
+
+/* While a take rolls, the slate counts: the REC part brighter, after the tally's red dot. */
+.slate[data-rolling='true'] span:nth-last-child(2) {
+  color: var(--ink);
+}
+
+.slate[data-rolling='true'] span:nth-last-child(2)::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--space-1);
+  border-radius: 50%;
+  background: var(--rec);
+  vertical-align: 1px;
+  animation: tally 1.2s var(--ease-out) infinite alternate;
+}
+
+.studio[data-motion='paused'] .slate[data-rolling='true'] span:nth-last-child(2)::before {
+  animation: none;
 }
 
 .slate span + span::before {
@@ -739,6 +799,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Under the tier, model and time: what the time buys, on its own line. */
+.modelHint {
+  grid-column: 1 / -1;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
 }
 
 .modelMeta {

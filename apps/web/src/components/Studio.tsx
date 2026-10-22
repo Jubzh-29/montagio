@@ -20,6 +20,7 @@ import {
 } from '@/lib/api-types';
 import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
+import { formatClock, formatDuration } from '@/lib/duration';
 import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
@@ -153,6 +154,10 @@ export function Studio() {
   const tab = pickTab(requestedTab, visibleTabs(extensions));
   const mode: Mode = tab === 'film' ? 'sequence' : 'single';
   const [canvas, setCanvas] = useState<CanvasState>({ view: 'gallery', before: 'gallery' });
+  // The render the visitor started from this page, and the time its Generate button announced;
+  // its clock counts from when it starts rolling (an object per take, so a new take restarts it).
+  const [take, setTake] = useState<{ expected_s: number } | null>(null);
+  const [clock, setClock] = useState<{ take: { expected_s: number }; ms: number } | null>(null);
   // The photo atelier (text to image, edit), over the canvas; and the text of a photo made from one.
   const [atelier, setAtelier] = useState<'t2i' | 'edit' | null>(null);
   // The ateliers opened and not closed yet: each stays mounted, out of view, until its Close or its photo is used.
@@ -463,8 +468,9 @@ export function Studio() {
   const rightsKey = `${upload.status === 'ready' ? upload.imageRef : ''}|${motionVideo.status === 'ready' ? motionVideo.videoRef : ''}`;
   const [rightsFor, setRightsFor] = useState(rightsKey);
   // A new photo on Camera shows on the monitor, with the dashed frame of where the chosen move ends:
-  // the cause and effect that would otherwise wait behind the Monitor button.
-  const startPhoto = upload.status === 'ready' ? upload.imageRef : null;
+  // the cause and effect that would otherwise wait behind the Monitor button. It switches when the
+  // photo is chosen, not when its upload ends: a Gallery click meanwhile is the visitor's last word.
+  const startPhoto = upload.status === 'uploading' || upload.status === 'ready' ? upload.localUrl : null;
   const [photoShown, setPhotoShown] = useState(startPhoto);
   if (photoShown !== startPhoto) {
     setPhotoShown(startPhoto);
@@ -700,6 +706,7 @@ export function Studio() {
   const generate = () => {
     if (submitting.current || !canGenerate || upload.status !== 'ready') return;
     followJob.current = true;
+    setTake({ expected_s: mode === 'sequence' && !remix ? filmEstimate : estimate });
     moveCanvas('generate');
     const userPrompt = prompt.trim() || undefined;
     if (tab === 'motion') {
@@ -808,6 +815,46 @@ export function Studio() {
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
   const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
+  // A result on the monitor is the screen's subject: its Download is the red button, Generate steps back.
+  const resultShown = succeeded !== undefined && canvas.view === 'result';
+  const elapsed_s = clock && clock.take === take ? clock.ms / 1000 : 0;
+  const percent = tracked ? Math.round(tracked.record.progress * 100) : 0;
+
+  // The slate's clock: one tick a second while the take rolls.
+  useEffect(() => {
+    if (!busy || !take) return;
+    const startedAt = Date.now();
+    const timer = setInterval(() => setClock({ take, ms: Date.now() - startedAt }), 1000);
+    return () => clearInterval(timer);
+  }, [busy, take]);
+  // The take is over once its render is: a render Reuse brings back later has no clock of its own.
+  const [rolling, setRolling] = useState(busy);
+  if (rolling !== busy) {
+    setRolling(busy);
+    if (!busy) setTake(null);
+  }
+
+  // The browser tab says a take is rolling, for a visitor on another tab; then that it is ready.
+  const pageTitle = useRef<string | null>(null);
+  const done = succeeded !== undefined;
+  useEffect(() => {
+    pageTitle.current ??= document.title;
+    const original = pageTitle.current;
+    if (busy) {
+      document.title = t('titleRec', { p: percent });
+      return;
+    }
+    if (!done || !document.hidden) {
+      document.title = original;
+      return;
+    }
+    document.title = t('titleReady');
+    const back = () => {
+      if (!document.hidden) document.title = original;
+    };
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
+  }, [busy, percent, done, t]);
   const sequenceTiles: SequenceTiles = {
     shotsOf: (id) => shots.flatMap((shot, index) => (shot.presetId === id ? [index + 1] : [])),
     nextShot: shots.length < MAX_SHOTS ? shots.length + 1 : null,
@@ -847,6 +894,12 @@ export function Studio() {
       : tab === 'avatar'
       ? speechSeconds > 0 && t('slateSpec', { s: speechSeconds })
       : t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
+    ...(busy && take
+      ? [
+          t('slateRec', { t: formatClock(elapsed_s) }),
+          take.expected_s - elapsed_s > 20 ? t('slateLeft', { d: formatDuration(take.expected_s - elapsed_s) }) : t('slateFinishing'),
+        ]
+      : []),
   ].filter(Boolean);
 
   const wallItemOfResult = tracked?.kind === 'job' ? [...effects, ...hooks].find((item) => item.id === tracked.record.label.itemId) : undefined;
@@ -1054,8 +1107,13 @@ export function Studio() {
             <>
               <div className={styles.generateBlock}>
                 {primaryLabel ? (
-                  <button type="button" className={styles.buttonPrimary} disabled={!canGenerate} onClick={generate}>
-                    {t(primaryLabel, { s: mode === 'sequence' && !remix ? filmEstimate : estimate })}
+                  <button
+                    type="button"
+                    className={resultShown ? styles.buttonSecondary : styles.buttonPrimary}
+                    disabled={!canGenerate}
+                    onClick={generate}
+                  >
+                    {t(primaryLabel, { d: formatDuration(mode === 'sequence' && !remix ? filmEstimate : estimate) })}
                   </button>
                 ) : (
                   <div className={styles.showcaseNote} role="note">
@@ -1175,10 +1233,15 @@ export function Studio() {
                 }
               />
               {slate && (
-                <p className={styles.slate}>
+                <p className={styles.slate} data-testid="slate" data-rolling={(busy && take !== null) || undefined}>
                   {slate.map((part, index) => (
                     <span key={index}>{part}</span>
                   ))}
+                </p>
+              )}
+              {busy && !IS_SHOWCASE && (
+                <p className={styles.hint} data-testid="leave-hint">
+                  {t('leaveHint')}
                 </p>
               )}
               {IS_SHOWCASE && succeeded?.placeholder && (
@@ -1201,7 +1264,7 @@ export function Studio() {
               {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (
-                    <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.presetId}.mp4`}>
+                    <a className={styles.buttonPrimary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.presetId}.mp4`}>
                       {t('download')}
                     </a>
                   )}
@@ -1221,7 +1284,7 @@ export function Studio() {
               {tracked?.kind === 'job' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (
-                    <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.label.itemId ?? tracked.record.task}.mp4`}>
+                    <a className={styles.buttonPrimary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.label.itemId ?? tracked.record.task}.mp4`}>
                       {t('download')}
                     </a>
                   )}
@@ -1250,7 +1313,7 @@ export function Studio() {
               {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (
-                    <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download="montagio-film.mp4">
+                    <a className={styles.buttonPrimary} href={tracked.record.outputUrl} download="montagio-film.mp4">
                       {t('downloadFilm')}
                     </a>
                   )}

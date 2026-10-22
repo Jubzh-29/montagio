@@ -1,6 +1,7 @@
 'use client';
 
 import { useI18n } from '@/i18n';
+import { formatDuration } from '@/lib/duration';
 import { refusalMessageKey } from '@/lib/refusals';
 import { useJob } from '@/lib/use-job';
 import { AiCaption } from './AiCaption';
@@ -18,7 +19,7 @@ export function HdPanel({ path, estimate_s, model }: { path: string; estimate_s:
       <div className={styles.actions}>
         {!done && (
           <button type="button" className={styles.buttonSecondary} disabled={busy} onClick={() => void start(path, {})}>
-            {t('hdAction', { s: estimate_s })}
+            {t('hdAction', { d: formatDuration(estimate_s) })}
           </button>
         )}
         {busy && job && (

@@ -21,6 +21,9 @@ test('a clip made in the studio is in the history and comes back with Reuse', as
   await expect(card.getByRole('link', { name: 'Download' })).toHaveAttribute('href', /\/media\/data\/generations\//);
   await card.getByRole('link', { name: 'Reuse' }).click();
   await expect(page).toHaveURL(/[?]tab=camera$/);
+  // The photo comes back on the monitor, with its move's frame; the gallery has the move selected.
+  await expect(page.getByRole('button', { name: 'Monitor', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pan Left' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('textbox', { name: 'What the photo shows', exact: true })).toHaveValue('a harbour at dawn');
   await expect(page.getByTestId('photo-slot').locator('img')).toHaveAttribute('src', /\/media\/data\/uploads\//);
