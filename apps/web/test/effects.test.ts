@@ -3,12 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readTags } from '@montagio/sequence';
 import { POST as postEffects } from '@/app/api/effects/route';
+import { POST as postImages } from '@/app/api/images/route';
 import { GET as getJob } from '@/app/api/jobs/[id]/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import type { JobSummary } from '@/lib/api-types';
 import { mediaFileFor } from '@/server/generations';
-import { readJobWorkflow } from '@/server/jobs';
+import { jobs, readJobWorkflow } from '@/server/jobs';
 import { getServices, resetServicesForTests } from '@/server/services';
 import { params, pngFile, repoRoot, setupTempData, uploadRequest } from './helpers';
 
@@ -118,4 +119,44 @@ test('a 9:16 photo gives a 9:16 render', async () => {
     return workflow[target.node]!.inputs[target.field];
   };
   expect([at('width'), at('height')]).toEqual([480, 832]);
+});
+
+describe('a start photo composed from a place, a character and a product', () => {
+  const madeFromText = async (prompt: string, key: string) => {
+    const res = await postImages(new Request('http://localhost/api/images', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': key },
+      body: JSON.stringify({ prompt, aspect: '16:9' }),
+    }));
+    const job = (await res.json()) as JobSummary;
+    for (let i = 0; i < 20; i++) {
+      const done = (await (await getJob(new Request('http://localhost/x'), params({ id: job.id }))).json()) as JobSummary;
+      if (done.state === 'succeeded') return done.outputImageRef!;
+    }
+    throw new Error('the reference photo did not settle');
+  };
+
+  test('the edit composes first, then the effect runs on what it made', async () => {
+    process.env.MONTAGIO_EXTENSIONS = 'all';
+    const location = await madeFromText('a sunny beach', 'compose-l');
+    const product = await madeFromText('a red soda can', 'compose-p');
+    const character = await madeFromText('a fictional surfer', 'compose-c');
+    const res = await post({ effectId: 'squish', compose: { location, character, product } }, 'compose-1');
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as JobSummary;
+    await poll(id);
+    const record = (await jobs.read(id))!;
+    expect(record.state).toBe('succeeded');
+    expect(record.steps.map((step) => step.name)).toEqual(['compose', 'effect']);
+    expect(record.inputs.personal).toBe(false);
+  });
+
+  test('one reference is refused; an imported one asks for consent', async () => {
+    process.env.MONTAGIO_EXTENSIONS = 'all';
+    const location = await madeFromText('a quiet street', 'compose-l2');
+    expect(await (await post({ effectId: 'squish', compose: { location } }, 'compose-2')).json()).toEqual({ error: 'invalid-input' });
+    const imported = ((await (await postUpload(uploadRequest(pngFile(1280, 720)))).json()) as { imageRef: string }).imageRef;
+    expect(await (await post({ effectId: 'squish', compose: { location, character: imported } }, 'compose-3')).json()).toEqual({ error: 'consent-required' });
+    expect((await post({ effectId: 'squish', compose: { location, character: imported }, consent: true }, 'compose-4')).status).toBe(201);
+  });
 });

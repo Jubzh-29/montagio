@@ -23,6 +23,8 @@ workflow: workflows/qwen-image-edit-2511.api.json
 bindings:
   image: { node: "41", field: image }
   image2: { node: "42", field: image }
+  # the third image of a composed start photo (a place, a character, a product)
+  image3: { node: "43", field: image }
   # the inpaint mask: white where the photo changes
   mask: { node: "180", field: image }
   # the positive encoder; the negative one (149) keeps an empty prompt, as in the template

@@ -31,6 +31,7 @@ export const EXTENSION_BINDING_KEYS = [
   'negative',
   'end_image',
   'image2',
+  'image3',
   'lora',
   'lora_strength',
   'motion_prompt',

@@ -41,6 +41,7 @@ import { ChoiceCard } from './ChoiceCard';
 import { Composer } from './Composer';
 import { ConsentCheck } from './ConsentCheck';
 import { AvatarFields, BUILT_IN_VOICE, type VoiceChoice } from './AvatarFields';
+import { COMPOSE_OFF, composeBody, composePersonal, composeReady, ComposeSlots, type ComposeState } from './ComposeSlots';
 import { HdPanel } from './HdPanel';
 import { MotionFields, type MotionVideo } from './MotionFields';
 import { MusicPanel } from './MusicPanel';
@@ -178,6 +179,8 @@ export function Studio() {
   // The Avatar tab: what the photo says, and in which language.
   const [speechText, setSpeechText] = useState('');
   const [voice, setVoice] = useState<VoiceChoice>(BUILT_IN_VOICE);
+  // An effect's start photo composed from a character, a place and a product (the edit puts them together first).
+  const [compose, setCompose] = useState<ComposeState>(COMPOSE_OFF);
   // The spoken language follows the interface's until the visitor picks one.
   const [pickedLanguage, setSpeechLanguage] = useState<'en' | 'fr' | null>(null);
   const speechLanguage = pickedLanguage ?? lang;
@@ -471,8 +474,11 @@ export function Studio() {
   const selectedEffect = wallChoice?.kind === 'effect' ? wallChoice.item : undefined;
   const selectedHook = wallChoice?.kind === 'hook' ? wallChoice.item : undefined;
   const needsOutfit = selectedHook?.references === 2;
+  const composing = tab === 'effects' && selectedEffect !== undefined && composeReady(compose);
   const askConsent =
-    tab === 'effects'
+    composing
+      ? composePersonal(compose)
+      : tab === 'effects'
       ? needsConsent(upload, selectedHook ? 'hook' : 'effect', needsOutfit ? outfit : undefined)
       : tab === 'avatar' && needsConsent(upload, 'avatar');
   // A photo made from a text says what it shows (state adjusted while rendering, when that photo changes).
@@ -517,6 +523,8 @@ export function Studio() {
     ? upload.status === 'ready' && motionVideo.status === 'ready' && rights && !busy
     : tab === 'avatar'
     ? upload.status === 'ready' && !busy && speechText.trim().length > 0 && (!askConsent || consent) && (!voice.mine || (voice.voiceRef !== null && voice.consent))
+    : composing
+    ? !busy && (!askConsent || consent)
     : tab === 'effects'
     ? upload.status === 'ready' && !busy && wallChoice !== undefined && (!askConsent || consent) && (!needsOutfit || outfit.status === 'ready')
     : remix
@@ -761,7 +769,8 @@ export function Studio() {
         return;
       }
       if (!selectedEffect) return;
-      const body = { imageRef: upload.imageRef, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}) };
+      const start = composing ? { compose: composeBody(compose) } : { imageRef: upload.imageRef };
+      const body = { ...start, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}) };
       void submit('job', body, undefined, '/api/effects');
       return;
     }
@@ -1096,7 +1105,10 @@ export function Studio() {
               <AvatarFields text={speechText} language={speechLanguage} max={300} onText={setSpeechText} onLanguage={setSpeechLanguage} voice={voice} onVoice={setVoice} />
             ) : tab === 'effects' ? (
               selectedEffect ? (
-                <EffectFields subject={subject} max={selectedEffect.subjectMax} onSubject={setSubject} disabled={IS_SHOWCASE} />
+                <>
+                  <EffectFields subject={subject} max={selectedEffect.subjectMax} onSubject={setSubject} disabled={IS_SHOWCASE} />
+                  {!IS_SHOWCASE && extensions?.extensions.includes('edit') && <ComposeSlots value={compose} onChange={setCompose} disabled={busy} />}
+                </>
               ) : needsOutfit ? (
                 <OutfitSource outfit={outfit} disabled={busy} onFile={(file) => void onOutfit(file)} />
               ) : null

@@ -1746,6 +1746,58 @@
   cursor: not-allowed;
 }
 
+/* A composed start photo: one row per reference (character, place, product). */
+.composeSlot {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+
+.composeThumb {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-s);
+  color: var(--ink-faint);
+  overflow: hidden;
+}
+
+.composeThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.composeText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.composeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  align-items: center;
+}
+
+.composeSelect {
+  min-height: 28px;
+  max-width: 200px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
 .lookChoice {
   display: inline-grid;
   grid-template-columns: repeat(4, auto);

@@ -400,5 +400,21 @@
   "voiceReady": "Échantillon prêt : {s} s gardées.",
   "voiceConsent": "C'est ma voix, ou la personne qui parle a donné son accord",
   "photoCharacter": "Personnage",
-  "inpaintNeedsPaint": "Peignez d'abord la zone à changer."
+  "inpaintNeedsPaint": "Peignez d'abord la zone à changer.",
+  "composeLabel": "Scène",
+  "composeToggle": "Personnage · Lieu · Produit",
+  "composeLead": "Deux ou trois photos réunies d'abord en une scène, puis l'effet joue dessus. Le lieu donne le cadre.",
+  "composeCharacter": "Personnage",
+  "composeCharacterHint": "Qui est dans la scène : une photo, ou un de vos personnages.",
+  "composeLocation": "Lieu",
+  "composeLocationHint": "Où ça se passe : un endroit, une pièce, un paysage.",
+  "composeProduct": "Produit",
+  "composeProductHint": "Ce qu'il tient ou ce qui est mis en avant : une bouteille, une chaussure, un téléphone.",
+  "composeAdd": "Ajouter une photo",
+  "composeReplace": "Une autre photo",
+  "composeRemove": "Retirer",
+  "composeFromCharacters": "Parmi mes personnages",
+  "composeUploadFailed": "Cette photo n'a pas pu être ajoutée.",
+  "composeNeedsTwo": "Ajoutez au moins deux photos pour composer la scène.",
+  "composeReadyHint": "{n} photos : la scène est composée d'abord, puis l'effet joue (quelques secondes de plus)."
 }

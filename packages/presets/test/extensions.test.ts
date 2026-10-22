@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { AVATAR_DEFAULT_PROMPT, compileAvatar, compileEdit, compileImageUpscale, compileMusic, compileSpeech, compileUpscale, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
+import { AVATAR_DEFAULT_PROMPT, compileAvatar, compileCompose, compileEdit, composeInstruction, compileImageUpscale, compileMusic, compileSpeech, compileUpscale, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -139,6 +139,33 @@ describe('compileImageUpscale (SeedVR2 on one frame)', () => {
   test('it runs on its own task only', () => {
     const video = extension('seedvr2-upscale');
     expect(() => compileImageUpscale(video.model, video.template, { imageRef: 'x.png', aspect: '16:9', seed: 1 })).toThrow(/i2i-upscale/);
+  });
+});
+
+describe('compileCompose (a start photo from a place, a character, a product)', () => {
+  const edit = () => extension('qwen-image-edit-2511');
+  const compose = (refs: Parameters<typeof compileCompose>[2]['refs']) => compileCompose(edit().model, edit().template, { refs, seed: 4 }, lib.lock);
+
+  test('the place is image 1, then the character, then the product; all three reach both encoders', () => {
+    const { workflow, order } = compose({ product: 'p.png', character: 'c.png', location: 'l.png' });
+    expect(order).toEqual(['location', 'character', 'product']);
+    expect([workflow['41']!.inputs.image, workflow['42']!.inputs.image, workflow['43']!.inputs.image]).toEqual(['l.png', 'c.png', 'p.png']);
+    expect(workflow['151']!.inputs).toMatchObject({ image2: ['42', 0], image3: ['43', 0] });
+    expect(workflow['151']!.inputs.prompt).toBe(
+      "Show the character from image 2 in the place of image 1, holding the product from image 3. Keep the character's face, hair and outfit, the product's exact shape, colors and label and the place's look. Light everything like the place. Photorealistic, one coherent photo.",
+    );
+  });
+
+  test('two references: no third image node', () => {
+    const { workflow, order } = compose({ character: 'c.png', product: 'p.png' });
+    expect(order).toEqual(['character', 'product']);
+    expect(workflow['43']).toBeUndefined();
+    expect(workflow['151']!.inputs.image3).toBeUndefined();
+    expect(composeInstruction(['location', 'product'])).toMatch(/^Place the product from image 2 in the place of image 1, as the hero of the shot\./);
+  });
+
+  test('one reference is not a composition', () => {
+    expect(() => compose({ character: 'c.png' })).toThrow(CompileError);
   });
 });
 

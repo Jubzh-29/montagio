@@ -198,7 +198,7 @@ export const EDIT_LOOKS = {
 } as const satisfies Record<EditLook, { lock: string; strength: number }>;
 
 /** Nodes of workflows/qwen-image-edit-2511.api.json that compileEdit keeps, removes or rewires. */
-const EDIT_NODES = { look: '170', lightning: '171', image2: '42', sampler: '169', mask: '180', maskChannel: '181', composite: '182', save: '9' } as const;
+const EDIT_NODES = { look: '170', lightning: '171', image2: '42', image3: '43', sampler: '169', mask: '180', maskChannel: '181', composite: '182', save: '9' } as const;
 /** With the 4-step Lightning LoRA, and without it (the template's values). */
 const EDIT_SAMPLING = { fast: { steps: 4, cfg: 1 }, quality: { steps: 40, cfg: 4 } } as const;
 
@@ -213,6 +213,8 @@ export type EditInputs = {
   look?: EditLook;
   /** A second image the instruction refers to ("wearing the outfit of image 2"). */
   image2Ref?: string;
+  /** A third one (a composed start photo: a place, a character, a product). */
+  image3Ref?: string;
   /** Inpaint: a mask painted over the photo, white where it changes; outside it the photo stays as it was. */
   maskRef?: string;
 };
@@ -235,7 +237,14 @@ export function compileEdit(
   // the Multiple-Angles LoRA reads its trigger first
   const instruction = look === 'angles' && !typed.startsWith('<sks>') ? `<sks> ${typed}` : typed;
   const fast = inputs.fast ?? true;
-  const workflow = bindExtension(model, template, { image: inputs.imageRef, image2: inputs.image2Ref, mask: inputs.maskRef, prompt: instruction, seed: inputs.seed });
+  const workflow = bindExtension(model, template, {
+    image: inputs.imageRef,
+    image2: inputs.image2Ref,
+    image3: inputs.image3Ref,
+    mask: inputs.maskRef,
+    prompt: instruction,
+    seed: inputs.seed,
+  });
   if (look) {
     const entry = lock.get(EDIT_LOOKS[look].lock);
     if (!entry) throw new CompileError(`the ${look} look needs lock entry ${EDIT_LOOKS[look].lock}`);
@@ -246,6 +255,7 @@ export function compileEdit(
   if (!fast) bypassNode(workflow, EDIT_NODES.lightning);
   Object.assign(workflow[EDIT_NODES.sampler]!.inputs, fast ? EDIT_SAMPLING.fast : EDIT_SAMPLING.quality);
   if (!inputs.image2Ref) dropNode(workflow, EDIT_NODES.image2);
+  if (!inputs.image3Ref) dropNode(workflow, EDIT_NODES.image3);
   if (inputs.maskRef) {
     // the edited image pasted over the photo through the mask: what the saver writes
     workflow[EDIT_NODES.save]!.inputs.images = [EDIT_NODES.composite, 0];
@@ -253,6 +263,56 @@ export function compileEdit(
     for (const id of [EDIT_NODES.composite, EDIT_NODES.maskChannel, EDIT_NODES.mask]) dropNode(workflow, id);
   }
   return { workflow, output: { ...model.output }, params: { instruction, seed: inputs.seed, fast, look } };
+}
+
+/**
+ * A composed start photo: a place, a character and a product (two of them at least), put
+ * together by the edit in one coherent photo. The place comes first, as image 1: its frame
+ * is the output's; then who, then what.
+ */
+export const COMPOSE_ROLES = ['location', 'character', 'product'] as const;
+export type ComposeRole = (typeof COMPOSE_ROLES)[number];
+export type ComposeRefs = Partial<Record<ComposeRole, string>>;
+
+/** The instruction for the roles in image order. */
+export function composeInstruction(order: readonly ComposeRole[]): string {
+  const n = (role: ComposeRole) => `image ${order.indexOf(role) + 1}`;
+  const has = (role: ComposeRole) => order.includes(role);
+  const keep = [
+    has('character') ? "the character's face, hair and outfit" : '',
+    has('product') ? "the product's exact shape, colors and label" : '',
+    has('location') ? "the place's look" : '',
+  ].filter(Boolean);
+  const keeps = `Keep ${keep.length > 1 ? `${keep.slice(0, -1).join(', ')} and ${keep.at(-1)}` : keep[0]}.`;
+  let scene: string;
+  if (has('character') && has('location')) {
+    scene = `Show the character from ${n('character')} in the place of ${n('location')}${has('product') ? `, holding the product from ${n('product')}` : ''}.`;
+  } else if (has('character')) {
+    scene = `Show the character from ${n('character')} holding the product from ${n('product')}, in a simple setting.`;
+  } else {
+    scene = `Place the product from ${n('product')} in the place of ${n('location')}, as the hero of the shot.`;
+  }
+  const light = has('location') ? ' Light everything like the place.' : '';
+  return `${scene} ${keeps}${light} Photorealistic, one coherent photo.`;
+}
+
+/** The start photo of an effect composed from two or three references; `order` says which file goes to image 1, 2, 3. */
+export function compileCompose(
+  model: ExtensionModel,
+  template: ApiWorkflow,
+  inputs: { refs: ComposeRefs; seed: number; fast?: boolean },
+  lock: ReadonlyMap<string, LockEntry>,
+): ExtensionCompiled<{ instruction: string; seed: number; fast: boolean; look: EditLook | null }> & { order: ComposeRole[] } {
+  const order = COMPOSE_ROLES.filter((role) => Boolean(inputs.refs[role]));
+  if (order.length < 2) throw new CompileError('a composed start photo needs two of a place, a character and a product');
+  const [first, second, third] = order.map((role) => inputs.refs[role]!);
+  const compiled = compileEdit(
+    model,
+    template,
+    { imageRef: first!, image2Ref: second, ...(third ? { image3Ref: third } : {}), instruction: composeInstruction(order), seed: inputs.seed, fast: inputs.fast ?? true },
+    lock,
+  );
+  return { ...compiled, order };
 }
 
 export type SpeechInputs = {

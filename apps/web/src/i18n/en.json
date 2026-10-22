@@ -400,5 +400,21 @@
   "voiceReady": "Sample ready: {s} s kept.",
   "voiceConsent": "This is my voice, or the speaker agreed to this use",
   "photoCharacter": "Character",
-  "inpaintNeedsPaint": "Paint the area to change first."
+  "inpaintNeedsPaint": "Paint the area to change first.",
+  "composeLabel": "Scene",
+  "composeToggle": "Character · Location · Product",
+  "composeLead": "Two or three photos put together in one scene first, then the effect plays on it. The location gives the frame.",
+  "composeCharacter": "Character",
+  "composeCharacterHint": "Who is in the scene: a photo, or one of your characters.",
+  "composeLocation": "Location",
+  "composeLocationHint": "Where it happens: a place, a room, a landscape.",
+  "composeProduct": "Product",
+  "composeProductHint": "What they hold or what stars: a bottle, a shoe, a phone.",
+  "composeAdd": "Add a photo",
+  "composeReplace": "Another photo",
+  "composeRemove": "Remove",
+  "composeFromCharacters": "From my characters",
+  "composeUploadFailed": "This photo could not be added.",
+  "composeNeedsTwo": "Add two photos at least to compose the scene.",
+  "composeReadyHint": "{n} photos: the scene is composed first, then the effect plays (a few seconds more)."
 }

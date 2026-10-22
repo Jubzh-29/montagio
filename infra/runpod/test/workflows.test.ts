@@ -14,7 +14,8 @@
  * speech.flac, the placeholders of those workflows.
  * ImageToMask and ImageCompositeMasked (the edit's inpaint) come from the same ComfyUI on
  * 2026-10-22; LoadImage lists mask.png, the placeholder of the inpaint mask, and LoadAudio
- * voice.flac, the placeholder of the avatar's voice sample.
+ * voice.flac, the placeholder of the avatar's voice sample; start3.png is the third image of a
+ * composed start photo (2026-10-22).
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -147,6 +148,7 @@ test.each([
   ['a look, 40 steps', { look: 'infl8' as const, fast: false }],
   ['two images', { image2Ref: 'start2.png' }],
   ['an inpaint mask', { maskRef: 'mask.png' }],
+  ['three images', { image2Ref: 'start2.png', image3Ref: 'start3.png' }],
 ])('the edit job is accepted: %s', (_, variant) => {
   const model = library.extensionModels.get('qwen-image-edit-2511')!;
   const inputs = { imageRef: 'start.png', instruction: 'make it night', seed: 3, ...variant };
