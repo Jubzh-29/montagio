@@ -147,6 +147,8 @@ test('GET /api/extensions describes the wall: effects first in their order, hook
     modelName: expect.stringMatching(/Wan 2.1/),
     license: 'Apache-2.0',
     previewUrl: '/media/presets/effects/previews/squish.mp4',
+    // Its first frame, shown while the clip loads.
+    posterUrl: '/media/presets/effects/previews/squish.jpg',
   });
   expect(body.hooks.find((hook) => hook.id === 'wardrobe-swap')?.references).toBe(2);
   // A hook's clip is captioned with the transition model, as an effect's with the effects model.

@@ -62,6 +62,7 @@ function PresetTile({
             className={styles.presetPreview}
             data-ready={previewReady}
             src={preset.previewUrl}
+            poster={preset.posterUrl}
             muted
             loop
             playsInline

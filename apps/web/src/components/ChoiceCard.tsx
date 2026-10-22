@@ -13,6 +13,7 @@ export function ChoiceCard({
   name,
   kindLabel,
   previewUrl,
+  posterUrl,
   poses,
   speed,
   icon,
@@ -22,6 +23,7 @@ export function ChoiceCard({
   name: string;
   kindLabel: string;
   previewUrl?: string;
+  posterUrl?: string;
   poses?: string[];
   speed?: number;
   icon: 'camera' | 'effect' | 'hook' | 'avatar' | 'motion';
@@ -43,7 +45,7 @@ export function ChoiceCard({
     <section className={styles.choiceCard} aria-labelledby="choice-name">
       <div className={styles.choiceMedia} data-icon={icon}>
         {previewUrl ? (
-          <video ref={video} className={styles.choiceVideo} src={previewUrl} loop muted playsInline preload="metadata" aria-hidden="true" />
+          <video ref={video} className={styles.choiceVideo} src={previewUrl} poster={posterUrl} loop muted playsInline preload="metadata" aria-hidden="true" />
         ) : poses && speed !== undefined ? (
           <MoveGlyph poses={poses} speed={speed} />
         ) : (

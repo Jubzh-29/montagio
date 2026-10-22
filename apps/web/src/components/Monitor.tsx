@@ -161,7 +161,7 @@ export function Monitor({
       {/* While the clip renders, the plan keeps moving over the dimmed photo: the camera is at work. */}
       {localUrl && !result && !endFrame && move && <PhotoPlan move={move} aspect={photoAspect} rendering={rendering} />}
 
-      {localUrl && !rendering && !showcase && (
+      {localUrl && !rendering && !result && !showcase && (
         <label htmlFor="photo-input" className={`${styles.buttonGhost} ${styles.replace}`}>
           {upload.status === 'uploading' ? t('uploading') : t('replacePhoto')}
         </label>

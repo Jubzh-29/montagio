@@ -472,7 +472,11 @@ export function Studio() {
   // photo is chosen, not when its upload ends: a Gallery click meanwhile is the visitor's last word.
   const startPhoto = upload.status === 'uploading' || upload.status === 'ready' ? upload.localUrl : null;
   const [photoShown, setPhotoShown] = useState(startPhoto);
-  if (photoShown !== startPhoto) {
+  // Only on a tab that is certain: asked for in the URL, or settled by /api/extensions. Before they
+  // answer, the Studio's guess is Camera, and the Effects wall would stay behind the monitor: the
+  // new photo waits for the tab to settle.
+  const tabSettled = extensions !== null || requestedTab === 'camera';
+  if (photoShown !== startPhoto && tabSettled) {
     setPhotoShown(startPhoto);
     if (startPhoto && tab === 'camera') setCanvas((current) => nextView('photo', current));
   }
@@ -958,6 +962,7 @@ export function Studio() {
                   name={wallChoice.item.name}
                   kindLabel={t(wallChoice.kind === 'hook' ? 'hookKind' : 'effectKind', { s: CLIP_SECONDS })}
                   previewUrl={wallChoice.item.previewUrl}
+                  posterUrl={wallChoice.item.posterUrl}
                   icon={wallChoice.kind}
                   paused={motionPaused}
                   onChange={() => moveCanvas('change')}
@@ -982,6 +987,7 @@ export function Studio() {
                 name={remix ? t('remixTitle', { name: remix.baseName }) : movePreset.name}
                 kindLabel={t('choiceCamera', { s: CLIP_SECONDS })}
                 previewUrl={remix ? undefined : movePreset.previewUrl}
+                posterUrl={remix ? undefined : movePreset.posterUrl}
                 poses={movePreset.poses}
                 speed={movePreset.speed}
                 icon="camera"

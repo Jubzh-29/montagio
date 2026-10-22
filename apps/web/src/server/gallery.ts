@@ -19,3 +19,8 @@ export async function presetPreviewUrl(root: string, preview: string, kind?: 'ef
     return undefined;
   }
 }
+
+/** The still a tile shows while that preview loads (npm run previews:posters), or undefined. */
+export function presetPosterUrl(root: string, preview: string, kind?: 'effects' | 'transitions'): Promise<string | undefined> {
+  return presetPreviewUrl(root, preview.replace(/\.mp4$/, '.jpg'), kind);
+}

@@ -49,12 +49,22 @@ test('prepare lists only the effects that have an example, with their samples', 
       modelId: 'wan21-i2v-effects',
       modelName: expect.stringMatching(/Wan 2.1/),
       license: 'Apache-2.0',
-      examples: [{ sample: 'landscape-a', url: 'effects/squish--landscape-a.mp4', workflowUrl: 'workflows/effect-squish--landscape-a.json' }],
+      examples: [
+        {
+          sample: 'landscape-a',
+          url: 'effects/squish--landscape-a.mp4',
+          workflowUrl: 'workflows/effect-squish--landscape-a.json',
+          poster: 'effects/squish--landscape-a.jpg',
+        },
+      ],
     },
   ]);
   expect(data.hooks).toEqual([expect.objectContaining({ id: 'iris-dive', references: 1, examples: [expect.objectContaining({ sample: 'landscape-a', url: 'hooks/iris-dive--landscape-a.mp4' })] })]);
   expect(sha256Of(join(out, 'effects', 'squish--landscape-a.mp4'))).toBe(sha256Of(showcasePath(root, 'effects', 'squish--landscape-a.mp4')));
   expect(existsSync(join(out, 'workflows', 'hook-iris-dive--landscape-a.json'))).toBe(true);
+  // The tile's still while the example loads: its first frame, which says it is AI-generated.
+  const poster = readFileSync(join(out, 'effects', 'squish--landscape-a.jpg'));
+  expect(poster.subarray(6, 6 + 'AI-generated'.length).toString('utf8')).toBe('AI-generated');
 }, PREPARE_TIMEOUT_MS);
 
 test('prepare keeps the text of a sample', async () => {

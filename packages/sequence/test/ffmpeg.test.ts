@@ -16,6 +16,7 @@ import {
   normalizeClip,
   placeholderClip,
   PLACEHOLDER_METADATA,
+  posterFrame,
   prepareMotionClip,
   previewClip,
   probe,
@@ -196,6 +197,18 @@ test('previewClip writes a small looping copy at the asked width with the tags',
   expect(p).toMatchObject({ width: 320, height: 184, codec: 'h264', pixFmt: 'yuv420p' });
   expect(p.duration_s).toBeCloseTo(2, 1);
   expect(await readTags(out)).toMatchObject(PLACEHOLDER_METADATA);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('posterFrame writes the first frame as a small JPEG that says it is AI-generated', async () => {
+  const out = join(dir, 'poster.jpg');
+  await posterFrame(clipA, out, { width: 240, comment: AI_METADATA.comment });
+  const p = await probe(out);
+  expect(p).toMatchObject({ width: 240, codec: 'mjpeg' });
+  const bytes = readFileSync(out);
+  expect([bytes[0], bytes[1]]).toEqual([0xff, 0xd8]);
+  // A JPEG comment segment (COM, FF FE) right after the start marker, holding the mention.
+  expect([bytes[2], bytes[3]]).toEqual([0xff, 0xfe]);
+  expect(bytes.subarray(6, 6 + AI_METADATA.comment.length).toString('utf8')).toBe(AI_METADATA.comment);
 }, FFMPEG_TEST_TIMEOUT_MS);
 
 test('a placeholder made from a JPEG and a normalized render share their H.264 headers', async () => {

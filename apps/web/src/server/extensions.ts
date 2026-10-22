@@ -4,7 +4,7 @@ import type { EffectSummary, ExtensionsInfo, HookSummary } from '@/lib/api-types
 import { EFFECT_ORDER, HOOK_ORDER, wallOrder } from '@/lib/wall-order';
 import { getEnv } from './env';
 import { JobError } from './errors';
-import { presetPreviewUrl } from './gallery';
+import { presetPosterUrl, presetPreviewUrl } from './gallery';
 import { getServices } from './services';
 
 /** The full path (no distillation LoRA, 20 steps) against the 4-step one: about 5 times longer (EXTENSIONS_ANALYSE.md §4). */
@@ -118,11 +118,13 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     (await visibleEffects()).map(async (preset): Promise<EffectSummary> => {
       const model = modelOf(preset.models.preferred);
       const previewUrl = await presetPreviewUrl(root, preset.preview, 'effects');
+      const posterUrl = previewUrl && (await presetPosterUrl(root, preset.preview, 'effects'));
       return {
         id: preset.id,
         name: preset.name,
         description: preset.description,
         ...(previewUrl ? { previewUrl } : {}),
+        ...(posterUrl ? { posterUrl } : {}),
         estimate_s: model ? estimateFor(model, preset.defaults.fast) : 0,
         subjectMax: model?.limits.max_chars ?? 120,
         modelId: preset.models.preferred,
@@ -136,12 +138,14 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     (await visibleHooks()).map(async (preset): Promise<HookSummary> => {
       const model = modelOf(preset.models.preferred);
       const previewUrl = await presetPreviewUrl(root, preset.preview, 'transitions');
+      const posterUrl = previewUrl && (await presetPosterUrl(root, preset.preview, 'transitions'));
       const fast = preset.defaults.fast;
       return {
         id: preset.id,
         name: preset.name,
         description: preset.description,
         ...(previewUrl ? { previewUrl } : {}),
+        ...(posterUrl ? { posterUrl } : {}),
         estimate_s: (editModel ? estimateFor(editModel, fast) : 0) + (model ? estimateFor(model, fast) : 0),
         references: preset.end_frame.references,
         modelId: preset.models.preferred,

@@ -84,6 +84,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     name: item.name,
     description: item.description,
     ...(item.examples[0] ? { previewUrl: showcaseUrl(item.examples[0].url) } : {}),
+    ...(item.examples[0]?.poster ? { posterUrl: showcaseUrl(item.examples[0].poster) } : {}),
     estimate_s: 0,
     modelId: item.modelId,
     modelName: item.modelName,
@@ -151,6 +152,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       name: preset.name,
       description: preset.description,
       previewUrl: showcaseUrl(preset.preview),
+      ...(preset.poster ? { posterUrl: showcaseUrl(preset.poster) } : {}),
       // The preview is the preset's clip on the first sample: it is a placeholder when that clip is.
       previewPlaceholder: clips.get(`${preset.id}|${firstSample}`)?.placeholder ?? true,
       poses: preset.poses,

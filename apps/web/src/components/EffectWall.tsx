@@ -10,6 +10,7 @@ import styles from './studio.module.css';
 function WallTile({
   name,
   previewUrl,
+  posterUrl,
   kind,
   selected,
   paused,
@@ -17,6 +18,8 @@ function WallTile({
 }: {
   name: string;
   previewUrl?: string;
+  /** The still shown until the clip plays: no black tile while it loads. */
+  posterUrl?: string;
   kind: 'effect' | 'hook';
   selected: boolean;
   paused: boolean;
@@ -32,7 +35,7 @@ function WallTile({
   return (
     <button type="button" className={styles.wallTile} aria-pressed={selected} data-kind={kind} onClick={onSelect}>
       {previewUrl ? (
-        <video ref={video} className={styles.wallVideo} src={previewUrl} loop muted playsInline preload="metadata" aria-hidden="true" />
+        <video ref={video} className={styles.wallVideo} src={previewUrl} poster={posterUrl} loop muted playsInline preload="metadata" aria-hidden="true" />
       ) : (
         <span className={styles.wallIcon} aria-hidden="true">
           {kind === 'hook' ? '◎' : '✦'}
@@ -96,12 +99,13 @@ export function EffectWall({
       )}
       {/* The two kinds of the wall, said once where they are filtered. */}
       {hooks.length > 0 && <p className={styles.hint}>{t('hooksHint')}</p>}
-      <div className={styles.wall}>
+      <div className={styles.wall} data-testid="effect-wall">
         {tiles.map((tile) => (
           <WallTile
             key={`${tile.kind}:${tile.id}`}
             name={tile.item.name}
             previewUrl={tile.item.previewUrl}
+            posterUrl={tile.item.posterUrl}
             kind={tile.kind}
             selected={selectedId === tile.id}
             paused={paused}

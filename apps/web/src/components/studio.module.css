@@ -1024,7 +1024,15 @@
   .generateBlock {
     padding-block: var(--space-3);
   }
+  /* The canvas comes first: the effects, the moves or the monitor are seen before the form. */
+  .intro {
+    order: -2;
+  }
+  .stage {
+    order: -1;
+  }
 }
+
 
 /* A narrow panel: the model's tier and name stack, so the name is never cut. */
 @media (max-width: 480px) {
@@ -1782,5 +1790,31 @@
 @media (prefers-reduced-motion: reduce) {
   .wallTile {
     transition: none;
+  }
+}
+
+/* Last in the file: it overrides the wall's and the gallery's own grids. */
+/* A phone: the wall and the gallery are one row that scrolls sideways, so the photo and Generate
+   stay a thumb away; a tile at the edge is cut, which says the row goes on. */
+@media (max-width: 640px) {
+  .wall,
+  .presetGrid {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--space-1);
+    padding-bottom: var(--space-2);
+  }
+  .wall {
+    grid-auto-columns: 42%;
+  }
+  .presetGrid {
+    grid-auto-columns: 46%;
+  }
+  .wallTile,
+  .preset {
+    scroll-snap-align: start;
   }
 }

@@ -4,6 +4,8 @@ export type PresetSummary = {
   description: string;
   /** Absent while the preset has no preview file yet. */
   previewUrl?: string;
+  /** The still shown while the preview loads. */
+  posterUrl?: string;
   /** Showcase: the preview loops a placeholder clip (camera move simulated by FFmpeg). */
   previewPlaceholder?: boolean;
   poses: string[];
@@ -122,6 +124,8 @@ export type EffectSummary = {
   description: string;
   /** Absent while the effect has no preview file yet. */
   previewUrl?: string;
+  /** The still shown while the preview loads. */
+  posterUrl?: string;
   estimate_s: number;
   /** The longest "what the photo shows" the effects model takes. */
   subjectMax: number;
@@ -139,6 +143,7 @@ export type HookSummary = {
   name: string;
   description: string;
   previewUrl?: string;
+  posterUrl?: string;
   estimate_s: number;
   /** 2: the hook needs a second photo (an outfit). */
   references: 1 | 2;
