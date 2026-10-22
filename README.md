@@ -56,7 +56,7 @@ The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan
 | **HD** | "HD 1080p" under a finished clip; "HD 2560 px" on a photo of the atelier or of a character | SeedVR2 3B (Apache-2.0) |
 | **Motion transfer** | the Motion tab: the character of a photo moves like a reference video of up to 5 s | Wan2.2-Animate-2, distilled (Apache-2.0) |
 
-Relight, inpaint, the HD photo and the voice sample were added on 2026-10-22 on these same models and weights: their workflows pass a real ComfyUI v0.41.0, and their renders wait for the next GPU session. An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
+Relight, inpaint, the HD photo, the photodump and the voice sample were added on 2026-10-22 on these same models and weights, and rendered on the L4 the same day: inpaint changes only the painted area, the HD photo takes 14 s to 1440×2560, a voice sample moves the voice from 131 Hz (built-in) to the sample's register. An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
 
 ## Proof, measured
 

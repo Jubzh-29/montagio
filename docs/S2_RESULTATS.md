@@ -157,6 +157,21 @@ Avancée au 21/10 au soir, sur la même L4 et les mêmes réglages : 480p et la 
 - **Sur le port**, Crash Push, Slow Push, Push & Settle et Rise & Push dépassent le bateau au lieu de s'arrêter dessus. Crane Up y fait un bateau fantôme.
 - **Sur la voiture**, Slow Push, Pull Back Reveal, Pan Left, Pan Right et Crane Up sont nets. Crash Push, lui, fait sortir la voiture du cadre.
 
+**Validation des nouvelles fonctions (22/10, 07:11)**
+
+Une série de 6 jobs dans un seul conteneur L4, pour environ 0,10 $ :
+
+| Job | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|
+| Portrait de personnage (Z-Image, 9:16) | 39 s, à froid | 20,3 Go | ✅ conforme au texte |
+| Photodump (édition, la personne au café) | 65 s, à froid | 22,2 Go | ✅ même visage, même ciré, nouvelle scène |
+| Relight « nuit néon » (voiture) | 20 s | 22,6 Go | ✅ cadrage gardé, lumière changée |
+| Inpaint du ciel (port, masque peint) | 20 s | 22,6 Go | ✅ seul le ciel change, le port reste au pixel près |
+| Photo HD (SeedVR2 sur une image, 1440×2560) | 14 s, chargement compris | 19,9 Go | ✅ bien plus net qu'un lanczos, identité gardée |
+| Voix clonée (échantillon synthétique plus aigu) | 14 s | 7,2 Go | ✅ F0 de 222 Hz, contre 131 Hz pour la voix intégrée |
+
+L'échantillon de voix est la voix intégrée de la S2, montée d'environ 4 demi-tons : aucune vraie personne. Résultats dans `s3/validation/`, hors dépôt.
+
 **Aperçus de la galerie**
 
 Les fichiers `previews/*.mp4` existent désormais : 11 presets, 6 effets, Wardrobe Swap et Ignite, soit 19 fichiers.

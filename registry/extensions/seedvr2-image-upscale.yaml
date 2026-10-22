@@ -16,6 +16,6 @@ bindings:
   height: { node: "57", field: resize_type.height }
   seed: { node: "54", field: seed }
 output: { node: "9", kind: image }
-# GPU seconds for one photo on an RTX 4090, the model loading included: an estimate until a
-# GPU session measures it (one frame of the 81 a 1080p clip takes 215 s for)
-estimate_s: 20
+# GPU seconds for one photo on an RTX 4090, the model loading included. Measured on 2026-10-22
+# on an L4 (about half as fast): 14 s to 1440x2560 with the model loading, peak 19.9 GB
+estimate_s: 10
