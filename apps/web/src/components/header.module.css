@@ -130,7 +130,7 @@
 .badge[data-state='ok'] {
   color: var(--ok);
   background: var(--ok-soft);
-  border-color: oklch(0.8 0.14 152 / 0.35);
+  border-color: oklch(0.82 0.11 200 / 0.35);
 }
 
 .badge[data-state='failed'] {

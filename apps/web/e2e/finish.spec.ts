@@ -51,13 +51,13 @@ test('a disabled button looks disabled', async ({ page }) => {
   expect(Number(await edit.evaluate((element) => getComputedStyle(element).opacity))).toBeLessThan(1);
 });
 
-test('the Open Stack row a caption links to is marked without the alarm red', async ({ page }) => {
+test('the Open Stack row a caption links to is marked in ink, not in the lime of action', async ({ page }) => {
   await page.goto('/open-stack#model-wan22-i2v-a14b-fun-camera');
   const row = page.locator('#model-wan22-i2v-a14b-fun-camera');
   await expect(row).toHaveAttribute('data-target', 'true');
   const shadow = await row.evaluate((element) => getComputedStyle(element).boxShadow);
-  // The accent red (--rec, oklch(0.55 0.19 22)) is the colour of action and of a failed check.
-  expect(shadow).not.toContain('0.55 0.19 22');
+  // The lime accent (--rec, oklch(0.89 0.22 132)) is the colour of action.
+  expect(shadow).not.toContain('0.89 0.22 132');
   expect(shadow).not.toBe('none');
 });
 

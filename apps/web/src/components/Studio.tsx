@@ -855,7 +855,7 @@ export function Studio() {
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
   const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
-  // A result on the monitor is the screen's subject: its Download is the red button, Generate steps back.
+  // A result on the monitor is the screen's subject: its Download is the lime button, Generate steps back.
   const resultShown = succeeded !== undefined && canvas.view === 'result';
   const elapsed_s = clock && clock.take === take ? clock.ms / 1000 : 0;
   const percent = tracked ? Math.round(tracked.record.progress * 100) : 0;

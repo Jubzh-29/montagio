@@ -97,14 +97,14 @@
   transition: background-color 180ms var(--ease-out);
 }
 
-/* The row a result's caption links to: lit and framed in ink, not in the red of action and of a failed check. */
+/* The row a result's caption links to: lit and framed in ink, not in the lime of action. */
 .row[data-target='true'] {
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--ink-muted);
 }
 
 .row:focus-visible {
-  outline: 2px solid var(--rec);
+  outline: 2px solid var(--ink);
   outline-offset: -2px;
 }
 

@@ -2,7 +2,7 @@
 title: Montagio
 emoji: 🎬
 colorFrom: gray
-colorTo: red
+colorTo: green
 sdk: static
 app_file: index.html
 pinned: false
