@@ -27,7 +27,7 @@ export function PhotoSource({
   disabled: boolean;
   onFile: (file: File) => void;
   onSample: () => void;
-  onAtelier?: (kind: 't2i' | 'edit') => void;
+  onAtelier?: (kind: 't2i' | 'edit' | 'draw') => void;
   t2i: boolean;
   edit: boolean;
   showcase?: {
@@ -107,6 +107,12 @@ export function PhotoSource({
           {edit && onAtelier && (
             <button type="button" className={styles.buttonSecondary} onClick={() => onAtelier('edit')} disabled={disabled || upload.status !== 'ready'}>
               {t('photoEdit')}
+            </button>
+          )}
+          {/* Draw to video: a sketch the edit turns into the start photo (the local app only). */}
+          {edit && onAtelier && !showcase && (
+            <button type="button" className={styles.buttonSecondary} onClick={() => onAtelier('draw')} disabled={disabled}>
+              {t('photoDraw')}
             </button>
           )}
           {/* A saved character's pictures come back here from the Characters page, in this tab. */}

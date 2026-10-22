@@ -439,5 +439,19 @@
   "adResult": "The ad, 9:16",
   "adEmpty": "Your ad will play here, in 9:16, with its music.",
   "adDownload": "Download the ad",
-  "adCaption": "Made with open weights, marked AI-generated in the file."
+  "adCaption": "Made with open weights, marked AI-generated in the file.",
+  "photoDraw": "Draw",
+  "drawTitle": "Draw the start photo",
+  "drawLead": "Sketch the shot, say what it is: the edit turns the drawing into a photo, then animate it with a camera move or an effect.",
+  "drawColor": "Colour",
+  "drawEraser": "Eraser (white)",
+  "drawCanvasLabel": "Drawing sheet",
+  "drawWhat": "What it is",
+  "drawWhatPlaceholder": "e.g. a red car on a coastal road at sunset",
+  "drawConsent": "This drawing is mine, and it shows no real person without their consent",
+  "drawMake": "Make it a photo (~{d})",
+  "drawNeedsDrawing": "Draw something on the sheet first.",
+  "drawNeedsText": "Say what the drawing shows.",
+  "drawNeedsConsent": "Tick the box above to go on.",
+  "drawResult": "Made from your drawing"
 }

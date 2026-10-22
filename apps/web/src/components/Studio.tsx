@@ -52,6 +52,7 @@ import { EffectWall } from './EffectWall';
 import { Header } from './Header';
 import { ModelPicker } from './ModelPicker';
 import { Monitor, type GenerationState, type TrackedJob, type UploadState } from './Monitor';
+import { DrawAtelier } from './DrawAtelier';
 import { PhotoAtelier, type AtelierPhoto } from './PhotoAtelier';
 import { PhotoSource } from './PhotoSource';
 import { PresetGallery, type SequenceTiles } from './PresetGallery';
@@ -169,9 +170,9 @@ export function Studio() {
   const [take, setTake] = useState<{ expected_s: number } | null>(null);
   const [clock, setClock] = useState<{ take: { expected_s: number }; ms: number } | null>(null);
   // The photo atelier (text to image, edit), over the canvas; and the text of a photo made from one.
-  const [atelier, setAtelier] = useState<'t2i' | 'edit' | null>(null);
+  const [atelier, setAtelier] = useState<'t2i' | 'edit' | 'draw' | null>(null);
   // The ateliers opened and not closed yet: each stays mounted, out of view, until its Close or its photo is used.
-  const [ateliers, setAteliers] = useState<('t2i' | 'edit')[]>([]);
+  const [ateliers, setAteliers] = useState<('t2i' | 'edit' | 'draw')[]>([]);
   const [photoPrompt, setPhotoPrompt] = useState<string | undefined>(undefined);
   // The Effects tab: the effect chosen on the wall, what the photo shows, and the consent box.
   const [effectId, setEffectId] = useState<string | null>(null);
@@ -416,7 +417,7 @@ export function Studio() {
   /** Showcase: a sample photo stands in for an upload; nothing is sent anywhere. */
   // The button that opened the atelier (Text to image, Edit): the focus goes back to it when it closes.
   const atelierOpener = useRef<HTMLElement | null>(null);
-  const openAtelier = (kind: 't2i' | 'edit') => {
+  const openAtelier = (kind: 't2i' | 'edit' | 'draw') => {
     if (busyRef.current) return;
     if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) atelierOpener.current = document.activeElement;
     setAtelier(kind);
@@ -424,7 +425,7 @@ export function Studio() {
     setCanvas((current) => nextView('open-atelier', current));
   };
 
-  const closeAtelier = (kind: 't2i' | 'edit') => {
+  const closeAtelier = (kind: 't2i' | 'edit' | 'draw') => {
     setAtelier(null);
     setAteliers((open) => open.filter((entry) => entry !== kind));
     setCanvas((current) => nextView('close-atelier', current));
@@ -437,7 +438,7 @@ export function Studio() {
   };
 
   /** The atelier's image becomes the start photo, as any upload would; one made from a text is described by it. */
-  const takePhoto = (photo: AtelierPhoto, kind: 't2i' | 'edit') => {
+  const takePhoto = (photo: AtelierPhoto, kind: 't2i' | 'edit' | 'draw') => {
     touched.current = true;
     ++uploadToken.current;
     setJob({ status: 'idle' });
@@ -1219,6 +1220,8 @@ export function Studio() {
                     onUse={(photo) => takePhoto(photo, kind)}
                     onClose={() => closeAtelier(kind)}
                   />
+                ) : kind === 'draw' ? (
+                  <DrawAtelier estimates={extensions?.estimates ?? { t2i: 12 }} onUse={(photo) => takePhoto(photo, kind)} onClose={() => closeAtelier(kind)} />
                 ) : (
                 <PhotoAtelier
                   kind={kind}

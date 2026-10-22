@@ -439,5 +439,19 @@
   "adResult": "La pub, en 9:16",
   "adEmpty": "Votre pub s'affichera ici, en 9:16, avec sa musique.",
   "adDownload": "Télécharger la pub",
-  "adCaption": "Faite avec des poids ouverts, marquée « AI-generated » dans le fichier."
+  "adCaption": "Faite avec des poids ouverts, marquée « AI-generated » dans le fichier.",
+  "photoDraw": "Dessiner",
+  "drawTitle": "Dessiner la photo de départ",
+  "drawLead": "Esquissez le plan, dites ce que c'est : l'édition transforme le dessin en photo, puis animez-la avec un mouvement de caméra ou un effet.",
+  "drawColor": "Couleur",
+  "drawEraser": "Gomme (blanc)",
+  "drawCanvasLabel": "Feuille de dessin",
+  "drawWhat": "Ce que c'est",
+  "drawWhatPlaceholder": "ex. une voiture rouge sur une route côtière au coucher du soleil",
+  "drawConsent": "Ce dessin est le mien, et il ne montre aucune vraie personne sans son accord",
+  "drawMake": "En faire une photo (~{d})",
+  "drawNeedsDrawing": "Dessinez d'abord quelque chose sur la feuille.",
+  "drawNeedsText": "Dites ce que montre le dessin.",
+  "drawNeedsConsent": "Cochez la case ci-dessus pour continuer.",
+  "drawResult": "Faite à partir de votre dessin"
 }
