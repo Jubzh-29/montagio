@@ -1,28 +1,32 @@
 /*
  * Montagio tokens. Scene: a creator at night, laptop open, judging short clips —
- * the clips must be the brightest thing on screen. Pure near-black ground,
- * one accent: the camera's REC tally red, reserved for the primary action and
- * the current selection.
+ * the clips must be the brightest thing on screen. A graphite ground, cool like
+ * a monitor's black, and one accent: the lime of a focus-peaking overlay,
+ * reserved for the primary action, the current selection and live state.
+ * The --rec tokens are named for their role (rolling the take), not their hue.
  */
 :root {
   color-scheme: dark;
 
-  --bg: oklch(0.11 0 0);
-  --surface: oklch(0.155 0 0);
-  --surface-2: oklch(0.19 0 0);
-  --line: oklch(0.27 0 0);
-  --line-strong: oklch(0.36 0 0);
+  --bg: oklch(0.155 0.006 250);
+  --surface: oklch(0.2 0.006 250);
+  --surface-2: oklch(0.24 0.007 250);
+  --line: oklch(0.31 0.008 250);
+  --line-strong: oklch(0.4 0.008 250);
   /* Text fields: their edge is what says "type here", so it meets 3:1 (WCAG 1.4.11). */
-  --line-input: oklch(0.5 0 0);
-  --ink: oklch(0.96 0 0);
-  --ink-muted: oklch(0.74 0 0);
-  --ink-faint: oklch(0.6 0 0);
+  --line-input: oklch(0.53 0.008 250);
+  --ink: oklch(0.97 0.003 250);
+  --ink-muted: oklch(0.77 0.005 250);
+  --ink-faint: oklch(0.65 0.006 250);
 
-  --rec: oklch(0.55 0.19 22);
-  --rec-hover: oklch(0.6 0.2 22);
-  --rec-soft: oklch(0.55 0.19 22 / 0.16);
-  --ok: oklch(0.8 0.14 152);
-  --ok-soft: oklch(0.8 0.14 152 / 0.12);
+  --rec: oklch(0.89 0.22 132);
+  --rec-hover: oklch(0.93 0.16 132);
+  --rec-soft: oklch(0.89 0.22 132 / 0.14);
+  /* Text and marks on the lime: dark, never white (13.6:1). */
+  --on-rec: oklch(0.2 0.04 132);
+  /* Verified, in cyan: the lime already means "act here". */
+  --ok: oklch(0.82 0.11 200);
+  --ok-soft: oklch(0.82 0.11 200 / 0.12);
   --warn: oklch(0.82 0.13 80);
   --error: oklch(0.7 0.17 25);
 

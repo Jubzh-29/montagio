@@ -1,0 +1,20 @@
+.ink {
+  fill: currentColor;
+}
+
+.dot {
+  fill: var(--rec);
+}
+
+.dot[data-recording='true'] {
+  animation: tally 1.2s var(--ease-out) infinite alternate;
+}
+
+@keyframes tally {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.35;
+  }
+}
