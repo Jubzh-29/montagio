@@ -52,9 +52,11 @@
   flex-direction: column;
   gap: var(--space-5);
   position: sticky;
-  top: 72px;
-  max-height: calc(100dvh - 88px);
+  top: var(--header-room);
+  max-height: calc(100dvh - var(--header-room) - var(--space-4));
   overflow-y: auto;
+  /* A field focused in the composer lands above its Generate block, not under it. */
+  scroll-padding-bottom: var(--generate-room);
   overscroll-behavior: contain;
   padding-right: var(--space-1);
 }
@@ -487,41 +489,12 @@
   gap: var(--space-2);
 }
 
-.preset {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-m);
-  background: var(--surface);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
-}
-
-.preset:hover {
-  border-color: var(--line-strong);
-  background: var(--surface-2);
-}
-
-.preset[aria-pressed='true'] {
-  border-color: var(--rec);
-  background: var(--rec-soft);
-}
-
-.presetMedia {
-  position: relative;
-  display: block;
-}
-
 .presetPreview {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: var(--radius-s);
   opacity: 0;
   transition: opacity var(--dur) var(--ease-out);
 }
@@ -557,24 +530,6 @@
   to {
     background: var(--surface-2);
   }
-}
-
-.presetText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 var(--space-1) var(--space-1);
-}
-
-.presetName {
-  font-weight: 600;
-  font-size: var(--text-m);
-}
-
-.presetDescription {
-  color: var(--ink-muted);
-  font-size: var(--text-xs);
-  line-height: 1.4;
 }
 
 /*
@@ -671,7 +626,7 @@
   transition: background var(--dur) var(--ease-out);
 }
 
-.preset[aria-pressed='true'] .glyphSubject {
+.tile[aria-pressed='true'] .glyphSubject {
   background: var(--ink);
 }
 
@@ -681,7 +636,7 @@
   border-radius: 2px;
 }
 
-.preset[aria-pressed='true'] .glyphTarget {
+.tile[aria-pressed='true'] .glyphTarget {
   border-color: oklch(0.96 0 0 / 0.75);
 }
 
@@ -1024,7 +979,7 @@
   /* On a phone the setup comes first (the wall below is long); Generate stays pinned at the bottom
      of the screen, and starting a render moves the focus, and the page, to the monitor. */
   .studio {
-    padding-bottom: 104px;
+    padding-bottom: var(--generate-room);
   }
   .panel {
     position: static;
@@ -1307,19 +1262,19 @@
   transition: background var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out);
 }
 
-.preset:hover .shotAdd,
-.preset:focus-visible .shotAdd {
+.tile:hover .shotAdd,
+.tile:focus-visible .shotAdd {
   border-color: var(--rec);
   background: var(--rec);
 }
 
 /* Three shots: the tiles stay readable but say they add nothing more. */
-.preset[data-full='true'] {
+.tile[data-full='true'] {
   cursor: not-allowed;
 }
 
-.preset[data-full='true'] .presetMedia,
-.preset[data-full='true'] .presetText {
+.tile[data-full='true'] .tileMedia,
+.tile[data-full='true'] .tileCaption {
   opacity: 0.55;
 }
 
@@ -1548,6 +1503,12 @@
   z-index: 1;
 }
 
+.choiceActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .choiceMeta {
   display: flex;
   align-items: center;
@@ -1733,35 +1694,6 @@
   gap: var(--space-3);
 }
 
-.wallTile {
-  position: relative;
-  display: grid;
-  place-items: center;
-  aspect-ratio: 4 / 5;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-l);
-  background: var(--surface);
-  overflow: hidden;
-  isolation: isolate;
-  cursor: pointer;
-  transition: border-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
-}
-
-.wallTile:hover {
-  border-color: var(--line-strong);
-}
-
-.wallTile[aria-pressed='true'] {
-  border-color: var(--rec);
-  box-shadow: 0 0 0 1px var(--rec);
-}
-
-.wallTile:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
-
 .wallVideo {
   position: absolute;
   inset: 0;
@@ -1775,23 +1707,8 @@
   color: var(--ink-faint);
 }
 
-.wallName {
-  position: absolute;
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: var(--space-3);
-  font-size: var(--text-l);
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-align: left;
-  text-transform: uppercase;
-  text-shadow: 0 1px 10px oklch(0 0 0 / 0.7);
-  z-index: 1;
-}
-
 /* Over a preview, a dark fade under the name keeps it legible on a bright frame. */
-.choiceMedia:has(> video)::after,
-.wallTile:has(> video)::after {
+.choiceMedia:has(> video)::after {
   content: '';
   position: absolute;
   inset: 55% 0 0;
@@ -1803,13 +1720,10 @@
   .wall {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .wallName {
-    font-size: var(--text-m);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wallTile {
+  .tileMedia {
     transition: none;
   }
 }
@@ -1834,8 +1748,7 @@
   .presetGrid {
     grid-auto-columns: 46%;
   }
-  .wallTile,
-  .preset {
+  .tile {
     scroll-snap-align: start;
   }
 }
@@ -1844,4 +1757,143 @@
 .bpm {
   width: 12ch;
   font-family: var(--font-mono);
+}
+
+/* The canvas's views: words underlined like the header's tabs, not a pill (pills are options). */
+.viewTabs {
+  display: flex;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.viewTab {
+  margin-bottom: -1px;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out);
+}
+
+.viewTab:hover {
+  color: var(--ink);
+}
+
+.viewTab[aria-pressed='true'] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.viewTab:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .viewTab {
+    min-height: 44px;
+  }
+}
+
+/*
+ * One tile for the camera moves, the effects and the hooks: the media framed (16:9 for a move, 4:5
+ * for an effect), its name over a dark fade, its description as a caption under it. Selected: the
+ * red frame. The name labels the button, the caption describes it (aria-labelledby, -describedby).
+ */
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tileMedia {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+
+.tileMedia[data-shape='wide'] {
+  aspect-ratio: 16 / 9;
+}
+
+.tileMedia[data-shape='tall'] {
+  aspect-ratio: 4 / 5;
+}
+
+/* The move's glyph fills the frame the preview will play in. */
+.tileMedia > .glyph {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.tile:hover .tileMedia {
+  border-color: var(--line-strong);
+}
+
+.tile[aria-pressed='true'] .tileMedia {
+  border-color: var(--rec);
+  box-shadow: 0 0 0 1px var(--rec);
+}
+
+.tile:focus-visible {
+  outline: none;
+}
+
+.tile:focus-visible .tileMedia {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* A dark fade under the name keeps it legible on a bright frame. */
+.tileMedia::after {
+  content: '';
+  position: absolute;
+  inset: 50% 0 0;
+  z-index: 1;
+  background: linear-gradient(to bottom, transparent, oklch(0 0 0 / 0.7));
+  pointer-events: none;
+}
+
+.tileName {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-2);
+  z-index: 2;
+  font-size: var(--text-m);
+  font-weight: 650;
+  line-height: 1.25;
+  text-shadow: 0 1px 8px oklch(0 0 0 / 0.7);
+}
+
+.tileCaption {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding-inline: var(--space-1);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
 }

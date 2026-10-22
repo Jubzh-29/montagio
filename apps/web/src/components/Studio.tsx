@@ -1010,6 +1010,12 @@ export function Studio() {
                 icon="camera"
                 paused={motionPaused}
                 onChange={() => moveCanvas('change')}
+                remix={
+                  mode === 'single' && !remix
+                    ? { onOpen: () => presetId && void openRemix(presetId), disabled: presetId === null }
+                    : undefined
+                }
+                remixRef={remixToggleRef}
               />
             ) : null
           }
@@ -1064,31 +1070,7 @@ export function Studio() {
               ) : null
             ) : (
             <>
-              {mode === 'single' && !remix && (
-                <button
-                  ref={remixToggleRef}
-                  type="button"
-                  className={styles.buttonSecondary}
-                  aria-expanded={false}
-                  disabled={presetId === null}
-                  aria-describedby="remix-hint"
-                  onClick={() => presetId && openRemix(presetId)}
-                >
-                  {t('remix')}
-                </button>
-              )}
-              {mode === 'single' && !remix && (
-                <p id="remix-hint" className={styles.hint}>
-                  {t('remixHint')}
-                </p>
-              )}
-              <ModelPicker
-                models={models}
-                loading={catalog === 'loading'}
-                selectedId={modelId}
-                onSelect={setModelId}
-                onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
-              />
+              {/* What the photo shows first: it describes the photo above, and Generate waits for it. */}
               <div className={styles.panelSection}>
                 <label htmlFor="scene-prompt" className={styles.sectionTitle}>
                   {t('prompt')}
@@ -1116,6 +1098,13 @@ export function Studio() {
                   </p>
                 )}
               </div>
+              <ModelPicker
+                models={models}
+                loading={catalog === 'loading'}
+                selectedId={modelId}
+                onSelect={setModelId}
+                onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
+              />
             </>
             )
           }
@@ -1132,7 +1121,7 @@ export function Studio() {
                 {primaryLabel ? (
                   <button
                     type="button"
-                    className={resultShown ? styles.buttonSecondary : styles.buttonPrimary}
+                    className={resultShown || canvas.view === 'atelier' ? styles.buttonSecondary : styles.buttonPrimary}
                     disabled={!canGenerate}
                     onClick={generate}
                   >
@@ -1187,7 +1176,13 @@ export function Studio() {
               </div>
             ))
           }
-          onView={(value) => setCanvas({ view: value, before: value })}
+          onView={(value) =>
+            setCanvas((current) =>
+              value === 'atelier'
+                ? { view: 'atelier', before: current.view === 'atelier' ? current.before : current.view }
+                : { view: value, before: value },
+            )
+          }
           gallery={
             tab === 'avatar' || tab === 'motion' ? null : tab === 'effects' ? (
               <EffectWall

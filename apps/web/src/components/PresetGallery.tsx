@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { catalogText, useI18n } from '@/i18n';
 import type { PresetSummary } from '@/lib/api-types';
 import { MoveGlyph } from './MoveGlyph';
@@ -24,6 +24,7 @@ function PresetTile({
 }) {
   const { t, lang } = useI18n();
   const text = catalogText(lang, preset);
+  const id = useId();
   const [previewReady, setPreviewReady] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
 
@@ -39,13 +40,15 @@ function PresetTile({
   return (
     <button
       type="button"
-      className={styles.preset}
+      className={styles.tile}
+      aria-labelledby={`${id}-name`}
+      aria-describedby={sequence ? `${id}-caption ${id}-shots` : `${id}-caption`}
       // A single shot selects one move; a sequence adds shots, nothing stays pressed.
       aria-pressed={sequence ? undefined : selected}
       data-full={sequence?.nextShot === null}
       onClick={onSelect}
     >
-      <span className={styles.presetMedia}>
+      <span className={styles.tileMedia} data-shape="wide">
         {sequence && (
           <span className={styles.shotMarks} aria-hidden="true">
             {shots.map((n) => (
@@ -74,13 +77,15 @@ function PresetTile({
           />
         )}
         {preset.previewPlaceholder && <span className={styles.badge}>{t('showcasePlaceholderBadge')}</span>}
+        <span id={`${id}-name`} className={styles.tileName}>
+          {text.name}
+        </span>
       </span>
-      <span className={styles.presetText}>
-        <span className={styles.presetName}>{text.name}</span>
-        <span className={styles.presetDescription}>{text.description}</span>
+      <span id={`${id}-caption`} className={styles.tileCaption}>
+        {text.description}
       </span>
       {sequence && (
-        <span className="visually-hidden">
+        <span id={`${id}-shots`} className="visually-hidden">
           {shots.length > 0 && t('inShots', { list: shots.join(', ') })}{' '}
           {sequence.nextShot === null ? t('shotsFull') : t('addAsShot', { i: sequence.nextShot })}
         </span>

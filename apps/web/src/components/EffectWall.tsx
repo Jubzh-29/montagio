@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { catalogText, useI18n } from '@/i18n';
 import type { EffectSummary, HookSummary } from '@/lib/api-types';
 import { wallFilter, type WallFilter } from '@/lib/effect-choice';
 import styles from './studio.module.css';
 
-/** One tile of the wall: its preview looping (never a missing file), its name over it. */
+/** One tile of the wall: its preview looping (never a missing file), its name over it, what it does under it. */
 function WallTile({
   name,
+  description,
   previewUrl,
   posterUrl,
   kind,
@@ -17,6 +18,7 @@ function WallTile({
   onSelect,
 }: {
   name: string;
+  description: string;
   previewUrl?: string;
   /** The still shown until the clip plays: no black tile while it loads. */
   posterUrl?: string;
@@ -26,6 +28,7 @@ function WallTile({
   onSelect: () => void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
+  const id = useId();
   useEffect(() => {
     const element = video.current;
     if (!element) return;
@@ -33,7 +36,16 @@ function WallTile({
     else element.play().catch(() => undefined);
   }, [paused, previewUrl]);
   return (
-    <button type="button" className={styles.wallTile} aria-pressed={selected} data-kind={kind} onClick={onSelect}>
+    <button
+      type="button"
+      className={styles.tile}
+      aria-pressed={selected}
+      aria-labelledby={`${id}-name`}
+      aria-describedby={`${id}-caption`}
+      data-kind={kind}
+      onClick={onSelect}
+    >
+      <span className={styles.tileMedia} data-shape="tall">
       {previewUrl ? (
         <video ref={video} className={styles.wallVideo} src={previewUrl} poster={posterUrl} loop muted playsInline preload="metadata" aria-hidden="true" />
       ) : (
@@ -41,7 +53,13 @@ function WallTile({
           {kind === 'hook' ? '◎' : '✦'}
         </span>
       )}
-      <span className={styles.wallName}>{name}</span>
+      <span id={`${id}-name`} className={styles.tileName}>
+        {name}
+      </span>
+      </span>
+      <span id={`${id}-caption`} className={styles.tileCaption}>
+        {description}
+      </span>
     </button>
   );
 }
@@ -104,6 +122,7 @@ export function EffectWall({
           <WallTile
             key={`${tile.kind}:${tile.id}`}
             name={catalogText(lang, tile.item).name}
+            description={catalogText(lang, tile.item).description}
             previewUrl={tile.item.previewUrl}
             posterUrl={tile.item.posterUrl}
             kind={tile.kind}

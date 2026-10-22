@@ -28,15 +28,16 @@ Geist and Geist Mono, one family, fixed rem scale (no fluid type): `--text-xs` 1
 
 ## Spacing and shape
 
-A 4 px scale (`--space-1` 4 … `--space-7` 48). Radii: 6 px (glyphs, badges), 10 px (tiles, rows, buttons), 14 px (the monitor). Layout: monitor left (sticky on desktop), setup panel right (320–400 px); one column under 960 px.
+A 4 px scale (`--space-1` 4 … `--space-7` 48). Radii: 6 px (glyphs, badges), 10 px (tiles, rows, buttons), 14 px (the monitor). Layout: a promise and a line on the tab across the top, then the composer left (320–400 px, sticky on desktop, `--header-room` under the header, `--generate-room` above its foot) and the canvas right; under 960 px one column with the canvas first, under 640 px the wall and the gallery scroll sideways.
 
 ## Components
 
 - **Monitor**: 16:9, crop marks inset 16 px. Empty, it plays the chosen move as a full-size viewfinder behind the call to drop a photo (on a phone only its grid drifts). Rendering: a bottom overlay with the REC tally, mono status, Cancel and a 3 px progress bar. Notices sit above the marks: error tone with a mark and a way out, neutral for a cancel.
 - **Move glyph** (`MoveGlyph.tsx`, `lib/move-glyph.ts`): grid, horizon, subject, frame marks at 14 %, and a dashed target frame that lands on the marks at the end of the move. Chained moves (push then hold) are drawn one after the other.
-- **Preset tile**: glyph (or the preview clip when one exists), name, one-line description. Selected: red border and tint. In a sequence: shot numbers and a + chip; dimmed when three shots are set.
+- **Tile** (camera moves, effects, hooks: one primitive): the media framed at radius 10 (16:9 for a move, 4:5 for an effect), the glyph or the preview clip with its poster, the name in sentence case over a dark fade, the description as a two-line caption under it (the name labels the button, the caption describes it). Selected: red frame. In a sequence: shot numbers and a + chip; dimmed when three shots are set.
 - **Shot list**: numbered rows with their own text field, free slots dashed.
-- **Buttons**: one vocabulary. Primary (red, 48 px, one per screen: Generate), secondary (bordered), ghost (over pictures), tool (text-sized, in a section head: Pause, Back to presets), link. On touch screens every control is 44 px high.
+- **Buttons**: one vocabulary. Primary (red, 48 px), one on screen at a time: Generate, or the result's Download once a result shows (Generate then steps back to an outline, as it does while the photo atelier is open); secondary (bordered), ghost (over pictures), tool (text-sized, in a section head or beside Change: Pause, Remix preset), link. On touch screens every control is 44 px high.
+- **View tabs and pills**: the canvas's views (Gallery, Monitor, Photo atelier while one is open) are words underlined like the header's tabs; the pill (a rounded segmented box) is kept for options: filters, formats, looks, languages.
 - **Open-stack badge**: pill with a tally mark; green when the check passed.
 
 ## Motion

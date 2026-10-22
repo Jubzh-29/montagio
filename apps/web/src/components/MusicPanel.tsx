@@ -82,7 +82,7 @@ export function MusicPanel({
         {t('musicBpmRange', { min: BPM_MIN, max: BPM_MAX })}
       </p>
       <div className={styles.actions}>
-        <button type="button" className={styles.buttonPrimary} disabled={!canStart} onClick={run}>
+        <button type="button" className={styles.buttonSecondary} disabled={!canStart} onClick={run}>
           {t('musicAdd', { d: formatDuration(estimate_s) })}
         </button>
         {busy && job && (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { useI18n } from '@/i18n';
 import { MoveGlyph } from './MoveGlyph';
 import styles from './studio.module.css';
@@ -19,6 +19,8 @@ export function ChoiceCard({
   icon,
   paused,
   onChange,
+  remix,
+  remixRef,
 }: {
   name: string;
   kindLabel: string;
@@ -30,6 +32,10 @@ export function ChoiceCard({
   paused: boolean;
   /** Brings the wall back; absent on a tab without a wall (Avatar). */
   onChange?: () => void;
+  /** A camera move: its YAML opens in the remix editor (the hint says so under the card). */
+  remix?: { onOpen: () => void; disabled: boolean };
+  /** The Remix button, focused again when the remix editor closes. */
+  remixRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useI18n();
   const video = useRef<HTMLVideoElement>(null);
@@ -59,12 +65,32 @@ export function ChoiceCard({
       </div>
       <div className={styles.choiceMeta}>
         <span>{kindLabel}</span>
-        {onChange && (
-          <button type="button" className={styles.buttonGhost} onClick={onChange}>
-            {t('choiceChange')}
-          </button>
-        )}
+        <span className={styles.choiceActions}>
+          {remix && (
+            <button
+              ref={remixRef}
+              type="button"
+              className={styles.toolButton}
+              aria-expanded={false}
+              aria-describedby="remix-hint"
+              disabled={remix.disabled}
+              onClick={remix.onOpen}
+            >
+              {t('remix')}
+            </button>
+          )}
+          {onChange && (
+            <button type="button" className={styles.buttonGhost} onClick={onChange}>
+              {t('choiceChange')}
+            </button>
+          )}
+        </span>
       </div>
+      {remix && (
+        <p id="remix-hint" className={styles.hint}>
+          {t('remixHint')}
+        </p>
+      )}
     </section>
   );
 }
