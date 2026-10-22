@@ -1,4 +1,9 @@
-# Montagio
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/montagio-logo.svg">
+    <img src="docs/brand/montagio-logo-light-bg.svg" alt="Montagio" width="320">
+  </picture>
+</h1>
 
 **Click like a one-click video app. Open the hood like ComfyUI.**
 

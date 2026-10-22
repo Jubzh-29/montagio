@@ -32,6 +32,10 @@ Geist and Geist Mono, one family, fixed rem scale (no fluid type): `--text-xs` 1
 
 A 4 px scale (`--space-1` 4 … `--space-7` 48). Radii: 6 px (glyphs, badges), 10 px (tiles, rows, buttons), 14 px (the monitor). Layout: a promise and a line on the tab across the top, then the composer left (320–400 px, sticky on desktop, `--header-room` under the header, `--generate-room` above its foot) and the canvas right; under 960 px one column with the canvas first, under 640 px the wall and the gallery scroll sideways.
 
+## Logo
+
+Two opposite viewfinder corners around the tally dot (the mark), and the name in heavy condensed lettering with the same lime dot over its i (the wordmark). Files in `docs/brand/`: the mark, the wordmark and the lockup, each for a dark ground (ink `#F4F5F7`, lime `#A2F745`) and a light one (ink `#0A0C0F`, lime darkened to `#5D9A07`, 3.45:1 on white), plus the 1280×640 social card. In the app (`Brand.tsx`, inline): the header shows the lockup, the mark at 20 px and the wordmark at 24 px; the mark's dot blinks while a take renders. The favicon and `icon.svg` use a cut of the mark drawn larger in its graphite tile, with thicker corners and a larger dot, so both survive 16 px; `apple-icon.png` keeps the drawn proportions.
+
 ## Components
 
 - **Monitor**: 16:9, crop marks inset 16 px. Empty, it plays the chosen move as a full-size viewfinder behind the call to drop a photo (on a phone only its grid drifts). Rendering: a bottom overlay with the REC tally, mono status, Cancel and a 3 px progress bar. Notices sit above the marks: error tone with a mark and a way out, neutral for a cancel.

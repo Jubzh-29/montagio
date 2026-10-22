@@ -7,6 +7,7 @@ import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import type { OpenStackReport } from '@/lib/api-types';
 import { tabHref, visibleTabs, type Tab } from '@/lib/tabs';
 import { useExtensions } from '@/lib/use-extensions';
+import { BrandMark, Wordmark } from './Brand';
 import styles from './header.module.css';
 
 function OpenStackBadge() {
@@ -127,8 +128,9 @@ export function Header({ recording = false, current }: { recording?: boolean; cu
         {t('skipToContent')}
       </a>
       <Link href="/explore" className={styles.brand}>
-        <span className={styles.rec} data-recording={recording} aria-hidden="true" />
-        <span className={styles.wordmark}>{t('appName')}</span>
+        <BrandMark recording={recording} className={styles.mark} />
+        <Wordmark className={styles.wordmark} />
+        <span className="visually-hidden">{t('appName')}</span>
         <span className={styles.tagline}>{t('tagline')}</span>
       </Link>
       <Tabs current={current} />
