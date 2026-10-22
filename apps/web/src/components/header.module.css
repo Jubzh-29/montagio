@@ -34,42 +34,28 @@
 
 .brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-2);
+  color: var(--ink);
   text-decoration: none;
   min-width: 0;
 }
 
-.rec {
-  align-self: center;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--line-strong);
-  transition: background var(--dur) var(--ease-out);
-}
-
-.rec[data-recording='true'] {
-  background: var(--rec);
-  animation: tally 1.2s var(--ease-out) infinite alternate;
-}
-
-@keyframes tally {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0.35;
-  }
+/* The logo's proportions (docs/brand/montagio-logo.svg): the mark 320/384 of the wordmark's height, the gap about a third of the mark. */
+.mark {
+  flex: none;
+  width: 20px;
+  height: 20px;
 }
 
 .wordmark {
-  font-size: var(--text-l);
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  flex: none;
+  height: 24px;
+  width: auto;
 }
 
 .tagline {
+  margin-left: var(--space-1);
   color: var(--ink-muted);
   font-size: var(--text-s);
   white-space: nowrap;
@@ -130,7 +116,7 @@
 .badge[data-state='ok'] {
   color: var(--ok);
   background: var(--ok-soft);
-  border-color: oklch(0.8 0.14 152 / 0.35);
+  border-color: oklch(0.82 0.11 200 / 0.35);
 }
 
 .badge[data-state='failed'] {

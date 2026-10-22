@@ -31,8 +31,8 @@ test('with the atelier open, Generate steps back, and the canvas switch leads aw
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await page.getByRole('button', { name: 'Text to image', exact: true }).click();
   await page.getByRole('textbox', { name: 'Describe the photo' }).fill('a red fox');
-  const red = await page.getByRole('button', { name: /^Create image/ }).evaluate((element) => getComputedStyle(element).backgroundColor);
-  expect(await page.getByRole('button', { name: /^Generate/ }).evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(red);
+  const primary = await page.getByRole('button', { name: /^Create image/ }).evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(await page.getByRole('button', { name: /^Generate/ }).evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(primary);
   await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pan Left', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Photo atelier', exact: true }).click();

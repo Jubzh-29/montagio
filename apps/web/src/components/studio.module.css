@@ -449,7 +449,7 @@
   font-size: var(--text-xs);
 }
 
-/* While a take rolls, the slate counts: the REC part brighter, after the tally's red dot. */
+/* While a take rolls, the slate counts: the REC part brighter, after the tally dot. */
 .slate[data-rolling='true'] span:nth-last-child(2) {
   color: var(--ink);
 }
@@ -942,7 +942,7 @@
   padding: 0 var(--space-5);
   border: 0;
   background: var(--rec);
-  color: oklch(1 0 0);
+  color: var(--on-rec);
   font-size: var(--text-m);
 }
 
@@ -1279,7 +1279,7 @@
 
 .shotMark {
   background: var(--rec);
-  color: oklch(1 0 0);
+  color: var(--on-rec);
 }
 
 .shotAdd {
@@ -1293,6 +1293,7 @@
 .tile:focus-visible .shotAdd {
   border-color: var(--rec);
   background: var(--rec);
+  color: var(--on-rec);
 }
 
 /* Three shots: the tiles stay readable but say they add nothing more. */
@@ -1983,7 +1984,7 @@
 /*
  * One tile for the camera moves, the effects and the hooks: the media framed (16:9 for a move, 4:5
  * for an effect), its name over a dark fade, its description as a caption under it. Selected: the
- * red frame. The name labels the button, the caption describes it (aria-labelledby, -describedby).
+ * lime frame. The name labels the button, the caption describes it (aria-labelledby, -describedby).
  */
 .tile {
   display: flex;
