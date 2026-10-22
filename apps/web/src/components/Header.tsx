@@ -113,6 +113,10 @@ export function Header({ recording = false, current }: { recording?: boolean; cu
   const { t } = useI18n();
   return (
     <header className={styles.header}>
+      {/* First in the tab order: past the header's ten stops, to the page itself. */}
+      <a className={styles.skip} href="#content">
+        {t('skipToContent')}
+      </a>
       <Link href="/" className={styles.brand}>
         <span className={styles.rec} data-recording={recording} aria-hidden="true" />
         <span className={styles.wordmark}>{t('appName')}</span>

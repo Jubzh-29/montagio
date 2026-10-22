@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { catalogText, useI18n } from '@/i18n';
 import type { EffectSummary, HookSummary } from '@/lib/api-types';
 import { wallFilter, type WallFilter } from '@/lib/effect-choice';
+import { usePlayWhileSeen } from '@/lib/use-play-while-seen';
 import styles from './studio.module.css';
 
 /** One tile of the wall: its preview looping (never a missing file), its name over it, what it does under it. */
@@ -29,12 +30,7 @@ function WallTile({
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const id = useId();
-  useEffect(() => {
-    const element = video.current;
-    if (!element) return;
-    if (paused) element.pause();
-    else element.play().catch(() => undefined);
-  }, [paused, previewUrl]);
+  usePlayWhileSeen(video, paused, previewUrl);
   return (
     <button
       type="button"

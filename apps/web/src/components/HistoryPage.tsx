@@ -100,7 +100,7 @@ export function HistoryPage() {
   return (
     <>
       <Header current="history" />
-      <main className={styles.page}>
+      <main id="content" tabIndex={-1} className={styles.page}>
         <h1 className={styles.title}>{t('historyTitle')}</h1>
         {IS_SHOWCASE && <p className={styles.note}>{t('historyShowcaseNote')}</p>}
         {items && items.length > 0 && (

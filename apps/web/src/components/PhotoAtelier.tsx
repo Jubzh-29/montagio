@@ -122,21 +122,31 @@ export function PhotoAtelier({
       </p>
 
       {kind === 't2i' ? (
-        <div className={styles.canvasViews} role="radiogroup" aria-label={t('t2iFormat')}>
+        <>
+        <p id="atelier-format" className={styles.sectionTitle}>
+          {t('t2iFormat')}
+        </p>
+        <div className={styles.canvasViews} role="radiogroup" aria-labelledby="atelier-format">
           {ASPECTS.map((value) => (
             <button key={value} type="button" role="radio" className={styles.mode} aria-checked={aspect === value} disabled={busy} onClick={() => setAspect(value)}>
               {value}
             </button>
           ))}
         </div>
+        </>
       ) : (
-        <div className={styles.lookChoice} role="radiogroup" aria-label={t('editLook')}>
+        <>
+        <p id="atelier-look" className={styles.sectionTitle}>
+          {t('editLook')}
+        </p>
+        <div className={styles.lookChoice} role="radiogroup" aria-labelledby="atelier-look">
           {LOOKS.map(([value, key]) => (
             <button key={value || 'none'} type="button" role="radio" className={styles.mode} aria-checked={look === value} disabled={busy} onClick={() => setLook(value)}>
               {t(key)}
             </button>
           ))}
         </div>
+        </>
       )}
 
       {askConsent && <ConsentCheck id="atelier-consent" checked={consent} onChange={setConsent} />}

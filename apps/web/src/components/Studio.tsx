@@ -396,8 +396,11 @@ export function Studio() {
   };
 
   /** Showcase: a sample photo stands in for an upload; nothing is sent anywhere. */
+  // The button that opened the atelier (Text to image, Edit): the focus goes back to it when it closes.
+  const atelierOpener = useRef<HTMLElement | null>(null);
   const openAtelier = (kind: 't2i' | 'edit') => {
     if (busyRef.current) return;
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) atelierOpener.current = document.activeElement;
     setAtelier(kind);
     setAteliers((open) => (open.includes(kind) ? open : [...open, kind]));
     setCanvas((current) => nextView('open-atelier', current));
@@ -407,6 +410,12 @@ export function Studio() {
     setAtelier(null);
     setAteliers((open) => open.filter((entry) => entry !== kind));
     setCanvas((current) => nextView('close-atelier', current));
+    const opener = atelierOpener.current;
+    atelierOpener.current = null;
+    // After the atelier has gone: the focus would otherwise fall to the page's body.
+    requestAnimationFrame(() => {
+      if (opener?.isConnected) opener.focus();
+    });
   };
 
   /** The atelier's image becomes the start photo, as any upload would; one made from a text is described by it. */
@@ -940,7 +949,7 @@ export function Studio() {
         />
       </Suspense>
       <Header recording={busy} current={tab} />
-      <main className={styles.studio} data-motion={motionPaused ? 'paused' : 'playing'}>
+      <main id="content" tabIndex={-1} className={styles.studio} data-motion={motionPaused ? 'paused' : 'playing'}>
         {/* What Montagio does, then what this tab makes: the first thing read, above the composer and the canvas. */}
         <div className={styles.intro}>
           <h1 className={styles.promise}>{t('promise')}</h1>

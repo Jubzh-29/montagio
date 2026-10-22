@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { catalogText, useI18n } from '@/i18n';
 import type { PresetSummary } from '@/lib/api-types';
+import { usePlayWhileSeen } from '@/lib/use-play-while-seen';
 import { MoveGlyph } from './MoveGlyph';
 import styles from './studio.module.css';
 
@@ -28,13 +29,8 @@ function PresetTile({
   const [previewReady, setPreviewReady] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
 
-  // No autoplay attribute: the clip plays only while the previews run.
-  useEffect(() => {
-    const element = video.current;
-    if (!element) return;
-    if (paused) element.pause();
-    else element.play().catch(() => undefined);
-  }, [paused, preset.previewUrl]);
+  // No autoplay attribute: the clip plays only while the previews run, and while the tile is seen.
+  usePlayWhileSeen(video, paused, preset.previewUrl);
 
   const shots = sequence?.shotsOf(preset.id) ?? [];
   return (

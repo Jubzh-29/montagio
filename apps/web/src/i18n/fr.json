@@ -148,6 +148,7 @@
   "showcasePlaceholderBadge": "provisoire",
   "showcasePlaceholderNote": "Certains clips sont encore provisoires : FFmpeg simule leur mouvement en attendant le rendu de la session GPU.",
   "tabsLabel": "Création",
+  "skipToContent": "Aller au contenu",
   "tabEffects": "Effets",
   "tabCamera": "Caméra",
   "tabFilm": "Film",

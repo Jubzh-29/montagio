@@ -148,6 +148,7 @@
   "showcasePlaceholderBadge": "placeholder",
   "showcasePlaceholderNote": "Some clips are still placeholders: FFmpeg simulates their camera move until the GPU session renders them.",
   "tabsLabel": "Creation",
+  "skipToContent": "Skip to content",
   "tabEffects": "Effects",
   "tabCamera": "Camera",
   "tabFilm": "Film",

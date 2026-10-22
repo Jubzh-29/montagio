@@ -69,7 +69,7 @@ export function OpenStack() {
   return (
     <>
       <Header />
-      <main className={styles.page}>
+      <main id="content" tabIndex={-1} className={styles.page}>
         <h1 className={styles.title}>{t('openStackTitle')}</h1>
         <p className={styles.intro}>{t('openStackIntro')}</p>
         {report ? (
