@@ -5,6 +5,7 @@
 import { basename } from 'node:path';
 import {
   compileAvatar,
+  compileCompose,
   compileEdit,
   compileEffect,
   compileHookEdit,
@@ -25,13 +26,14 @@ import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } f
 /**
  * In the order a session runs them, the priority order of 2026-10-19 (the motion transfer,
  * added on 2026-10-20, last): a hook's edit comes before its transition, the voice before the
- * avatar that speaks it.
+ * avatar that speaks it, a composed photo before the effects that animate it.
  */
-export const EXTENSION_JOBS = ['edit', 'effect', 'hook-edit', 'transition', 'voice', 'avatar', 'music', 'upscale', 'upscale-image', 'voice-change', 'motion'] as const;
+export const EXTENSION_JOBS = ['edit', 'compose', 'effect', 'hook-edit', 'transition', 'voice', 'avatar', 'music', 'upscale', 'upscale-image', 'voice-change', 'motion'] as const;
 export type ExtensionJobName = (typeof EXTENSION_JOBS)[number];
 
 const TASKS: Record<ExtensionJobName, ExtensionTask> = {
   edit: 'i2i-edit',
+  compose: 'i2i-edit',
   effect: 'i2v-effect',
   'hook-edit': 'i2i-edit',
   transition: 'flf2v',
@@ -62,10 +64,12 @@ export const DEFAULT_HOOK = 'iris-dive';
 
 export type ExtensionJobOptions = {
   jobs: readonly ExtensionJobName[];
-  /** The photo of edit, effect, hook and avatar. */
+  /** The photo of edit, effect, hook and avatar; the place of a composition. */
   input?: string;
-  /** The second image of a two-reference hook (the outfit of wardrobe-swap). */
+  /** The second image of a two-reference hook (the outfit of wardrobe-swap), or the character of a composition. */
   input2?: string;
+  /** The product of a composition (optional: a place and a character are enough). */
+  input3?: string;
   /** The edit's inpaint mask (white where the photo changes). */
   mask?: string;
   /** The end frame of a transition run on its own (a hook's edit output otherwise). */
@@ -174,6 +178,23 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
           library.lock,
         );
         return [{ name, tag: mask ? `${name}:inpaint` : name, model, ...job, files: [file('image', photo), ...(mask ? [file('mask', mask)] : [])] }];
+      }
+      case 'compose': {
+        // The Studio's composed start photo: a place, a character and a product, in that image order.
+        const place = need(opts.input, '--input', name);
+        const character = need(opts.input2, '--input2', name);
+        const product = opts.input3;
+        const refs = { location: basename(place), character: basename(character), ...(product ? { product: basename(product) } : {}) };
+        const { order, ...job } = compileCompose(model, template, { refs, seed: opts.seed, fast }, library.lock);
+        return [
+          {
+            name,
+            tag: `${name}:${order.length}refs`,
+            model,
+            ...job,
+            files: [file('image', place), file('image2', character), ...(product ? [file('image3', product)] : [])],
+          },
+        ];
       }
       case 'effect': {
         const photo = need(opts.input, '--input', name);

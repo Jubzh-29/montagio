@@ -14,12 +14,13 @@ beforeAll(async () => {
 
 const base = { language: 'en' as const, duration_s: 10, seed: 7, aspect: '16:9' as const };
 
-const files = { input: '/data/photo.png', input2: '/data/outfit.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, voice: '/data/voice.flac', motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const };
+const files = { input: '/data/photo.png', input2: '/data/outfit.png', input3: '/data/product.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, voice: '/data/voice.flac', motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const };
 
 test('one job per extension, in the order of the session, each accepted by ComfyUI v0.41.0 once its files are uploaded', () => {
   const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
   expect(jobs.map((job) => [job.tag, job.model.id])).toEqual([
     ['edit', 'qwen-image-edit-2511'],
+    ['compose:3refs', 'qwen-image-edit-2511'],
     ['effect:squish', 'wan21-i2v-effects'],
     ['hook-edit:wardrobe-swap', 'qwen-image-edit-2511'],
     ['transition:wardrobe-swap', 'wan22-flf2v-transition'],
@@ -54,6 +55,11 @@ test('each job uploads the files it reads and nothing else', () => {
     { node: '240', field: 'file', path: '/data/motion.mp4' },
   ]);
   expect(uploads.edit).toEqual([{ node: '41', field: 'image', path: '/data/photo.png' }]);
+  expect(uploads.compose).toEqual([
+    { node: '41', field: 'image', path: '/data/photo.png' },
+    { node: '42', field: 'image', path: '/data/outfit.png' },
+    { node: '43', field: 'image', path: '/data/product.png' },
+  ]);
   expect(uploads.effect).toEqual([{ node: '52', field: 'image', path: '/data/photo.png' }]);
   expect(uploads['hook-edit']).toEqual([
     { node: '41', field: 'image', path: '/data/photo.png' },
@@ -74,6 +80,7 @@ test('an extension record carries the sha256 of its photo', () => {
   const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
   expect(Object.fromEntries(jobs.map((job) => [job.name, photoFile(job)]))).toEqual({
     edit: '/data/photo.png',
+    compose: '/data/photo.png',
     effect: '/data/photo.png',
     'hook-edit': '/data/photo.png',
     transition: '/data/photo.png',

@@ -72,6 +72,7 @@ const { values: args } = parseArgs({
     extension: { type: 'string' },
     input: { type: 'string' },
     input2: { type: 'string' },
+    input3: { type: 'string' },
     mask: { type: 'string' },
     end: { type: 'string' },
     effect: { type: 'string', default: 'all' },
@@ -112,11 +113,12 @@ if (args.help) {
   --dry-run          compile and write the workflows, contact nothing
 
 Extensions (instead of presets):
-  --extension LIST   edit, effect, hook (= hook-edit then transition), voice, avatar, music, upscale, motion (comma list) or "all"
+  --extension LIST   edit, compose, effect, hook (= hook-edit then transition), voice, avatar, music, upscale, motion (comma list) or "all"
   --input PATH       the photo of edit, effect, hook and avatar (default demo-assets/images/sample-16x9.png)
   --effect LIST      the effects to run, e.g. squish,explode, or "all" (default all)
   --hook ID          the hook of hook-edit and transition (default iris-dive)
-  --input2 PATH      the second image of a two-reference hook (the outfit of wardrobe-swap)
+  --input2 PATH      the second image of a two-reference hook (the outfit of wardrobe-swap), or compose's character
+  --input3 PATH      compose: the product (--input is the place); with effect, the effects animate the composed photo
   --mask PATH        edit: inpaint through this mask (white where the photo changes, the photo's size)
   --end PATH         the end frame of a transition run alone; without it, the hook's edit runs first and makes it
   --quality          the edit, the effects and the transition without their 4-step LoRAs (more steps, slower)
@@ -470,7 +472,9 @@ type ExtensionRecord = RunRecord & {
  * The extension jobs (edit, effects, hooks, voice, avatar, music, upscale): compiled first,
  * checked against the running ComfyUI's /object_info, run one after the other, timed, with
  * peak VRAM, their outputs downloaded into <out>/clips. Without --audio, the avatar speaks the
- * voice job's output; without --end, a hook's transition ends on its edit's output.
+ * voice job's output; without --end, a hook's transition ends on its edit's output; with compose,
+ * the effects animate the composed photo. The definitions of the nodes used are kept in
+ * <out>/object_info-extensions.json, as this ComfyUI declares them.
  */
 async function runExtensions(
   library: Library,
@@ -496,11 +500,14 @@ async function runExtensions(
   // Without an end frame, the transition ends on the hook's edit: the edit runs first.
   const chainedHook = names.includes('transition') && !args.end;
   if (chainedHook && !names.includes('hook-edit')) names.splice(names.indexOf('transition'), 0, 'hook-edit');
+  // With a composition, the effects animate the composed photo: the composition runs first.
+  const chainedCompose = names.includes('compose') && names.includes('effect');
   // Each text feeds one job (the voice, for an avatar that speaks its output).
   const text = jobTexts(args.text, names);
 
-  const input = args.input ? fromCaller(args.input) : join(repoRoot, 'demo-assets', 'images', 'sample-16x9.png');
+  let input = args.input ? fromCaller(args.input) : join(repoRoot, 'demo-assets', 'images', 'sample-16x9.png');
   const input2 = args.input2 ? fromCaller(args.input2) : undefined;
+  const input3 = args.input3 ? fromCaller(args.input3) : undefined;
   const mask = args.mask ? fromCaller(args.mask) : undefined;
   let end = args.end ? fromCaller(args.end) : undefined;
   const clip = args.clip ? fromCaller(args.clip) : undefined;
@@ -542,6 +549,7 @@ async function runExtensions(
     jobs,
     input,
     input2,
+    input3,
     mask,
     ...(args.voice ? { voice: fromCaller(args.voice) } : {}),
     end: end ?? (args['dry-run'] ? 'end.png' : undefined),
@@ -565,7 +573,7 @@ async function runExtensions(
   });
   // Compile what can be compiled now: a missing file fails before any GPU second is spent.
   const first = names.filter(
-    (name) => args['dry-run'] || !((chained && name === 'avatar') || (chainedHook && name === 'transition')),
+    (name) => args['dry-run'] || !((chained && name === 'avatar') || (chainedHook && name === 'transition') || (chainedCompose && name === 'effect')),
   );
   const jobs = extensionJobs(library, options(first));
   await mkdir(join(outDir, 'workflows'), { recursive: true });
@@ -574,7 +582,9 @@ async function runExtensions(
   const { client, objectInfo, comfyuiVersion, gpu } = await connect(target, comfyuiUrl);
 
   const records: ExtensionRecord[] = [];
+  const classes = new Set<string>();
   const run = async (job: ExtensionJob): Promise<ExtensionRecord> => {
+    for (const node of Object.values(job.workflow)) classes.add(node.class_type);
     const tag = `ext-${job.tag.replace(':', '-')}__${job.model.id}`;
     await writeFile(join(outDir, 'workflows', `${tag}.api.json`), `${JSON.stringify(job.workflow, null, 2)}\n`);
     const record: ExtensionRecord = {
@@ -638,6 +648,25 @@ async function runExtensions(
       const [transition] = extensionJobs(library, options(['transition']));
       await run(transition!);
     }
+    if (chainedCompose && job.name === 'compose' && !args['dry-run']) {
+      const photo = record.outputs[0];
+      if (record.status !== 'succeeded' || !photo) {
+        console.error('  ✗ no composed photo for the effects: the effect jobs are skipped');
+        continue;
+      }
+      input = join(outDir, photo);
+      const { width, height } = imageSize(await readFile(input));
+      aspect = pickAspect(width, height);
+      for (const effect of extensionJobs(library, options(['effect']))) await run(effect);
+    }
+  }
+
+  // The nodes' definitions on this ComfyUI, merged across the runs of a series: the tests' fixture is checked against them.
+  if (objectInfo) {
+    const file = join(outDir, 'object_info-extensions.json');
+    const kept = await readFile(file, 'utf8').then((text) => JSON.parse(text) as ObjectInfo, () => ({}) as ObjectInfo);
+    for (const name of classes) if (objectInfo[name]) kept[name] = objectInfo[name];
+    await writeFile(file, `${JSON.stringify(kept, null, 2)}\n`);
   }
 
   console.log('\njob                      model                       status            wall s  exec s  peak VRAM MiB');
