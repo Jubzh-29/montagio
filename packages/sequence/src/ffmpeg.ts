@@ -346,6 +346,27 @@ export async function prepareVoiceSample(input: string, out: string, opts: { max
 }
 
 /**
+ * Lay a transparent PNG (an ad's tagline, drawn by the browser) over a 9:16 clip: the image is
+ * scaled to the clip, the sound is kept, and the result carries the AI mention. Both inputs are
+ * read as local files only.
+ */
+export async function overlayImage(input: string, image: string, out: string): Promise<void> {
+  const { width, height } = await probe(input);
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    ...LOCAL_FILE_ONLY, '-i', input,
+    ...LOCAL_FILE_ONLY, '-i', image,
+    '-filter_complex', `[1:v]scale=${width}:${height}[over];[0:v][over]overlay=0:0,format=yuv420p[out]`,
+    '-map', '[out]', '-map', '0:a?',
+    ...VERTICAL_X264,
+    '-c:a', 'copy',
+    ...metadataArgs(AI_METADATA),
+    '-movflags', '+faststart',
+    '-f', 'mp4', partial,
+  ]);
+}
+
+/**
  * A light copy of a clip for a looping gallery tile: `width` pixels wide and a
  * high CRF, so a dozen tiles cost the visitor a megabyte or two, not twenty.
  */

@@ -177,7 +177,7 @@ export type ExtensionsInfo = {
   examples?: Partial<Record<'avatar' | 'motion', { previewUrl: string; posterUrl?: string }>>;
 };
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad';
 
 import type { CharacterType } from './characters';
 

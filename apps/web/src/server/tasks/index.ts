@@ -1,4 +1,5 @@
 import type { JobTask, TaskDef } from '../jobs';
+import { adTask } from './ad';
 import { avatarTask } from './avatar';
 import { editTask } from './edit';
 import { effectTask } from './effect';
@@ -20,4 +21,5 @@ export const TASKS: Partial<Record<JobTask, TaskDef>> = {
   upscale: upscaleTask,
   'image-upscale': imageUpscaleTask,
   motion: motionTask,
+  ad: adTask,
 };

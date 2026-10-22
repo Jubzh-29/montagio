@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { AVATAR_DEFAULT_PROMPT, compileAvatar, compileCompose, compileEdit, composeInstruction, compileImageUpscale, compileMusic, compileSpeech, compileUpscale, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
+import { AD_STYLES, adInstruction, AVATAR_DEFAULT_PROMPT, compileAvatar, compileCompose, compileEdit, composeInstruction, compileImageUpscale, compileMusic, compileSpeech, compileUpscale, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -166,6 +166,17 @@ describe('compileCompose (a start photo from a place, a character, a product)', 
 
   test('one reference is not a composition', () => {
     expect(() => compose({ character: 'c.png' })).toThrow(CompileError);
+  });
+});
+
+describe('adInstruction (the product ad scene)', () => {
+  test('the product is image 1; a character presents it from image 2; the top of the frame stays clear', () => {
+    expect(adInstruction('studio', false)).toMatch(/^A professional advertising photo of the product from image 1, on a clean seamless studio backdrop/);
+    expect(adInstruction('bold', true)).toMatch(/the character from image 2 presents the product from image 1, on a vivid colorful background/);
+    for (const style of Object.keys(AD_STYLES) as (keyof typeof AD_STYLES)[]) {
+      expect(adInstruction(style, true)).toMatch(/Leave clear space at the top of the frame\./);
+      expect(AD_STYLES[style].music).toMatch(/no vocals/);
+    }
   });
 });
 

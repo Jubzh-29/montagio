@@ -70,6 +70,7 @@ export function exploreTools(presets: readonly PresetSummary[], info: Extensions
     },
     { id: 'film', href: tabHref('film'), name: 'tabFilm', description: 'exploreFilmText', previewUrl: previewOf(presets, 'pull-back-reveal'), icon: '▤' },
     !showcase && { id: 'characters', href: '/characters', name: 'tabCharacters', description: 'exploreCharactersText', icon: '☺' },
+    !showcase && has('edit') && has('music') && { id: 'ads', href: '/ads', name: 'tabAds', description: 'exploreAdsText', icon: '▶' },
     has('avatar') && { id: 'avatar', href: tabHref('avatar'), name: 'tabAvatar', description: 'exploreAvatarText', icon: '◉' },
     has('motion') && { id: 'motion', href: tabHref('motion'), name: 'tabMotion', description: 'exploreMotionText', icon: '⇄' },
     { id: 't2i', href: tabHref('camera'), name: 'exploreT2iName', description: 'exploreT2iText', icon: 'Aa' },

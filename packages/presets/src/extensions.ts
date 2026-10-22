@@ -315,6 +315,38 @@ export function compileCompose(
   return { ...compiled, order };
 }
 
+/**
+ * The styles of a product ad: the scene the edit stages the product in, and the music ACE-Step
+ * writes for it (always instrumental: an ad's words are its tagline).
+ */
+export const AD_STYLES = {
+  studio: {
+    scene: 'on a clean seamless studio backdrop with soft gradient light, a premium commercial look',
+    music: 'minimal elegant electronic beat for a premium product commercial, instrumental, no vocals',
+  },
+  lifestyle: {
+    scene: 'in a bright, natural everyday setting where it is used, warm natural light',
+    music: 'warm upbeat acoustic pop for a feel-good commercial, instrumental, no vocals',
+  },
+  bold: {
+    scene: 'on a vivid colorful background with bold graphic shapes and dramatic light, an energetic look',
+    music: 'energetic punchy electronic track for a hype commercial, instrumental, no vocals',
+  },
+} as const;
+export type AdStyle = keyof typeof AD_STYLES;
+
+/** The edit's instruction for an ad: the product (image 1) in the style's scene, presented by a character (image 2) or not. */
+export function adInstruction(style: AdStyle, withCharacter: boolean): string {
+  const { scene } = AD_STYLES[style];
+  const head = withCharacter
+    ? `A professional advertising photo: the character from image 2 presents the product from image 1, ${scene}.`
+    : `A professional advertising photo of the product from image 1, ${scene}.`;
+  const keep = withCharacter
+    ? "Keep the product's exact shape, colors, label and logo, and the character's face, hair and outfit."
+    : "Keep the product's exact shape, colors, label and logo.";
+  return `${head} ${keep} Leave clear space at the top of the frame. Photorealistic, one coherent photo.`;
+}
+
 export type SpeechInputs = {
   /** What the avatar says. */
   text: string;

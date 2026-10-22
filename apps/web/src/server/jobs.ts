@@ -24,7 +24,7 @@ import { saveUploadFromFile, type Provenance } from './uploads';
 
 export { JobError } from './errors';
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad';
 
 export type StepRecord = {
   name: string;

@@ -206,6 +206,9 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
         },
       };
     }
+    case 'ad':
+      // A ready-to-post ad: Reuse goes back to the Effects wall with its effect chosen.
+      return { ...base, kind: 'clip', task: 'ad', reprise: { tab: 'effects', effectId: String(record.inputs.effectId) } };
     case 'upscale': {
       // An HD clip is a clip of its own; Reuse reopens the setup of the clip it was made from.
       const parent = await parentItem(lib, record.parent);

@@ -9,6 +9,7 @@ export {
   headerHash,
   mixMusic,
   normalizeClip,
+  overlayImage,
   placeholderClip,
   prepareMotionClip,
   posterFrame,

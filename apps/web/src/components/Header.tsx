@@ -80,7 +80,7 @@ function useMoreOutOfView(ref: RefObject<HTMLElement | null>, count: number): { 
 }
 
 /** The creation tabs, as links: the Studio reads the tab from the URL. */
-function Tabs({ current }: { current?: Tab | 'history' | 'explore' | 'characters' }) {
+function Tabs({ current }: { current?: Tab | 'history' | 'explore' | 'characters' | 'ads' }) {
   const { t } = useI18n();
   const tabs = visibleTabs(useExtensions());
   const row = useRef<HTMLElement>(null);
@@ -107,6 +107,11 @@ function Tabs({ current }: { current?: Tab | 'history' | 'explore' | 'characters
           {t('tabCharacters')}
         </Link>
       )}
+      {!IS_SHOWCASE && (
+        <Link href="/ads" className={styles.tab} aria-current={current === 'ads' ? 'page' : undefined}>
+          {t('tabAds')}
+        </Link>
+      )}
       {tabs.map((tab) => (
         <Link key={tab} href={tabHref(tab)} className={styles.tab} aria-current={current === tab ? 'page' : undefined}>
           {t(TAB_LABELS[tab])}
@@ -119,7 +124,7 @@ function Tabs({ current }: { current?: Tab | 'history' | 'explore' | 'characters
   );
 }
 
-export function Header({ recording = false, current }: { recording?: boolean; current?: Tab | 'history' | 'explore' | 'characters' }) {
+export function Header({ recording = false, current }: { recording?: boolean; current?: Tab | 'history' | 'explore' | 'characters' | 'ads' }) {
   const { t } = useI18n();
   return (
     <header className={styles.header}>

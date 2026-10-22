@@ -14,6 +14,7 @@ import {
   headerHash,
   mixMusic,
   normalizeClip,
+  overlayImage,
   placeholderClip,
   PLACEHOLDER_METADATA,
   posterFrame,
@@ -367,3 +368,19 @@ describe('prepareMotionClip and what the clip sent carries', () => {
     }
   }, FFMPEG_TEST_TIMEOUT_MS);
 });
+
+test('an image laid over a 9:16 clip keeps its size, its sound and the AI mention', async () => {
+  const vertical = join(dir, 'over-src.mp4');
+  const png = join(dir, 'tagline.png');
+  const out = join(dir, 'over.mp4');
+  execFileSync('ffmpeg', [
+    '-loglevel', 'error', '-y',
+    '-f', 'lavfi', '-i', 'testsrc=size=720x1280:rate=16', '-f', 'lavfi', '-i', 'sine=frequency=440',
+    '-t', '1', '-pix_fmt', 'yuv420p', '-shortest', vertical,
+  ]);
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=white@0.5:s=360x640,format=rgba', '-frames:v', '1', png]);
+  await overlayImage(vertical, png, out);
+  expect(await probe(out)).toMatchObject({ width: 720, height: 1280 });
+  expect(await probeAudio(out)).not.toBeNull();
+  expect((await readTags(out)).comment).toBe(AI_METADATA.comment);
+}, FFMPEG_TEST_TIMEOUT_MS);
