@@ -50,6 +50,20 @@ test('the sample of another tab, or an effect without a render of it, is moved t
   expect(demoKindOf(out)).toBe('moved');
 }, 60_000);
 
+test('the avatar of the sample portrait, and the motion of the sample character on the sample dance, are their GPU renders', async () => {
+  const sampleFor = async (tab: string) =>
+    ((await (await postSampleUpload(new Request(`http://localhost/api/uploads/sample?for=${tab}`, { method: 'POST' }))).json()) as { imageRef: string }).imageRef;
+  const portrait = photoFile(await sampleFor('avatar'));
+  const character = photoFile(await sampleFor('motion'));
+  const voice = { node: '2', field: 'audio', path: join(repoRoot, 'demo-assets', 'audio', '_default.flac') };
+  expect(await render({ presetId: 'avatar', output: 'video', files: [...files(portrait), voice] })).toBe(join(repoRoot, 'demo-assets', 'examples', 'avatar.mp4'));
+  const dance = { node: '2', field: 'video', path: join(repoRoot, 'demo-assets', 'videos', 'sample-dance.mp4') };
+  expect(await render({ presetId: 'motion', output: 'video', files: [...files(character), dance] })).toBe(join(repoRoot, 'demo-assets', 'examples', 'motion.mp4'));
+  // Another dance: the example would show the wrong one, so the photo is moved instead.
+  const other = { node: '2', field: 'video', path: join(repoRoot, 'demo-assets', 'clips', '_default.mp4') };
+  expect(demoKindOf(await render({ presetId: 'motion', output: 'video', files: [...files(character), other] }))).toBe('moved');
+}, 60_000);
+
 test('nothing for a job without a photo or that makes no video', async () => {
   const { imageRef } = await sample();
   expect(await render({ presetId: 'crash-push', output: 'image', files: files(photoFile(imageRef)) })).toBeUndefined();
