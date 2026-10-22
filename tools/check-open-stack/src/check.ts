@@ -31,6 +31,7 @@ const FUNCTION_OF_TASK: Record<ExtensionTask, StackFunction> = {
   flf2v: 'transitions',
   'i2i-edit': 'photo',
   tts: 'avatar',
+  'a2a-vc': 'avatar',
   'ia2v-talk': 'avatar',
   t2a: 'music',
   'v2v-upscale': 'hd',

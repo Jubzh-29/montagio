@@ -1,0 +1,22 @@
+# Voice change (extension "avatar"): the speech of a clip said again in the voice of a sample,
+# words and delivery kept. The node is ChatterboxVC, from the same pinned and patched
+# wildminder/ComfyUI-Chatterbox pack as the avatar's voice, reading the same weight pack
+# (tts/chatterbox/resembleai-mtl-v3): the S3Gen decoder and the voice encoder.
+schema: montagio/extension-model@0.1
+id: chatterbox-vc
+name: Chatterbox VC (voice change)
+extension: avatar
+task: a2a-vc
+license: MIT
+weights: [chatterbox-s3gen, chatterbox-ve, chatterbox-conds]
+workflow: workflows/chatterbox-vc.api.json
+bindings:
+  # the speech to say again, mono FLAC as the app prepares it (30 s at most)
+  audio: { node: "1", field: audio }
+  # the voice to say it in: a sample given with its speaker's consent
+  voice: { node: "4", field: audio }
+output: { node: "3", kind: audio }
+limits: { max_duration_s: 30 }
+# GPU seconds for 30 s of speech on an RTX 4090, the model loading included: an estimate until a
+# GPU session measures it (the voice of the avatar takes 2.5 to 5 s warm on an L4)
+estimate_s: 15

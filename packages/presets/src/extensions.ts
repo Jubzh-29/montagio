@@ -347,6 +347,18 @@ export function adInstruction(style: AdStyle, withCharacter: boolean): string {
   return `${head} ${keep} Leave clear space at the top of the frame. Photorealistic, one coherent photo.`;
 }
 
+/** A voice change: the speech of a clip (mono FLAC) said again in the voice of a sample. */
+export function compileVoiceChange(
+  model: ExtensionModel,
+  template: ApiWorkflow,
+  inputs: { audioRef: string; voiceRef: string },
+): ExtensionCompiled<{ audioRef: string; voiceRef: string }> {
+  expectTask(model, 'a2a-vc');
+  if (!inputs.audioRef || !inputs.voiceRef) throw new CompileError('a voice change needs the speech and the voice sample');
+  const workflow = bindExtension(model, template, { audio: inputs.audioRef, voice: inputs.voiceRef });
+  return { workflow, output: { ...model.output }, params: { ...inputs } };
+}
+
 export type SpeechInputs = {
   /** What the avatar says. */
   text: string;

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { pickAspect, type Aspect } from '@montagio/presets';
-import { prepareMotionClip, prepareVoiceSample, probe } from '@montagio/sequence';
+import { prepareMotionClip, prepareSpeechVideo, prepareVoiceSample, probe } from '@montagio/sequence';
 import { imageSize } from 'image-size';
 import { MAX_VIDEO_BYTES, MAX_VOICE_BYTES } from '@/lib/limits';
 import { getEnv } from './env';
@@ -232,6 +232,76 @@ export async function readVoiceMeta(voiceRef: string): Promise<VoiceMeta | null>
   try {
     await access(join(voicesDir(), `${match[1]}.flac`));
     return JSON.parse(await readFile(join(voicesDir(), `${match[1]}.json`), 'utf8')) as VoiceMeta;
+  } catch {
+    return null;
+  }
+}
+
+/** A clip whose voice will change: the video kept (30 s at most) and its sound alone, the voice change's input. */
+export type SpeechMeta = { speechRef: string; audioRef: string; duration_s: number; width: number; height: number; aspect: Aspect };
+
+const speechDir = () => join(getEnv().data, 'uploads', 'speech');
+
+/** Keep a clip's first 30 s with its sound, and that sound as mono FLAC; a clip without sound is refused. */
+async function storeSpeech(source: string): Promise<SpeechMeta> {
+  const id = randomUUID();
+  const dir = speechDir();
+  await mkdir(dir, { recursive: true });
+  const video = join(dir, `${id}.mp4`);
+  const audio = join(dir, `${id}.flac`);
+  const metaFile = join(dir, `${id}.json`);
+  try {
+    let prepared: Awaited<ReturnType<typeof prepareSpeechVideo>>;
+    try {
+      prepared = await prepareSpeechVideo(source, video, audio);
+    } catch {
+      throw new UploadError(400, 'the file is not a readable video with sound');
+    }
+    if (!(prepared.duration_s >= 1)) throw new UploadError(400, 'a speech video lasts 1 s at least');
+    const meta: SpeechMeta = {
+      speechRef: `speech/${id}.mp4`,
+      audioRef: `speech/${id}.flac`,
+      duration_s: prepared.duration_s,
+      width: prepared.width,
+      height: prepared.height,
+      aspect: pickAspect(prepared.width, prepared.height),
+    };
+    await writeFile(metaFile, JSON.stringify(meta));
+    return meta;
+  } catch (error) {
+    await Promise.all([rm(video, { force: true }), rm(audio, { force: true }), rm(metaFile, { force: true })]);
+    throw error;
+  }
+}
+
+/** A video sent for a voice change (MP4, WebM or QuickTime, 50 MB at most). */
+export async function saveSpeechUpload(file: File): Promise<SpeechMeta> {
+  const ext = VIDEO_TYPES[file.type];
+  if (!ext) throw new UploadError(415, 'only MP4, WebM and QuickTime videos are accepted');
+  if (file.size > MAX_VIDEO_BYTES) throw new UploadError(413, 'videos are limited to 50 MB');
+  const dir = speechDir();
+  await mkdir(dir, { recursive: true });
+  const source = join(dir, `${randomUUID()}.source.${ext}`);
+  try {
+    await writeFile(source, new Uint8Array(await file.arrayBuffer()));
+    return await storeSpeech(source);
+  } finally {
+    await rm(source, { force: true });
+  }
+}
+
+/** A clip made here (an avatar) prepared the same way. */
+export function saveSpeechFromFile(path: string): Promise<SpeechMeta> {
+  return storeSpeech(path);
+}
+
+export async function readSpeechMeta(speechRef: string): Promise<SpeechMeta | null> {
+  const match = /^speech\/([0-9a-f-]{36})\.mp4$/.exec(speechRef);
+  if (!match) return null;
+  try {
+    await access(join(speechDir(), `${match[1]}.mp4`));
+    await access(join(speechDir(), `${match[1]}.flac`));
+    return JSON.parse(await readFile(join(speechDir(), `${match[1]}.json`), 'utf8')) as SpeechMeta;
   } catch {
     return null;
   }

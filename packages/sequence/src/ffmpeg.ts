@@ -367,6 +367,56 @@ export async function overlayImage(input: string, image: string, out: string): P
 }
 
 /**
+ * A clip whose speech will be said in another voice: its first `max_s` seconds (30 by default)
+ * as an H.264 and AAC MP4 without metadata, and its sound alone as mono FLAC at 24 kHz, the
+ * voice change's input. A file without a sound stream fails before any encoding; both are
+ * read and written as local files only.
+ */
+export async function prepareSpeechVideo(
+  input: string,
+  outVideo: string,
+  outAudio: string,
+  opts: { max_s?: number } = {},
+): Promise<{ duration_s: number; width: number; height: number }> {
+  const { max_s = 30 } = opts;
+  if (!(await probeAudio(input))) throw new SequenceToolError(`no audio stream in ${input}`);
+  await writeAtomically(outVideo, (partial) => [
+    '-loglevel', 'error', '-y',
+    ...LOCAL_FILE_ONLY, '-i', input,
+    '-map', '0:v:0', '-map', '0:a:0', '-map_metadata', '-1',
+    '-t', String(max_s),
+    '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p',
+    '-c:a', 'aac', '-b:a', '160k',
+    '-movflags', '+faststart',
+    '-f', 'mp4', partial,
+  ]);
+  await writeAtomically(outAudio, (partial) => [
+    '-loglevel', 'error', '-y',
+    ...LOCAL_FILE_ONLY, '-i', outVideo,
+    '-map', '0:a:0', '-vn', '-ac', '1', '-ar', '24000',
+    '-c:a', 'flac', '-f', 'flac', partial,
+  ]);
+  const { duration_s, width, height } = await probe(outVideo);
+  return { duration_s, width, height };
+}
+
+/** A clip with a new sound (a voice changed): the picture copied, the sound in AAC, the AI mention. */
+export async function replaceAudio(video: string, audio: string, out: string): Promise<void> {
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    ...LOCAL_FILE_ONLY, '-i', video,
+    ...LOCAL_FILE_ONLY, '-i', audio,
+    '-map', '0:v:0', '-map', '1:a:0',
+    '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k',
+    '-shortest',
+    ...metadataArgs(AI_METADATA),
+    '-movflags', '+faststart',
+    '-f', 'mp4', partial,
+  ]);
+}
+
+/**
  * A light copy of a clip for a looping gallery tile: `width` pixels wide and a
  * high CRF, so a dozen tiles cost the visitor a megabyte or two, not twenty.
  */

@@ -72,6 +72,7 @@ export function exploreTools(presets: readonly PresetSummary[], info: Extensions
     !showcase && { id: 'characters', href: '/characters', name: 'tabCharacters', description: 'exploreCharactersText', icon: '☺' },
     !showcase && has('edit') && has('music') && { id: 'ads', href: '/ads', name: 'tabAds', description: 'exploreAdsText', icon: '▶' },
     has('avatar') && { id: 'avatar', href: tabHref('avatar'), name: 'tabAvatar', description: 'exploreAvatarText', icon: '◉' },
+    !showcase && has('avatar') && Boolean(info?.estimates.voiceChange) && { id: 'voice', href: '/voice', name: 'tabVoice', description: 'exploreVoiceText', icon: '≈' },
     has('motion') && { id: 'motion', href: tabHref('motion'), name: 'tabMotion', description: 'exploreMotionText', icon: '⇄' },
     { id: 't2i', href: tabHref('camera'), name: 'exploreT2iName', description: 'exploreT2iText', icon: 'Aa' },
     has('edit') && { id: 'edit', href: tabHref('camera'), name: 'exploreEditName', description: 'exploreEditText', icon: '✎' },

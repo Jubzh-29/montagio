@@ -58,6 +58,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 | `seedvr2-upscale.api.json` | `templates/utility_seedvr2_3b_int8_upscale_video.json` | SeedVR2 3B int8 | node 76, MP4 |
 | `qwen-image-edit-2511.api.json` | `templates/image_qwen_image_edit_2511.json` | Qwen-Image-Edit-2511 fp8mixed | node 9, PNG |
 | `chatterbox-mtl-voice.api.json` | none (no official template: ComfyUI has no local text-to-speech node) | Chatterbox Multilingual V3 | node 3, FLAC |
+| `chatterbox-vc.api.json` | none (no official template: ComfyUI has no local voice conversion node) | Chatterbox VC (S3Gen) | node 3, FLAC |
 | `wan22-s2v-avatar.api.json` | `templates/video_wan2_2_14B_s2v.json` | Wan 2.2 S2V 14B fp8 | node 113, MP4 with the speech |
 | `wan21-i2v-effect.api.json` | `templates/image_to_video_wan.json` | Wan 2.1 I2V 14B 480p fp8, an effect LoRA | node 56, MP4 |
 | `wan22-flf2v-transition.api.json` | `templates/video_wan2_2_14B_flf2v.json` | Wan 2.2 I2V A14B fp8 (high and low noise) | node 61, MP4 |
@@ -93,6 +94,12 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 - The voice pack is the folder `models/tts/chatterbox/resembleai-mtl-v3` (`model_pack_name`), with `t3_mtl23ls_v3.safetensors`. `s3gen_v3.safetensors` is deliberately absent: the loader would prefer it, while the official V3 code pairs V3 with `s3gen`.
 - No `audio_prompt`: the built-in voice speaks (no cloned voice, and none left in the node's cache). `crash_protection_template` is empty (by default a text under 21 characters is wrapped in "hmm"); the watermark is off (`resemble-perth` is not installed).
 - The compiler writes `cfg_weight` 0 in French (the model card's advice when the voice is of another language) and 0.5 in English, removes square brackets (read as tags), and never sends seed 0 (random to this node).
+
+### chatterbox-vc
+
+- Written for Montagio: `ChatterboxVC` from the same pinned `wildminder/ComfyUI-Chatterbox` pack, between two core `LoadAudio` (node 1, the speech; node 4, the voice sample) and `SaveAudioAdvanced` in FLAC. The words and the delivery of the speech stay; only the voice changes, to the sample's.
+- It reads the `resembleai-mtl-v3` pack's S3Gen, voice encoder and conditionals already in the lock (no new weight), runs 10 flow steps with one refinement pass and cuts the speech into 30 s chunks at most (the app keeps 30 s). The watermark is off, as for the avatar's voice.
+- The app asks for the speaker's consent on the sample, and the rights on a video sent here; the clip comes back with the AI mention.
 
 ### wan22-s2v-avatar
 
@@ -136,6 +143,7 @@ Extension models (a binding with several inputs gets the same value in each):
 | `seedvr2-upscale` | video 73.file; width / height 57.resize_type.width / 57.resize_type.height; seed 54.seed | 76 (video) |
 | `qwen-image-edit-2511` | image 41.image; image2 42.image; prompt 151.prompt; seed 169.seed | 9 (image) |
 | `chatterbox-mtl-voice` | text 2.text; language 2.language; seed 2.seed; cfg 2.cfg_weight | 3 (audio) |
+| `chatterbox-vc` | audio 1.audio; voice 4.audio | 3 (audio) |
 | `wan22-s2v-avatar` | image 52.image; audio 58.audio; prompt 6.text; seed 3.seed (+1, +2 on the extension samplers); width / height 93.width / 93.height; frames 96.length | 113 (video) |
 | `wan21-i2v-effects` | image 52.image; prompt 6.text; negative 7.text; seed 3.seed; width / height / frames 50.width / height / length; lora 200.lora_name; lora_strength 200.strength_model | 56 (video) |
 | `wan22-flf2v-transition` | image 68.image; end_image 62.image; prompt 6.text; negative 7.text; seed 57.noise_seed; width / height / frames 67.width / height / length | 61 (video) |

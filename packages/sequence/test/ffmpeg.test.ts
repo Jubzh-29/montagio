@@ -19,10 +19,12 @@ import {
   PLACEHOLDER_METADATA,
   posterFrame,
   prepareMotionClip,
+  prepareSpeechVideo,
   previewClip,
   probe,
   probeAudio,
   readTags,
+  replaceAudio,
   SequenceToolError,
   SHOWCASE_COLOUR,
   SHOWCASE_X264,
@@ -382,5 +384,34 @@ test('an image laid over a 9:16 clip keeps its size, its sound and the AI mentio
   await overlayImage(vertical, png, out);
   expect(await probe(out)).toMatchObject({ width: 720, height: 1280 });
   expect(await probeAudio(out)).not.toBeNull();
+  expect((await readTags(out)).comment).toBe(AI_METADATA.comment);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('a speech clip keeps 30 s of picture and sound, and its sound alone as mono FLAC at 24 kHz', async () => {
+  const talk = join(dir, 'talk.mp4');
+  execFileSync('ffmpeg', [
+    '-loglevel', 'error', '-y',
+    '-f', 'lavfi', '-i', 'testsrc=size=640x360:rate=16', '-f', 'lavfi', '-i', 'sine=frequency=200',
+    '-t', '3', '-pix_fmt', 'yuv420p', '-shortest', talk,
+  ]);
+  const video = join(dir, 'speech.mp4');
+  const audio = join(dir, 'speech.flac');
+  const kept = await prepareSpeechVideo(talk, video, audio, { max_s: 2 });
+  expect(kept).toMatchObject({ width: 640, height: 360 });
+  expect(kept.duration_s).toBeCloseTo(2, 0);
+  expect(await probeAudio(video)).not.toBeNull();
+  const flac = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name,channels,sample_rate', '-of', 'csv=p=0', audio]).toString().trim();
+  expect(flac).toBe('flac,24000,1');
+  await expect(prepareSpeechVideo(clipA, join(dir, 'silent.mp4'), join(dir, 'silent.flac'))).rejects.toThrow(SequenceToolError);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('a new sound under a clip keeps the picture and carries the AI mention', async () => {
+  const voice = join(dir, 'voice-24k.flac');
+  const out = join(dir, 'revoiced.mp4');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=300:duration=2:sample_rate=24000', '-ac', '1', voice]);
+  await replaceAudio(clipA, voice, out);
+  const streams = streamsOf(out);
+  expect(streams.video).not.toBeNull();
+  expect(streams.audio).not.toBeNull();
   expect((await readTags(out)).comment).toBe(AI_METADATA.comment);
 }, FFMPEG_TEST_TIMEOUT_MS);

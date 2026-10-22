@@ -9,6 +9,7 @@ import { motionTask } from './motion';
 import { musicTask } from './music';
 import { t2iTask } from './t2i';
 import { upscaleTask } from './upscale';
+import { voiceChangeTask } from './voice-change';
 
 /** The tasks the job engine runs; each lot adds its own. */
 export const TASKS: Partial<Record<JobTask, TaskDef>> = {
@@ -22,4 +23,5 @@ export const TASKS: Partial<Record<JobTask, TaskDef>> = {
   'image-upscale': imageUpscaleTask,
   motion: motionTask,
   ad: adTask,
+  'voice-change': voiceChangeTask,
 };

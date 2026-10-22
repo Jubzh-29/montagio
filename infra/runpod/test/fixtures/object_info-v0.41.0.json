@@ -4787,5 +4787,176 @@
   ],
   "name": "ImageToMask",
   "python_module": "comfy_extras.nodes_mask"
+ },
+ "ChatterboxVC": {
+  "input": {
+   "required": {
+    "model_pack_name": [
+     "COMBO",
+     {
+      "default": "resembleai-mtl-v3",
+      "multiselect": false,
+      "options": [
+       "resembleai-mtl-v3"
+      ]
+     }
+    ],
+    "source_audio": [
+     "AUDIO",
+     {}
+    ],
+    "n_timesteps": [
+     "INT",
+     {
+      "default": 10,
+      "min": 2,
+      "max": 50,
+      "step": 1
+     }
+    ],
+    "temperature": [
+     "FLOAT",
+     {
+      "default": 1.0,
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.05
+     }
+    ],
+    "flow_cfg_scale": [
+     "FLOAT",
+     {
+      "default": 0.7,
+      "min": 0.0,
+      "max": 2.0,
+      "step": 0.05
+     }
+    ],
+    "use_watermark": [
+     "BOOLEAN",
+     {
+      "default": false
+     }
+    ],
+    "device": [
+     "COMBO",
+     {
+      "default": "default",
+      "multiselect": false,
+      "options": [
+       "default",
+       "cpu",
+       "auto"
+      ]
+     }
+    ],
+    "dtype": [
+     "COMBO",
+     {
+      "default": "auto",
+      "multiselect": false,
+      "options": [
+       "auto",
+       "bf16",
+       "fp16",
+       "fp32"
+      ]
+     }
+    ],
+    "attention_mode": [
+     "COMBO",
+     {
+      "default": "sdpa",
+      "multiselect": false,
+      "options": [
+       "eager",
+       "sdpa"
+      ]
+     }
+    ],
+    "refinement_passes": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1,
+      "max": 30,
+      "step": 1
+     }
+    ],
+    "max_chunk_duration": [
+     "FLOAT",
+     {
+      "default": 30.0,
+      "min": 0.0,
+      "max": 300.0,
+      "step": 5.0
+     }
+    ],
+    "chunk_method": [
+     "COMBO",
+     {
+      "default": "smart",
+      "multiselect": false,
+      "options": [
+       "smart",
+       "fixed"
+      ]
+     }
+    ]
+   },
+   "optional": {
+    "target_voice_audio": [
+     "AUDIO",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model_pack_name",
+    "source_audio",
+    "n_timesteps",
+    "temperature",
+    "flow_cfg_scale",
+    "use_watermark",
+    "device",
+    "dtype",
+    "attention_mode",
+    "refinement_passes",
+    "max_chunk_duration",
+    "chunk_method"
+   ],
+   "optional": [
+    "target_voice_audio"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "AUDIO"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "converted_audio"
+  ],
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "ChatterboxVC",
+  "display_name": "Chatterbox Voice Conversion 🗣️",
+  "description": "Convert recorded speech into a Chatterbox voice while keeping the words and the delivery.",
+  "python_module": "custom_nodes.ComfyUI-Chatterbox",
+  "category": "WMNodes/sound/vc",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
  }
 }

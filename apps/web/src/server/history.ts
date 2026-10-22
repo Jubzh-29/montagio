@@ -206,6 +206,9 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
         },
       };
     }
+    case 'voice-change':
+      // A clip in another voice: Reuse goes back to the Avatar tab.
+      return { ...base, kind: 'clip', task: 'voice-change', reprise: { tab: 'avatar' } };
     case 'ad':
       // A ready-to-post ad: Reuse goes back to the Effects wall with its effect chosen.
       return { ...base, kind: 'clip', task: 'ad', reprise: { tab: 'effects', effectId: String(record.inputs.effectId) } };

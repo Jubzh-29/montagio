@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { AD_STYLES, adInstruction, AVATAR_DEFAULT_PROMPT, compileAvatar, compileCompose, compileEdit, composeInstruction, compileImageUpscale, compileMusic, compileSpeech, compileUpscale, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
+import { AD_STYLES, adInstruction, AVATAR_DEFAULT_PROMPT, compileAvatar, compileCompose, compileEdit, composeInstruction, compileImageUpscale, compileMusic, compileSpeech, compileUpscale, compileVoiceChange, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -288,6 +288,29 @@ describe('compileEdit (Qwen-Image-Edit-2511)', () => {
       'index_timestep_zero',
       'index_timestep_zero',
     ]);
+  });
+});
+
+describe('compileVoiceChange (Chatterbox VC)', () => {
+  const vc = () => extension('chatterbox-vc');
+
+  test('the speech and the voice sample go to their own loaders, the audio comes out of the saver', () => {
+    const { workflow, output } = compileVoiceChange(vc().model, vc().template, { audioRef: 'speech.flac', voiceRef: 'voice.flac' });
+    expect(workflow['1']!.inputs.audio).toBe('speech.flac');
+    expect(workflow['4']!.inputs.audio).toBe('voice.flac');
+    expect(workflow['2']!.class_type).toBe('ChatterboxVC');
+    expect(workflow['2']!.inputs).toMatchObject({ source_audio: ['1', 0], target_voice_audio: ['4', 0], use_watermark: false });
+    expect(output).toEqual({ node: '3', kind: 'audio' });
+  });
+
+  test('without the speech or the sample it is a CompileError', () => {
+    expect(() => compileVoiceChange(vc().model, vc().template, { audioRef: '', voiceRef: 'voice.flac' })).toThrow(CompileError);
+    expect(() => compileVoiceChange(vc().model, vc().template, { audioRef: 'speech.flac', voiceRef: '' })).toThrow(CompileError);
+  });
+
+  test('a model of another task is refused', () => {
+    const voice = extension('chatterbox-mtl-voice');
+    expect(() => compileVoiceChange(voice.model, voice.template, { audioRef: 'a.flac', voiceRef: 'b.flac' })).toThrow(CompileError);
   });
 });
 

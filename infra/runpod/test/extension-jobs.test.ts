@@ -14,7 +14,7 @@ beforeAll(async () => {
 
 const base = { language: 'en' as const, duration_s: 10, seed: 7, aspect: '16:9' as const };
 
-const files = { input: '/data/photo.png', input2: '/data/outfit.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const };
+const files = { input: '/data/photo.png', input2: '/data/outfit.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, voice: '/data/voice.flac', motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const };
 
 test('one job per extension, in the order of the session, each accepted by ComfyUI v0.41.0 once its files are uploaded', () => {
   const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
@@ -23,11 +23,12 @@ test('one job per extension, in the order of the session, each accepted by Comfy
     ['effect:squish', 'wan21-i2v-effects'],
     ['hook-edit:wardrobe-swap', 'qwen-image-edit-2511'],
     ['transition:wardrobe-swap', 'wan22-flf2v-transition'],
-    ['voice', 'chatterbox-mtl-voice'],
+    ['voice:cloned', 'chatterbox-mtl-voice'],
     ['avatar', 'wan22-s2v-avatar'],
     ['music', 'ace-step15-music'],
     ['upscale', 'seedvr2-upscale'],
     ['upscale-image', 'seedvr2-image-upscale'],
+    ['voice-change', 'chatterbox-vc'],
     ['motion', 'wan-animate2-motion'],
   ]);
   for (const job of jobs) {
@@ -40,7 +41,12 @@ test('each job uploads the files it reads and nothing else', () => {
   const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
   const uploads = Object.fromEntries(jobs.map((job) => [job.name, job.files]));
   expect(uploads.music).toEqual([]);
-  expect(uploads.voice).toEqual([]);
+  // with --voice, the voice speaks with the sample
+  expect(uploads.voice).toEqual([{ node: '4', field: 'audio', path: '/data/voice.flac' }]);
+  expect(uploads['voice-change']).toEqual([
+    { node: '1', field: 'audio', path: '/data/speech.flac' },
+    { node: '4', field: 'audio', path: '/data/voice.flac' },
+  ]);
   expect(uploads.upscale).toEqual([{ node: '73', field: 'file', path: '/data/clip.mp4' }]);
   expect(uploads['upscale-image']).toEqual([{ node: '41', field: 'image', path: '/data/photo.png' }]);
   expect(uploads.motion).toEqual([
@@ -76,6 +82,7 @@ test('an extension record carries the sha256 of its photo', () => {
     music: null,
     upscale: null,
     'upscale-image': '/data/photo.png',
+    'voice-change': null,
     motion: '/data/photo.png',
   });
 });

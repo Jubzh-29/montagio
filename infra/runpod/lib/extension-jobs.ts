@@ -14,6 +14,7 @@ import {
   compileSpeech,
   compileImageUpscale,
   compileUpscale,
+  compileVoiceChange,
   EDIT_LOOK_IDS,
   type ApiWorkflow,
   type Aspect,
@@ -26,7 +27,7 @@ import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } f
  * added on 2026-10-20, last): a hook's edit comes before its transition, the voice before the
  * avatar that speaks it.
  */
-export const EXTENSION_JOBS = ['edit', 'effect', 'hook-edit', 'transition', 'voice', 'avatar', 'music', 'upscale', 'upscale-image', 'motion'] as const;
+export const EXTENSION_JOBS = ['edit', 'effect', 'hook-edit', 'transition', 'voice', 'avatar', 'music', 'upscale', 'upscale-image', 'voice-change', 'motion'] as const;
 export type ExtensionJobName = (typeof EXTENSION_JOBS)[number];
 
 const TASKS: Record<ExtensionJobName, ExtensionTask> = {
@@ -39,6 +40,7 @@ const TASKS: Record<ExtensionJobName, ExtensionTask> = {
   music: 't2a',
   upscale: 'v2v-upscale',
   'upscale-image': 'i2i-upscale',
+  'voice-change': 'a2a-vc',
   motion: 'motion-transfer',
 };
 
@@ -240,6 +242,12 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
         if (opts.clipAspect === undefined || opts.clipFrames === undefined) throw new Error('the upscale job needs the aspect and the frame count of its clip');
         const job = compileUpscale(model, template, { videoRef: basename(clip), aspect: opts.clipAspect, frames: opts.clipFrames, seed: opts.seed });
         return [{ name, tag: name, model, ...job, files: [file('video', clip)] }];
+      }
+      case 'voice-change': {
+        const speech = need(opts.audio, '--audio', name);
+        const sample = need(opts.voice, '--voice', name);
+        const job = compileVoiceChange(model, template, { audioRef: basename(speech), voiceRef: basename(sample) });
+        return [{ name, tag: name, model, ...job, files: [file('audio', speech), file('voice', sample)] }];
       }
       case 'upscale-image': {
         const photo = need(opts.input, '--input', name);

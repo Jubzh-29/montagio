@@ -5,6 +5,7 @@ Files the `demo` backend (`MONTAGIO_BACKEND=demo`, no GPU) hands out instead of 
 | File | What it is | Made with |
 |---|---|---|
 | `clips/<preset>.mp4`, `clips/_default.mp4` | the clip of a camera move or an effect | pre-rendered placeholders |
+| `clips/avatar.mp4` | the clip of an avatar, with sound like the real one (so a voice change can start from it) | `ffmpeg -i clips/_default.mp4 -i audio/_default.flac -map 0:v -map 1:a -c:v copy -c:a aac -b:a 64k -shortest -map_metadata -1 clips/avatar.mp4` |
 | `images/_default.png` | the image of a text-to-image or edit job | `ffmpeg -f lavfi -i "gradients=s=1280x720:c0=0x1d2b3a:c1=0x6b3a2a:x0=0:y0=0:x1=1280:y1=720:speed=0" -frames:v 1 _default.png` |
 | `audio/_default.flac` | the sound of a music or voice job | `ffmpeg -f lavfi -i "sine=frequency=440:duration=5:sample_rate=24000" -ac 1 -c:a flac _default.flac` |
 | `images/sample-16x9.png` | the sample photo of the Studio: a fishing harbour at golden hour, the showcase's `landscape-a` (the camera previews show it), 1280×720, tagged AI-generated | Z-Image-Turbo (Apache-2.0), seed 42, from the prompt in `showcase/manifest.yaml`; a fictional scene, no real person |

@@ -15,6 +15,11 @@ export function uploadPath(imageRef: string): string {
   return join(getEnv().data, ...imageRef.split('/'));
 }
 
+/** The file behind a speech clip's ref ("speech/<id>.mp4" or its sound "speech/<id>.flac"), under MONTAGIO_DATA/uploads. */
+export function speechPath(ref: string): string {
+  return join(getEnv().data, 'uploads', ...ref.split('/'));
+}
+
 /** The file behind a voice sample's voiceRef ("voices/<id>.flac"), under MONTAGIO_DATA/uploads. */
 export function voicePath(voiceRef: string): string {
   return join(getEnv().data, 'uploads', ...voiceRef.split('/'));

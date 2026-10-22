@@ -1376,6 +1376,11 @@ export function Studio() {
                     {t('openInComfy')}
                     <span className={styles.fileTag}>.json</span>
                   </a>
+                  {!IS_SHOWCASE && tracked.record.task === 'avatar' && extensions?.estimates.voiceChange !== undefined && (
+                    <a className={styles.buttonSecondary} href={`/voice?from=${encodeURIComponent(tracked.record.id)}`}>
+                      {t('avatarChangeVoice')}
+                    </a>
+                  )}
                 </div>
               )}
               {!IS_SHOWCASE &&

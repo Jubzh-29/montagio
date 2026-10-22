@@ -15,7 +15,9 @@
  * ImageToMask and ImageCompositeMasked (the edit's inpaint) come from the same ComfyUI on
  * 2026-10-22; LoadImage lists mask.png, the placeholder of the inpaint mask, and LoadAudio
  * voice.flac, the placeholder of the avatar's voice sample; start3.png is the third image of a
- * composed start photo (2026-10-22).
+ * composed start photo (2026-10-22). ChatterboxVC (the voice change) is written from its pinned
+ * source (nodes/vc_node.py and nodes/common.py at 4597af8f) with the runtime widgets of the captured
+ * ChatterboxMTLTTS, until the next GPU session captures it.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -220,7 +222,7 @@ test('every class of the fixture comes from the core of ComfyUI or from the Mont
     const origin =
       name === 'MontagioCameraEmbedding'
         ? 'custom_nodes.montagio'
-        : name === 'ChatterboxMTLTTS'
+        : name.startsWith('Chatterbox')
           ? 'custom_nodes.ComfyUI-Chatterbox'
           : /^(nodes|comfy_extras\.[a-z0-9_]+)$/;
     expect({ name, module: spec.python_module }).toEqual({ name, module: expect.stringMatching(origin) });
