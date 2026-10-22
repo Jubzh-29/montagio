@@ -37,6 +37,12 @@ export type UploadResult = {
 
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled';
 
+/**
+ * A demo render (no GPU): the clip a GPU session made of the same sample photo, or the photo
+ * moved by FFmpeg. Absent for a model's render.
+ */
+export type DemoKind = 'example' | 'moved';
+
 export type GenerationRecord = {
   id: string;
   presetId: string;
@@ -52,6 +58,7 @@ export type GenerationRecord = {
   workflowUrl?: string;
   /** A showcase clip whose camera move FFmpeg simulated, waiting for the GPU session. */
   placeholder?: boolean;
+  demo?: DemoKind;
 };
 
 /** What a model makes, in the order of the Open Stack page (as @montagio/check-open-stack lists them). */
@@ -230,6 +237,7 @@ export type JobSummary = {
   verticalUrl?: string;
   /** Showcase: an example still waiting for the GPU session. */
   placeholder?: boolean;
+  demo?: DemoKind;
   createdAt: string;
 };
 

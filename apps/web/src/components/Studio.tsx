@@ -1317,7 +1317,9 @@ export function Studio() {
               {IS_SHOWCASE && succeeded && !succeeded.placeholder && (resultModel ?? showcase?.model) && (
                 <AiCaption text="showcaseCaption" testId="result-caption" model={(resultModel ?? showcase?.model)!} />
               )}
-              {!IS_SHOWCASE && succeeded && resultModel && <AiCaption model={resultModel} />}
+              {!IS_SHOWCASE && succeeded && resultModel && (
+                <AiCaption model={resultModel} demoKind={tracked?.kind === 'sequence' ? undefined : tracked?.record.demo} />
+              )}
               {succeeded && tracked?.kind === 'job' && tracked.record.task === 'motion' && (
                 <p className={styles.caption} data-testid="motion-no-sound">
                   {t('motionNoSound')}

@@ -25,6 +25,12 @@ export const PLACEHOLDER_METADATA = {
   description: 'Placeholder: the camera move is simulated by FFmpeg from the sample photo; it is not a model output.',
 } as const;
 
+/** What a clip of the demo backend says when FFmpeg moved the photo: no model made it. */
+export const DEMO_MOVE_METADATA = {
+  comment: 'Montagio demo render',
+  description: 'Demo render: the photo is moved by FFmpeg along the preset; no model made this clip.',
+} as const;
+
 /** Drop the source's tags (a pod path, an encoder string) and write `tags` as standard MP4 tags. */
 export function metadataArgs(tags: VideoTags): string[] {
   return ['-map_metadata', '-1', ...Object.entries(tags).flatMap(([key, value]) => ['-metadata', `${key}=${value}`])];

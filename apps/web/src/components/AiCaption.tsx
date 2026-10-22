@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useI18n } from '@/i18n';
 import { IS_SHOWCASE } from '@/lib/api';
+import type { DemoKind } from '@/lib/api-types';
 import { useExtensions } from '@/lib/use-extensions';
 import { stackHref } from '@/lib/open-stack';
 import styles from './studio.module.css';
@@ -20,6 +21,7 @@ export function AiCaption({
   testId = 'ai-caption',
   as: Tag = 'p',
   prefix,
+  demoKind,
 }: {
   /** Without an id (an unknown model), the name is plain text. */
   model: { id?: string; name: string; license: string };
@@ -28,11 +30,23 @@ export function AiCaption({
   /** A figure's caption, styled by its figure. */
   as?: 'p' | 'figcaption';
   prefix?: string;
+  /** What a demo result is: the GPU render of the same sample photo, or the photo moved by FFmpeg. */
+  demoKind?: DemoKind;
 }) {
   const { t } = useI18n();
   // Without a GPU (the demo backend) no model made the result: the caption says what would make it.
   const demo = useExtensions()?.demo === true && !IS_SHOWCASE;
-  const [before, after = ''] = t(demo && text === 'aiCaption' ? 'demoCaption' : text, { license: model.license }).split('{model}');
+  const key =
+    text !== 'aiCaption'
+      ? text
+      : demoKind === 'example'
+        ? 'demoExampleCaption'
+        : demoKind === 'moved'
+          ? 'demoMovedCaption'
+          : demo
+            ? 'demoCaption'
+            : text;
+  const [before, after = ''] = t(key, { license: model.license }).split('{model}');
   return (
     <Tag className={Tag === 'p' ? styles.caption : undefined} data-testid={testId}>
       {prefix}

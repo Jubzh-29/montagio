@@ -15,6 +15,8 @@ export function setupTempData(): () => string {
     process.env.MONTAGIO_DATA = dir;
     process.env.MONTAGIO_BACKEND = 'demo';
     process.env.MONTAGIO_DEMO_DURATION_MS = '60000';
+    // The pre-rendered files of demo-assets/, not a render of each test photo (demo-render.test.ts turns it on).
+    process.env.MONTAGIO_DEMO_RENDER = 'off';
     resetServicesForTests();
   });
   // Retries: on Windows a clip FFmpeg just closed can stay locked for a moment.

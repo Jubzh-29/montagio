@@ -172,6 +172,8 @@
   "choiceCamera": "Camera move · {s} s",
   "aiCaption": "AI-generated · {model} ({license})",
   "demoCaption": "Demo render: no model ran here. With a GPU, {model} ({license}) makes it.",
+  "demoExampleCaption": "Demo render: no model ran here. On a GPU, {model} ({license}) made this clip of the same sample photo · AI-generated",
+  "demoMovedCaption": "Demo render: FFmpeg moves the photo, no model ran here. With a GPU, {model} ({license}) makes it.",
   "errorBlockedName": "This text names a well-known person. Montagio does not make images of real people without their consent.",
   "errorConsentRequired": "Tick the box to confirm you are the person in this photo, or that you have their consent.",
   "errorExtensionDisabled": "This feature is not available on this installation.",
