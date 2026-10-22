@@ -94,6 +94,7 @@
   "stackMotion": "Motion transfer",
   "weightSource": "Source repository, where the licence was read: {url}",
   "sizeGb": "{size} GB",
+  "sizeMb": "{size} MB",
   "modelCol": "Model",
   "licenseCol": "License",
   "weightsCol": "Weights",

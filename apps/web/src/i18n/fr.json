@@ -94,6 +94,7 @@
   "stackMotion": "Transfert de mouvement",
   "weightSource": "Dépôt d’origine, où la licence a été lue : {url}",
   "sizeGb": "{size} Go",
+  "sizeMb": "{size} Mo",
   "modelCol": "Modèle",
   "licenseCol": "Licence",
   "weightsCol": "Poids",

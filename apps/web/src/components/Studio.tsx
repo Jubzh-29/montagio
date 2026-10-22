@@ -1041,8 +1041,6 @@ export function Studio() {
                     ? t('motionKind', { s: Math.round(motionVideo.duration_s * 10) / 10 })
                     : t('motionKindEmpty')
                 }
-                previewUrl={extensions?.examples?.motion?.previewUrl}
-                posterUrl={extensions?.examples?.motion?.posterUrl}
                 icon="motion"
                 paused={motionPaused}
               />
@@ -1050,8 +1048,6 @@ export function Studio() {
               <ChoiceCard
                 name={t('tabAvatar')}
                 kindLabel={speechSeconds > 0 ? t('avatarKind', { s: speechSeconds }) : t('avatarKindEmpty')}
-                previewUrl={extensions?.examples?.avatar?.previewUrl}
-                posterUrl={extensions?.examples?.avatar?.posterUrl}
                 icon="avatar"
                 paused={motionPaused}
               />
