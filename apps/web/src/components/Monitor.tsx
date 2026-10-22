@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type CSSProperties, type DragEvent, type RefObject } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type RefObject } from 'react';
 import { useI18n } from '@/i18n';
 import type { JobState, SampleSummary } from '@/lib/api-types';
 import { photoTarget } from '@/lib/move-glyph';
@@ -28,7 +28,6 @@ export function Monitor({
   upload,
   generation,
   onFile,
-  onSample,
   onCancel,
   onRetry,
   statusLabel,
@@ -37,12 +36,13 @@ export function Monitor({
   announcement,
   statusRef,
   autoPlayResult = true,
+  example,
+  examplePaused = false,
   showcase,
 }: {
   upload: UploadState;
   generation: GenerationState;
   onFile: (file: File) => void;
-  onSample: () => void;
   onCancel: () => void;
   onRetry: () => void;
   /** Replaces the default running text, e.g. "Shot 2/3 — 40%". */
@@ -57,6 +57,10 @@ export function Monitor({
   statusRef?: RefObject<HTMLDivElement | null>;
   /** Off for a clip the visitor did not ask for while the previews are paused (reduced motion). */
   autoPlayResult?: boolean;
+  /** A tab without a wall (Avatar, Motion): a render of what it makes, looping behind the empty monitor. */
+  example?: { previewUrl: string; posterUrl?: string };
+  /** The previews are paused (the toggle, or reduced motion): the example too. */
+  examplePaused?: boolean;
   /**
    * The showcase: sample photos replace the drop zone. Unless it takes uploads (its
    * `uploads` capability, off in the static showcase), a dropped file is answered
@@ -76,6 +80,13 @@ export function Monitor({
   // The photo's own shape, so the target frame sits on the picture and not on its pillarbox.
   const [photoAspect, setPhotoAspect] = useState(16 / 9);
   const localUrl = upload.status === 'idle' ? undefined : upload.localUrl;
+  const exampleVideo = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const element = exampleVideo.current;
+    if (!element) return;
+    if (examplePaused) element.pause();
+    else element.play().catch(() => undefined);
+  }, [examplePaused, example?.previewUrl, localUrl]);
   const record = generation.status === 'tracking' ? generation.record : undefined;
   const rendering =
     generation.status === 'submitting' || (record !== undefined && (record.state === 'queued' || record.state === 'running'));
@@ -130,7 +141,21 @@ export function Monitor({
         />
       ) : (
         <>
-          {move && <MoveGlyph variant="monitor" poses={move.poses} speed={move.speed} replay={move.id} />}
+          {example ? (
+            <video
+              ref={exampleVideo}
+              className={styles.monitorExample}
+              src={example.previewUrl}
+              poster={example.posterUrl}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              aria-hidden="true"
+            />
+          ) : (
+            move && <MoveGlyph variant="monitor" poses={move.poses} speed={move.speed} replay={move.id} />
+          )}
           {showcase ? (
             <div className={styles.monitorEmpty}>
               {/* The sample photos are in the composer, beside the photo slot. */}
@@ -142,19 +167,13 @@ export function Monitor({
               )}
             </div>
           ) : (
+            // One place to add a photo, the composer's: the monitor says where it is (a drop here still works).
             <div className={styles.monitorEmpty}>
               <p className={styles.monitorEmptyTitle}>{t('monitorEmpty')}</p>
               <p className={styles.monitorEmptyHint}>{t('monitorEmptyHint')}</p>
-              <div className={styles.emptyActions}>
-                <label htmlFor="photo-input" className={styles.buttonSecondary}>
-                  {t('choosePhoto')}
-                </label>
-                <button type="button" className={styles.buttonLink} onClick={onSample}>
-                  {t('useSample')}
-                </button>
-              </div>
             </div>
           )}
+          {example && <p className={styles.exampleCaption}>{t('exampleCaption')}</p>}
         </>
       )}
 

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 const root = join(__dirname, '..', '..', '..');
 
 test('every gallery preview has its still beside it, which says it is AI-generated', () => {
-  const clips = ['presets/previews', 'presets/effects/previews', 'presets/transitions/previews'].flatMap((folder) =>
+  const clips = ['presets/previews', 'presets/effects/previews', 'presets/transitions/previews', 'presets/extensions/previews'].flatMap((folder) =>
     readdirSync(join(root, folder))
       .filter((file) => file.endsWith('.mp4'))
       .map((file) => join(root, folder, file)),

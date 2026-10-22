@@ -42,7 +42,7 @@ export function ChoiceCard({
   }, [paused, previewUrl]);
 
   return (
-    <section className={styles.choiceCard} aria-labelledby="choice-name">
+    <section className={styles.choiceCard} aria-labelledby="choice-name" data-testid="choice-card">
       <div className={styles.choiceMedia} data-icon={icon}>
         {previewUrl ? (
           <video ref={video} className={styles.choiceVideo} src={previewUrl} poster={posterUrl} loop muted playsInline preload="metadata" aria-hidden="true" />

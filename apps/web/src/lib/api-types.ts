@@ -171,6 +171,8 @@ export type ExtensionsInfo = {
   upscaleModel?: { id: string; name: string; license: string; maxFrames: number };
   /** The motion transfer model, for the caption under its clip. */
   motionModel?: { id: string; name: string; license: string };
+  /** A render of what Avatar and Motion make, looping in their card and on their empty monitor. */
+  examples?: Partial<Record<'avatar' | 'motion', { previewUrl: string; posterUrl?: string }>>;
 };
 
 export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'motion';

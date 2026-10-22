@@ -6,7 +6,7 @@ const sampleImage = resolve(__dirname, '../../../demo-assets/images/sample-16x9.
 const CAMERA = '/?tab=camera';
 // A camera move waits for what the photo shows: an uploaded photo comes without it.
 const scene = (page: Page) => page.getByRole('textbox', { name: 'What the photo shows', exact: true });
-const describePhoto = (page: Page) => scene(page).fill('a television test card with colour bars');
+const describePhoto = (page: Page) => scene(page).fill('a fishing harbour at golden hour');
 
 test('studio happy path in demo mode', async ({ page }) => {
   await page.goto(CAMERA);
@@ -102,11 +102,11 @@ test('the caption under a clip links to its model on the open stack page', async
 test('a sample photo lets a visitor try without their own image, described already', async ({ page }) => {
   await page.goto(CAMERA);
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
-  await expect(scene(page)).toHaveValue(/^a television test card/);
+  await expect(scene(page)).toHaveValue(/^a quiet fishing harbour/);
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeEnabled();
   const body = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/api/generations'));
   await page.getByRole('button', { name: /^Generate/ }).click();
-  expect(((await body).postDataJSON() as { userPrompt?: string }).userPrompt).toMatch(/^a television test card/);
+  expect(((await body).postDataJSON() as { userPrompt?: string }).userPrompt).toMatch(/^a quiet fishing harbour/);
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
 });
 

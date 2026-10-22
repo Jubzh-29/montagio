@@ -4,7 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 const sampleImage = resolve(__dirname, '../../../demo-assets/images/sample-16x9.png');
 // A film's moves wait for what the photo shows, like a single move: an uploaded photo comes without it.
 const scene = (page: Page) => page.getByRole('textbox', { name: 'What the photo shows', exact: true });
-const describePhoto = (page: Page) => scene(page).fill('a television test card with colour bars');
+const describePhoto = (page: Page) => scene(page).fill('a fishing harbour at golden hour');
 
 test('sequence happy path: three moves, one film, a 9:16 cut', async ({ page }) => {
   test.setTimeout(90_000);

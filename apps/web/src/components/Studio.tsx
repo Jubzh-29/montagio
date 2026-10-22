@@ -945,14 +945,22 @@ export function Studio() {
             tab === 'motion' ? (
               <ChoiceCard
                 name={t('tabMotion')}
-                kindLabel={t('motionKind', { s: motionVideo.status === 'ready' && motionVideo.duration_s !== undefined ? Math.round(motionVideo.duration_s * 10) / 10 : 5 })}
+                kindLabel={
+                  motionVideo.status === 'ready' && motionVideo.duration_s !== undefined
+                    ? t('motionKind', { s: Math.round(motionVideo.duration_s * 10) / 10 })
+                    : t('motionKindEmpty')
+                }
+                previewUrl={extensions?.examples?.motion?.previewUrl}
+                posterUrl={extensions?.examples?.motion?.posterUrl}
                 icon="motion"
                 paused={motionPaused}
               />
             ) : tab === 'avatar' ? (
               <ChoiceCard
                 name={t('tabAvatar')}
-                kindLabel={speechSeconds > 0 ? t('avatarKind', { s: speechSeconds }) : t('tabAvatar')}
+                kindLabel={speechSeconds > 0 ? t('avatarKind', { s: speechSeconds }) : t('avatarKindEmpty')}
+                previewUrl={extensions?.examples?.avatar?.previewUrl}
+                posterUrl={extensions?.examples?.avatar?.posterUrl}
                 icon="avatar"
                 paused={motionPaused}
               />
@@ -1217,8 +1225,9 @@ export function Studio() {
                 stepImageUrl={tracked?.kind === 'job' ? tracked.record.stepImageUrl : undefined}
                 autoPlayResult={!(motionPaused && view?.id === arrivalId)}
                 onFile={onFile}
-                onSample={() => void loadSample()}
                 onCancel={cancel}
+                example={tab === 'avatar' || tab === 'motion' ? extensions?.examples?.[tab] : undefined}
+                examplePaused={motionPaused}
                 onRetry={() => setJob({ status: 'idle' })}
                 statusLabel={statusLabel}
                 showcase={

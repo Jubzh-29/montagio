@@ -33,10 +33,10 @@ function baseFor(prefix: string | undefined): string | null {
 export async function GET(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const [prefix, ...rest] = (await params).path;
   let base = baseFor(prefix);
-  // Preset previews are addressed as /media/presets/previews/<file>; those of the effects
-  // and the hooks as /media/presets/effects/previews/<file> and /media/presets/transitions/previews/<file>.
+  // Preset previews are addressed as /media/presets/previews/<file>; those of the effects, the hooks
+  // and the extensions' examples as /media/presets/{effects,transitions,extensions}/previews/<file>.
   if (prefix === 'presets') {
-    const kind = rest[0] === 'effects' || rest[0] === 'transitions' ? rest.shift() : undefined;
+    const kind = rest[0] === 'effects' || rest[0] === 'transitions' || rest[0] === 'extensions' ? rest.shift() : undefined;
     if (rest[0] !== 'previews') base = null;
     else if (kind && base) base = join(getEnv().root, 'presets', kind, 'previews');
     rest.shift();

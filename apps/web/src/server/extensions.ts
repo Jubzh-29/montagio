@@ -159,6 +159,14 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const music = extensions.includes('music') ? musicModel(lib) : null;
   const upscale = extensions.includes('upscale') ? upscaleModel(lib) : null;
   const motion = extensions.includes('motion') ? motionModel(lib) : null;
+  // A tab without a wall shows what it makes: a render of the GPU session, looping (presets/extensions/previews).
+  const examples: NonNullable<ExtensionsInfo['examples']> = {};
+  for (const id of ['avatar', 'motion'] as const) {
+    if (!extensions.includes(id)) continue;
+    const previewUrl = await presetPreviewUrl(root, `previews/${id}.mp4`, 'extensions');
+    const posterUrl = previewUrl && (await presetPosterUrl(root, `previews/${id}.mp4`, 'extensions'));
+    if (previewUrl) examples[id] = { previewUrl, ...(posterUrl ? { posterUrl } : {}) };
+  }
   return {
     extensions,
     effects,
@@ -176,5 +184,6 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     ...(music ? { musicModel: summaryOf(music) } : {}),
     ...(upscale ? { upscaleModel: { ...summaryOf(upscale), maxFrames: upscale.limits.max_input_frames ?? 121 } } : {}),
     ...(motion ? { motionModel: summaryOf(motion) } : {}),
+    ...(Object.keys(examples).length > 0 ? { examples } : {}),
   };
 }
