@@ -177,3 +177,20 @@ L'échantillon de voix est la voix intégrée de la S2, montée d'environ 4 demi
 Les fichiers `previews/*.mp4` existent désormais : 11 presets, 6 effets, Wardrobe Swap et Ignite, soit 19 fichiers.
 - **Format** : H.264 muet, 832×480 (480×832 pour la personne), environ 6 Mo en tout.
 - **Choix du clip** : le meilleur de chaque preset entre le port et la voiture. Pour les effets, le chien en peluche de la S2 (Squish, Frozen Moment), la voiture (Explode, Cake-ify) et la personne (Snap Zoom, Full Circle).
+
+## 12. Composition, pub, dessin et changement de voix (22/10)
+
+Une série de 5 jobs dans un seul conteneur L4, le 22/10 à 15:12 : 8 min 24 s, soit environ 0,17 $. La liste des jobs est dans `s3/validation/s5-jobs.txt`, les résultats dans `s3/validation/20261022-131334-s5-validation/`, hors dépôt.
+
+| Job | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|
+| Scène de pub, style Lifestyle (la petite voiture, sans personnage) | 78 s, à froid | 22,2 Go | ✅ produit gardé, scène chaude, espace libre en haut ; un autocollant inventé sur la portière |
+| Dessin → photo (voiture rouge sur une route côtière) | 21 s | 22,5 Go | ✅ composition, formes et couleurs du dessin gardées |
+| Composition à 3 références (port, personne fictive, petite voiture) | 46 s | 22,4 Go | ✅ même visage, le port, la voiture en main ; le t-shirt passe du gris au bleu clair |
+| Snap Zoom sur la photo composée | 182 s | 22,4 Go | ✅ finit sur le visage, comme en S2 ; le fond du port devient des vagues |
+| Musique de pub (ACE-Step, 10 s) | 33 s | 22,3 Go | ✅ pop acoustique rythmée, sans voix ; les 2,5 dernières secondes sont silencieuses |
+| Changement de voix (Chatterbox VC) | 2,6 s | 21,2 Go | ❌ arrêt au chargement : il manque `t3_cfg.safetensors` et `tokenizer.json` |
+
+- **Changement de voix** : le node `ChatterboxVC` ouvre le pack par le chargeur « classique », qui construit aussi le TTS anglais à côté du convertisseur. Il lui faut donc le T3 anglais et son tokenizer, deux fichiers du même dépôt Resemble AI (MIT, 2,1 Go). Ils sont ajoutés au lock dans le dossier du pack. La voix multilingue de l'avatar n'est pas touchée : elle choisit son T3 par son nom. Un nouveau passage sur le GPU reste à faire.
+- **Définition du node** : la série garde maintenant les `/object_info` des nodes qu'elle emploie (`object_info-extensions.json`). Celle de `ChatterboxVC` est identique, infobulles mises à part, à la fixture écrite d'après le code source épinglé.
+- Les photos d'entrée sont fictives : le port et la personne viennent de Z-Image, la petite voiture aussi. Le dessin a été fait pour ce test.
