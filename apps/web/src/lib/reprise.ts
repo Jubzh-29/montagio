@@ -1,3 +1,5 @@
+import type { Lang } from '@/i18n';
+import { CATALOG_FR } from '@/i18n/catalog-fr';
 import type { HistoryItem } from './api-types';
 
 /** What the Studio sets back from a history item. */
@@ -51,6 +53,29 @@ export function applyReprise(item: HistoryItem): StudioRestore {
     restore.motion = { ...(reprise.videoRef ? { videoRef: reprise.videoRef } : {}), character: reprise.prompt ?? '', action: reprise.motion ?? '' };
   }
   return restore;
+}
+
+/**
+ * The name of what made an item, in the interface's language: its move, effect or hook, its film's
+ * moves, with the HD and music marks the server adds; anything else keeps the server's name.
+ */
+export function historyName(item: HistoryItem, lang: Lang): string {
+  if (lang !== 'fr') return item.name;
+  const { reprise } = item;
+  const nameOf = (id: string) => CATALOG_FR[id]?.name;
+  const id = reprise.effectId ?? reprise.hookId ?? reprise.presetId;
+  const base = reprise.shots?.length
+    ? reprise.shots.map((shot) => nameOf(shot.presetId) ?? shot.presetId).join(' → ')
+    : id
+      ? nameOf(id)
+      : undefined;
+  if (!base) return item.name;
+  return item.task === 'upscale' ? `${base} · HD` : item.task === 'music' ? `${base} ♪` : base;
+}
+
+/** What a card is titled by: what was asked (a scene, a subject, a speech, a text), when there is one. */
+export function historySubject(item: HistoryItem): string | undefined {
+  return item.reprise.prompt?.trim() || undefined;
 }
 
 export type HistoryFilter = 'all' | HistoryItem['kind'];

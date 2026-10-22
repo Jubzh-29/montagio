@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useI18n } from '@/i18n';
+import { catalogText, useI18n } from '@/i18n';
 import type { PresetSummary } from '@/lib/api-types';
 import { MoveGlyph } from './MoveGlyph';
 import styles from './studio.module.css';
@@ -22,7 +22,8 @@ function PresetTile({
   sequence?: SequenceTiles;
   onSelect: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const text = catalogText(lang, preset);
   const [previewReady, setPreviewReady] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
 
@@ -75,8 +76,8 @@ function PresetTile({
         {preset.previewPlaceholder && <span className={styles.badge}>{t('showcasePlaceholderBadge')}</span>}
       </span>
       <span className={styles.presetText}>
-        <span className={styles.presetName}>{preset.name}</span>
-        <span className={styles.presetDescription}>{preset.description}</span>
+        <span className={styles.presetName}>{text.name}</span>
+        <span className={styles.presetDescription}>{text.description}</span>
       </span>
       {sequence && (
         <span className="visually-hidden">

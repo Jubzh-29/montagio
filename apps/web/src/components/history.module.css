@@ -83,6 +83,15 @@
   font-weight: 600;
 }
 
+/* A long scene or speech stays two lines high. */
+.cardName {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
 .cardMeta {
   color: var(--ink-muted);
   font-size: var(--text-xs);

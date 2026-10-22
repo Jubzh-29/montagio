@@ -1839,3 +1839,9 @@
     scroll-snap-align: start;
   }
 }
+
+/* A tempo is three digits: its field is that wide, not the panel's width. */
+.bpm {
+  width: 12ch;
+  font-family: var(--font-mono);
+}

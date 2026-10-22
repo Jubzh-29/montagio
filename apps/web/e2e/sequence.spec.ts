@@ -65,7 +65,7 @@ test('a film gets music: two downloads with sound, the silent ones stay', async 
   await describePhoto(page);
   await page.getByRole('button', { name: /^Generate film/ }).click();
   await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /\/media\/data\/sequences\//, { timeout: 60_000 });
-  await page.getByRole('textbox', { name: 'The music' }).fill('tense synth pulse');
+  await page.getByRole('textbox', { name: 'What it sounds like' }).fill('tense synth pulse');
   await page.getByRole('button', { name: /^Add music/ }).click();
   await expect(page.getByRole('link', { name: 'Download with music' })).toHaveAttribute('href', /\/media\/data\/jobs\/.+\/film\.mp4$/, { timeout: 30_000 });
   await expect(page.getByRole('link', { name: '9:16 with music' })).toHaveAttribute('href', /film-9x16\.mp4$/);

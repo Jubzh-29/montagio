@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useI18n } from '@/i18n';
+import { catalogText, useI18n } from '@/i18n';
 import type { EffectSummary, HookSummary } from '@/lib/api-types';
 import { wallFilter, type WallFilter } from '@/lib/effect-choice';
 import styles from './studio.module.css';
@@ -63,7 +63,7 @@ export function EffectWall({
   onPause: (paused: boolean) => void;
   onSelect: (id: string) => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [filter, setFilter] = useState<WallFilter>('all');
   const tiles = wallFilter(effects, hooks, hooks.length > 0 ? filter : 'effects');
   return (
@@ -103,7 +103,7 @@ export function EffectWall({
         {tiles.map((tile) => (
           <WallTile
             key={`${tile.kind}:${tile.id}`}
-            name={tile.item.name}
+            name={catalogText(lang, tile.item).name}
             previewUrl={tile.item.previewUrl}
             posterUrl={tile.item.posterUrl}
             kind={tile.kind}

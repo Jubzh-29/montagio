@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useI18n, type MessageKey } from '@/i18n';
+import { catalogName, useI18n, type MessageKey } from '@/i18n';
 import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import {
   TERMINAL_STATES,
@@ -781,6 +781,12 @@ export function Studio() {
     }
   }, [job.status, viewState]);
 
+  // Try again: a failed render is taken again as it was set up; a refused one waits for the change it asked for.
+  const retry = () => {
+    setJob({ status: 'idle' });
+    if (canGenerate) generate();
+  };
+
   const cancel = async () => {
     if (!tracked) return;
     try {
@@ -887,7 +893,10 @@ export function Studio() {
     speed: movePreset.speed,
   };
   // The slate under the monitor: the take about to be shot, even once a photo hides the viewfinder.
-  const slateMove = tab === 'motion' ? t('tabMotion') : tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoice?.item.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  // The names of the choice in hand, in the interface's language.
+  const wallChoiceName = wallChoice ? catalogName(lang, wallChoice.item.id, wallChoice.item.name) : undefined;
+  const moveName = movePreset ? catalogName(lang, movePreset.id, movePreset.name) : undefined;
+  const slateMove = tab === 'motion' ? t('tabMotion') : tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoiceName : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? moveName : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
   // An avatar lasts as long as its speech: the slate says the estimate, once there is a text.
   const speechSeconds = estimateSpeech(speechText, speechLanguage);
   const slate = slateMove && [
@@ -967,7 +976,7 @@ export function Studio() {
             ) : tab === 'effects' ? (
               wallChoice ? (
                 <ChoiceCard
-                  name={wallChoice.item.name}
+                  name={catalogName(lang, wallChoice.item.id, wallChoice.item.name)}
                   kindLabel={t(wallChoice.kind === 'hook' ? 'hookKind' : 'effectKind', { s: CLIP_SECONDS })}
                   previewUrl={wallChoice.item.previewUrl}
                   posterUrl={wallChoice.item.posterUrl}
@@ -992,7 +1001,7 @@ export function Studio() {
               </>
             ) : movePreset ? (
               <ChoiceCard
-                name={remix ? t('remixTitle', { name: remix.baseName }) : movePreset.name}
+                name={remix ? t('remixTitle', { name: remix.baseName }) : catalogName(lang, movePreset.id, movePreset.name)}
                 kindLabel={t('choiceCamera', { s: CLIP_SECONDS })}
                 previewUrl={remix ? undefined : movePreset.previewUrl}
                 posterUrl={remix ? undefined : movePreset.posterUrl}
@@ -1228,7 +1237,7 @@ export function Studio() {
                 onCancel={cancel}
                 example={tab === 'avatar' || tab === 'motion' ? extensions?.examples?.[tab] : undefined}
                 examplePaused={motionPaused}
-                onRetry={() => setJob({ status: 'idle' })}
+                onRetry={retry}
                 statusLabel={statusLabel}
                 showcase={
                   IS_SHOWCASE

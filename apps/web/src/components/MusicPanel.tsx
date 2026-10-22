@@ -10,6 +10,8 @@ import styles from './studio.module.css';
 
 const PROMPT_MAX = 300;
 const DEFAULT_BPM = 90;
+const BPM_MIN = 10;
+const BPM_MAX = 300;
 
 /**
  * Under a finished film: an instrumental soundtrack (a description, a tempo), mixed under the
@@ -67,14 +69,18 @@ export function MusicPanel({
       <input
         id="music-bpm"
         type="number"
-        className={styles.prompt}
-        min={10}
-        max={300}
+        className={`${styles.prompt} ${styles.bpm}`}
+        min={BPM_MIN}
+        max={BPM_MAX}
+        aria-describedby="music-bpm-range"
         step={1}
         value={Number.isNaN(bpm) ? '' : bpm}
         disabled={busy}
         onChange={(event) => setBpm(event.target.valueAsNumber)}
       />
+      <p id="music-bpm-range" className={styles.counter}>
+        {t('musicBpmRange', { min: BPM_MIN, max: BPM_MAX })}
+      </p>
       <div className={styles.actions}>
         <button type="button" className={styles.buttonPrimary} disabled={!canStart} onClick={run}>
           {t('musicAdd', { d: formatDuration(estimate_s) })}
