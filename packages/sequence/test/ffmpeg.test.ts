@@ -415,3 +415,15 @@ test('a new sound under a clip keeps the picture and carries the AI mention', as
   expect(streams.audio).not.toBeNull();
   expect((await readTags(out)).comment).toBe(AI_METADATA.comment);
 }, FFMPEG_TEST_TIMEOUT_MS);
+
+test('a sent file that is a list of other files is refused, not read through', async () => {
+  // An ffconcat list named .mp4 would copy the files it names (other uploads, next to it) into the result.
+  const talk = join(dir, 'talk-for-list.mp4');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=16', '-f', 'lavfi', '-i', 'sine', '-t', '1', '-pix_fmt', 'yuv420p', '-shortest', talk]);
+  const list = join(dir, 'list.mp4');
+  writeFileSync(list, 'ffconcat version 1.0\nfile talk-for-list.mp4\n');
+  // FFmpeg alone reads it through: the list is a real threat, not a broken file.
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-protocol_whitelist', 'file', '-i', list, '-f', 'null', '-']);
+  await expect(prepareMotionClip(list, join(dir, 'never-motion.mp4'))).rejects.toThrow(SequenceToolError);
+  await expect(prepareSpeechVideo(list, join(dir, 'never.mp4'), join(dir, 'never.flac'))).rejects.toThrow(SequenceToolError);
+}, FFMPEG_TEST_TIMEOUT_MS);

@@ -45,6 +45,13 @@ function run(tool: Tool, args: string[], opts: { failOnStderr?: boolean } = {}):
 /** Input options that open a local file and nothing else: a URL given as the media is not fetched. */
 const LOCAL_FILE_ONLY = ['-protocol_whitelist', 'file'];
 
+/**
+ * The demuxers allowed for a file someone sent: real media containers only. An ffconcat list or a
+ * playlist named .mp4 would make FFmpeg read the other local files it names into the result.
+ */
+const SENT_VIDEO = ['-format_whitelist', 'mov,mp4,m4a,3gp,3g2,mj2,matroska,webm'];
+const SENT_AUDIO = ['-format_whitelist', 'wav,mp3,flac,ogg,aac,mov,mp4,m4a,3gp,3g2,mj2,matroska,webm'];
+
 export async function probe(
   media: string,
 ): Promise<{ width: number; height: number; duration_s: number; fps: number; codec: string; pixFmt: string }> {
@@ -314,7 +321,7 @@ export async function prepareMotionClip(
   await probe(input);
   await writeAtomically(out, (partial) => [
     '-loglevel', 'error', '-y',
-    ...LOCAL_FILE_ONLY, '-i', input,
+    ...LOCAL_FILE_ONLY, ...SENT_VIDEO, '-i', input,
     '-map', '0:v:0', '-an', '-map_metadata', '-1',
     '-t', String(max_s),
     '-vf', `fps=${fps},scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1`,
@@ -336,7 +343,7 @@ export async function prepareVoiceSample(input: string, out: string, opts: { max
   if (!(await probeAudio(input))) throw new SequenceToolError(`no audio stream in ${input}`);
   await writeAtomically(out, (partial) => [
     '-loglevel', 'error', '-y',
-    ...LOCAL_FILE_ONLY, '-i', input,
+    ...LOCAL_FILE_ONLY, ...SENT_AUDIO, '-i', input,
     '-map', '0:a:0', '-vn', '-map_metadata', '-1',
     '-t', String(max_s),
     '-ac', '1', '-ar', '24000',
@@ -382,7 +389,7 @@ export async function prepareSpeechVideo(
   if (!(await probeAudio(input))) throw new SequenceToolError(`no audio stream in ${input}`);
   await writeAtomically(outVideo, (partial) => [
     '-loglevel', 'error', '-y',
-    ...LOCAL_FILE_ONLY, '-i', input,
+    ...LOCAL_FILE_ONLY, ...SENT_VIDEO, '-i', input,
     '-map', '0:v:0', '-map', '0:a:0', '-map_metadata', '-1',
     '-t', String(max_s),
     '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1',
