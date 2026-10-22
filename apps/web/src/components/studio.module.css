@@ -2,6 +2,8 @@
 .studio {
   display: grid;
   grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+  /* The promise's row is its own height: the composer, spanning both rows, gives its extra to the canvas's. */
+  grid-template-rows: auto 1fr;
   gap: var(--space-6);
   width: 100%;
   max-width: 1360px;
@@ -10,7 +12,47 @@
   align-items: start;
 }
 
+/* What Montagio does, then what the tab makes: above the canvas, so the composer starts right under
+   the header and its Generate stays above the fold of a laptop screen. */
+.intro {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.promise {
+  font-size: var(--text-xl);
+  font-weight: 650;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.lede {
+  max-width: 75ch;
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+}
+
+/* On a phone the promise stays two lines high, above the work. */
+@media (max-width: 640px) {
+  .promise {
+    font-size: var(--text-l);
+  }
+}
+
 /* The canvas: the wall of previews, or the monitor and its result. */
+.panel {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.stage {
+  grid-column: 2;
+  grid-row: 2;
+}
+
 .stage {
   display: flex;
   flex-direction: column;
@@ -24,9 +66,11 @@
   flex-direction: column;
   gap: var(--space-5);
   position: sticky;
-  top: 72px;
-  max-height: calc(100dvh - 88px);
+  top: var(--header-room);
+  max-height: calc(100dvh - var(--header-room) - var(--space-6));
   overflow-y: auto;
+  /* A field focused in the composer lands above its Generate block, not under it. */
+  scroll-padding-bottom: var(--generate-room);
   overscroll-behavior: contain;
   padding-right: var(--space-1);
 }
@@ -108,6 +152,27 @@
 }
 
 /* Above the viewfinder, whose lines are faint enough to read the text over. */
+/* A tab without a wall shows what it makes behind the empty monitor's words: dimmed, looping. */
+.monitorExample {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.4;
+}
+
+.exampleCaption {
+  position: absolute;
+  /* Clear of the viewfinder's corner marks. */
+  left: var(--space-7);
+  bottom: var(--space-5);
+  z-index: 1;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
 .monitorEmpty {
   position: relative;
   z-index: 1;
@@ -209,6 +274,45 @@
   right: var(--space-2);
   --dx: -12px;
   --dy: -12px;
+}
+
+/* While the clip renders, the plan travels again and again, from the whole photo to where the shot ends. */
+.photoPlan[data-rendering='true'] .planTarget {
+  animation: plan-in 2.4s var(--ease-camera) infinite alternate both;
+}
+
+.photoPlan[data-rendering='true'] .planArrow {
+  animation: plan-out 2.4s var(--ease-camera) infinite alternate both;
+}
+
+.studio[data-motion='paused'] .photoPlan[data-rendering='true'] .planTarget,
+.studio[data-motion='paused'] .photoPlan[data-rendering='true'] .planArrow {
+  animation: none;
+}
+
+/* The clip comes up like a print under the enlarger: from a flash of light to its own exposure. */
+.reveal {
+  animation: reveal 600ms var(--ease-out) both;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    filter: brightness(1.8);
+    transform: scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: reveal-fade 240ms linear both;
+  }
+}
+
+@keyframes reveal-fade {
+  from {
+    opacity: 0;
+  }
 }
 
 @keyframes plan-out {
@@ -345,6 +449,27 @@
   font-size: var(--text-xs);
 }
 
+/* While a take rolls, the slate counts: the REC part brighter, after the tally's red dot. */
+.slate[data-rolling='true'] span:nth-last-child(2) {
+  color: var(--ink);
+}
+
+.slate[data-rolling='true'] span:nth-last-child(2)::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--space-1);
+  border-radius: 50%;
+  background: var(--rec);
+  vertical-align: 1px;
+  animation: tally 1.2s var(--ease-out) infinite alternate;
+}
+
+.studio[data-motion='paused'] .slate[data-rolling='true'] span:nth-last-child(2)::before {
+  animation: none;
+}
+
 .slate span + span::before {
   content: '·';
   margin-right: var(--space-2);
@@ -378,41 +503,12 @@
   gap: var(--space-2);
 }
 
-.preset {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-m);
-  background: var(--surface);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
-}
-
-.preset:hover {
-  border-color: var(--line-strong);
-  background: var(--surface-2);
-}
-
-.preset[aria-pressed='true'] {
-  border-color: var(--rec);
-  background: var(--rec-soft);
-}
-
-.presetMedia {
-  position: relative;
-  display: block;
-}
-
 .presetPreview {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: var(--radius-s);
   opacity: 0;
   transition: opacity var(--dur) var(--ease-out);
 }
@@ -448,24 +544,6 @@
   to {
     background: var(--surface-2);
   }
-}
-
-.presetText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 var(--space-1) var(--space-1);
-}
-
-.presetName {
-  font-weight: 600;
-  font-size: var(--text-m);
-}
-
-.presetDescription {
-  color: var(--ink-muted);
-  font-size: var(--text-xs);
-  line-height: 1.4;
 }
 
 /*
@@ -562,7 +640,7 @@
   transition: background var(--dur) var(--ease-out);
 }
 
-.preset[aria-pressed='true'] .glyphSubject {
+.tile[aria-pressed='true'] .glyphSubject {
   background: var(--ink);
 }
 
@@ -572,7 +650,7 @@
   border-radius: 2px;
 }
 
-.preset[aria-pressed='true'] .glyphTarget {
+.tile[aria-pressed='true'] .glyphTarget {
   border-color: oklch(0.96 0 0 / 0.75);
 }
 
@@ -713,6 +791,13 @@
   white-space: nowrap;
 }
 
+/* Under the tier, model and time: what the time buys, on its own line. */
+.modelHint {
+  grid-column: 1 / -1;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
 .modelMeta {
   display: flex;
   gap: var(--space-2);
@@ -734,6 +819,9 @@
   background: var(--surface);
   resize: vertical;
   transition: border-color var(--dur) var(--ease-out);
+  /* A text field grows with its text (where the browser can), up to about six lines. */
+  field-sizing: content;
+  max-height: 12lh;
 }
 
 .prompt::placeholder {
@@ -824,6 +912,7 @@
 }
 
 .hint {
+  max-width: 70ch;
   color: var(--ink-muted);
   font-size: var(--text-s);
 }
@@ -894,21 +983,24 @@
   border-color: oklch(0.96 0 0 / 0.5);
 }
 
-.buttonGhost:disabled {
-  opacity: 0.5;
+.buttonGhost:disabled,
+.buttonSecondary:disabled,
+.toolButton:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 @media (max-width: 960px) {
   .studio {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
     padding: var(--space-4);
     gap: var(--space-5);
   }
   /* On a phone the setup comes first (the wall below is long); Generate stays pinned at the bottom
      of the screen, and starting a render moves the focus, and the page, to the monitor. */
   .studio {
-    padding-bottom: 104px;
+    padding-bottom: var(--generate-room);
   }
   .panel {
     position: static;
@@ -929,7 +1021,21 @@
   .generateBlock {
     padding-block: var(--space-3);
   }
+  /* The canvas comes first: the effects, the moves or the monitor are seen before the form. */
+  .intro,
+  .panel,
+  .stage {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .intro {
+    order: -2;
+  }
+  .stage {
+    order: -1;
+  }
 }
+
 
 /* A narrow panel: the model's tier and name stack, so the name is never cut. */
 @media (max-width: 480px) {
@@ -1183,19 +1289,19 @@
   transition: background var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out);
 }
 
-.preset:hover .shotAdd,
-.preset:focus-visible .shotAdd {
+.tile:hover .shotAdd,
+.tile:focus-visible .shotAdd {
   border-color: var(--rec);
   background: var(--rec);
 }
 
 /* Three shots: the tiles stay readable but say they add nothing more. */
-.preset[data-full='true'] {
+.tile[data-full='true'] {
   cursor: not-allowed;
 }
 
-.preset[data-full='true'] .presetMedia,
-.preset[data-full='true'] .presetText {
+.tile[data-full='true'] .tileMedia,
+.tile[data-full='true'] .tileCaption {
   opacity: 0.55;
 }
 
@@ -1279,6 +1385,18 @@
 .caption {
   color: var(--ink-muted);
   font-size: var(--text-s);
+}
+
+/* The model's name, a way to its weights and licences on the Open Stack page. */
+.captionLink {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+
+.captionLink:hover {
+  text-decoration-color: currentColor;
 }
 
 .showcaseNote {
@@ -1375,7 +1493,7 @@
   place-items: center;
   aspect-ratio: 16 / 9;
   border: 1px solid var(--line);
-  border-radius: var(--radius-l);
+  border-radius: var(--radius-m);
   background: var(--surface);
   overflow: hidden;
   isolation: isolate;
@@ -1410,6 +1528,12 @@
   letter-spacing: 0.02em;
   text-shadow: 0 1px 8px oklch(0 0 0 / 0.6);
   z-index: 1;
+}
+
+.choiceActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .choiceMeta {
@@ -1698,35 +1822,6 @@
   gap: var(--space-3);
 }
 
-.wallTile {
-  position: relative;
-  display: grid;
-  place-items: center;
-  aspect-ratio: 4 / 5;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-l);
-  background: var(--surface);
-  overflow: hidden;
-  isolation: isolate;
-  cursor: pointer;
-  transition: border-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
-}
-
-.wallTile:hover {
-  border-color: var(--line-strong);
-}
-
-.wallTile[aria-pressed='true'] {
-  border-color: var(--rec);
-  box-shadow: 0 0 0 1px var(--rec);
-}
-
-.wallTile:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
-
 .wallVideo {
   position: absolute;
   inset: 0;
@@ -1740,23 +1835,8 @@
   color: var(--ink-faint);
 }
 
-.wallName {
-  position: absolute;
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: var(--space-3);
-  font-size: var(--text-l);
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-align: left;
-  text-transform: uppercase;
-  text-shadow: 0 1px 10px oklch(0 0 0 / 0.7);
-  z-index: 1;
-}
-
 /* Over a preview, a dark fade under the name keeps it legible on a bright frame. */
-.choiceMedia:has(> video)::after,
-.wallTile:has(> video)::after {
+.choiceMedia:has(> video)::after {
   content: '';
   position: absolute;
   inset: 55% 0 0;
@@ -1768,13 +1848,222 @@
   .wall {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .wallName {
-    font-size: var(--text-m);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wallTile {
+  .tileMedia {
     transition: none;
+  }
+}
+
+/* Last in the file: it overrides the wall's and the gallery's own grids. */
+/* A phone: the wall and the gallery are one row that scrolls sideways, so the photo and Generate
+   stay a thumb away; a tile at the edge is cut, which says the row goes on. */
+@media (max-width: 640px) {
+  .wall,
+  .presetGrid {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--space-1);
+    padding-bottom: var(--space-2);
+  }
+  .wall {
+    grid-auto-columns: 42%;
+  }
+  .presetGrid {
+    grid-auto-columns: 46%;
+  }
+  .tile {
+    scroll-snap-align: start;
+  }
+}
+
+/* A tempo is three digits: its field is that wide, not the panel's width. */
+.bpm {
+  width: 12ch;
+  font-family: var(--font-mono);
+}
+
+/* The canvas's views: words underlined like the header's tabs, not a pill (pills are options). */
+.viewTabs {
+  display: flex;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+
+.viewTab {
+  margin-bottom: -1px;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: var(--text-s);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out);
+}
+
+.viewTab:hover {
+  color: var(--ink);
+}
+
+.viewTab[aria-pressed='true'] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.viewTab:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .viewTab {
+    min-height: 44px;
+  }
+}
+
+/*
+ * One tile for the camera moves, the effects and the hooks: the media framed (16:9 for a move, 4:5
+ * for an effect), its name over a dark fade, its description as a caption under it. Selected: the
+ * red frame. The name labels the button, the caption describes it (aria-labelledby, -describedby).
+ */
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tileMedia {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+
+.tileMedia[data-shape='wide'] {
+  aspect-ratio: 16 / 9;
+}
+
+.tileMedia[data-shape='tall'] {
+  aspect-ratio: 4 / 5;
+}
+
+/* The move's glyph fills the frame the preview will play in. */
+.tileMedia > .glyph {
+  position: absolute;
+  inset: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.tile:hover .tileMedia {
+  border-color: var(--line-strong);
+}
+
+.tile[aria-pressed='true'] .tileMedia {
+  border-color: var(--rec);
+  box-shadow: 0 0 0 1px var(--rec);
+}
+
+.tile:focus-visible {
+  outline: none;
+}
+
+.tile:focus-visible .tileMedia {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* A dark fade under the name keeps it legible on a bright frame. */
+.tileMedia::after {
+  content: '';
+  position: absolute;
+  inset: 50% 0 0;
+  z-index: 1;
+  background: linear-gradient(to bottom, transparent, oklch(0 0 0 / 0.7));
+  pointer-events: none;
+}
+
+.tileName {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-2);
+  z-index: 2;
+  font-size: var(--text-m);
+  font-weight: 650;
+  line-height: 1.25;
+  text-shadow: 0 1px 8px oklch(0 0 0 / 0.7);
+}
+
+.tileCaption {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding-inline: var(--space-1);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+/* Quality or Fast, by Generate: two pills with their times, and what the chosen one buys. */
+.modelChoice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  border: 0;
+}
+
+.modelChoice .mode {
+  cursor: pointer;
+}
+
+.modelChoice .mode[data-selected='true'] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.modelChoice .mode:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.modelHintLine {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+/* The model choice: by Generate on a large screen, in the fields on a phone (its bar stays one button high). */
+@media (min-width: 961px) {
+  .modelsInFields {
+    display: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .modelsByGenerate {
+    display: none;
   }
 }

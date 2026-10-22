@@ -1,8 +1,10 @@
 'use client';
 
 import { useI18n } from '@/i18n';
+import { formatDuration } from '@/lib/duration';
 import { refusalMessageKey } from '@/lib/refusals';
 import { useJob } from '@/lib/use-job';
+import { AiCaption } from './AiCaption';
 import styles from './studio.module.css';
 
 /** Under a finished clip: its 1080p version (SeedVR2), a clip of its own; the 480p one stays. */
@@ -17,7 +19,7 @@ export function HdPanel({ path, estimate_s, model }: { path: string; estimate_s:
       <div className={styles.actions}>
         {!done && (
           <button type="button" className={styles.buttonSecondary} disabled={busy} onClick={() => void start(path, {})}>
-            {t('hdAction', { s: estimate_s })}
+            {t('hdAction', { d: formatDuration(estimate_s) })}
           </button>
         )}
         {busy && job && (
@@ -42,9 +44,7 @@ export function HdPanel({ path, estimate_s, model }: { path: string; estimate_s:
         </p>
       )}
       {done && (
-        <p className={styles.caption} data-testid="hd-caption">
-          {t('aiCaption', { model: model.name, license: model.license })}
-        </p>
+        <AiCaption testId="hd-caption" model={model} />
       )}
     </div>
   );

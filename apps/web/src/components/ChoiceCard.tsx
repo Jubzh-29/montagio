@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { useI18n } from '@/i18n';
 import { MoveGlyph } from './MoveGlyph';
 import styles from './studio.module.css';
@@ -13,21 +13,29 @@ export function ChoiceCard({
   name,
   kindLabel,
   previewUrl,
+  posterUrl,
   poses,
   speed,
   icon,
   paused,
   onChange,
+  remix,
+  remixRef,
 }: {
   name: string;
   kindLabel: string;
   previewUrl?: string;
+  posterUrl?: string;
   poses?: string[];
   speed?: number;
   icon: 'camera' | 'effect' | 'hook' | 'avatar' | 'motion';
   paused: boolean;
   /** Brings the wall back; absent on a tab without a wall (Avatar). */
   onChange?: () => void;
+  /** A camera move: its YAML opens in the remix editor (the hint says so under the card). */
+  remix?: { onOpen: () => void; disabled: boolean };
+  /** The Remix button, focused again when the remix editor closes. */
+  remixRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const { t } = useI18n();
   const video = useRef<HTMLVideoElement>(null);
@@ -40,10 +48,10 @@ export function ChoiceCard({
   }, [paused, previewUrl]);
 
   return (
-    <section className={styles.choiceCard} aria-labelledby="choice-name">
+    <section className={styles.choiceCard} aria-labelledby="choice-name" data-testid="choice-card">
       <div className={styles.choiceMedia} data-icon={icon}>
         {previewUrl ? (
-          <video ref={video} className={styles.choiceVideo} src={previewUrl} loop muted playsInline preload="metadata" aria-hidden="true" />
+          <video ref={video} className={styles.choiceVideo} src={previewUrl} poster={posterUrl} loop muted playsInline preload="metadata" aria-hidden="true" />
         ) : poses && speed !== undefined ? (
           <MoveGlyph poses={poses} speed={speed} />
         ) : (
@@ -57,12 +65,32 @@ export function ChoiceCard({
       </div>
       <div className={styles.choiceMeta}>
         <span>{kindLabel}</span>
-        {onChange && (
-          <button type="button" className={styles.buttonGhost} onClick={onChange}>
-            {t('choiceChange')}
-          </button>
-        )}
+        <span className={styles.choiceActions}>
+          {remix && (
+            <button
+              ref={remixRef}
+              type="button"
+              className={styles.toolButton}
+              aria-expanded={false}
+              aria-describedby="remix-hint"
+              disabled={remix.disabled}
+              onClick={remix.onOpen}
+            >
+              {t('remix')}
+            </button>
+          )}
+          {onChange && (
+            <button type="button" className={styles.buttonGhost} onClick={onChange}>
+              {t('choiceChange')}
+            </button>
+          )}
+        </span>
       </div>
+      {remix && (
+        <p id="remix-hint" className={styles.hint}>
+          {t('remixHint')}
+        </p>
+      )}
     </section>
   );
 }

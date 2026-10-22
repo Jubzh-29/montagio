@@ -68,7 +68,7 @@ export function ExplorePage() {
   return (
     <>
       <Header current="explore" />
-      <main className={styles.page}>
+      <main id="content" tabIndex={-1} className={styles.page}>
         <section className={styles.hero} aria-labelledby="explore-title">
           <h1 id="explore-title" className={styles.title}>
             {t('exploreTitle')}

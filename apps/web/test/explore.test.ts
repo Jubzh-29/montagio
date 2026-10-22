@@ -26,6 +26,7 @@ const effect = (id: string, previewUrl?: string) => ({
   ...(previewUrl ? { previewUrl } : {}),
   estimate_s: 80,
   subjectMax: 120,
+  modelId: 'wan21-i2v-effects',
   modelName: 'Wan 2.1',
   license: 'Apache-2.0',
 });

@@ -5,8 +5,8 @@ import { HOOKS_READY, pickTab, READY_TABS, tabHref, TAB_ORDER, visibleTabs } fro
 const ALL = new Set(TAB_ORDER);
 
 const none: ExtensionsInfo = { extensions: [], effects: [], hooks: [], estimates: { t2i: 12 } };
-const effect = { id: 'squish', name: 'Squish', description: '', estimate_s: 90, subjectMax: 120, modelName: 'Wan 2.1 I2V 480p (effects)', license: 'Apache-2.0' };
-const hook = { id: 'iris-dive', name: 'Iris Dive', description: '', estimate_s: 160, references: 1 as const, modelName: 'Wan 2.2 FLF2V', license: 'Apache-2.0' };
+const effect = { id: 'squish', name: 'Squish', description: '', estimate_s: 90, subjectMax: 120, modelId: 'wan21-i2v-effects', modelName: 'Wan 2.1 I2V 480p (effects)', license: 'Apache-2.0' };
+const hook = { id: 'iris-dive', name: 'Iris Dive', description: '', estimate_s: 160, references: 1 as const, modelId: 'wan22-flf2v-transition', modelName: 'Wan 2.2 FLF2V', license: 'Apache-2.0' };
 
 test('without extensions, camera then film', () => {
   expect(visibleTabs(none)).toEqual(['camera', 'film']);

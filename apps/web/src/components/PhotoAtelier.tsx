@@ -1,8 +1,9 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useI18n } from '@/i18n';
+import { useI18n, type MessageKey } from '@/i18n';
 import { apiFetch } from '@/lib/api';
+import { formatDuration } from '@/lib/duration';
 import type { ExtensionsInfo } from '@/lib/api-types';
 import { needsConsent } from '@/lib/consent';
 import {
@@ -22,6 +23,7 @@ import { ConsentCheck } from './ConsentCheck';
 import { MaskPainter } from './MaskPainter';
 import { PhotoHd } from './PhotoHd';
 import type { UploadState } from './Monitor';
+import { AiCaption } from './AiCaption';
 import styles from './studio.module.css';
 
 const ASPECTS = ['16:9', '9:16', '1:1'] as const;
@@ -82,6 +84,20 @@ export function PhotoAtelier({
   const done = job?.state === 'succeeded' && job.outputImageRef && job.outputUrl ? job : null;
   const canStart =
     text.trim().length > 0 && !busy && (kind === 't2i' || (photo.status === 'ready' && (!askConsent || consent) && (!inpaint || maskPainted)));
+  // What a disabled button waits for, said under it: the photo first, then the text, then the consent.
+  const waitingFor: MessageKey | null = busy
+    ? null
+    : kind === 'edit' && photo.status !== 'ready'
+      ? 'editNeedsPhoto'
+      : !text.trim()
+        ? kind === 't2i'
+          ? 't2iNeedsText'
+          : 'editNeedsText'
+        : kind === 'edit' && askConsent && !consent
+          ? 'editNeedsConsent'
+          : kind === 'edit' && inpaint && !maskPainted
+            ? 'inpaintNeedsPaint'
+            : null;
   const percent = job ? Math.round(job.progress * 100) : 0;
 
   /** The painted mask, uploaded like a photo; undefined when nothing is painted, null when the upload failed. */
@@ -154,13 +170,16 @@ export function PhotoAtelier({
 
       {kind === 't2i' ? (
         <>
-          <div className={styles.canvasViews} role="radiogroup" aria-label={t('t2iFormat')}>
-            {ASPECTS.map((value) => (
-              <button key={value} type="button" role="radio" className={styles.mode} aria-checked={aspect === value} disabled={busy} onClick={() => setAspect(value)}>
-                {value}
-              </button>
-            ))}
-          </div>
+        <p id="atelier-format" className={styles.sectionTitle}>
+          {t('t2iFormat')}
+        </p>
+        <div className={styles.canvasViews} role="radiogroup" aria-labelledby="atelier-format">
+          {ASPECTS.map((value) => (
+            <button key={value} type="button" role="radio" className={styles.mode} aria-checked={aspect === value} disabled={busy} onClick={() => setAspect(value)}>
+              {value}
+            </button>
+          ))}
+        </div>
           <fieldset className={styles.styleSet}>
             <legend className={styles.sectionTitle}>{t('styleTitle')}</legend>
             {STYLE_GROUPS.map((group) => (
@@ -187,13 +206,16 @@ export function PhotoAtelier({
         </>
       ) : (
         <>
-          <div className={styles.lookChoice} role="radiogroup" aria-label={t('editLook')}>
-            {LOOKS.map(([value, key]) => (
-              <button key={value || 'none'} type="button" role="radio" className={styles.mode} aria-checked={look === value} disabled={busy} onClick={() => setLook(value)}>
-                {t(key)}
-              </button>
-            ))}
-          </div>
+        <p id="atelier-look" className={styles.sectionTitle}>
+          {t('editLook')}
+        </p>
+        <div className={styles.lookChoice} role="radiogroup" aria-labelledby="atelier-look">
+          {LOOKS.map(([value, key]) => (
+            <button key={value || 'none'} type="button" role="radio" className={styles.mode} aria-checked={look === value} disabled={busy} onClick={() => setLook(value)}>
+              {t(key)}
+            </button>
+          ))}
+        </div>
           <div className={styles.styleRow} role="group" aria-label={t('relightTitle')}>
             <span className={styles.styleLabel} aria-hidden="true">
               {t('relightTitle')}
@@ -229,8 +251,14 @@ export function PhotoAtelier({
       {askConsent && <ConsentCheck id="atelier-consent" checked={consent} onChange={setConsent} />}
 
       <div className={styles.atelierActions}>
-        <button type="button" className={styles.buttonPrimary} disabled={!canStart} onClick={() => void run()}>
-          {kind === 't2i' ? t('t2iCreate', { s: estimates.t2i }) : t('editApply', { s: estimates.edit ?? 0 })}
+        <button
+          type="button"
+          className={styles.buttonPrimary}
+          disabled={!canStart}
+          aria-describedby={waitingFor ? `atelier-waiting-${kind}` : undefined}
+          onClick={() => void run()}
+        >
+          {kind === 't2i' ? t('t2iCreate', { d: formatDuration(estimates.t2i) }) : t('editApply', { d: formatDuration(estimates.edit ?? 0) })}
         </button>
         {busy && job && (
           <button type="button" className={styles.buttonGhost} onClick={() => void cancel()}>
@@ -238,6 +266,11 @@ export function PhotoAtelier({
           </button>
         )}
       </div>
+      {waitingFor && (
+        <p id={`atelier-waiting-${kind}`} className={styles.hint}>
+          {t(waitingFor)}
+        </p>
+      )}
 
       <p className="visually-hidden" role="status">
         {busy ? t('announceRendering') : done ? t('atelierReady') : ''}
@@ -267,10 +300,11 @@ export function PhotoAtelier({
             <figure>
               {/* eslint-disable-next-line @next/next/no-img-element -- the image just made */}
               <img src={done.outputUrl} alt="" data-testid="atelier-result" />
-              <figcaption data-testid="ai-caption">
-                {kind === 'edit' && `${t('editAfter')} · `}
-                {t('aiCaption', { model: done.label.name ?? done.modelId, license: licenseOf(done.modelId) ?? '?' })}
-              </figcaption>
+              <AiCaption
+                as="figcaption"
+                prefix={kind === 'edit' ? `${t('editAfter')} · ` : undefined}
+                model={{ id: done.modelId, name: done.label.name ?? done.modelId, license: licenseOf(done.modelId) ?? '?' }}
+              />
             </figure>
           )}
         </div>

@@ -7,8 +7,29 @@
   justify-content: space-between;
   gap: var(--space-4);
   padding: var(--space-3) var(--space-5);
-  background: oklch(0.11 0 0 / 0.92);
+  /* Opaque: the page scrolls under it, and must not show through its words. */
+  background: var(--bg);
   border-bottom: 1px solid var(--line);
+}
+
+/* Out of sight until it has the focus: then over the header's start. */
+.skip {
+  position: absolute;
+  left: var(--space-3);
+  top: var(--space-2);
+  z-index: 1;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-m);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: var(--text-s);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+}
+
+.skip:focus {
+  transform: none;
 }
 
 .brand {
@@ -189,6 +210,20 @@
     width: 100%;
     margin-right: 0;
     overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  /* More tabs off screen: the row fades out on that side, the way a strip of film runs on. */
+  .tabs[data-more-after='true'] {
+    mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+  }
+  .tabs[data-more-before='true'] {
+    mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent);
+  }
+  .tabs[data-more-before='true'][data-more-after='true'] {
+    mask-image: linear-gradient(to right, transparent, #000 48px, #000 calc(100% - 48px), transparent);
   }
   .tab {
     flex: 1 0 auto;

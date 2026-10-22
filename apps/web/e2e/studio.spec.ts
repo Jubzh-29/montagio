@@ -6,18 +6,20 @@ const sampleImage = resolve(__dirname, '../../../demo-assets/images/sample-16x9.
 const CAMERA = '/?tab=camera';
 // A camera move waits for what the photo shows: an uploaded photo comes without it.
 const scene = (page: Page) => page.getByRole('textbox', { name: 'What the photo shows', exact: true });
-const describePhoto = (page: Page) => scene(page).fill('a television test card with colour bars');
+const describePhoto = (page: Page) => scene(page).fill('a fishing harbour at golden hour');
 
 test('studio happy path in demo mode', async ({ page }) => {
   await page.goto(CAMERA);
   await expect(page.getByRole('link', { name: /open weights — verified/ })).toBeVisible();
   await page.setInputFiles('input[type=file]', sampleImage);
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await describePhoto(page);
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.getByRole('progressbar')).toBeVisible();
   await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /\/media\//, { timeout: 15_000 });
-  await expect(page.getByTestId('ai-caption')).toHaveText(/^AI-generated · .+ [(]Apache-2.0[)]$/);
+  // The demo backend: the caption says no model ran, and names the one that would.
+  await expect(page.getByTestId('ai-caption')).toHaveText(/^Demo render: no model ran here\. With a GPU, .+ [(]Apache-2.0[)] makes it\.$/);
   const download = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Open in ComfyUI' }).click();
   expect((await download).suggestedFilename()).toMatch(/\.json$/);
@@ -27,6 +29,7 @@ test('generate stays disabled until an image, a preset and what the photo shows 
   await page.goto(CAMERA);
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeDisabled();
   await page.setInputFiles('input[type=file]', sampleImage);
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeDisabled();
   await expect(page.getByText('Describe what the photo shows to generate.')).toBeVisible();
@@ -60,6 +63,7 @@ test('double click sends a single generation', async ({ page }) => {
   });
   await page.goto(CAMERA);
   await page.setInputFiles('input[type=file]', sampleImage);
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await describePhoto(page);
   await page.getByRole('button', { name: /^Generate/ }).dblclick();
@@ -71,24 +75,39 @@ test('french toggle', async ({ page }) => {
   await page.goto(CAMERA);
   await page.getByRole('button', { name: 'FR', exact: true }).click();
   await expect(page.getByRole('button', { name: /^Générer/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: /open weights — vérifié/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /poids ouverts — vérifié/ })).toBeVisible();
 });
 
-test('open stack page lists three Apache-2.0 models', async ({ page }) => {
+test('the open stack page lists every model by what it makes, each Apache-2.0 or MIT', async ({ page }) => {
   await page.goto('/open-stack');
+  for (const name of [/^Camera/, /^Effects$/, /^Transitions and hooks$/, /^Photo/, /^Avatar$/, /^Music$/, /^HD/, /^Motion/]) {
+    await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
+  }
   const rows = page.locator('[data-testid=model-row]');
-  await expect(rows).toHaveCount(3);
-  for (const row of await rows.all()) await expect(row).toContainText('Apache-2.0');
+  await expect(rows).toHaveCount(11);
+  for (const row of await rows.all()) await expect(row).toContainText(/Apache-2\.0|MIT/);
+});
+
+test('the caption under a clip links to its model on the open stack page', async ({ page }) => {
+  await page.goto(CAMERA);
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('ai-caption').getByRole('link', { name: 'Wan 2.2 Fun Camera' }).click();
+  await expect(page).toHaveURL(/\/open-stack\/?#model-wan22-i2v-a14b-fun-camera$/);
+  const row = page.locator('#model-wan22-i2v-a14b-fun-camera');
+  await expect(row).toHaveAttribute('data-target', 'true');
+  await expect(row).toBeInViewport();
 });
 
 test('a sample photo lets a visitor try without their own image, described already', async ({ page }) => {
   await page.goto(CAMERA);
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
-  await expect(scene(page)).toHaveValue(/^a television test card/);
+  await expect(scene(page)).toHaveValue(/^a quiet fishing harbour/);
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeEnabled();
   const body = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/api/generations'));
   await page.getByRole('button', { name: /^Generate/ }).click();
-  expect(((await body).postDataJSON() as { userPrompt?: string }).userPrompt).toMatch(/^a television test card/);
+  expect(((await body).postDataJSON() as { userPrompt?: string }).userPrompt).toMatch(/^a quiet fishing harbour/);
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
 });
 
@@ -184,6 +203,7 @@ test('a tab the Studio does not show falls back to the first one', async ({ page
 test('a camera clip gets its HD version', async ({ page }) => {
   await page.goto('/?tab=camera');
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
@@ -199,6 +219,7 @@ test('with no extension shown, no extension button anywhere', async ({ page }) =
   for (const tab of ['Effects', 'Avatar']) await expect(page.getByRole('link', { name: tab, exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });

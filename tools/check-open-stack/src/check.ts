@@ -2,20 +2,53 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LibraryError, loadLibrary, type Library } from '@montagio/presets';
-import { ALLOWED_WEIGHT_LICENSES, parseLock, type LockEntry } from '@montagio/registry';
+import { ALLOWED_WEIGHT_LICENSES, parseLock, type CAPABILITIES, type ExtensionTask, type LockEntry } from '@montagio/registry';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 
 export type Violation = {
-  rule: 'weight-license' | 'weight-source' | 'weight-file' | 'node-not-allowed' | 'forbidden-pattern' | 'closed-package' | 'library';
+  rule:
+    | 'weight-license'
+    | 'weight-source'
+    | 'weight-file'
+    | 'weight-unlisted'
+    | 'node-not-allowed'
+    | 'forbidden-pattern'
+    | 'closed-package'
+    | 'library';
   file: string;
   detail: string;
 };
 
+/** What a model makes, in the order the Open Stack page lists them. */
+export const STACK_FUNCTIONS = ['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion'] as const;
+export type StackFunction = (typeof STACK_FUNCTIONS)[number];
+
+/** Exhaustive on purpose: a new capability or task does not compile until it says what it makes. */
+const FUNCTION_OF_CAPABILITY: Record<(typeof CAPABILITIES)[number], StackFunction> = { 'i2v-camera': 'camera', i2v: 'camera', t2i: 'photo' };
+const FUNCTION_OF_TASK: Record<ExtensionTask, StackFunction> = {
+  'i2v-effect': 'effects',
+  flf2v: 'transitions',
+  'i2i-edit': 'photo',
+  tts: 'avatar',
+  'ia2v-talk': 'avatar',
+  t2a: 'music',
+  'v2v-upscale': 'hd',
+  'i2i-upscale': 'hd',
+  'motion-transfer': 'motion',
+};
+
+/** A weight file of a model, as the lock fetches it: its licence, its size and the repository it comes from. */
+export type StackWeight = { id: string; license: string; file?: string; bytes?: number; source?: string };
+
+/** A model the Studio can run, under what it makes; `extension` is absent for those every install has. */
+export type StackModel = { id: string; name: string; function: StackFunction; license: string; extension?: string; weights: StackWeight[] };
+
 export type OpenStackReport = {
   ok: boolean;
   checkedAt: string;
-  models: { id: string; license: string; weights: { id: string; license: string }[] }[];
+  /** Every model of registry/models and registry/extensions, grouped in the order of STACK_FUNCTIONS. */
+  models: StackModel[];
   violations: Violation[];
 };
 
@@ -545,13 +578,46 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
   }
 
   const lockById = new Map(lock.map((entry) => [entry.id, entry]));
-  const models = library
-    ? [...library.models.values()].map((model) => ({
-        id: model.id,
-        license: model.license,
-        weights: model.weights.map((id) => ({ id, license: lockById.get(id)?.license ?? '(missing)' })),
-      }))
+  const weightOf = (id: string): StackWeight => {
+    const entry = lockById.get(id);
+    if (!entry) return { id, license: '(missing)' };
+    return {
+      id,
+      license: entry.license,
+      file: entry.file,
+      ...(entry.size !== undefined ? { bytes: entry.size } : {}),
+      ...(entry.source ? { source: entry.source } : {}),
+    };
+  };
+  const models: StackModel[] = library
+    ? [
+        ...[...library.models.values()].map((model) => ({
+          id: model.id,
+          name: model.name,
+          function: FUNCTION_OF_CAPABILITY[model.capabilities[0]!],
+          license: model.license,
+          weights: model.weights.map(weightOf),
+        })),
+        ...[...library.extensionModels.values()].map((model) => ({
+          id: model.id,
+          name: model.name,
+          function: FUNCTION_OF_TASK[model.task],
+          license: model.license,
+          extension: model.extension,
+          weights: model.weights.map(weightOf),
+        })),
+      ].sort((a, b) => STACK_FUNCTIONS.indexOf(a.function) - STACK_FUNCTIONS.indexOf(b.function))
     : [];
+
+  // What is fetched is what the page lists: a lock weight no model declares would be downloaded unseen.
+  if (library) {
+    const declared = new Set(models.flatMap((model) => model.weights.map((weight) => weight.id)));
+    for (const entry of lock) {
+      if (!declared.has(entry.id)) {
+        violations.push({ rule: 'weight-unlisted', file: lockFile, detail: `${entry.id} is in the lock, but no model declares it: the Open Stack page would not list it` });
+      }
+    }
+  }
 
   return { ok: violations.length === 0, checkedAt: new Date().toISOString(), models, violations };
 }

@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import en from './en.json';
 import fr from './fr.json';
+import { CATALOG_FR } from './catalog-fr';
 
 export type Lang = 'en' | 'fr';
 export type MessageKey = keyof typeof en;
@@ -13,6 +14,17 @@ const STORAGE_KEY = 'lang';
 export function t(key: MessageKey, lang: Lang, vars: Record<string, string | number> = {}): string {
   const template = DICTIONARIES[lang][key] ?? DICTIONARIES.en[key];
   return template.replace(/\{(\w+)\}/g, (_, name: string) => String(vars[name] ?? `{${name}}`));
+}
+
+/** A camera move's, an effect's or a hook's name in the interface's language; strings only, so a caller's state stays its own. */
+export function catalogName(lang: Lang, id: string, english: string): string {
+  return (lang === 'fr' ? CATALOG_FR[id]?.name : undefined) ?? english;
+}
+
+/** A camera move's, an effect's or a hook's name and description in the interface's language (English: its YAML file's). */
+export function catalogText(lang: Lang, item: { id: string; name: string; description?: string }): { name: string; description: string } {
+  const french = lang === 'fr' ? CATALOG_FR[item.id] : undefined;
+  return { name: french?.name ?? item.name, description: french?.description ?? item.description ?? '' };
 }
 
 // The chosen language lives in localStorage; the server always renders English.

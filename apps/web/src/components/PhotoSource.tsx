@@ -72,7 +72,7 @@ export function PhotoSource({
           // eslint-disable-next-line @next/next/no-img-element -- local object URL or sample preview
           <img className={styles.photoThumb} src={localUrl} alt="" />
         ) : (
-          <span className={styles.photoEmpty}>{acceptsFiles ? t('monitorEmpty') : t('showcasePickSample')}</span>
+          <span className={styles.photoEmpty}>{acceptsFiles ? t('photoDrop') : t('showcasePickSample')}</span>
         )}
         <div className={styles.photoActions}>
           {acceptsFiles && (

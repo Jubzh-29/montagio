@@ -114,7 +114,7 @@ Pour mettre à jour la vitrine, reconstruire, puis relancer la même commande `h
 À faire sur l'URL directe, dans Chrome, puis de nouveau dans Firefox :
 
 - [ ] L'accueil s'affiche, avec le badge « 100% open weights — verified » et les trois photos d'exemple.
-- [ ] `/open-stack/`, ouvert directement (rechargement compris), liste les trois modèles en Apache-2.0.
+- [ ] `/open-stack/`, ouvert directement (rechargement compris), liste chaque modèle par fonction (caméra, effets, transitions et hooks, photo, avatar, musique, HD, mouvement), tous en Apache-2.0 ou MIT, et la légende d’un clip mène à la ligne de son modèle.
 - [ ] Une photo, un preset, puis « Show clip » : le clip joue, et sa légende dit s'il est provisoire ou pré-généré.
 - [ ] « Open in ComfyUI » télécharge `montagio-<preset>.json`.
 - [ ] En Séquence, une photo et trois presets, puis « Assemble film » : le film joue en quelques secondes après le chargement de FFmpeg. « Download film » et « Download 9:16 » fonctionnent.

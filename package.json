@@ -19,6 +19,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test:nodes": "python -m pytest comfy-nodes -q",
     "test:modal": "python -m pytest infra/modal -q",
+    "previews:posters": "tsx apps/web/scripts/preview-posters.mts",
     "check:open-stack": "tsx tools/check-open-stack/src/cli.ts . --out apps/web/public/open-stack-report.json",
     "montagio": "tsx packages/presets/src/montagio.ts",
     "showcase": "tsx packages/showcase/src/showcase.ts",

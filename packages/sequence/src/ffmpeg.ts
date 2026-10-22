@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { AI_AUDIO_METADATA, AI_METADATA, metadataArgs, type VideoTags } from './tags';
@@ -359,6 +359,35 @@ export async function previewClip(input: string, out: string, opts: { width: num
     ...metadataArgs(opts.tags),
     '-f', 'mp4', partial,
   ]);
+}
+
+/**
+ * The still a gallery tile shows while its clip loads: the clip's first frame as a JPEG,
+ * `width` wide, with `comment` (the AI-generated mention) in a comment segment, as a clip
+ * carries it in its metadata.
+ */
+export async function posterFrame(input: string, out: string, opts: { width: number; comment: string }): Promise<void> {
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    '-i', input,
+    '-frames:v', '1',
+    '-vf', `scale=${opts.width}:-2`,
+    '-q:v', '5',
+    '-f', 'image2', '-c:v', 'mjpeg', partial,
+  ]);
+  await writeFile(out, withJpegComment(await readFile(out), opts.comment));
+}
+
+/** A JPEG with a comment segment (COM: FF FE, its length, the text) right after its start marker. */
+export function withJpegComment(jpeg: Buffer, comment: string): Buffer {
+  if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) throw new Error('not a JPEG');
+  const text = Buffer.from(comment, 'utf8');
+  const segment = Buffer.alloc(4 + text.length);
+  segment[0] = 0xff;
+  segment[1] = 0xfe;
+  segment.writeUInt16BE(text.length + 2, 2);
+  text.copy(segment, 4);
+  return Buffer.concat([jpeg.subarray(0, 2), segment, jpeg.subarray(2)]);
 }
 
 /** zoompan expressions (z, x, y) in terms of `on`, the output frame number. */

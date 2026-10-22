@@ -4,6 +4,8 @@ export type PresetSummary = {
   description: string;
   /** Absent while the preset has no preview file yet. */
   previewUrl?: string;
+  /** The still shown while the preview loads. */
+  posterUrl?: string;
   /** Showcase: the preview loops a placeholder clip (camera move simulated by FFmpeg). */
   previewPlaceholder?: boolean;
   poses: string[];
@@ -52,10 +54,21 @@ export type GenerationRecord = {
   placeholder?: boolean;
 };
 
+/** What a model makes, in the order of the Open Stack page (as @montagio/check-open-stack lists them). */
+export type StackFunction = 'camera' | 'effects' | 'transitions' | 'photo' | 'avatar' | 'music' | 'hd' | 'motion';
+
 export type OpenStackReport = {
   ok: boolean;
   checkedAt: string;
-  models: { id: string; license: string; weights: { id: string; license: string }[] }[];
+  /** Every model the Studio can run, grouped by function; `extension` is absent for those every install has. */
+  models: {
+    id: string;
+    name: string;
+    function: StackFunction;
+    license: string;
+    extension?: string;
+    weights: { id: string; license: string; file?: string; bytes?: number; source?: string }[];
+  }[];
   violations: { rule: string; file: string; detail: string }[];
 };
 
@@ -111,10 +124,13 @@ export type EffectSummary = {
   description: string;
   /** Absent while the effect has no preview file yet. */
   previewUrl?: string;
+  /** The still shown while the preview loads. */
+  posterUrl?: string;
   estimate_s: number;
   /** The longest "what the photo shows" the effects model takes. */
   subjectMax: number;
-  /** The model that renders it and its license, for the caption under the clip. */
+  /** The model that renders it and its license, for the caption under the clip (its id links to its Open Stack line). */
+  modelId: string;
   modelName: string;
   license: string;
   /** Showcase: the sample photos it has an example for. */
@@ -127,12 +143,14 @@ export type HookSummary = {
   name: string;
   description: string;
   previewUrl?: string;
+  posterUrl?: string;
   estimate_s: number;
   /** 2: the hook needs a second photo (an outfit). */
   references: 1 | 2;
   /** Showcase: the sample photos it has an example for. */
   samples?: string[];
   /** The transition model, for the caption under the clip. */
+  modelId: string;
   modelName: string;
   license: string;
 };
@@ -153,6 +171,10 @@ export type ExtensionsInfo = {
   upscaleModel?: { id: string; name: string; license: string; maxFrames: number };
   /** The motion transfer model, for the caption under its clip. */
   motionModel?: { id: string; name: string; license: string };
+  /** The demo backend answers (no GPU): a result is a stand-in clip, and its caption says no model ran. */
+  demo?: boolean;
+  /** A render of what Avatar and Motion make, looping in their card and on their empty monitor. */
+  examples?: Partial<Record<'avatar' | 'motion', { previewUrl: string; posterUrl?: string }>>;
 };
 
 export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion';

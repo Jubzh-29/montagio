@@ -373,7 +373,7 @@ export function CharactersPage() {
   return (
     <>
       <Header current="characters" />
-      <main className={styles.page}>
+      <main id="content" tabIndex={-1} className={styles.page}>
         <div className={styles.intro}>
           <h1 className={styles.title}>{t('charactersTitle')}</h1>
           <p className={styles.lead}>{t('charactersLead')}</p>

@@ -18,7 +18,7 @@ export function Canvas({
   recent,
 }: {
   view: CanvasView;
-  onView: (view: 'gallery' | 'result') => void;
+  onView: (view: CanvasView) => void;
   gallery: ReactNode;
   result: ReactNode;
   atelier?: ReactNode;
@@ -27,13 +27,17 @@ export function Canvas({
   const { t } = useI18n();
   // A tab without a wall (Avatar) shows the monitor: the photo, then the render.
   const shown = view === 'gallery' && !gallery ? 'result' : view;
+  // The views of the canvas, as tabs (the pill is for options): the wall, the monitor, and the photo
+  // atelier while one is open, so the atelier is never a dead end and the visitor can come back to it.
+  const views: CanvasView[] = [...(gallery ? (['gallery'] as const) : []), 'result', ...(atelier ? (['atelier'] as const) : [])];
+  const labels: Record<CanvasView, string> = { gallery: t('canvasGallery'), result: t('canvasResult'), atelier: t('canvasAtelier') };
   return (
     <section className={styles.stage} aria-label={t('monitor')}>
-      {view !== 'atelier' && gallery && (
-        <div className={styles.canvasViews} role="group" aria-label={t('canvasViews')}>
-          {(['gallery', 'result'] as const).map((value) => (
-            <button key={value} type="button" className={styles.mode} aria-pressed={view === value} onClick={() => onView(value)}>
-              {value === 'gallery' ? t('canvasGallery') : t('canvasResult')}
+      {views.length > 1 && (
+        <div className={styles.viewTabs} role="group" aria-label={t('canvasViews')}>
+          {views.map((value) => (
+            <button key={value} type="button" className={styles.viewTab} aria-pressed={shown === value} onClick={() => onView(value)}>
+              {labels[value]}
             </button>
           ))}
         </div>
