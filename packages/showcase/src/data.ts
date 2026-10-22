@@ -11,7 +11,8 @@ export type ShowcaseExampleItem = {
   modelId: string;
   modelName: string;
   license: string;
-  examples: { sample: string; url: string; workflowUrl: string }[];
+  /** `poster`: the clip's first frame, shown while it loads (absent in data written before it). */
+  examples: { sample: string; url: string; workflowUrl: string; poster?: string }[];
 };
 
 /**
@@ -26,8 +27,8 @@ export type ShowcaseData = {
   repoUrl: string | null;
   /** The model every rendered clip was made with. */
   model: { id: string; name: string; license: string };
-  /** `preview` is a light loop of the preset on the first sample, for the gallery tile. */
-  presets: { id: string; name: string; description: string; poses: string[]; speed: number; defaultModel: string; preview: string; yaml: string }[];
+  /** `preview` is a light loop of the preset on the first sample, for the gallery tile; `poster` its first frame. */
+  presets: { id: string; name: string; description: string; poses: string[]; speed: number; defaultModel: string; preview: string; poster?: string; yaml: string }[];
   models: { id: string; name: string; kind: 'video' | 'image'; tier: 'quality' | 'fast'; license: string; estimate_s: { '480p': number; '720p'?: number } }[];
   /** What validatePreset needs, as Map entries. */
   library: { models: [string, ModelEntry][]; templates: [string, ApiWorkflow][]; lock: [string, LockEntry][] };

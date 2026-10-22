@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
 import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import type { HistoryItem } from '@/lib/api-types';
-import { historyFilter, repriseHref, type HistoryFilter } from '@/lib/reprise';
+import { historyFilter, historyName, historySubject, repriseHref, type HistoryFilter } from '@/lib/reprise';
 import { useMotionPaused } from '@/lib/use-motion';
 import { Header } from './Header';
 import { ShowcaseFooter } from './ShowcaseFooter';
@@ -50,15 +50,19 @@ export function HistoryCard({ item, paused }: { item: HistoryItem; paused: boole
   const { t, lang } = useI18n();
   const date = new Date(item.createdAt).toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' });
   const extension = item.kind === 'photo' ? 'png' : 'mp4';
+  const subject = historySubject(item);
+  const name = historyName(item, lang);
+  const kindAndName = name === item.modelName ? t(KIND_KEYS[item.kind]) : `${t(KIND_KEYS[item.kind])} · ${name}`;
   return (
     <li className={styles.card}>
       <HistoryMedia item={item} paused={paused} />
       <div className={styles.cardText}>
-        <p className={styles.cardName}>
-          {t(KIND_KEYS[item.kind])} · {item.name}
-        </p>
+        {/* Titled by what was asked, which tells two takes apart; what made it goes under. */}
+        <p className={styles.cardName}>{subject ?? kindAndName}</p>
         <p className={styles.cardMeta}>
-          {item.modelName} · <time dateTime={item.createdAt}>{date}</time>
+          {subject && `${kindAndName} · `}
+          {item.modelName !== name && `${item.modelName} · `}
+          <time dateTime={item.createdAt}>{date}</time>
         </p>
       </div>
       <div className={styles.cardActions}>
@@ -96,7 +100,7 @@ export function HistoryPage() {
   return (
     <>
       <Header current="history" />
-      <main className={styles.page}>
+      <main id="content" tabIndex={-1} className={styles.page}>
         <h1 className={styles.title}>{t('historyTitle')}</h1>
         {IS_SHOWCASE && <p className={styles.note}>{t('historyShowcaseNote')}</p>}
         {items && items.length > 0 && (

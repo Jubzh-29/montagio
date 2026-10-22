@@ -67,7 +67,8 @@ test('unset flag: nothing dated, nothing shown', async () => {
   libraryCopy(undateLibrary);
   expect(await visibleExtensions()).toEqual([]);
   expect(await visibleEffects()).toEqual([]);
-  expect(await info()).toEqual({ extensions: [], effects: [], hooks: [], estimates: { t2i: 5 } });
+  // The tests run the demo backend: the Studio is told so (its captions say no model ran).
+  expect(await info()).toEqual({ extensions: [], effects: [], hooks: [], estimates: { t2i: 5 }, demo: true });
 });
 
 test('unset flag: the dates of GPU sessions S2 and S3 show the seven extensions, the six effects, Wardrobe Swap and Ignite', async () => {
@@ -142,13 +143,17 @@ test('GET /api/extensions describes the wall: effects first in their order, hook
     description: expect.any(String),
     estimate_s: expect.any(Number),
     subjectMax: expect.any(Number),
+    // The caption links to its Open Stack line by this id.
+    modelId: 'wan21-i2v-effects',
     modelName: expect.stringMatching(/Wan 2.1/),
     license: 'Apache-2.0',
     previewUrl: '/media/presets/effects/previews/squish.mp4',
+    // Its first frame, shown while the clip loads.
+    posterUrl: '/media/presets/effects/previews/squish.jpg',
   });
   expect(body.hooks.find((hook) => hook.id === 'wardrobe-swap')?.references).toBe(2);
   // A hook's clip is captioned with the transition model, as an effect's with the effects model.
-  expect(body.hooks[0]).toMatchObject({ modelName: expect.stringMatching(/Wan 2.2/), license: 'Apache-2.0' });
+  expect(body.hooks[0]).toMatchObject({ modelId: 'wan22-flf2v-transition', modelName: expect.stringMatching(/Wan 2.2/), license: 'Apache-2.0' });
   expect(body.estimates).toEqual({ t2i: 5, edit: 15, avatar: 255, music: 15, upscale: 215, motion: 205 }); // avatar: voice 15 + avatar 240
   // The edit's caption names its model and license, which the preset catalogue does not hold.
   expect(body.editModel).toEqual({ id: 'qwen-image-edit-2511', name: expect.stringMatching(/^Qwen-Image-Edit-2511/), license: 'Apache-2.0' });

@@ -12,6 +12,7 @@ import {
   headerHash,
   PLACEHOLDER_METADATA,
   placeholderClip,
+  posterFrame,
   previewClip,
   SHOWCASE_COLOUR,
   SHOWCASE_X264,
@@ -26,6 +27,8 @@ import { DEFAULT_PLACEHOLDER_SEED, showcaseWorkflow } from './workflow';
 /** Width of the gallery tile loops. */
 const PREVIEW_WIDTH = 320;
 const previewFile = (preset: string) => `previews/${preset}.mp4`;
+/** The first frame of a clip, beside it: what a tile shows while the clip loads. */
+const posterOf = (file: string) => file.replace(/\.mp4$/, '.jpg');
 
 /** Bumped when the way prepare encodes changes: every cached file is then made again. */
 const CACHE_VERSION = 'v2';
@@ -138,6 +141,9 @@ export async function prepareShowcase(
       await ensure(previewFile(item.preset.id), hash('preview', clipPrint, PREVIEW_WIDTH, tags), (path) =>
         previewClip(join(outDir, item.file), path, { width: PREVIEW_WIDTH, tags }),
       );
+      await ensure(posterOf(previewFile(item.preset.id)), hash('poster', clipPrint, PREVIEW_WIDTH, tags), (path) =>
+        posterFrame(join(outDir, item.file), path, { width: PREVIEW_WIDTH, comment: tags.comment }),
+      );
     }
     const workflow = showcaseWorkflow(library, manifest, item.preset, item.sample, item.rendered?.seed ?? DEFAULT_PLACEHOLDER_SEED);
     const workflowPath = join(outDir, item.workflow);
@@ -147,7 +153,7 @@ export async function prepareShowcase(
   }
 
   // The effect and hook examples, copied as ingest wrote them, with their workflows.
-  const exampleUrls = new Map<string, { sample: string; url: string; workflowUrl: string }[]>();
+  const exampleUrls = new Map<string, { sample: string; url: string; workflowUrl: string; poster: string }[]>();
   for (const [kind, entries] of [
     ['effect', manifest.effects.map((entry) => ({ id: entry.effect, entry }))],
     ['hook', manifest.hooks.map((entry) => ({ id: entry.hook, entry }))],
@@ -156,9 +162,12 @@ export async function prepareShowcase(
       const file = kind === 'effect' ? effectFile(id, entry.sample) : hookFile(id, entry.sample);
       const workflowUrl = exampleWorkflowFile(kind, id, entry.sample);
       await ensure(file, hash('example', entry.sha256), (path) => copyFile(join(showcaseDir, file), path));
+      await ensure(posterOf(file), hash('example-poster', entry.sha256, PREVIEW_WIDTH), (path) =>
+        posterFrame(join(outDir, file), path, { width: PREVIEW_WIDTH, comment: AI_METADATA.comment }),
+      );
       await ensure(workflowUrl, hash('example-workflow', entry.workflow_sha256), (path) => copyFile(join(showcaseDir, workflowUrl), path));
       const key = `${kind}:${id}`;
-      exampleUrls.set(key, [...(exampleUrls.get(key) ?? []), { sample: entry.sample, url: file, workflowUrl }]);
+      exampleUrls.set(key, [...(exampleUrls.get(key) ?? []), { sample: entry.sample, url: file, workflowUrl, poster: posterOf(file) }]);
     }
   }
   const exampleItem = (kind: 'effect' | 'hook', preset: { id: string; name: string; description: string; models: { preferred: string } }) => {
@@ -201,6 +210,7 @@ export async function prepareShowcase(
         speed: preset.camera.speed,
         defaultModel: preset.models.preferred,
         preview: previewFile(preset.id),
+        poster: posterOf(previewFile(preset.id)),
         yaml: await readFile(join(root, ...(library.presetFiles.get(preset.id) ?? `presets/${preset.id}.yaml`).split('/')), 'utf8'),
       })),
     ),

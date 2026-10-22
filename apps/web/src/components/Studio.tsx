@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useI18n } from '@/i18n';
+import { catalogName, useI18n, type MessageKey } from '@/i18n';
 import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import {
   TERMINAL_STATES,
@@ -20,6 +20,7 @@ import {
 } from '@/lib/api-types';
 import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
+import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
 import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
@@ -31,7 +32,7 @@ import { needsScene, restoredScene, SCENE_MAX, sceneMissing, sceneOf } from '@/l
 import { canUpscale } from '@/lib/hd';
 import { estimateSpeech } from '@/lib/speech';
 import { nextView, tabEvent, type CanvasEvent, type CanvasState, type ShownTab } from '@/lib/studio-view';
-import { HOOKS_READY, pickTab, tabHref, visibleTabs } from '@/lib/tabs';
+import { HOOKS_READY, pickTab, tabHref, visibleTabs, type Tab } from '@/lib/tabs';
 import { refreshExtensions, useExtensions } from '@/lib/use-extensions';
 import { useShowcase } from '@/lib/use-showcase';
 import { AiCaption } from './AiCaption';
@@ -136,6 +137,24 @@ function lostJob(job: Tracked): Job {
   return { ...job, record: { ...job.record, state: 'failed', error: 'lost' } } as Tracked;
 }
 
+/** The sample photo of each tab (demo-assets/images), and the description that comes with it. */
+const SAMPLE_OF_TAB: Record<Tab, { file: string; scene: MessageKey; forTab?: 'effects' | 'avatar' | 'motion' }> = {
+  effects: { file: 'sample-subject.png', scene: 'sampleSubjectScene', forTab: 'effects' },
+  camera: { file: 'sample-16x9.png', scene: 'samplePhotoScene' },
+  film: { file: 'sample-16x9.png', scene: 'samplePhotoScene' },
+  avatar: { file: 'sample-portrait.png', scene: 'samplePortraitScene', forTab: 'avatar' },
+  motion: { file: 'sample-character.png', scene: 'sampleCharacterScene', forTab: 'motion' },
+};
+
+/** Under the promise: what each tab makes, in one line. */
+const TAB_LEDES: Record<Tab, MessageKey> = {
+  effects: 'ledeEffects',
+  camera: 'ledeCamera',
+  film: 'ledeFilm',
+  avatar: 'ledeAvatar',
+  motion: 'ledeMotion',
+};
+
 export function Studio() {
   const { t, lang } = useI18n();
   // The tab comes from the URL (?tab=), among those the extensions allow; Camera is the single shot, Film the sequence.
@@ -144,6 +163,10 @@ export function Studio() {
   const tab = pickTab(requestedTab, visibleTabs(extensions));
   const mode: Mode = tab === 'film' ? 'sequence' : 'single';
   const [canvas, setCanvas] = useState<CanvasState>({ view: 'gallery', before: 'gallery' });
+  // The render the visitor started from this page, and the time its Generate button announced;
+  // its clock counts from when it starts rolling (an object per take, so a new take restarts it).
+  const [take, setTake] = useState<{ expected_s: number } | null>(null);
+  const [clock, setClock] = useState<{ take: { expected_s: number }; ms: number } | null>(null);
   // The photo atelier (text to image, edit), over the canvas; and the text of a photo made from one.
   const [atelier, setAtelier] = useState<'t2i' | 'edit' | null>(null);
   // The ateliers opened and not closed yet: each stays mounted, out of view, until its Close or its photo is used.
@@ -362,17 +385,22 @@ export function Studio() {
     if (busyRef.current) return;
     touched.current = true;
     const token = ++uploadToken.current;
-    const localUrl = '/media/demo-assets/images/sample-16x9.png';
+    // Each tab has its sample: a subject for an effect, a face for an avatar, a character for a motion.
+    const sample = SAMPLE_OF_TAB[tab];
+    const localUrl = `/media/demo-assets/images/${sample.file}`;
     setJob({ status: 'idle' });
     setPhotoPrompt(undefined);
-    setPrompt(t('samplePhotoScene'));
-    sceneOfPhoto.current = true;
+    // The sample comes described, unless the visitor typed a description before it: theirs stays.
+    if (sceneOfPhoto.current || !prompt.trim()) {
+      setPrompt(t(sample.scene));
+      sceneOfPhoto.current = true;
+    }
     setUpload({ status: 'uploading', localUrl });
     const settle = (next: UploadState) => {
       if (token === uploadToken.current) setUpload(next);
     };
     try {
-      const res = await apiFetch('/api/uploads/sample', { method: 'POST' });
+      const res = await apiFetch(sample.forTab ? `/api/uploads/sample?for=${sample.forTab}` : '/api/uploads/sample', { method: 'POST' });
       if (!res.ok) return settle({ status: 'error', message: t('errorGeneric') });
       const result = (await res.json()) as UploadResult;
       settle({ status: 'ready', localUrl, imageRef: result.imageRef, personal: result.personal });
@@ -382,8 +410,11 @@ export function Studio() {
   };
 
   /** Showcase: a sample photo stands in for an upload; nothing is sent anywhere. */
+  // The button that opened the atelier (Text to image, Edit): the focus goes back to it when it closes.
+  const atelierOpener = useRef<HTMLElement | null>(null);
   const openAtelier = (kind: 't2i' | 'edit') => {
     if (busyRef.current) return;
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) atelierOpener.current = document.activeElement;
     setAtelier(kind);
     setAteliers((open) => (open.includes(kind) ? open : [...open, kind]));
     setCanvas((current) => nextView('open-atelier', current));
@@ -393,6 +424,12 @@ export function Studio() {
     setAtelier(null);
     setAteliers((open) => open.filter((entry) => entry !== kind));
     setCanvas((current) => nextView('close-atelier', current));
+    const opener = atelierOpener.current;
+    atelierOpener.current = null;
+    // After the atelier has gone: the focus would otherwise fall to the page's body.
+    requestAnimationFrame(() => {
+      if (opener?.isConnected) opener.focus();
+    });
   };
 
   /** The atelier's image becomes the start photo, as any upload would; one made from a text is described by it. */
@@ -453,6 +490,19 @@ export function Studio() {
   // The rights box is for this photo and this clip: another one asks again.
   const rightsKey = `${upload.status === 'ready' ? upload.imageRef : ''}|${motionVideo.status === 'ready' ? motionVideo.videoRef : ''}`;
   const [rightsFor, setRightsFor] = useState(rightsKey);
+  // A new photo on Camera shows on the monitor, with the dashed frame of where the chosen move ends:
+  // the cause and effect that would otherwise wait behind the Monitor button. It switches when the
+  // photo is chosen, not when its upload ends: a Gallery click meanwhile is the visitor's last word.
+  const startPhoto = upload.status === 'uploading' || upload.status === 'ready' ? upload.localUrl : null;
+  const [photoShown, setPhotoShown] = useState(startPhoto);
+  // Only on a tab that is certain: asked for in the URL, or settled by /api/extensions. Before they
+  // answer, the Studio's guess is Camera, and the Effects wall would stay behind the monitor: the
+  // new photo waits for the tab to settle.
+  const tabSettled = extensions !== null || requestedTab === 'camera';
+  if (photoShown !== startPhoto && tabSettled) {
+    setPhotoShown(startPhoto);
+    if (startPhoto && tab === 'camera') setCanvas((current) => nextView('photo', current));
+  }
   if (rightsFor !== rightsKey) {
     setRightsFor(rightsKey);
     setRights(false);
@@ -683,6 +733,7 @@ export function Studio() {
   const generate = () => {
     if (submitting.current || !canGenerate || upload.status !== 'ready') return;
     followJob.current = true;
+    setTake({ expected_s: mode === 'sequence' && !remix ? filmEstimate : estimate });
     moveCanvas('generate');
     const userPrompt = prompt.trim() || undefined;
     if (tab === 'motion') {
@@ -753,6 +804,12 @@ export function Studio() {
     }
   }, [job.status, viewState]);
 
+  // Try again: a failed render is taken again as it was set up; a refused one waits for the change it asked for.
+  const retry = () => {
+    setJob({ status: 'idle' });
+    if (canGenerate) generate();
+  };
+
   const cancel = async () => {
     if (!tracked) return;
     try {
@@ -791,6 +848,48 @@ export function Studio() {
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
   const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
+  // A result on the monitor is the screen's subject: its Download is the red button, Generate steps back.
+  const resultShown = succeeded !== undefined && canvas.view === 'result';
+  const elapsed_s = clock && clock.take === take ? clock.ms / 1000 : 0;
+  const percent = tracked ? Math.round(tracked.record.progress * 100) : 0;
+  // The slate's time left: the progress's pace once there is some, so 96 % no longer reads "~9 min left".
+  const left_s = take ? remainingSeconds(elapsed_s, take.expected_s, tracked?.record.progress ?? 0) : 0;
+
+  // The slate's clock: one tick a second while the take rolls.
+  useEffect(() => {
+    if (!busy || !take) return;
+    const startedAt = Date.now();
+    const timer = setInterval(() => setClock({ take, ms: Date.now() - startedAt }), 1000);
+    return () => clearInterval(timer);
+  }, [busy, take]);
+  // The take is over once its render is: a render Reuse brings back later has no clock of its own.
+  const [rolling, setRolling] = useState(busy);
+  if (rolling !== busy) {
+    setRolling(busy);
+    if (!busy) setTake(null);
+  }
+
+  // The browser tab says a take is rolling, for a visitor on another tab; then that it is ready.
+  const pageTitle = useRef<string | null>(null);
+  const done = succeeded !== undefined;
+  useEffect(() => {
+    pageTitle.current ??= document.title;
+    const original = pageTitle.current;
+    if (busy) {
+      document.title = t('titleRec', { p: percent });
+      return;
+    }
+    if (!done || !document.hidden) {
+      document.title = original;
+      return;
+    }
+    document.title = t('titleReady');
+    const back = () => {
+      if (!document.hidden) document.title = original;
+    };
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
+  }, [busy, percent, done, t]);
   const sequenceTiles: SequenceTiles = {
     shotsOf: (id) => shots.flatMap((shot, index) => (shot.presetId === id ? [index + 1] : [])),
     nextShot: shots.length < MAX_SHOTS ? shots.length + 1 : null,
@@ -819,7 +918,10 @@ export function Studio() {
     speed: movePreset.speed,
   };
   // The slate under the monitor: the take about to be shot, even once a photo hides the viewfinder.
-  const slateMove = tab === 'motion' ? t('tabMotion') : tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoice?.item.name : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? movePreset?.name : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  // The names of the choice in hand, in the interface's language.
+  const wallChoiceName = wallChoice ? catalogName(lang, wallChoice.item.id, wallChoice.item.name) : undefined;
+  const moveName = movePreset ? catalogName(lang, movePreset.id, movePreset.name) : undefined;
+  const slateMove = tab === 'motion' ? t('tabMotion') : tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoiceName : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? moveName : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
   // An avatar lasts as long as its speech: the slate says the estimate, once there is a text.
   const speechSeconds = estimateSpeech(speechText, speechLanguage);
   const slate = slateMove && [
@@ -830,11 +932,17 @@ export function Studio() {
       : tab === 'avatar'
       ? speechSeconds > 0 && t('slateSpec', { s: speechSeconds })
       : t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
+    ...(busy && take
+      ? [
+          t('slateRec', { t: formatClock(elapsed_s) }),
+          left_s > 20 ? t('slateLeft', { d: formatDuration(left_s) }) : t('slateFinishing'),
+        ]
+      : []),
   ].filter(Boolean);
 
   const wallItemOfResult = tracked?.kind === 'job' ? [...effects, ...hooks].find((item) => item.id === tracked.record.label.itemId) : undefined;
-  const resultModel: { name: string; license: string } | undefined = wallItemOfResult
-    ? { name: wallItemOfResult.modelName, license: wallItemOfResult.license }
+  const resultModel: { id?: string; name: string; license: string } | undefined = wallItemOfResult
+    ? { id: wallItemOfResult.modelId, name: wallItemOfResult.modelName, license: wallItemOfResult.license }
     : tracked?.kind === 'job' && tracked.record.task === 'avatar'
       ? extensions?.avatarModel
     : tracked?.kind === 'job' && tracked.record.task === 'motion'
@@ -857,33 +965,46 @@ export function Studio() {
         />
       </Suspense>
       <Header recording={busy} current={tab} />
-      <main className={styles.studio} data-motion={motionPaused ? 'paused' : 'playing'}>
-        <h1 className="visually-hidden">
-          {t('appName')} — {t('tagline')}
-        </h1>
+      <main id="content" tabIndex={-1} className={styles.studio} data-motion={motionPaused ? 'paused' : 'playing'}>
+        {/* What Montagio does, then what this tab makes: the first thing read, above the composer and the canvas. */}
+        <div className={styles.intro}>
+          <h1 className={styles.promise}>{t('promise')}</h1>
+          <p className={styles.lede} data-testid="tab-lede">
+            {t(TAB_LEDES[tab])}
+          </p>
+        </div>
         <Composer
           label={t('composerLabel')}
           choice={
             tab === 'motion' ? (
               <ChoiceCard
                 name={t('tabMotion')}
-                kindLabel={t('motionKind', { s: motionVideo.status === 'ready' && motionVideo.duration_s !== undefined ? Math.round(motionVideo.duration_s * 10) / 10 : 5 })}
+                kindLabel={
+                  motionVideo.status === 'ready' && motionVideo.duration_s !== undefined
+                    ? t('motionKind', { s: Math.round(motionVideo.duration_s * 10) / 10 })
+                    : t('motionKindEmpty')
+                }
+                previewUrl={extensions?.examples?.motion?.previewUrl}
+                posterUrl={extensions?.examples?.motion?.posterUrl}
                 icon="motion"
                 paused={motionPaused}
               />
             ) : tab === 'avatar' ? (
               <ChoiceCard
                 name={t('tabAvatar')}
-                kindLabel={speechSeconds > 0 ? t('avatarKind', { s: speechSeconds }) : t('tabAvatar')}
+                kindLabel={speechSeconds > 0 ? t('avatarKind', { s: speechSeconds }) : t('avatarKindEmpty')}
+                previewUrl={extensions?.examples?.avatar?.previewUrl}
+                posterUrl={extensions?.examples?.avatar?.posterUrl}
                 icon="avatar"
                 paused={motionPaused}
               />
             ) : tab === 'effects' ? (
               wallChoice ? (
                 <ChoiceCard
-                  name={wallChoice.item.name}
+                  name={catalogName(lang, wallChoice.item.id, wallChoice.item.name)}
                   kindLabel={t(wallChoice.kind === 'hook' ? 'hookKind' : 'effectKind', { s: CLIP_SECONDS })}
                   previewUrl={wallChoice.item.previewUrl}
+                  posterUrl={wallChoice.item.posterUrl}
                   icon={wallChoice.kind}
                   paused={motionPaused}
                   onChange={() => moveCanvas('change')}
@@ -905,14 +1026,21 @@ export function Studio() {
               </>
             ) : movePreset ? (
               <ChoiceCard
-                name={remix ? t('remixTitle', { name: remix.baseName }) : movePreset.name}
+                name={remix ? t('remixTitle', { name: remix.baseName }) : catalogName(lang, movePreset.id, movePreset.name)}
                 kindLabel={t('choiceCamera', { s: CLIP_SECONDS })}
                 previewUrl={remix ? undefined : movePreset.previewUrl}
+                posterUrl={remix ? undefined : movePreset.posterUrl}
                 poses={movePreset.poses}
                 speed={movePreset.speed}
                 icon="camera"
                 paused={motionPaused}
                 onChange={() => moveCanvas('change')}
+                remix={
+                  mode === 'single' && !remix
+                    ? { onOpen: () => presetId && void openRemix(presetId), disabled: presetId === null }
+                    : undefined
+                }
+                remixRef={remixToggleRef}
               />
             ) : null
           }
@@ -967,25 +1095,7 @@ export function Studio() {
               ) : null
             ) : (
             <>
-              {mode === 'single' && !remix && (
-                <button
-                  ref={remixToggleRef}
-                  type="button"
-                  className={styles.buttonSecondary}
-                  aria-expanded={false}
-                  disabled={presetId === null}
-                  onClick={() => presetId && openRemix(presetId)}
-                >
-                  {t('remix')}
-                </button>
-              )}
-              <ModelPicker
-                models={models}
-                loading={catalog === 'loading'}
-                selectedId={modelId}
-                onSelect={setModelId}
-                onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
-              />
+              {/* What the photo shows first: it describes the photo above, and Generate waits for it. */}
               <div className={styles.panelSection}>
                 <label htmlFor="scene-prompt" className={styles.sectionTitle}>
                   {t('prompt')}
@@ -1013,6 +1123,15 @@ export function Studio() {
                   </p>
                 )}
               </div>
+              {/* On a phone, the full picker; on a large screen it sits by Generate (below). */}
+              <ModelPicker
+                models={models}
+                loading={catalog === 'loading'}
+                selectedId={modelId}
+                onSelect={setModelId}
+                onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
+                className={styles.modelsInFields}
+              />
             </>
             )
           }
@@ -1026,9 +1145,26 @@ export function Studio() {
           generate={
             <>
               <div className={styles.generateBlock}>
+                {/* What the time buys, right where it is spent: Quality and Fast with their times. */}
+                {(tab === 'camera' || tab === 'film') && models.length > 1 && (
+                  <ModelPicker
+                    compact
+                    name="model-by-generate"
+                    models={models}
+                    selectedId={modelId}
+                    onSelect={setModelId}
+                    onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
+                    className={styles.modelsByGenerate}
+                  />
+                )}
                 {primaryLabel ? (
-                  <button type="button" className={styles.buttonPrimary} disabled={!canGenerate} onClick={generate}>
-                    {t(primaryLabel, { s: mode === 'sequence' && !remix ? filmEstimate : estimate })}
+                  <button
+                    type="button"
+                    className={resultShown || canvas.view === 'atelier' ? styles.buttonSecondary : styles.buttonPrimary}
+                    disabled={!canGenerate}
+                    onClick={generate}
+                  >
+                    {t(primaryLabel, { d: formatDuration(mode === 'sequence' && !remix ? filmEstimate : estimate) })}
                   </button>
                 ) : (
                   <div className={styles.showcaseNote} role="note">
@@ -1060,7 +1196,7 @@ export function Studio() {
                 {IS_SHOWCASE && kind === 't2i' ? (
                   <ShowcaseTextAtelier
                     texts={sampleTexts}
-                    model={{ name: 'Z-Image Turbo', license: catalogModels.find((model) => model.id === 'z-image-turbo')?.license ?? 'Apache-2.0' }}
+                    model={{ id: 'z-image-turbo', name: 'Z-Image Turbo', license: catalogModels.find((model) => model.id === 'z-image-turbo')?.license ?? 'Apache-2.0' }}
                     onUse={(photo) => takePhoto(photo, kind)}
                     onClose={() => closeAtelier(kind)}
                   />
@@ -1079,7 +1215,13 @@ export function Studio() {
               </div>
             ))
           }
-          onView={(value) => setCanvas({ view: value, before: value })}
+          onView={(value) =>
+            setCanvas((current) =>
+              value === 'atelier'
+                ? { view: 'atelier', before: current.view === 'atelier' ? current.before : current.view }
+                : { view: value, before: value },
+            )
+          }
           gallery={
             tab === 'avatar' || tab === 'motion' ? null : tab === 'effects' ? (
               <EffectWall
@@ -1126,9 +1268,10 @@ export function Studio() {
                 stepImageUrl={tracked?.kind === 'job' ? tracked.record.stepImageUrl : undefined}
                 autoPlayResult={!(motionPaused && view?.id === arrivalId)}
                 onFile={onFile}
-                onSample={() => void loadSample()}
                 onCancel={cancel}
-                onRetry={() => setJob({ status: 'idle' })}
+                example={tab === 'avatar' || tab === 'motion' ? extensions?.examples?.[tab] : undefined}
+                examplePaused={motionPaused}
+                onRetry={retry}
                 statusLabel={statusLabel}
                 showcase={
                   IS_SHOWCASE
@@ -1148,34 +1291,38 @@ export function Studio() {
                 }
               />
               {slate && (
-                <p className={styles.slate}>
+                <p className={styles.slate} data-testid="slate" data-rolling={(busy && take !== null) || undefined}>
                   {slate.map((part, index) => (
                     <span key={index}>{part}</span>
                   ))}
                 </p>
               )}
-              {IS_SHOWCASE && succeeded && (
-                <p className={styles.caption} data-testid="result-caption">
-                  {succeeded.placeholder
-                    ? t('showcasePlaceholderCaption')
-                    : t('showcaseCaption', { model: resultModel?.name ?? showcase?.model.name ?? '', license: resultModel?.license ?? showcase?.model.license ?? '' })}
+              {busy && !IS_SHOWCASE && (
+                <p className={styles.hint} data-testid="leave-hint">
+                  {t('leaveHint')}
                 </p>
               )}
-              {!IS_SHOWCASE && succeeded && resultModel && <AiCaption modelName={resultModel.name} license={resultModel.license} />}
+              {IS_SHOWCASE && succeeded?.placeholder && (
+                <p className={styles.caption} data-testid="result-caption">
+                  {t('showcasePlaceholderCaption')}
+                </p>
+              )}
+              {IS_SHOWCASE && succeeded && !succeeded.placeholder && (resultModel ?? showcase?.model) && (
+                <AiCaption text="showcaseCaption" testId="result-caption" model={(resultModel ?? showcase?.model)!} />
+              )}
+              {!IS_SHOWCASE && succeeded && resultModel && <AiCaption model={resultModel} />}
               {succeeded && tracked?.kind === 'job' && tracked.record.task === 'motion' && (
                 <p className={styles.caption} data-testid="motion-no-sound">
                   {t('motionNoSound')}
                 </p>
               )}
               {busy && tracked?.kind === 'job' && tracked.record.stepImageUrl && extensions?.editModel && (
-                <p className={styles.caption} data-testid="end-frame-caption">
-                  {t('hookEndFrame', { model: extensions.editModel.name, license: extensions.editModel.license })}
-                </p>
+                <AiCaption text="hookEndFrame" testId="end-frame-caption" model={extensions.editModel} />
               )}
               {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (
-                    <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.presetId}.mp4`}>
+                    <a className={styles.buttonPrimary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.presetId}.mp4`}>
                       {t('download')}
                     </a>
                   )}
@@ -1195,7 +1342,7 @@ export function Studio() {
               {tracked?.kind === 'job' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (
-                    <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.label.itemId ?? tracked.record.task}.mp4`}>
+                    <a className={styles.buttonPrimary} href={tracked.record.outputUrl} download={`montagio-${tracked.record.label.itemId ?? tracked.record.task}.mp4`}>
                       {t('download')}
                     </a>
                   )}
@@ -1224,7 +1371,7 @@ export function Studio() {
               {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (
-                    <a className={styles.buttonSecondary} href={tracked.record.outputUrl} download="montagio-film.mp4">
+                    <a className={styles.buttonPrimary} href={tracked.record.outputUrl} download="montagio-film.mp4">
                       {t('downloadFilm')}
                     </a>
                   )}

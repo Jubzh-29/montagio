@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useI18n } from '@/i18n';
+import { useId, useRef, useState } from 'react';
+import { catalogText, useI18n } from '@/i18n';
 import type { PresetSummary } from '@/lib/api-types';
+import { usePlayWhileSeen } from '@/lib/use-play-while-seen';
 import { MoveGlyph } from './MoveGlyph';
 import styles from './studio.module.css';
 
@@ -22,29 +23,28 @@ function PresetTile({
   sequence?: SequenceTiles;
   onSelect: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const text = catalogText(lang, preset);
+  const id = useId();
   const [previewReady, setPreviewReady] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
 
-  // No autoplay attribute: the clip plays only while the previews run.
-  useEffect(() => {
-    const element = video.current;
-    if (!element) return;
-    if (paused) element.pause();
-    else element.play().catch(() => undefined);
-  }, [paused, preset.previewUrl]);
+  // No autoplay attribute: the clip plays only while the previews run, and while the tile is seen.
+  usePlayWhileSeen(video, paused, preset.previewUrl);
 
   const shots = sequence?.shotsOf(preset.id) ?? [];
   return (
     <button
       type="button"
-      className={styles.preset}
+      className={styles.tile}
+      aria-labelledby={`${id}-name`}
+      aria-describedby={sequence ? `${id}-caption ${id}-shots` : `${id}-caption`}
       // A single shot selects one move; a sequence adds shots, nothing stays pressed.
       aria-pressed={sequence ? undefined : selected}
       data-full={sequence?.nextShot === null}
       onClick={onSelect}
     >
-      <span className={styles.presetMedia}>
+      <span className={styles.tileMedia} data-shape="wide">
         {sequence && (
           <span className={styles.shotMarks} aria-hidden="true">
             {shots.map((n) => (
@@ -62,6 +62,7 @@ function PresetTile({
             className={styles.presetPreview}
             data-ready={previewReady}
             src={preset.previewUrl}
+            poster={preset.posterUrl}
             muted
             loop
             playsInline
@@ -72,13 +73,15 @@ function PresetTile({
           />
         )}
         {preset.previewPlaceholder && <span className={styles.badge}>{t('showcasePlaceholderBadge')}</span>}
+        <span id={`${id}-name`} className={styles.tileName}>
+          {text.name}
+        </span>
       </span>
-      <span className={styles.presetText}>
-        <span className={styles.presetName}>{preset.name}</span>
-        <span className={styles.presetDescription}>{preset.description}</span>
+      <span id={`${id}-caption`} className={styles.tileCaption}>
+        {text.description}
       </span>
       {sequence && (
-        <span className="visually-hidden">
+        <span id={`${id}-shots`} className="visually-hidden">
           {shots.length > 0 && t('inShots', { list: shots.join(', ') })}{' '}
           {sequence.nextShot === null ? t('shotsFull') : t('addAsShot', { i: sequence.nextShot })}
         </span>

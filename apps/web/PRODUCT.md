@@ -14,11 +14,11 @@ The primary audience is the jury of the Comfy open-source contest named in the R
 
 ## Product Purpose
 
-Montagio is a one-click camera-move studio on open weights (Wan 2.2 Fun Camera), built on ComfyUI. A photo plus a preset gives a 5 s clip with a controlled camera move; two or three presets give a 10 to 15 s film. Every preset is an open YAML file that opens in ComfyUI. Success: the jury understands the product in five seconds, gets a clip in a few clicks, and trusts that the whole stack is open.
+Montagio turns one photo into a few seconds of viral video effect, on 100 % open weights, built on ComfyUI. The Studio opens on the Effects wall: a photo plus an effect (Squish, Explode…) or a hook (an edit, then a transition to it) gives a short clip. The other tabs are the tools around it: a controlled camera move (Wan 2.2 Fun Camera) for a 5 s clip, two or three moves for a 10 to 15 s film, a talking avatar, a motion transfer. Every preset is an open YAML file that opens in ComfyUI. Success: the jury understands the product in five seconds, gets a clip in a few clicks, and trusts that the whole stack is open.
 
 ## Positioning
 
-Click like on a commercial camera-preset studio, open the hood like in ComfyUI: that immediacy, on a stack that is open from the weights to the workflow.
+One photo, one viral effect, in a few clicks, like on the commercial effect studios; open the hood like in ComfyUI. That immediacy, on a stack that is open from the weights to the workflow, and that proves it: every result's caption leads to its model's weights and licences. The camera moves stay the signature: the dashed frame that shows where the camera ends, before REC.
 
 ## Brand Personality
 
@@ -34,7 +34,7 @@ The project spec also forbids the commercial competitor's name, logo, texts, out
 
 ## Design Principles
 
-- **Motion first.** The camera moves are the product: they move on screen before anything is read.
+- **Motion first.** The effects and the camera moves are the product: they move on screen before anything is read.
 - **The clip is the brightest thing on screen.** The interface stays dark and quiet around the media.
 - **One click, hood available.** One primary action per screen; ComfyUI, YAML and licences are one step away, never in the way.
 - **Show the proof.** Open weights, licences and the open-stack check are visible, verifiable, never hidden.

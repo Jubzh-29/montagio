@@ -30,18 +30,52 @@ test('clean repo passes', async () => {
   const r = await checkOpenStack(fixture('clean'));
   expect(r.violations).toEqual([]);
   expect(r.ok).toBe(true);
+  const wan21 = 'https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P';
+  const camera = 'https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera';
   expect(r.models).toEqual([
     {
       id: 'wan22-i2v-a14b-fun-camera',
+      name: 'Wan 2.2 Fun Camera',
+      function: 'camera',
       license: 'Apache-2.0',
       weights: [
-        { id: 'wan22-fun-camera-high', license: 'Apache-2.0' },
-        { id: 'wan22-fun-camera-low', license: 'Apache-2.0' },
-        { id: 'umt5-xxl-fp8', license: 'Apache-2.0' },
-        { id: 'wan21-vae', license: 'Apache-2.0' },
+        { id: 'wan22-fun-camera-high', license: 'Apache-2.0', file: 'wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors', source: camera },
+        { id: 'wan22-fun-camera-low', license: 'Apache-2.0', file: 'wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors', source: camera },
+        { id: 'umt5-xxl-fp8', license: 'Apache-2.0', file: 'umt5_xxl_fp8_e4m3fn_scaled.safetensors', source: 'https://huggingface.co/google/umt5-xxl' },
+        { id: 'wan21-vae', license: 'Apache-2.0', file: 'wan_2.1_vae.safetensors', source: wan21 },
       ],
     },
   ]);
+});
+
+test('the repository report lists every weight it ships, each under what it makes', async () => {
+  const r = await checkOpenStack(repoRoot(), { configDir: toolDir });
+  // Every function the Studio offers, in the order of the Open Stack page.
+  expect([...new Set(r.models.map((model) => model.function))]).toEqual(['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion']);
+  expect(r.models.find((model) => model.id === 'wan-animate2-motion')).toMatchObject({ function: 'motion', extension: 'motion' });
+  expect(r.models.find((model) => model.id === 'z-image-turbo')).toMatchObject({ function: 'photo' });
+  expect(r.models.find((model) => model.id === 'z-image-turbo')).not.toHaveProperty('extension');
+  // Nothing fetched goes unlisted: each lock weight is a weight of a listed model, with its size and source.
+  const lock = (parseYaml(readFileSync(join(repoRoot(), 'registry', 'models.lock.yaml'), 'utf8')) as { weights: { id: string }[] }).weights;
+  const listed = new Map(r.models.flatMap((model) => model.weights.map((weight) => [weight.id, weight] as const)));
+  expect(lock.map((entry) => entry.id).filter((id) => !listed.has(id))).toEqual([]);
+  for (const weight of listed.values()) expect(weight).toMatchObject({ bytes: expect.any(Number), source: expect.stringMatching(/^https:\/\//) });
+}, 60_000);
+
+test('a lock weight that no model declares is a violation: the page would not list it', async () => {
+  const clean = (path: string) => readFileSync(join(fixture('clean'), path), 'utf8');
+  const root = scratchRepo({
+    'presets/crash-push.yaml': clean('presets/crash-push.yaml'),
+    'registry/models/wan-fun-camera.yaml': clean('registry/models/wan-fun-camera.yaml'),
+    'workflows/wan22-fun-camera.api.json': clean('workflows/wan22-fun-camera.api.json'),
+    'registry/models.lock.yaml':
+      clean('registry/models.lock.yaml') +
+      '  - id: stray-upscaler\n    file: stray.safetensors\n    url: https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P\n    license: Apache-2.0\n    source: https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P\n',
+  });
+  const r = await checkOpenStack(root, { configDir: toolDir });
+  expect(r.violations).toContainEqual(
+    expect.objectContaining({ rule: 'weight-unlisted', file: join('registry', 'models.lock.yaml'), detail: expect.stringContaining('stray-upscaler') }),
+  );
 });
 
 test('restrictive weight license fails', async () => {

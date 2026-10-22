@@ -19,6 +19,8 @@ const nextConfig: NextConfig = showcaseExport
   : {
       /* config options here */
       cacheComponents: true,
+      // In development, Next's indicator sits over the canvas, not over the composer's hints.
+      devIndicators: { position: 'bottom-right' },
       partialPrefetching: true,
       // The Comfy SDK reads files and hashes them with WebAssembly: load it with Node's own
       // module loader instead of bundling it into the route handlers.

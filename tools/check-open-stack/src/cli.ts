@@ -15,7 +15,8 @@ if (out) {
 }
 
 if (report.ok) {
-  console.log(`open stack: OK — ${report.models.length} model(s), every weight Apache-2.0 or MIT, no closed API`);
+  const files = new Set(report.models.flatMap((model) => model.weights.map((weight) => weight.id))).size;
+  console.log(`open stack: OK — ${report.models.length} model(s), ${files} weight file(s), every weight Apache-2.0 or MIT, no closed API`);
 } else {
   console.error(`open stack: ${report.violations.length} violation(s)`);
   for (const v of report.violations) console.error(`  [${v.rule}] ${v.file}: ${v.detail}`);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useI18n } from '@/i18n';
+import { catalogText, useI18n } from '@/i18n';
 import type { PresetSummary } from '@/lib/api-types';
 import styles from './studio.module.css';
 
@@ -20,8 +20,11 @@ export function ShotList({
   /** The showcase renders nothing: a shot's text could not change its pre-generated clip. */
   promptsDisabled?: boolean;
 }) {
-  const { t } = useI18n();
-  const nameOf = (id: string) => presets.find((preset) => preset.id === id)?.name ?? id;
+  const { t, lang } = useI18n();
+  const nameOf = (id: string) => {
+    const preset = presets.find((entry) => entry.id === id);
+    return preset ? catalogText(lang, preset).name : id;
+  };
   // The slots still free, drawn empty: the film's shape (two shots, a third optional) reads before any click.
   const free = Array.from({ length: max - shots.length }, (_, i) => shots.length + i + 1);
   return (
