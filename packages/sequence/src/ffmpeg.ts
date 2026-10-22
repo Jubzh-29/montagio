@@ -82,7 +82,7 @@ export async function probeAudio(
     '-select_streams', 'a:0',
     '-show_entries', 'stream=codec_name,sample_rate,channels,duration:format=duration',
     '-of', 'json',
-    media,
+    ...LOCAL_FILE_ONLY, media,
   ]);
   const json = JSON.parse(out) as {
     streams?: { codec_name?: string; sample_rate?: string; channels?: number; duration?: string }[];
@@ -327,7 +327,8 @@ export async function prepareMotionClip(
 
 /**
  * A voice sample for the avatar's cloned voice: its first `max_s` seconds (20 by default),
- * mono at 24 kHz, in FLAC, without any video stream. A file without an audio stream fails
+ * mono at 24 kHz, in FLAC, without any video stream nor metadata (a phone writes where it
+ * recorded). `input` is read as a local file only. A file without an audio stream fails
  * before any encoding. Returns the length kept.
  */
 export async function prepareVoiceSample(input: string, out: string, opts: { max_s?: number } = {}): Promise<{ duration_s: number }> {
@@ -335,8 +336,8 @@ export async function prepareVoiceSample(input: string, out: string, opts: { max
   if (!(await probeAudio(input))) throw new SequenceToolError(`no audio stream in ${input}`);
   await writeAtomically(out, (partial) => [
     '-loglevel', 'error', '-y',
-    '-i', input,
-    '-map', '0:a:0', '-vn',
+    ...LOCAL_FILE_ONLY, '-i', input,
+    '-map', '0:a:0', '-vn', '-map_metadata', '-1',
     '-t', String(max_s),
     '-ac', '1', '-ar', '24000',
     '-c:a', 'flac', '-f', 'flac', partial,
