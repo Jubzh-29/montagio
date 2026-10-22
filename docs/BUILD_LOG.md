@@ -180,3 +180,9 @@ UI/UX audit of 21/10 (score 26/40, no P0, three P1): its action plan, one branch
   - On Camera and Film, What the photo shows comes right under the photo, above the model choice, so the sticky Generate block no longer covers it at 1440×900; the composer scrolls a focused field above that block. Remix preset is a text-sized button beside Change on the choice card, its one-line hint under it.
   - The header's and the Generate block's room are two tokens (`--header-room`, `--generate-room`) instead of 72, 88, 104 and 112 px spread over three rules; `DESIGN.md` describes the actual layout, the tile, the view tabs and the one-red-button rule.
   - Checked on the laptop, one suite at a time: typecheck, lint, web `npm test` 355/355, the demo e2e 89/89, the showcase 14/14; the Effects and Camera tabs in a browser at 1440 px.
+- Lot 8, accessibility (`feat/ux-a11y`, on top of lot 7).
+  - A skip link is the first stop of the Studio, History and Open Stack pages and leads to their main content (`#content`), past the header's tabs, badge and languages.
+  - The photo atelier gives the focus back to the button that opened it (Text to image or Edit) when it closes, by Use this photo, Close or Keep, instead of leaving it on the page's body.
+  - The atelier's Format and Look groups have a visible label that also names them (`aria-labelledby`); the tiles' descriptions were exposed in lot 7.
+  - A looping preview plays only while a quarter of its tile is on screen (`usePlayWhileSeen`, an IntersectionObserver), and never while the previews are paused; the audit counted up to nine to twelve clips playing at once.
+  - Checked on the laptop, one suite at a time: typecheck, lint, web `npm test` 355/355, the demo e2e 93/93, the showcase 14/14. The four new tests failed first for the reason they test, the last one also against the wall of lot 7.
