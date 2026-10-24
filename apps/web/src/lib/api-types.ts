@@ -158,6 +158,8 @@ export type HookSummary = {
 /** What the Studio may show: the extensions the flag and the GPU dates allow, and the time estimates. */
 export type ExtensionsInfo = {
   extensions: ExtensionId[];
+  /** Features shown only with MONTAGIO_EXPERIMENTAL (not validated on a GPU yet). */
+  experimental?: ('moodboard' | 'palette-photo')[];
   effects: EffectSummary[];
   hooks: HookSummary[];
   estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; imageUpscale?: number; motion?: number; voiceChange?: number; translate?: number };

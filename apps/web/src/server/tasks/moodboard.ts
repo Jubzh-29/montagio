@@ -5,7 +5,7 @@ import { compileEdit, compileImage, parseImageStyle, type Aspect, type ImageStyl
 import { moodboardSheet } from '@montagio/sequence';
 import { MOODBOARD_INSTRUCTION, MOODBOARD_REFS_MAX } from '@/lib/image-style';
 import { JobError } from '../errors';
-import { requireExtension } from '../extensions';
+import { requireExperimental, requireExtension } from '../extensions';
 import { assertConsent, assertNoBlockedName } from '../guards';
 import { jobDir, type TaskDef } from '../jobs';
 import { readUploadMeta, type UploadMeta } from '../uploads';
@@ -43,6 +43,8 @@ async function referencesOf(raw: unknown): Promise<UploadMeta[]> {
 export const moodboardTask: TaskDef = {
   async prepare(body, lib) {
     await requireExtension('edit');
+    // The look did not carry over on the GPU (2026-10-24): behind MONTAGIO_EXPERIMENTAL until it does.
+    requireExperimental('moodboard');
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
     const aspect = ASPECTS.find((value) => value === body.aspect);
     const style = parseImageStyle(body.style);

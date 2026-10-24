@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { compileEdit, EDIT_LOOK_IDS, type EditLook, type Library } from '@montagio/presets';
 import type { ExtensionModel } from '@montagio/registry';
 import { JobError } from '../errors';
-import { requireExtension } from '../extensions';
+import { requireExperimental, requireExtension } from '../extensions';
 import { assertConsent, assertNoBlockedName } from '../guards';
 import type { TaskDef } from '../jobs';
 import { readUploadMeta, type UploadMeta } from '../uploads';
@@ -43,6 +43,8 @@ export const editTask: TaskDef = {
     // A second photo the edit reads (Change palette: its colors), a known upload; not with an inpaint.
     let second: UploadMeta | null = null;
     if (body.image2Ref !== undefined && body.image2Ref !== null) {
+      // The edit copied the second photo's content, not only its colors (GPU, 2026-10-24): behind the flag.
+      requireExperimental('palette-photo');
       second = typeof body.image2Ref === 'string' ? await readUploadMeta(body.image2Ref) : null;
       if (!second) throw new JobError('unknown-image');
       if (maskRef) throw new JobError('invalid-input');

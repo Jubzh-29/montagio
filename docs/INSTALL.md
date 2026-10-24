@@ -141,6 +141,7 @@ Without a 24 GB GPU, `install --app-only` installs the app alone: no ComfyUI, no
 |---|---|
 | `MONTAGIO_HOME` | install folder |
 | `MONTAGIO_EXTENSIONS` | the default of `--extensions`; the app reads it too |
+| `MONTAGIO_EXPERIMENTAL` | features not validated on a GPU yet, shown anyway: `moodboard`, `palette-photo` (comma list) |
 | `MONTAGIO_COMFYUI_ARGS` | extra ComfyUI arguments, separated by spaces, for example `--lowvram`; `--listen` and `--port` are refused, ComfyUI stays on 127.0.0.1 and the install's port |
 | `HF_TOKEN` | a Hugging Face token; not needed for the files of the lock |
 | `MONTAGIO_FFMPEG`, `MONTAGIO_FFPROBE` | FFmpeg and ffprobe outside the `PATH` |

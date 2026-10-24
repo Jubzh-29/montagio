@@ -66,6 +66,7 @@ export function PhotoAtelier({
   kind,
   photo,
   estimates,
+  experimental = [],
   onUse,
   onClose,
   licenseOf,
@@ -73,6 +74,8 @@ export function PhotoAtelier({
   kind: 't2i' | 'edit';
   photo: UploadState;
   estimates: ExtensionsInfo['estimates'];
+  /** The features behind MONTAGIO_EXPERIMENTAL this server shows (the moodboard, a palette from a photo). */
+  experimental?: NonNullable<ExtensionsInfo['experimental']>;
   onUse: (photo: AtelierPhoto) => void;
   onClose: () => void;
   /** The license of a model of the catalogue, for the caption under the image. */
@@ -255,7 +258,7 @@ export function PhotoAtelier({
               </div>
             ))}
           </fieldset>
-          {estimates.edit !== undefined && (
+          {estimates.edit !== undefined && experimental.includes('moodboard') && (
             <div className={styles.panelSection}>
               <p id="atelier-moodboard" className={styles.sectionTitle}>
                 {t('moodboardTitle')}
@@ -344,6 +347,8 @@ export function PhotoAtelier({
                 {t(paletteKey(palette))}
               </button>
             ))}
+            {experimental.includes('palette-photo') && (
+              <>
             <input
               id="palette-input"
               className="visually-hidden"
@@ -358,6 +363,8 @@ export function PhotoAtelier({
             <label htmlFor="palette-input" className={styles.chip} aria-disabled={busy || inpaint || undefined}>
               {t('paletteFromPhoto')}
             </label>
+              </>
+            )}
           </div>
           {palettePhoto && (
             <div className={styles.palettePhoto}>

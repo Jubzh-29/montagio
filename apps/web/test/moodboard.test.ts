@@ -18,11 +18,22 @@ let flag: string | undefined;
 beforeEach(() => {
   flag = process.env.MONTAGIO_EXTENSIONS;
   process.env.MONTAGIO_EXTENSIONS = 'all';
+  process.env.MONTAGIO_EXPERIMENTAL = 'moodboard,palette-photo';
   process.env.MONTAGIO_DEMO_DURATION_MS = '0';
 });
 afterEach(() => {
   if (flag === undefined) delete process.env.MONTAGIO_EXTENSIONS;
   else process.env.MONTAGIO_EXTENSIONS = flag;
+  delete process.env.MONTAGIO_EXPERIMENTAL;
+});
+
+test('without MONTAGIO_EXPERIMENTAL, no moodboard and no palette from a photo', async () => {
+  delete process.env.MONTAGIO_EXPERIMENTAL;
+  const made = await madeRef('x-ref');
+  expect((await post(postMoodboards, { prompt: 'a red bicycle', aspect: '16:9', refs: [made] }, 'x-1')).status).toBe(404);
+  expect((await post(postEdits, { imageRef: made, image2Ref: made, instruction: PALETTE_FROM_PHOTO_INSTRUCTION }, 'x-2')).status).toBe(404);
+  // The ready-made palettes need no flag.
+  expect((await post(postEdits, { imageRef: made, instruction: paletteInstruction('noir') }, 'x-3')).status).toBe(201);
 });
 
 const post = (route: (request: Request) => Promise<Response>, body: unknown, key: string) =>

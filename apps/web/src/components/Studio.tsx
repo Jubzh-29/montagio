@@ -1246,6 +1246,7 @@ export function Studio() {
                   kind={kind}
                   photo={upload}
                   estimates={extensions?.estimates ?? { t2i: 12 }}
+                  experimental={extensions?.experimental ?? []}
                   onUse={(photo) => takePhoto(photo, kind)}
                   onClose={() => closeAtelier(kind)}
                   licenseOf={(id) =>

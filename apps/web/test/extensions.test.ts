@@ -68,7 +68,7 @@ test('unset flag: nothing dated, nothing shown', async () => {
   expect(await visibleExtensions()).toEqual([]);
   expect(await visibleEffects()).toEqual([]);
   // The tests run the demo backend: the Studio is told so (its captions say no model ran).
-  expect(await info()).toEqual({ extensions: [], effects: [], hooks: [], estimates: { t2i: 5 }, demo: true });
+  expect(await info()).toEqual({ extensions: [], effects: [], hooks: [], experimental: [], estimates: { t2i: 5 }, demo: true });
 });
 
 test('unset flag: the dates of GPU sessions S2 and S3 show the seven extensions, the six effects, Wardrobe Swap and Ignite', async () => {
