@@ -1114,7 +1114,7 @@ export function Studio() {
     slateMove,
     tab !== 'effects' && tab !== 'avatar' && tab !== 'motion' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
     tab === 'motion'
-      ? motionVideo.status === 'ready' && motionVideo.duration_s !== undefined && t('slateSpec', { s: Math.round(Math.min(motionVideo.duration_s, restyling ? RESTYLE_SECONDS : Infinity) * 10) / 10 })
+      ? motionVideo.status === 'ready' && motionVideo.duration_s !== undefined && t('slateSpec', { s: Math.round(Math.min(motionVideo.duration_s, restyling || swapping ? RESTYLE_SECONDS : Infinity) * 10) / 10 })
       : tab === 'avatar'
       ? speechSeconds > 0 && t('slateSpec', { s: speechSeconds })
       : t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
@@ -1243,7 +1243,7 @@ export function Studio() {
             ) : null
           }
           photo={
-            restyling ? null : (
+            restyling || swapping ? null : (
             <>
             <PhotoSource
               upload={upload}
@@ -1511,7 +1511,7 @@ export function Studio() {
           result={
             <>
               <Monitor
-                upload={restyling ? look : upload}
+                upload={restyling ? look : swapping ? swapPhoto : upload}
                 generation={monitorState}
                 move={move}
                 announcement={announcement}
