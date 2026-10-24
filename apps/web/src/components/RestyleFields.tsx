@@ -29,9 +29,10 @@ export function MotionModeSwitch({ mode, onMode, disabled }: { mode: MotionMode;
 }
 
 /**
- * The restyle's fields: the clip (prepared at upload like a motion's), what the scene becomes, and
- * an optional image whose look to follow. Without one, the clip's first frame is restyled from the
- * text first (when the edit is installed), which the hint under the slot says.
+ * The restyle's fields: the clip (prepared at upload like a motion's), the reference image it is
+ * best with (a character, an outfit, a style), then what the scene becomes. Without an image, the
+ * clip's first frame is restyled from the text first when the edit is installed; otherwise the text
+ * alone drives it, less reliably, which the hint in the slot says.
  */
 export function RestyleFields({
   video,
@@ -68,21 +69,6 @@ export function RestyleFields({
         onVideo={onVideo}
         labels={{ title: 'restyleVideo', empty: 'restyleVideoEmpty', add: 'restyleVideoAdd' }}
       />
-      <div className={styles.panelSection}>
-        <label htmlFor="restyle-text" className={styles.sectionTitle}>
-          {t('restyleText')}
-        </label>
-        <textarea
-          id="restyle-text"
-          className={styles.prompt}
-          rows={2}
-          maxLength={TEXT_MAX}
-          placeholder={t('restyleTextPlaceholder')}
-          value={text}
-          aria-required
-          onChange={(event) => onText(event.target.value)}
-        />
-      </div>
       <section className={styles.panelSection} aria-labelledby="restyle-look-title">
         <h2 id="restyle-look-title" className={styles.sectionTitle}>
           {t('restyleLook')}
@@ -123,6 +109,21 @@ export function RestyleFields({
           </p>
         )}
       </section>
+      <div className={styles.panelSection}>
+        <label htmlFor="restyle-text" className={styles.sectionTitle}>
+          {t('restyleText')}
+        </label>
+        <textarea
+          id="restyle-text"
+          className={styles.prompt}
+          rows={2}
+          maxLength={TEXT_MAX}
+          placeholder={t('restyleTextPlaceholder')}
+          value={text}
+          aria-required
+          onChange={(event) => onText(event.target.value)}
+        />
+      </div>
     </>
   );
 }
