@@ -76,6 +76,16 @@ test('a restyle reprise reopens the motion tab in its restyle mode, its image as
   expect(without.restyle).toEqual({ text: 'snow' });
 });
 
+test('a swap reprise reopens the motion tab in its swap mode, its image as the new object, the object to paint again', () => {
+  const swap = item({ task: 'swap', reprise: { tab: 'motion', swap: true, imageRef: 'uploads/b.png', personal: true, videoRef: 'videos/v.mp4', prompt: 'a red motorbike' } });
+  const back = applyReprise(swap);
+  expect(back).toMatchObject({ tab: 'motion', swap: { videoRef: 'videos/v.mp4', text: 'a red motorbike', photo: { imageRef: 'uploads/b.png', personal: true } } });
+  expect(back.photo).toBeUndefined();
+  expect(back.motion).toBeUndefined();
+  expect(back.restyle).toBeUndefined();
+  expect(applyReprise(item({ task: 'swap', reprise: { tab: 'motion', swap: true, prompt: 'a dog' } })).swap).toEqual({ text: 'a dog' });
+});
+
 test('the filter keeps one kind', () => {
   const items = [item(), item({ key: 'job:j', kind: 'photo' }), item({ key: 'sequence:s', kind: 'film' })];
   expect(historyFilter(items, 'all')).toHaveLength(3);

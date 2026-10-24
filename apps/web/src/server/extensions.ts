@@ -106,6 +106,13 @@ export function restyleModel(lib: Library): ExtensionModel {
   return model;
 }
 
+/** The object swap model of the extension "swap". */
+export function swapModel(lib: Library): ExtensionModel {
+  const model = [...lib.extensionModels.values()].find((entry) => entry.task === 'v2v-swap');
+  if (!model) throw new Error('no v2v-swap model in registry/extensions');
+  return model;
+}
+
 /** The 1080p model of the extension "upscale". */
 export function upscaleModel(lib: Library): ExtensionModel {
   const model = [...lib.extensionModels.values()].find((entry) => entry.task === 'v2v-upscale');
@@ -176,9 +183,10 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const voiceChange = extensions.includes('avatar') ? [...lib.extensionModels.values()].find((entry) => entry.task === 'a2a-vc') : undefined;
   const motion = extensions.includes('motion') ? motionModel(lib) : null;
   const restyle = extensions.includes('restyle') ? restyleModel(lib) : null;
+  const swap = extensions.includes('swap') ? swapModel(lib) : null;
   // A tab without a wall shows what it makes: a render of the GPU session, looping (presets/extensions/previews).
   const examples: NonNullable<ExtensionsInfo['examples']> = {};
-  for (const id of ['avatar', 'motion', 'restyle'] as const) {
+  for (const id of ['avatar', 'motion', 'restyle', 'swap'] as const) {
     if (!extensions.includes(id)) continue;
     const previewUrl = await presetPreviewUrl(root, `previews/${id}.mp4`, 'extensions');
     const posterUrl = previewUrl && (await presetPosterUrl(root, `previews/${id}.mp4`, 'extensions'));
@@ -198,6 +206,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
       ...(voiceChange ? { voiceChange: estimateFor(voiceChange, true) } : {}),
       ...(motion ? { motion: estimateFor(motion, true) } : {}),
       ...(restyle ? { restyle: estimateFor(restyle, true) } : {}),
+      ...(swap ? { swap: estimateFor(swap, true) } : {}),
     },
     ...(extensions.includes('edit') && editModel ? { editModel: summaryOf(editModel) } : {}),
     ...(avatar ? { avatarModel: summaryOf(avatar.avatar) } : {}),
@@ -205,6 +214,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     ...(upscale ? { upscaleModel: { ...summaryOf(upscale), maxFrames: upscale.limits.max_input_frames ?? 121 } } : {}),
     ...(motion ? { motionModel: summaryOf(motion) } : {}),
     ...(restyle ? { restyleModel: summaryOf(restyle) } : {}),
+    ...(swap ? { swapModel: summaryOf(swap) } : {}),
     ...(Object.keys(examples).length > 0 ? { examples } : {}),
     ...((process.env.MONTAGIO_BACKEND ?? 'demo') === 'demo' ? { demo: true } : {}),
   };

@@ -49,6 +49,7 @@ import { MotionFields, type MotionVideo } from './MotionFields';
 import { MotionLibrary } from './MotionLibrary';
 import { MotionModeSwitch, RestyleFields, type MotionMode } from './RestyleFields';
 import { MusicPanel } from './MusicPanel';
+import { pointsOfMask, SwapFields } from './SwapFields';
 import { ShowcaseTextAtelier } from './ShowcaseTextAtelier';
 import { EffectFields } from './EffectFields';
 import { OutfitSource } from './OutfitSource';
@@ -201,17 +202,26 @@ export function Studio() {
   const [restyleText, setRestyleText] = useState('');
   const [look, setLook] = useState<UploadState>({ status: 'idle' });
   const lookToken = useRef(0);
+  // Its swap mode: an object painted over the clip's first frame, replaced from a text and an optional photo of the new one.
+  const [swapText, setSwapText] = useState('');
+  const [swapPainted, setSwapPainted] = useState(false);
+  const swapMask = useRef<(() => Promise<Blob | null>) | null>(null);
+  const [swapPhoto, setSwapPhoto] = useState<UploadState>({ status: 'idle' });
+  const swapPhotoToken = useRef(0);
   // The motion of the library taken as the clip, if the clip came from there.
   const [libraryId, setLibraryId] = useState<string | null>(null);
   // The Motion tab's character (or a restyle's look) composed by the edit from a character, its outfit, a product.
   const [motionCompose, setMotionCompose] = useState<ComposeState>(COMPOSE_OFF);
-  // A mode shows with its extension; with only one of the two, the tab has that one.
+  // A mode shows with its extension; with only one, the tab has that one.
   const hasMotion = extensions?.extensions.includes('motion') ?? false;
   const hasRestyle = extensions?.extensions.includes('restyle') ?? false;
-  const motionMode: MotionMode = !hasRestyle ? 'character' : !hasMotion ? 'restyle' : askedMotionMode;
+  const hasSwap = extensions?.extensions.includes('swap') ?? false;
+  const motionModes = (['character', 'restyle', 'swap'] as const).filter((id) => (id === 'character' ? hasMotion : id === 'restyle' ? hasRestyle : hasSwap));
+  const motionMode: MotionMode = motionModes.includes(askedMotionMode) ? askedMotionMode : (motionModes[0] ?? 'character');
   const restyling = tab === 'motion' && motionMode === 'restyle';
-  // Without a look image, the edit restyles the clip's first frame first, when it is installed.
-  const motionComposing = tab === 'motion' && (extensions?.extensions.includes('edit') ?? false) && composeReady(motionCompose, 'character');
+  const swapping = tab === 'motion' && motionMode === 'swap';
+  // Without a look image, the edit restyles the clip's first frame first, when it is installed. A swap composes nothing.
+  const motionComposing = tab === 'motion' && !swapping && (extensions?.extensions.includes('edit') ?? false) && composeReady(motionCompose, 'character');
   const restyleFirstFrame = !motionComposing && look.status !== 'ready' && (extensions?.extensions.includes('edit') ?? false);
   const [rights, setRights] = useState(false);
   const [subject, setSubject] = useState('');
@@ -441,6 +451,20 @@ export function Studio() {
     setLook({ status: 'idle' });
   };
 
+  /** The swap's photo of the new object: an ordinary upload, which a new one or Remove replaces. */
+  const onSwapPhoto = async (file: File) => {
+    if (busyRef.current) return;
+    const token = ++swapPhotoToken.current;
+    const localUrl = URL.createObjectURL(file);
+    setSwapPhoto({ status: 'uploading', localUrl });
+    const next = await sendUpload(file, localUrl, t);
+    if (token === swapPhotoToken.current) setSwapPhoto(next);
+  };
+  const clearSwapPhoto = () => {
+    swapPhotoToken.current++;
+    setSwapPhoto({ status: 'idle' });
+  };
+
   /** The sample photo, copied by the server: its origin is known, so no effect on it asks for consent, and what it shows too. */
   const loadSample = async () => {
     if (busyRef.current) return;
@@ -554,7 +578,15 @@ export function Studio() {
   // The rights box is for this photo (or this look image) and this clip: another one asks again.
   const rightsKey = [
     motionMode,
-    motionComposing ? Object.values(composeBody(motionCompose)).join(',') : restyling ? (look.status === 'ready' ? look.imageRef : '') : upload.status === 'ready' ? upload.imageRef : '',
+    motionComposing
+      ? Object.values(composeBody(motionCompose)).join(',')
+      : restyling
+        ? (look.status === 'ready' ? look.imageRef : '')
+        : swapping
+          ? (swapPhoto.status === 'ready' ? swapPhoto.imageRef : '')
+          : upload.status === 'ready'
+            ? upload.imageRef
+            : '',
     motionVideo.status === 'ready' ? motionVideo.videoRef : '',
   ].join('|');
   const [rightsFor, setRightsFor] = useState(rightsKey);
@@ -580,7 +612,9 @@ export function Studio() {
   const askScene = needsScene(tab, IS_SHOWCASE);
   const missingScene = sceneMissing(tab, IS_SHOWCASE, prompt);
   const ready = upload.status === 'ready' && modelId !== null && !busy && !missingScene;
-  const canGenerate = restyling
+  const canGenerate = swapping
+    ? motionVideo.status === 'ready' && swapText.trim().length > 0 && swapPainted && (swapPhoto.status === 'idle' || swapPhoto.status === 'ready') && rights && !busy
+    : restyling
     ? motionVideo.status === 'ready' && restyleText.trim().length > 0 && (motionComposing || look.status === 'idle' || look.status === 'ready') && rights && !busy
     : tab === 'motion'
     ? (upload.status === 'ready' || motionComposing) && motionVideo.status === 'ready' && rights && !busy
@@ -667,6 +701,15 @@ export function Studio() {
       setMotionVideo(back.restyle.videoRef ? { status: 'ready', videoRef: back.restyle.videoRef, url: `/media/data/uploads/${back.restyle.videoRef}` } : { status: 'idle' });
       const kept = back.restyle.look;
       setLook(kept ? { status: 'ready', localUrl: `/media/data/${kept.imageRef}`, imageRef: kept.imageRef, personal: kept.personal } : { status: 'idle' });
+    }
+    if (back.swap) {
+      motionToken.current++;
+      swapPhotoToken.current++;
+      setMotionMode('swap');
+      setSwapText(back.swap.text);
+      setMotionVideo(back.swap.videoRef ? { status: 'ready', videoRef: back.swap.videoRef, url: `/media/data/uploads/${back.swap.videoRef}` } : { status: 'idle' });
+      const kept = back.swap.photo;
+      setSwapPhoto(kept ? { status: 'ready', localUrl: `/media/data/${kept.imageRef}`, imageRef: kept.imageRef, personal: kept.personal } : { status: 'idle' });
     }
     if (back.motion) {
       // An upload still on its way must not replace the clip brought back.
@@ -817,6 +860,23 @@ export function Studio() {
     followJob.current = true;
     setTake({ expected_s: mode === 'sequence' && !remix ? filmEstimate : estimate });
     moveCanvas('generate');
+    if (swapping) {
+      // No start photo: the clip, the points painted over its first frame, the text, and the new object's photo.
+      if (motionVideo.status !== 'ready') return;
+      const body = { videoRef: motionVideo.videoRef, prompt: swapText.trim(), ...(swapPhoto.status === 'ready' ? { imageRef: swapPhoto.imageRef } : {}), rights: true };
+      submitting.current = true;
+      void (async () => {
+        const mask = await swapMask.current?.().catch(() => null);
+        const points = mask ? await pointsOfMask(mask).catch(() => []) : [];
+        submitting.current = false;
+        if (points.length === 0) {
+          setJob({ status: 'error', message: t('swapMarkNone') });
+          return;
+        }
+        await submit('job', { ...body, points }, undefined, '/api/swap');
+      })();
+      return;
+    }
     if (restyling) {
       // No start photo: the clip, the text, and the look image when there is one.
       if (motionVideo.status !== 'ready') return;
@@ -939,7 +999,9 @@ export function Studio() {
 
   const selectedModel = models.find((model) => model.id === modelId);
   const estimate =
-    restyling
+    swapping
+      ? (extensions?.estimates.swap ?? 0)
+      : restyling
       ? (extensions?.estimates.restyle ?? 0) + (restyleFirstFrame || motionComposing ? (extensions?.estimates.edit ?? 0) : 0)
       : tab === 'motion'
       ? (extensions?.estimates.motion ?? 0) * motionWindows(motionFrames(motionVideo.status === 'ready' ? (motionVideo.duration_s ?? 5) : 5)) +
@@ -1045,7 +1107,7 @@ export function Studio() {
         }}
       />
     ) : null;
-  const slateMove = restyling ? t('restyleTitle') : tab === 'motion' ? t('tabMotion') : tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoiceName : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? moveName : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  const slateMove = swapping ? t('swapTitle') : restyling ? t('restyleTitle') : tab === 'motion' ? t('tabMotion') : tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoiceName : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? moveName : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
   // An avatar lasts as long as its speech: the slate says the estimate, once there is a text.
   const speechSeconds = estimateSpeech(speechText, speechLanguage);
   const slate = slateMove && [
@@ -1073,6 +1135,8 @@ export function Studio() {
       ? extensions?.motionModel
     : tracked?.kind === 'job' && tracked.record.task === 'restyle'
       ? extensions?.restyleModel
+    : tracked?.kind === 'job' && tracked.record.task === 'swap'
+      ? extensions?.swapModel
     : tracked?.kind === 'generation'
       ? models.find((model) => model.id === tracked.record.modelId)
       : tracked?.kind === 'sequence'
@@ -1089,7 +1153,7 @@ export function Studio() {
           }}
           onFrom={setFrom}
           onMode={(value) => {
-            if (value === 'restyle' || value === 'character') setMotionMode(value);
+            if (value === 'restyle' || value === 'character' || value === 'swap') setMotionMode(value);
           }}
         />
       </Suspense>
@@ -1099,7 +1163,7 @@ export function Studio() {
         <div className={styles.intro}>
           <h1 className={styles.promise}>{t('promise')}</h1>
           <p className={styles.lede} data-testid="tab-lede">
-            {t(restyling ? 'ledeRestyle' : TAB_LEDES[tab])}
+            {t(swapping ? 'ledeSwap' : restyling ? 'ledeRestyle' : TAB_LEDES[tab])}
           </p>
         </div>
         <Composer
@@ -1108,18 +1172,20 @@ export function Studio() {
             tab === 'motion' ? (
               <>
                 <ChoiceCard
-                  name={t(restyling ? 'restyleTitle' : 'tabMotion')}
+                  name={t(swapping ? 'swapTitle' : restyling ? 'restyleTitle' : 'tabMotion')}
                   kindLabel={
                     motionVideo.status === 'ready' && motionVideo.duration_s !== undefined
-                      ? t(restyling ? 'restyleKind' : 'motionKind', { s: Math.round(Math.min(motionVideo.duration_s, restyling ? RESTYLE_SECONDS : Infinity) * 10) / 10 })
-                      : t(restyling ? 'restyleKindEmpty' : 'motionKindEmpty')
+                      ? t(swapping ? 'swapKind' : restyling ? 'restyleKind' : 'motionKind', {
+                          s: Math.round(Math.min(motionVideo.duration_s, restyling || swapping ? RESTYLE_SECONDS : Infinity) * 10) / 10,
+                        })
+                      : t(swapping ? 'swapKindEmpty' : restyling ? 'restyleKindEmpty' : 'motionKindEmpty')
                   }
-                  previewUrl={extensions?.examples?.[restyling ? 'restyle' : 'motion']?.previewUrl}
-                  posterUrl={extensions?.examples?.[restyling ? 'restyle' : 'motion']?.posterUrl}
+                  previewUrl={extensions?.examples?.[swapping ? 'swap' : restyling ? 'restyle' : 'motion']?.previewUrl}
+                  posterUrl={extensions?.examples?.[swapping ? 'swap' : restyling ? 'restyle' : 'motion']?.posterUrl}
                   icon="motion"
                   paused={motionPaused}
                 />
-                {hasMotion && hasRestyle && <MotionModeSwitch mode={motionMode} onMode={setMotionMode} disabled={busy} />}
+                {motionModes.length > 1 && <MotionModeSwitch mode={motionMode} modes={motionModes} onMode={setMotionMode} disabled={busy} />}
               </>
             ) : tab === 'avatar' ? (
               <ChoiceCard
@@ -1208,7 +1274,23 @@ export function Studio() {
             )
           }
           fields={
-            restyling ? (
+            swapping ? (
+              <SwapFields
+                video={motionVideo}
+                disabled={busy}
+                paused={motionPaused}
+                onVideo={(file) => void onMotionVideo(file)}
+                onPainted={setSwapPainted}
+                maskExport={swapMask}
+                photo={swapPhoto}
+                onPhoto={(file) => void onSwapPhoto(file)}
+                onClearPhoto={clearSwapPhoto}
+                text={swapText}
+                onText={setSwapText}
+                cut={motionVideo.status === 'ready' && (motionVideo.duration_s ?? 0) > RESTYLE_SECONDS + 0.05}
+                library={motionLibrary}
+              />
+            ) : restyling ? (
               <RestyleFields
                 video={motionVideo}
                 disabled={busy}
@@ -1294,7 +1376,9 @@ export function Studio() {
             )
           }
           consent={
-            restyling ? (
+            swapping ? (
+              <ConsentCheck id="swap-rights" label="swapRights" checked={rights} onChange={setRights} />
+            ) : restyling ? (
               <ConsentCheck id="restyle-rights" label="restyleRights" checked={rights} onChange={setRights} />
             ) : tab === 'motion' ? (
               <ConsentCheck id="motion-rights" label="motionRights" checked={rights} onChange={setRights} />
@@ -1336,12 +1420,15 @@ export function Studio() {
                     )}
                   </div>
                 )}
-                {!restyling && !motionComposing && upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
+                {!restyling && !swapping && !motionComposing && upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
+                {swapping && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('swapNeedsVideo')}</p>}
+                {swapping && motionVideo.status === 'ready' && !swapPainted && <p className={styles.hint}>{t('swapNeedsMark')}</p>}
+                {swapping && motionVideo.status === 'ready' && swapPainted && !swapText.trim() && <p className={styles.hint}>{t('swapNeedsText')}</p>}
                 {restyling && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('restyleNeedsVideo')}</p>}
                 {restyling && motionVideo.status === 'ready' && !restyleText.trim() && <p className={styles.hint}>{t('restyleNeedsText')}</p>}
                 {upload.status === 'ready' && missingScene && <p className={styles.hint}>{t('sceneNeeded')}</p>}
                 {tab === 'effects' && upload.status === 'ready' && needsOutfit && outfit.status !== 'ready' && <p className={styles.hint}>{t('hookNeedsOutfit')}</p>}
-                {tab === 'motion' && !restyling && (upload.status === 'ready' || motionComposing) && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('motionNeedsVideo')}</p>}
+                {tab === 'motion' && !restyling && !swapping && (upload.status === 'ready' || motionComposing) && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('motionNeedsVideo')}</p>}
               </div>
               {/* Outside the sticky block: on a phone that block stays one button high over the gallery. */}
               {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}
@@ -1431,10 +1518,24 @@ export function Studio() {
                 statusRef={statusRef}
                 stepImageUrl={tracked?.kind === 'job' ? tracked.record.stepImageUrl : undefined}
                 autoPlayResult={!(motionPaused && view?.id === arrivalId)}
-                onFile={restyling ? (file) => void onLook(file) : onFile}
+                onFile={swapping ? (file) => void onSwapPhoto(file) : restyling ? (file) => void onLook(file) : onFile}
                 onCancel={cancel}
-                empty={restyling ? { title: 'restyleMonitorEmpty', hint: 'restyleMonitorEmptyHint' } : undefined}
-                example={restyling ? extensions?.examples?.restyle : tab === 'avatar' || tab === 'motion' ? extensions?.examples?.[tab] : undefined}
+                empty={
+                  swapping
+                    ? { title: 'swapMonitorEmpty', hint: 'swapMonitorEmptyHint' }
+                    : restyling
+                      ? { title: 'restyleMonitorEmpty', hint: 'restyleMonitorEmptyHint' }
+                      : undefined
+                }
+                example={
+                  swapping
+                    ? extensions?.examples?.swap
+                    : restyling
+                      ? extensions?.examples?.restyle
+                      : tab === 'avatar' || tab === 'motion'
+                        ? extensions?.examples?.[tab]
+                        : undefined
+                }
                 examplePaused={motionPaused}
                 onRetry={retry}
                 statusLabel={statusLabel}
@@ -1476,9 +1577,9 @@ export function Studio() {
                 <AiCaption text="showcaseCaption" testId="result-caption" model={(resultModel ?? showcase?.model)!} />
               )}
               {!IS_SHOWCASE && succeeded && resultModel && <AiCaption model={resultModel} />}
-              {succeeded && tracked?.kind === 'job' && (tracked.record.task === 'motion' || tracked.record.task === 'restyle') && (
+              {succeeded && tracked?.kind === 'job' && (tracked.record.task === 'motion' || tracked.record.task === 'restyle' || tracked.record.task === 'swap') && (
                 <p className={styles.caption} data-testid="motion-no-sound">
-                  {t(tracked.record.task === 'restyle' ? 'restyleNoSound' : 'motionNoSound')}
+                  {t(tracked.record.task === 'motion' ? 'motionNoSound' : 'restyleNoSound')}
                 </p>
               )}
               {busy && tracked?.kind === 'job' && tracked.record.stepImageUrl && extensions?.editModel && (
@@ -1583,7 +1684,7 @@ function TabParam({
 }: {
   onTab: (tab: string | null) => void;
   onFrom: (key: string | null) => void;
-  /** ?mode= of the Motion tab: character or restyle. */
+  /** ?mode= of the Motion tab: character, restyle or swap. */
   onMode: (mode: string | null) => void;
 }) {
   const params = useSearchParams();

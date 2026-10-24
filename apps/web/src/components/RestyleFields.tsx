@@ -6,24 +6,36 @@ import type { UploadState } from './Monitor';
 import { MotionVideoSlot, type MotionVideo } from './MotionFields';
 import styles from './studio.module.css';
 
-/** What the Motion tab does with its clip: a character performs it, or its scene is restyled. */
-export type MotionMode = 'character' | 'restyle';
+/** What the Motion tab does with its clip: a character performs it, its scene is restyled, or an object of it is swapped. */
+export type MotionMode = 'character' | 'restyle' | 'swap';
 
 const TEXT_MAX = 500;
 
-/** The two uses of the Motion tab's clip, under its card; shown only when both extensions are. */
-export function MotionModeSwitch({ mode, onMode, disabled }: { mode: MotionMode; onMode: (mode: MotionMode) => void; disabled: boolean }) {
+const MODE_LABELS = { character: 'motionModeCharacter', restyle: 'motionModeRestyle', swap: 'motionModeSwap' } as const;
+
+/** The uses of the Motion tab's clip, under its card; shown only when two or more of their extensions are. */
+export function MotionModeSwitch({
+  mode,
+  modes,
+  onMode,
+  disabled,
+}: {
+  mode: MotionMode;
+  /** The modes whose extension is shown, in this order. */
+  modes: readonly MotionMode[];
+  onMode: (mode: MotionMode) => void;
+  disabled: boolean;
+}) {
   const { t } = useI18n();
   return (
     // In a section, as the avatar's language: a bare child of the panel's column would be squeezed.
     <div className={styles.panelSection}>
       <div className={styles.canvasViews} role="group" aria-label={t('motionModeLabel')} data-testid="motion-mode">
-        <button type="button" className={styles.mode} aria-pressed={mode === 'character'} disabled={disabled} onClick={() => onMode('character')}>
-          {t('motionModeCharacter')}
-        </button>
-        <button type="button" className={styles.mode} aria-pressed={mode === 'restyle'} disabled={disabled} onClick={() => onMode('restyle')}>
-          {t('motionModeRestyle')}
-        </button>
+        {modes.map((id) => (
+          <button key={id} type="button" className={styles.mode} aria-pressed={mode === id} disabled={disabled} onClick={() => onMode(id)}>
+            {t(MODE_LABELS[id])}
+          </button>
+        ))}
       </div>
     </div>
   );

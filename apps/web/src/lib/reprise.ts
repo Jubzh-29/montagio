@@ -19,6 +19,8 @@ export type StudioRestore = {
   motion?: { videoRef?: string; character: string; action: string };
   /** A restyle: its clip (when it is still there), its text, and its look image (when there was one and it is still there). */
   restyle?: { videoRef?: string; text: string; look?: { imageRef: string; personal: boolean } };
+  /** An object swap: its clip (when it is still there), its text, and its new object's photo (when there was one); the object is painted again. */
+  swap?: { videoRef?: string; text: string; photo?: { imageRef: string; personal: boolean } };
   /** What an avatar says, and in which language. */
   speech?: { text: string; language: 'en' | 'fr' };
   modelId?: string;
@@ -41,6 +43,15 @@ export function applyReprise(item: HistoryItem): StudioRestore {
       ...(reprise.videoRef ? { videoRef: reprise.videoRef } : {}),
       text: reprise.prompt ?? '',
       ...(reprise.imageRef ? { look: { imageRef: reprise.imageRef, personal: reprise.personal ?? true } } : {}),
+    };
+    return restore;
+  }
+  if (reprise.swap) {
+    // The Motion tab in its swap mode: the image is the new object, never the start photo.
+    restore.swap = {
+      ...(reprise.videoRef ? { videoRef: reprise.videoRef } : {}),
+      text: reprise.prompt ?? '',
+      ...(reprise.imageRef ? { photo: { imageRef: reprise.imageRef, personal: reprise.personal ?? true } } : {}),
     };
     return restore;
   }
