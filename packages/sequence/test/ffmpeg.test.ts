@@ -10,6 +10,7 @@ import {
   concatCopy,
   decodeCheck,
   exportVertical,
+  extractFirstFrame,
   extractLastFrame,
   headerHash,
   mixMusic,
@@ -443,4 +444,10 @@ test('a moodboard sheet puts one to four pictures side by side, two by two for f
     expect(await probe(out)).toMatchObject({ width: width * MOODBOARD_TILE, height: height * MOODBOARD_TILE });
   }
   await expect(moodboardSheet([], join(dir, 'never.png'))).rejects.toThrow(SequenceToolError);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('the first frame of a clip keeps its full size', async () => {
+  const png = join(dir, 'first.png');
+  await extractFirstFrame(clipA, png);
+  expect(await probe(png)).toMatchObject({ width: 832, height: 480 });
 }, FFMPEG_TEST_TIMEOUT_MS);

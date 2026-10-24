@@ -149,6 +149,11 @@ export async function extractLastFrame(video: string, outPng: string): Promise<v
   await run(ffmpeg(), ['-loglevel', 'error', '-y', '-sseof', '-1', '-i', video, '-update', '1', '-q:v', '1', outPng]);
 }
 
+/** The first frame of a clip, at its full size: the face a translated clip starts from. */
+export async function extractFirstFrame(video: string, outPng: string): Promise<void> {
+  await run(ffmpeg(), ['-loglevel', 'error', '-y', ...LOCAL_FILE_ONLY, '-i', video, '-frames:v', '1', '-q:v', '1', outPng]);
+}
+
 /** Join clips into one H.264 film; every clip is fitted (letterboxed) to `size` and `fps`. */
 export async function concatClips(
   clips: string[],

@@ -542,5 +542,17 @@
   "communityTitleLabel": "Title",
   "communityAuthorLabel": "Your name (optional)",
   "communityAuthorPlaceholder": "e.g. Mira",
-  "communityPublishNote": "The gallery keeps a copy and its settings. Its recipe file shares the settings only, never your photo."
+  "communityPublishNote": "The gallery keeps a copy and its settings. Its recipe file shares the settings only, never your photo.",
+  "tabTranslate": "Translate",
+  "exploreTranslateText": "A talking clip said again in another language, in the same voice, the lips following the new words.",
+  "translateTitle": "Translate",
+  "translateLead": "The same clip in another language: the speech is heard and translated, said again in the same voice, and the face is animated again so that the lips follow the new words.",
+  "translateNeedsExtension": "Translate needs the avatar extension.",
+  "translateLanguage": "Into",
+  "translateConsent": "The person shown agreed to be shown speaking another language, in their own voice",
+  "translateMake": "Translate (~{d})",
+  "translateNeeds": "Add a clip, pick a language, then tick the boxes.",
+  "translateResult": "The clip, translated",
+  "translateEmpty": "Your clip will play here, in its new language.",
+  "avatarTranslate": "Translate"
 }

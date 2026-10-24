@@ -7,6 +7,7 @@ import type { HistoryItem } from '@/lib/api-types';
 import { formatDuration } from '@/lib/duration';
 import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { refusalMessageKey } from '@/lib/refusals';
+import { TRANSLATE_CHOICES, type TranslateChoice } from '@/lib/translate';
 import { useExtensions } from '@/lib/use-extensions';
 import { useJob } from '@/lib/use-job';
 import { ConsentCheck } from './ConsentCheck';
@@ -26,9 +27,13 @@ const jobIdOf = (item: HistoryItem) => item.key.slice('job:'.length);
 /**
  * The voice change: a clip where someone speaks (a video sent here, or an avatar made here) and a
  * voice sample its speaker agreed to lend give the same clip, words and rhythm kept, in that voice.
+ * Translate (mode "translate"): the same clip said in another language, in its own voice, the lips
+ * following the new words.
  */
-export function VoicePage() {
+export function VoicePage({ mode = 'change' }: { mode?: 'change' | 'translate' }) {
   const { t } = useI18n();
+  const translating = mode === 'translate';
+  const [language, setLanguage] = useState<TranslateChoice>('en');
   const info = useExtensions();
   const { job, refusal, busy, start } = useJob();
   const [source, setSource] = useState<'video' | 'avatar'>('video');
@@ -43,7 +48,7 @@ export function VoicePage() {
 
   useEffect(() => {
     if (IS_SHOWCASE) return;
-    // From the Avatar tab's result: /voice?from=<job id> starts on that avatar.
+    // From the Avatar tab's result: /voice?from=<job id> (or /translate) starts on that avatar.
     const from = new URLSearchParams(window.location.search).get('from');
     apiFetch('/api/history')
       .then((res) => jsonOrThrow<HistoryItem[]>(res))
@@ -83,16 +88,26 @@ export function VoicePage() {
     setSampleState('idle');
   };
 
-  const available = Boolean(info?.extensions.includes('avatar') && info.estimates.voiceChange !== undefined);
+  const estimate = translating ? info?.estimates.translate : info?.estimates.voiceChange;
+  const available = Boolean(info?.extensions.includes('avatar') && estimate !== undefined);
   const avatar = avatars.find((item) => jobIdOf(item) === avatarId) ?? null;
   const clipReady = source === 'video' ? speech !== null && rights : avatar !== null;
-  const canStart = available && clipReady && sample !== null && consent && !busy;
+  const canStart = available && clipReady && (translating || sample !== null) && consent && !busy;
   const done = job?.state === 'succeeded' && job.outputUrl ? job : null;
   const failed = job?.state === 'failed' || job?.state === 'canceled';
   const percent = job ? Math.round(job.progress * 100) : 0;
 
   const make = () => {
-    if (!canStart || !sample) return;
+    if (!canStart) return;
+    if (translating) {
+      void start('/api/translations', {
+        ...(source === 'video' && speech ? { speechRef: speech.speechRef, rights } : { sourceJobId: avatarId }),
+        language,
+        consent,
+      });
+      return;
+    }
+    if (!sample) return;
     void start('/api/voice-changes', {
       ...(source === 'video' && speech ? { speechRef: speech.speechRef, rights } : { sourceJobId: avatarId }),
       voiceRef: sample.voiceRef,
@@ -105,13 +120,13 @@ export function VoicePage() {
       <Header />
       <main id="content" tabIndex={-1} className={page.page}>
         <div className={page.intro}>
-          <h1 className={page.title}>{t('voiceChangeTitle')}</h1>
-          <p className={page.lead}>{t('voiceChangeLead')}</p>
+          <h1 className={page.title}>{t(translating ? 'translateTitle' : 'voiceChangeTitle')}</h1>
+          <p className={page.lead}>{t(translating ? 'translateLead' : 'voiceChangeLead')}</p>
         </div>
         {IS_SHOWCASE ? (
           <p className={studio.hint}>{t('charactersShowcase')}</p>
         ) : !available ? (
-          <p className={studio.hint}>{t('voiceChangeNeedsExtension')}</p>
+          <p className={studio.hint}>{t(translating ? 'translateNeedsExtension' : 'voiceChangeNeedsExtension')}</p>
         ) : (
           <div className={page.layout}>
             <section className={page.panel} aria-labelledby="voice-setup">
@@ -183,6 +198,22 @@ export function VoicePage() {
                 </>
               )}
 
+              {translating ? (
+                <>
+                  <p id="translate-language" className={studio.sectionTitle}>
+                    {t('translateLanguage')}
+                  </p>
+                  <div className={studio.styleRow} role="radiogroup" aria-labelledby="translate-language">
+                    {TRANSLATE_CHOICES.map(([value, name]) => (
+                      <button key={value} type="button" role="radio" lang={value} className={studio.chip} aria-checked={language === value} disabled={busy} onClick={() => setLanguage(value)}>
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                  <ConsentCheck id="translate-consent" checked={consent} onChange={setConsent} label="translateConsent" />
+                </>
+              ) : (
+                <>
               <span className={studio.sectionTitle}>{t('voiceSampleTitle')}</span>
               <label className={studio.buttonSecondary} htmlFor="voice-sample" aria-disabled={busy || undefined}>
                 {sample ? t('voiceReplace') : t('voiceUpload')}
@@ -209,16 +240,18 @@ export function VoicePage() {
                       : t('voiceSampleHint')}
               </p>
               {sample && <ConsentCheck id="voice-consent" checked={consent} onChange={setConsent} label="voiceConsent" />}
+                </>
+              )}
 
               <button type="button" className={studio.buttonPrimary} disabled={!canStart} onClick={make}>
-                {t('voiceChangeMake', { d: formatDuration(info?.estimates.voiceChange ?? 0) })}
+                {t(translating ? 'translateMake' : 'voiceChangeMake', { d: formatDuration(estimate ?? 0) })}
               </button>
-              {!canStart && !busy && <p className={studio.hint}>{t('voiceChangeNeeds')}</p>}
+              {!canStart && !busy && <p className={studio.hint}>{t(translating ? 'translateNeeds' : 'voiceChangeNeeds')}</p>}
             </section>
 
             <section className={page.result} aria-labelledby="voice-result" aria-live="polite">
               <h2 id="voice-result" className={studio.sectionTitle}>
-                {t('voiceChangeResult')}
+                {t(translating ? 'translateResult' : 'voiceChangeResult')}
               </h2>
               {busy && job && (
                 <div className={studio.progress} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label={t('running', { p: percent })}>
@@ -233,13 +266,13 @@ export function VoicePage() {
               {done ? (
                 <>
                   <video className={styles.video} src={done.outputUrl} controls playsInline />
-                  <a className={studio.buttonSecondary} href={done.outputUrl} download="montagio-voice.mp4">
+                  <a className={studio.buttonSecondary} href={done.outputUrl} download={translating ? `montagio-${language}.mp4` : 'montagio-voice.mp4'}>
                     {t('voiceChangeDownload')}
                   </a>
                   <p className={studio.hint}>{t('adCaption')}</p>
                 </>
               ) : (
-                !busy && <p className={styles.empty}>{t('voiceChangeEmpty')}</p>
+                !busy && <p className={styles.empty}>{t(translating ? 'translateEmpty' : 'voiceChangeEmpty')}</p>
               )}
             </section>
           </div>

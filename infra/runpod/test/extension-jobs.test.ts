@@ -25,6 +25,7 @@ test('one job per extension, in the order of the session, each accepted by Comfy
     ['hook-edit:wardrobe-swap', 'qwen-image-edit-2511'],
     ['transition:wardrobe-swap', 'wan22-flf2v-transition'],
     ['voice:cloned', 'chatterbox-mtl-voice'],
+    ['translate:fr', 'gemma4-translate'],
     ['avatar', 'wan22-s2v-avatar'],
     ['music', 'ace-step15-music'],
     ['upscale', 'seedvr2-upscale'],
@@ -44,6 +45,7 @@ test('each job uploads the files it reads and nothing else', () => {
   expect(uploads.music).toEqual([]);
   // with --voice, the voice speaks with the sample
   expect(uploads.voice).toEqual([{ node: '4', field: 'audio', path: '/data/voice.flac' }]);
+  expect(uploads.translate).toEqual([{ node: '1', field: 'audio', path: '/data/speech.flac' }]);
   expect(uploads['voice-change']).toEqual([
     { node: '1', field: 'audio', path: '/data/speech.flac' },
     { node: '4', field: 'audio', path: '/data/voice.flac' },
@@ -85,6 +87,7 @@ test('an extension record carries the sha256 of its photo', () => {
     'hook-edit': '/data/photo.png',
     transition: '/data/photo.png',
     voice: null,
+    translate: null,
     avatar: '/data/photo.png',
     music: null,
     upscale: null,

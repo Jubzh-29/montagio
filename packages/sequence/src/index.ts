@@ -5,6 +5,7 @@ export {
   decodeCheck,
   ensureTools,
   exportVertical,
+  extractFirstFrame,
   extractLastFrame,
   headerHash,
   mixMusic,

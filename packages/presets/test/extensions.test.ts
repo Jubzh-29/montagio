@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { AD_STYLES, adInstruction, AVATAR_DEFAULT_PROMPT, compileAvatar, compileCompose, compileEdit, composeInstruction, compileImageUpscale, compileMusic, compileSpeech, compileUpscale, compileVoiceChange, CompileError, EDIT_LOOKS, loadLibrary, SMOOTH_MULTIPLIER, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
+import { AD_STYLES, adInstruction, AVATAR_DEFAULT_PROMPT, compileAvatar, compileCompose, compileEdit, composeInstruction, compileImageUpscale, compileMusic, compileSpeech, compileTranslate, compileUpscale, compileVoiceChange, CompileError, EDIT_LOOKS, loadLibrary, SMOOTH_MULTIPLIER, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -313,6 +313,26 @@ describe('compileEdit (Qwen-Image-Edit-2511)', () => {
       'index_timestep_zero',
       'index_timestep_zero',
     ]);
+  });
+});
+
+describe('compileTranslate (Gemma 4 E4B + Chatterbox)', () => {
+  const translate = () => extension('gemma4-translate');
+
+  test('the speech goes to Gemma and to the voice; the text Chatterbox says is the output of Gemma', () => {
+    const { workflow, output, params } = compileTranslate(translate().model, translate().template, { audioRef: 'speech.flac', language: 'es', seed: 0 });
+    expect(workflow['1']!.inputs.audio).toBe('speech.flac');
+    expect(workflow['3']!.class_type).toBe('TextGenerate');
+    expect(workflow['3']!.inputs).toMatchObject({ audio: ['1', 0], sampling_mode: 'off', thinking: false });
+    expect(String(workflow['3']!.inputs.prompt)).toMatch(/translate it into Spanish\. Only output the Spanish translation/);
+    expect(workflow['4']!.inputs).toMatchObject({ text: ['3', 0], language: 'es', cfg_weight: 0, seed: 1, audio_prompt: ['1', 0] });
+    expect(output).toEqual({ node: '5', kind: 'audio' });
+    expect(params).toMatchObject({ language: 'es', cfg: 0, seed: 1 });
+  });
+
+  test('a language Chatterbox does not speak here, or no speech, is a CompileError', () => {
+    expect(() => compileTranslate(translate().model, translate().template, { audioRef: 'speech.flac', language: 'xx' as 'en', seed: 1 })).toThrow(CompileError);
+    expect(() => compileTranslate(translate().model, translate().template, { audioRef: '', language: 'fr', seed: 1 })).toThrow(CompileError);
   });
 });
 

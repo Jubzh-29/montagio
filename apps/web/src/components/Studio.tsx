@@ -1400,6 +1400,11 @@ export function Studio() {
                       {t('avatarChangeVoice')}
                     </a>
                   )}
+                  {!IS_SHOWCASE && tracked.record.task === 'avatar' && extensions?.estimates.translate !== undefined && (
+                    <a className={styles.buttonSecondary} href={`/translate?from=${encodeURIComponent(tracked.record.id)}`}>
+                      {t('avatarTranslate')}
+                    </a>
+                  )}
                 </div>
               )}
               {!IS_SHOWCASE &&

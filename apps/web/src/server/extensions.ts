@@ -167,6 +167,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const upscale = extensions.includes('upscale') ? upscaleModel(lib) : null;
   const imageUpscale = extensions.includes('upscale') ? imageUpscaleModel(lib) : null;
   const voiceChange = extensions.includes('avatar') ? [...lib.extensionModels.values()].find((entry) => entry.task === 'a2a-vc') : undefined;
+  const translate = extensions.includes('avatar') ? [...lib.extensionModels.values()].find((entry) => entry.task === 'a2a-translate') : undefined;
   const motion = extensions.includes('motion') ? motionModel(lib) : null;
   // A tab without a wall shows what it makes: a render of the GPU session, looping (presets/extensions/previews).
   const examples: NonNullable<ExtensionsInfo['examples']> = {};
@@ -188,6 +189,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
       ...(upscale ? { upscale: estimateFor(upscale, true) } : {}),
       ...(imageUpscale ? { imageUpscale: estimateFor(imageUpscale, true) } : {}),
       ...(voiceChange ? { voiceChange: estimateFor(voiceChange, true) } : {}),
+      ...(translate && avatar ? { translate: estimateFor(translate, true) + estimateFor(avatar.avatar, true) } : {}),
       ...(motion ? { motion: estimateFor(motion, true) } : {}),
     },
     ...(extensions.includes('edit') && editModel ? { editModel: summaryOf(editModel) } : {}),

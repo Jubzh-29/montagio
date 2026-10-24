@@ -542,5 +542,17 @@
   "communityTitleLabel": "Titre",
   "communityAuthorLabel": "Votre nom (facultatif)",
   "communityAuthorPlaceholder": "ex. Mira",
-  "communityPublishNote": "La galerie garde une copie et ses réglages. Son fichier recette ne partage que les réglages, jamais votre photo."
+  "communityPublishNote": "La galerie garde une copie et ses réglages. Son fichier recette ne partage que les réglages, jamais votre photo.",
+  "tabTranslate": "Traduire",
+  "exploreTranslateText": "Un clip parlant redit dans une autre langue, avec la même voix, les lèvres suivant les nouveaux mots.",
+  "translateTitle": "Traduire",
+  "translateLead": "Le même clip dans une autre langue : la parole est écoutée et traduite, redite avec la même voix, et le visage est animé de nouveau pour que les lèvres suivent les nouveaux mots.",
+  "translateNeedsExtension": "La traduction a besoin de l'extension avatar.",
+  "translateLanguage": "Vers",
+  "translateConsent": "La personne montrée est d'accord pour parler une autre langue, avec sa propre voix",
+  "translateMake": "Traduire (~{d})",
+  "translateNeeds": "Ajoutez un clip, choisissez une langue, puis cochez les cases.",
+  "translateResult": "Le clip, traduit",
+  "translateEmpty": "Votre clip sera lu ici, dans sa nouvelle langue.",
+  "avatarTranslate": "Traduire"
 }

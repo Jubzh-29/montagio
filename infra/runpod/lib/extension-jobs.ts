@@ -13,6 +13,7 @@ import {
   compileMotion,
   compileMusic,
   compileSpeech,
+  compileTranslate,
   compileImageUpscale,
   compileUpscale,
   compileVoiceChange,
@@ -20,6 +21,7 @@ import {
   type ApiWorkflow,
   type Aspect,
   type Library,
+  type TranslateLanguage,
 } from '@montagio/presets';
 import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } from '@montagio/registry';
 
@@ -28,7 +30,7 @@ import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } f
  * added on 2026-10-20, last): a hook's edit comes before its transition, the voice before the
  * avatar that speaks it, a composed photo before the effects that animate it.
  */
-export const EXTENSION_JOBS = ['edit', 'compose', 'effect', 'hook-edit', 'transition', 'voice', 'avatar', 'music', 'upscale', 'upscale-image', 'voice-change', 'motion'] as const;
+export const EXTENSION_JOBS = ['edit', 'compose', 'effect', 'hook-edit', 'transition', 'voice', 'translate', 'avatar', 'music', 'upscale', 'upscale-image', 'voice-change', 'motion'] as const;
 export type ExtensionJobName = (typeof EXTENSION_JOBS)[number];
 
 const TASKS: Record<ExtensionJobName, ExtensionTask> = {
@@ -38,6 +40,7 @@ const TASKS: Record<ExtensionJobName, ExtensionTask> = {
   'hook-edit': 'i2i-edit',
   transition: 'flf2v',
   voice: 'tts',
+  translate: 'a2a-translate',
   avatar: 'ia2v-talk',
   music: 't2a',
   upscale: 'v2v-upscale',
@@ -94,6 +97,8 @@ export type ExtensionJobOptions = {
   /** The text of each job that reads one, read by that job only; a job given none keeps its default. */
   text?: Partial<Record<TextJobName, string>>;
   language: 'en' | 'fr';
+  /** Translate: the language the speech (--audio) is said again in. */
+  to?: TranslateLanguage;
   /** Music: the length of the film it goes under. */
   duration_s: number;
   seed: number;
@@ -284,6 +289,11 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
           smooth: opts.smooth ?? false,
         });
         return [{ name, tag: name, model, ...job, files: [file('video', clip)] }];
+      }
+      case 'translate': {
+        const speech = need(opts.audio, '--audio', name);
+        const job = compileTranslate(model, template, { audioRef: basename(speech), language: opts.to ?? 'fr', seed: opts.seed });
+        return [{ name, tag: `${name}:${opts.to ?? 'fr'}`, model, ...job, files: [file('audio', speech)] }];
       }
       case 'voice-change': {
         const speech = need(opts.audio, '--audio', name);

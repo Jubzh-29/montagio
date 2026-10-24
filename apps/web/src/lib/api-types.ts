@@ -160,7 +160,7 @@ export type ExtensionsInfo = {
   extensions: ExtensionId[];
   effects: EffectSummary[];
   hooks: HookSummary[];
-  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; imageUpscale?: number; motion?: number; voiceChange?: number };
+  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; imageUpscale?: number; motion?: number; voiceChange?: number; translate?: number };
   /** The photo edit's model, for the caption under an edit (the preset catalogue does not hold it). */
   editModel?: { id: string; name: string; license: string };
   /** The avatar model, for the caption under a talking avatar. */
@@ -177,7 +177,7 @@ export type ExtensionsInfo = {
   examples?: Partial<Record<'avatar' | 'motion', { previewUrl: string; posterUrl?: string }>>;
 };
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad' | 'voice-change' | 'moodboard';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad' | 'voice-change' | 'moodboard' | 'translate';
 
 import type { CharacterKind, CharacterType } from './characters';
 

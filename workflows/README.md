@@ -59,6 +59,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 | `qwen-image-edit-2511.api.json` | `templates/image_qwen_image_edit_2511.json` | Qwen-Image-Edit-2511 fp8mixed | node 9, PNG |
 | `chatterbox-mtl-voice.api.json` | none (no official template: ComfyUI has no local text-to-speech node) | Chatterbox Multilingual V3 | node 3, FLAC |
 | `chatterbox-vc.api.json` | none (no official template: ComfyUI has no local voice conversion node) | Chatterbox VC (S3Gen) | node 3, FLAC |
+| `translate-speech.api.json` | none (written for Montagio from the core TextGenerate node) | Gemma 4 E4B int8, then Chatterbox Multilingual V3 | node 5, FLAC |
 | `wan22-s2v-avatar.api.json` | `templates/video_wan2_2_14B_s2v.json` | Wan 2.2 S2V 14B fp8 | node 113, MP4 with the speech |
 | `wan21-i2v-effect.api.json` | `templates/image_to_video_wan.json` | Wan 2.1 I2V 14B 480p fp8, an effect LoRA | node 56, MP4 |
 | `wan22-flf2v-transition.api.json` | `templates/video_wan2_2_14B_flf2v.json` | Wan 2.2 I2V A14B fp8 (high and low noise) | node 61, MP4 |
@@ -101,6 +102,12 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 - Written for Montagio: `ChatterboxVC` from the same pinned `wildminder/ComfyUI-Chatterbox` pack, between two core `LoadAudio` (node 1, the speech; node 4, the voice sample) and `SaveAudioAdvanced` in FLAC. The words and the delivery of the speech stay; only the voice changes, to the sample's.
 - It reads the `resembleai-mtl-v3` pack folder. The node's classic loader builds the English TTS beside the converter, so the folder also holds `t3_cfg.safetensors` and `tokenizer.json` (2.1 GB, MIT, the same Resemble AI repository); the multilingual voice still picks its own T3 by name. It runs 10 flow steps with one refinement pass and cuts the speech into 30 s chunks at most (the app keeps 30 s). The watermark is off, as for the avatar's voice.
 - The app asks for the speaker's consent on the sample, and the rights on a video sent here; the clip comes back with the AI mention.
+
+### translate-speech
+
+- Written for Montagio: `LoadAudio` (node 1, the speech), the core `CLIPLoader` reading Gemma 4 E4B (int8, one file with its audio encoder and tokenizer), the core `TextGenerate` (node 3, greedy decoding, no thinking) asked for the translation alone, then `ChatterboxMTLTTS` (node 4) saying that text, its `text` input linked to node 3, with the speech as its voice reference (`audio_prompt`), and `SaveAudioAdvanced` in FLAC, `montagio/translation`.
+- `cfg_weight` is 0, the Chatterbox card's advice when the reference voice speaks another language than the text. The app then animates the face again on that speech (Wan 2.2 S2V): the lips follow the new words.
+- Gemma 4 hears 30 s of audio at most; the app keeps 15 s, what the avatar animates.
 
 ### wan22-s2v-avatar
 
@@ -145,6 +152,7 @@ Extension models (a binding with several inputs gets the same value in each):
 | `qwen-image-edit-2511` | image 41.image; image2 42.image; prompt 151.prompt; seed 169.seed | 9 (image) |
 | `chatterbox-mtl-voice` | text 2.text; language 2.language; seed 2.seed; cfg 2.cfg_weight | 3 (audio) |
 | `chatterbox-vc` | audio 1.audio; voice 4.audio | 3 (audio) |
+| `gemma4-translate` | audio 1.audio; prompt 3.prompt; language 4.language; cfg 4.cfg_weight; seed 4.seed | 5 (audio) |
 | `wan22-s2v-avatar` | image 52.image; audio 58.audio; prompt 6.text; seed 3.seed (+1, +2 on the extension samplers); width / height 93.width / 93.height; frames 96.length | 113 (video) |
 | `wan21-i2v-effects` | image 52.image; prompt 6.text; negative 7.text; seed 3.seed; width / height / frames 50.width / height / length; lora 200.lora_name; lora_strength 200.strength_model | 56 (video) |
 | `wan22-flf2v-transition` | image 68.image; end_image 62.image; prompt 6.text; negative 7.text; seed 57.noise_seed; width / height / frames 67.width / height / length | 61 (video) |

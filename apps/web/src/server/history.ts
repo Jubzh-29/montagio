@@ -207,6 +207,9 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
         },
       };
     }
+    case 'translate':
+      // A clip said in another language: Reuse goes back to the Avatar tab.
+      return { ...base, kind: 'clip', task: 'translate', reprise: { tab: 'avatar' } };
     case 'voice-change':
       // A clip in another voice: Reuse goes back to the Avatar tab.
       return { ...base, kind: 'clip', task: 'voice-change', reprise: { tab: 'avatar' } };
