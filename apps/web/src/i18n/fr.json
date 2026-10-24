@@ -505,5 +505,7 @@
   "recipeLoading": "Chargement de la recette…",
   "recipeFailed": "La recette n’a pas pu être chargée. Rouvrez-la pour réessayer.",
   "recipeSame": "Même workflow que l’original.",
-  "recipeDiffers": "Le workflow diffère de l’original (autre photo, ou autre version de Montagio)."
+  "recipeDiffers": "Le workflow diffère de l’original (autre photo, ou autre version de Montagio).",
+  "recipeSeedChip": "Graine {seed} · reproduction",
+  "recipeNewSeed": "Nouvelle graine"
 }
