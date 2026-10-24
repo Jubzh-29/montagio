@@ -1,7 +1,9 @@
 # Translate (extension "avatar"): the speech of a clip said again in another language, in the
-# same voice. Gemma 4 E4B (Apache-2.0) listens to the speech and writes its translation with the
-# core TextGenerate node of ComfyUI v0.41.0 (no extra node pack: its CLIPLoader reads the model,
-# audio encoder and tokenizer included); Chatterbox Multilingual V3 (MIT, the avatar's voice)
+# same voice. Gemma 4 E4B (Apache-2.0) works in two passes with the core TextGenerate node of
+# ComfyUI v0.41.0 (no extra node pack: its CLIPLoader reads the model, audio encoder and tokenizer
+# included): it transcribes the speech (node 3), then translates that text (node 7), the
+# instruction joined to it by the core StringConcatenate (node 6). Asked for both at once, it gave
+# back the transcription (GPU session of 2026-10-24). Chatterbox Multilingual V3 (MIT, the avatar's voice)
 # says the translated text with the source speech as its voice reference. The app then makes the
 # talking avatar again on that speech: the lips follow the new words.
 schema: montagio/extension-model@0.1
@@ -15,8 +17,8 @@ workflow: workflows/translate-speech.api.json
 bindings:
   # the speech to translate: mono FLAC as the app prepares it; also the voice it is said again in
   audio: { node: "1", field: audio }
-  # the translation instruction (the target language written in)
-  prompt: { node: "3", field: prompt }
+  # the translation instruction (the target language written in), put before the transcription
+  prompt: { node: "6", field: string_a }
   language: { node: "4", field: language }
   cfg: { node: "4", field: cfg_weight }
   seed: { node: "4", field: seed }

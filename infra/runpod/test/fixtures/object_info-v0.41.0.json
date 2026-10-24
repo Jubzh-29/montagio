@@ -5362,5 +5362,44 @@
    "thinking"
   ],
   "python_module": "comfy_extras.nodes_textgen"
+ },
+ "StringConcatenate": {
+  "input": {
+   "required": {
+    "string_a": [
+     "STRING",
+     {
+      "multiline": true
+     }
+    ],
+    "string_b": [
+     "STRING",
+     {
+      "multiline": true
+     }
+    ],
+    "delimiter": [
+     "STRING",
+     {
+      "default": "",
+      "multiline": false
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "string_a",
+    "string_b",
+    "delimiter"
+   ]
+  },
+  "output": [
+   "STRING"
+  ],
+  "output_name": [
+   "STRING"
+  ],
+  "python_module": "comfy_extras.nodes_string"
  }
 }

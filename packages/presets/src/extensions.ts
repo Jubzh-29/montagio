@@ -433,14 +433,15 @@ const LANGUAGE_NAME: Record<TranslateLanguage, string> = {
   zh: 'Mandarin Chinese, in simplified characters',
 };
 
-/** What Gemma 4 is asked: the translation alone, short enough for the avatar to say it. */
+/** What Gemma 4 is asked once it has transcribed the speech: the translation of that text alone, short enough to say. */
 export function translateInstruction(language: TranslateLanguage): string {
   const name = LANGUAGE_NAME[language];
-  return `Transcribe the speech in this audio, then translate it into ${name}. Only output the ${name} translation: one plain paragraph, natural and concise, without quotes, labels or notes.`;
+  return `Translate the following text into ${name}. Only output the ${name} translation: one plain paragraph, natural and concise, without quotes, labels or notes. The text:`;
 }
 
 /**
- * Translate a speech (Gemma 4 E4B with the core TextGenerate node), then say the translation in the
+ * Translate a speech (Gemma 4 E4B with the core TextGenerate node: it transcribes, then translates
+ * the transcription in a second pass), then say the translation in the
  * same voice (Chatterbox Multilingual V3, the speech as its reference). cfg_weight is 0, the model
  * card's advice when the reference voice speaks another language than the text.
  */
