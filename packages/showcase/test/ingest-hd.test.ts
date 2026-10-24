@@ -1,4 +1,4 @@
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadLibrary } from '@montagio/presets';
@@ -6,6 +6,7 @@ import { AI_METADATA, probe, readTags } from '@montagio/sequence';
 import { runCli } from '../src/cli';
 import { IngestError, ingestHd } from '../src/ingest';
 import { loadManifest } from '../src/manifest';
+import { prepareShowcase } from '../src/prepare';
 import { verifyShowcase } from '../src/verify';
 import { hdWorkflow, showcaseJob, showcaseWorkflow, workflowSha256 } from '../src/workflow';
 import { addExample, addRenderedClip, FFMPEG_TIMEOUT_MS, makeRoot, rawRender, removeRoot, repoRoot, sha256Of, showcasePath } from './helpers';
@@ -76,6 +77,17 @@ async function writeCameraRun(preset: string, raw: string, texts: { description:
   writeFileSync(join(renders, 'smoke.jsonl'), `${JSON.stringify(record)}\n`);
 }
 
+/** The HD pass's model as data.json names it for the caption. */
+const SEEDVR2 = { id: 'seedvr2-upscale', name: 'SeedVR2 3B (1080p upscale)', license: 'Apache-2.0' };
+
+/** The open stack report prepare needs; returns where prepare writes the showcase. */
+function writeReport(): string {
+  const path = join(root, 'apps', 'web', 'public', 'open-stack-report.json');
+  mkdirSync(join(path, '..'), { recursive: true });
+  writeFileSync(path, JSON.stringify({ ok: true, checkedAt: '2026-10-24T12:00:00.000Z', models: [], violations: [] }));
+  return join(root, 'apps', 'web', 'public', 'showcase');
+}
+
 const hdOf = async (input: string) => {
   const library = await loadLibrary(root);
   return workflowSha256(hdWorkflow(library, { model: 'seedvr2-upscale', input, seed: 42 }, '16:9'));
@@ -119,6 +131,11 @@ test('the HD pass of a showcase clip replaces its file, and its entry keeps the 
 
   // Ingested again, the pass is traced through the clip its entry remembers.
   expect(await ingestHd(root, upscale, { inputs, renders: [] })).toMatchObject({ replaced: ['clips/crash-push--landscape-a.mp4'], skipped: [] });
+
+  // data.json names the pass's model, for the clip's caption (alone on its sample: no 480p placeholder to join).
+  rmSync(join(root, 'presets', 'pan-left.yaml'));
+  const data = await prepareShowcase(root, { outDir: writeReport(), strict: false, repoUrl: null });
+  expect(data.clips).toEqual([expect.objectContaining({ preset: 'crash-push', placeholder: false, hd: SEEDVR2 })]);
 
   // A changed HD workflow is caught like a changed camera workflow: a warning, an error in strict mode.
   const manifestPath = showcasePath(root, 'manifest.yaml');
@@ -168,6 +185,8 @@ test('the HD pass of an effect example replaces its file and keeps its workflow'
   expect((await loadManifest(root)).effects[0]).toEqual({ ...before, sha256: sha256Of(file), hd: expect.objectContaining({ source_sha256: before.sha256 }) });
   expect(await probe(file)).toMatchObject({ width: 1920, height: 1080, fps: 16 });
   expect((await verifyShowcase(root, { strict: false })).errors).toEqual([]);
+  const data = await prepareShowcase(root, { outDir: writeReport(), strict: false, repoUrl: null });
+  expect(data.effects.find((item) => item.id === 'squish')?.examples).toEqual([expect.objectContaining({ sample: 'landscape-a', hd: SEEDVR2 })]);
 }, FFMPEG_TIMEOUT_MS * 2);
 
 test('skips a pass it cannot trace to a render, a withheld render and another size; refuses a clip upscaled twice', async () => {

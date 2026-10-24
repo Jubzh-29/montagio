@@ -115,7 +115,7 @@ Pour mettre à jour la vitrine, reconstruire, puis relancer la même commande `h
 
 - [ ] L'accueil s'affiche, avec le badge « 100% open weights — verified » et les trois photos d'exemple.
 - [ ] `/open-stack/`, ouvert directement (rechargement compris), liste chaque modèle par fonction (caméra, effets, transitions et hooks, photo, avatar, musique, HD, mouvement), tous en Apache-2.0 ou MIT, et la légende d’un clip mène à la ligne de son modèle.
-- [ ] Une photo, un preset, puis « Show clip » : le clip joue, et sa légende dit s'il est provisoire ou pré-généré.
+- [ ] Une photo, un preset, puis « Show clip » : le clip joue, et sa légende dit s'il est provisoire ou pré-généré. Depuis la passe HD (partie 7), elle nomme aussi SeedVR2, et l'ardoise sous le moniteur dit « 1080p ».
 - [ ] « Open in ComfyUI » télécharge `montagio-<preset>.json`.
 - [ ] En Séquence, une photo et trois presets, puis « Assemble film » : le film joue en quelques secondes après le chargement de FFmpeg. « Download film » et « Download 9:16 » fonctionnent.
 - [ ] Les étiquettes du film téléchargé sont les bonnes : `ffprobe -v error -show_entries format_tags -of json montagio-film.mp4` doit afficher `"comment": "AI-generated"` après la S3, ou `"Montagio showcase placeholder"` avant.
@@ -250,7 +250,9 @@ Pour chaque passe HD réussie, `ingest --hd` :
 - prend la sortie à la taille HD (`smoke.ts` liste aussi le clip 480p envoyé parmi les sorties, en `…__r1.mp4`) et la réencode dans l'encodage de la vitrine ;
 - refuse un dossier où le même clip a été agrandi deux fois.
 
-Un exemple d'effet ou de hook passe en HD de la même façon, mais il doit d'abord être dans la vitrine en 480p (`ingest --examples`), avec son workflow. Les 9 dossiers du 24/10 ont été intégrés ainsi, avec `--renders` sur les 6 dossiers `refonte-*` et sur celui du pilote.
+Un exemple d'effet ou de hook passe en HD de la même façon, mais il doit d'abord être dans la vitrine en 480p (`ingest --examples`), avec son workflow.
+
+**Ce que montre la page.** `prepare` écrit le modèle de la passe HD de chaque clip et de chaque exemple dans `data.json`. La légende d'un résultat le nomme après le modèle du rendu, chacun lié à sa ligne de la page Open Stack : « Pre-generated with Montagio · Wan 2.2 Fun Camera (Apache-2.0) · in HD by SeedVR2 3B (1080p upscale) (Apache-2.0) · AI-generated ». Un film le nomme quand tous ses plans ont eu la même passe. Quand tous les clips sont en HD, l'ardoise sous le moniteur dit « 1080p » au lieu de « 480p ». Les 9 dossiers du 24/10 ont été intégrés ainsi, avec `--renders` sur les 6 dossiers `refonte-*` et sur celui du pilote.
 
 **Trois effets écartés.** Cake-ify, Explode et Squish sur la passante (`portrait-a`) sont techniquement réussis, mais montrent un couteau qui tranche une personne, une personne dans une explosion et des mains qui écrasent une personne. Ils ont quitté la vitrine (fichiers et workflows supprimés) et sont listés sous `withheld`, avec leur raison : `ingest`, `ingest --examples` et `ingest --hd` les écartent, et le manifeste refuse qu'un rendu écarté soit aussi listé. Les mêmes effets sur la voiture restent.
 

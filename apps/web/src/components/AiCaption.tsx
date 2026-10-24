@@ -7,22 +7,27 @@ import { useExtensions } from '@/lib/use-extensions';
 import { stackHref } from '@/lib/open-stack';
 import styles from './studio.module.css';
 
-/** The captions that name a model: each holds `{model}` and `{license}`. */
-type CaptionText = 'aiCaption' | 'demoCaption' | 'showcaseCaption' | 'hookEndFrame';
+/** The captions that name a model: each holds `{model}` and `{license}`; the HD one also `{hd}` and `{hdLicense}`. */
+type CaptionText = 'aiCaption' | 'demoCaption' | 'showcaseCaption' | 'showcaseHdCaption' | 'hookEndFrame';
+
+type CaptionModel = { id?: string; name: string; license: string };
 
 /**
  * Under every result: what made it, and that it is AI-generated (the AI Act's visible mention).
- * The model's name leads to its line on the Open Stack page, where its weights and licences are.
+ * Each model's name leads to its line on the Open Stack page, where its weights and licences are:
+ * the one that rendered the result, and the one that restored it to 1080p when there is one (`hd`).
  */
 export function AiCaption({
   model,
+  hd,
   text = 'aiCaption',
   testId = 'ai-caption',
   as: Tag = 'p',
   prefix,
 }: {
   /** Without an id (an unknown model), the name is plain text. */
-  model: { id?: string; name: string; license: string };
+  model: CaptionModel;
+  hd?: CaptionModel;
   text?: CaptionText;
   testId?: string;
   /** A figure's caption, styled by its figure. */
@@ -32,19 +37,19 @@ export function AiCaption({
   const { t } = useI18n();
   // Without a GPU (the demo backend) no model made the result: the caption says what would make it.
   const demo = useExtensions()?.demo === true && !IS_SHOWCASE;
-  const [before, after = ''] = t(demo && text === 'aiCaption' ? 'demoCaption' : text, { license: model.license }).split('{model}');
+  const parts = t(demo && text === 'aiCaption' ? 'demoCaption' : text, { license: model.license, hdLicense: hd?.license ?? '' }).split(/(\{model\}|\{hd\})/);
+  const name = (named: CaptionModel, key: number) =>
+    named.id ? (
+      <Link key={key} href={stackHref(named.id)} className={styles.captionLink}>
+        {named.name}
+      </Link>
+    ) : (
+      named.name
+    );
   return (
     <Tag className={Tag === 'p' ? styles.caption : undefined} data-testid={testId}>
       {prefix}
-      {before}
-      {model.id ? (
-        <Link href={stackHref(model.id)} className={styles.captionLink}>
-          {model.name}
-        </Link>
-      ) : (
-        model.name
-      )}
-      {after}
+      {parts.map((part, index) => (part === '{model}' ? name(model, index) : part === '{hd}' && hd ? name(hd, index) : part))}
     </Tag>
   );
 }

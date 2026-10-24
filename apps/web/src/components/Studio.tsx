@@ -948,7 +948,7 @@ export function Studio() {
       ? motionVideo.status === 'ready' && motionVideo.duration_s !== undefined && t('slateSpec', { s: Math.round(motionVideo.duration_s * 10) / 10 })
       : tab === 'avatar'
       ? speechSeconds > 0 && t('slateSpec', { s: speechSeconds })
-      : t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
+      : t(IS_SHOWCASE && showcase?.hd ? 'slateSpecHd' : 'slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
     ...(busy && take
       ? [
           t('slateRec', { t: formatClock(elapsed_s) }),
@@ -1330,7 +1330,13 @@ export function Studio() {
                 </p>
               )}
               {IS_SHOWCASE && succeeded && !succeeded.placeholder && (resultModel ?? showcase?.model) && (
-                <AiCaption text="showcaseCaption" testId="result-caption" model={(resultModel ?? showcase?.model)!} />
+                // A clip restored to 1080p also names its HD pass's model.
+                <AiCaption
+                  text={succeeded.hdModel ? 'showcaseHdCaption' : 'showcaseCaption'}
+                  testId="result-caption"
+                  model={(resultModel ?? showcase?.model)!}
+                  hd={succeeded.hdModel}
+                />
               )}
               {!IS_SHOWCASE && succeeded && resultModel && <AiCaption model={resultModel} />}
               {succeeded && tracked?.kind === 'job' && tracked.record.task === 'motion' && (
