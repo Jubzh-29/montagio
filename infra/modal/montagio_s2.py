@@ -79,10 +79,11 @@ def _image() -> modal.Image:
         )
         .add_local_dir(runpod / "patches", f"{REMOTE_REPO}/infra/runpod/patches", copy=True)
         # The pod's install, on a GPU: bootstrap.sh picks the PyTorch build from the driver and checks
-        # that torch sees CUDA. Node.js, ComfyUI, PyTorch, the proxy, then the voice node (a warning if it fails).
+        # that torch sees CUDA. Node.js, ComfyUI, PyTorch, the proxy, then the voice node and the object
+        # swap's tracker (a warning if one fails).
         .run_commands(
             f"cd {REMOTE_REPO} && bash -c '{BOOTSTRAP} && preflight && install_node && install_comfyui"
-            " && install_proxy && install_voice_node'",
+            " && install_proxy && install_voice_node && install_segment_node'",
             gpu=BUILD_GPU,
         )
     )

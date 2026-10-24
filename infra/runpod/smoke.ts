@@ -37,7 +37,7 @@ import {
 } from '@montagio/presets';
 import { extractFirstFrame, prepareMotionClip, probe, probeAudio } from '@montagio/sequence';
 import { imageSize } from 'image-size';
-import { EXTENSION_JOBS, extensionJobs, jobTexts, photoFile, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
+import { EXTENSION_JOBS, extensionJobs, jobTexts, parseSwapPoints, photoFile, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
 import { imageFingerprint, imagePrompts } from './lib/image';
 import { negativeOverride } from './lib/prompts';
 import { assertLocalBaseUrl, cameraMove, checkWorkflow, comboOptions, guardFetch, VramSampler, type ObjectInfo, type VramStats } from './lib/comfy';
@@ -83,6 +83,8 @@ const { values: args } = parseArgs({
     clip: { type: 'string' },
     smooth: { type: 'boolean', default: false },
     motion: { type: 'string' },
+    points: { type: 'string' },
+    exclude: { type: 'string' },
     audio: { type: 'string' },
     voice: { type: 'string' },
     text: { type: 'string', multiple: true, default: [] },
@@ -116,9 +118,10 @@ if (args.help) {
 
 Extensions (instead of presets):
   --extension LIST   edit, compose, effect, hook (= hook-edit then transition), voice, avatar, music, upscale, motion,
-                     restyle (comma list) or "all"; restyle-edit,restyle restyles the clip's first frame, then keeps it
+                     restyle, swap (comma list) or "all"; restyle-edit,restyle restyles the clip's first frame,
+                     then keeps it
   --input PATH       the photo of edit, effect, hook and avatar (default demo-assets/images/sample-16x9.png); restyle
-                     run alone: a look to follow (without --input, the text alone)
+                     run alone: a look to follow; swap: the photo of the new object (without --input, the text alone)
   --effect LIST      the effects to run, e.g. squish,explode, or "all" (default all)
   --hook ID          the hook of hook-edit and transition (default iris-dive)
   --input2 PATH      the second image of a two-reference hook (the outfit of wardrobe-swap), or compose's character
@@ -131,13 +134,17 @@ Extensions (instead of presets):
   --look LOOK        a look of the edit job: infl8, action or angles
   --clip PATH        the clip to upscale (required by upscale)
   --smooth           upscale: RIFE frames in between, twice the clip's frame rate (16 to 32 fps for Wan)
-  --motion PATH      the reference video of the motion transfer, or the clip to restyle (required by motion and restyle):
-                     its first 30 s are kept, at 16 fps, silent (a restyle rebuilds the first 5 s)
+  --motion PATH      the reference video of the motion transfer, or the clip to restyle or swap an object of (required by
+                     motion, restyle and swap): its first 30 s are kept, at 16 fps, silent (restyle and swap use 5 s)
+  --points X,Y[;X,Y] swap: points on the object to replace, on the clip's first frame, in fractions of its width and
+                     height from the top left (0.5,0.5 is the centre)
+  --exclude X,Y[;..] swap: points on what is not the object, when the tracker takes too much
   --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
   --voice PATH       voice: speak with this sample (a consented recording, mono FLAC) instead of the built-in voice
   --text [JOB=]TEXT  the edit instruction, the effects' subject, the words to say, the music description or the
-                     restyle's new look (each has a default), for the one job of the run that reads a text; when
-                     several do, name it: --text edit=… --text effect=… --text voice=… --text music=… --text restyle=…
+                     restyle's new look or the swap's new object (each has a default), for the one job of the run that
+                     reads a text; when several do, name it: --text edit=… --text effect=… --text voice=… --text
+                     music=… --text restyle=… --text swap=…
                      (repeatable)
   --language en|fr   the language of the voice (default en)
   --duration S       music: the length of the film it goes under (default 10)
@@ -541,12 +548,14 @@ async function runExtensions(
   let motion: string | undefined;
   let motion_s: number | undefined;
   let motionAspect: Aspect | undefined;
+  let motionSize: { width: number; height: number } | undefined;
   let restyleFrame: string | undefined;
-  if (names.some((name) => name === 'motion' || name === 'restyle' || name === 'restyle-edit')) {
+  if (names.some((name) => name === 'motion' || name === 'restyle' || name === 'restyle-edit' || name === 'swap')) {
     if (args['dry-run']) {
       motion = args.motion ? fromCaller(args.motion) : 'motion.mp4';
       motion_s = 5;
       motionAspect = '9:16';
+      motionSize = { width: 480, height: 832 };
       restyleFrame = input;
     } else if (args.motion) {
       await mkdir(join(outDir, 'inputs'), { recursive: true });
@@ -554,6 +563,7 @@ async function runExtensions(
       const prepared = await prepareMotionClip(fromCaller(args.motion), motion, { max_s: 30 });
       motion_s = prepared.duration_s;
       motionAspect = pickAspect(prepared.width, prepared.height);
+      motionSize = { width: prepared.width, height: prepared.height };
       if (names.includes('restyle-edit')) {
         restyleFrame = join(outDir, 'inputs', 'first-frame.png');
         await extractFirstFrame(motion, restyleFrame);
@@ -592,8 +602,12 @@ async function runExtensions(
     motion,
     motion_s,
     motionAspect,
+    motionSize,
     restyleFrame,
     restyleReference,
+    swapPoints: parseSwapPoints(args.points, '--points'),
+    swapExclude: parseSwapPoints(args.exclude, '--exclude'),
+    ...(args.input ? { swapImage: input } : {}),
     audio: audio ?? (args['dry-run'] ? 'speech.flac' : undefined),
     audio_s: audio_s ?? (args['dry-run'] ? 5 : undefined),
     text,

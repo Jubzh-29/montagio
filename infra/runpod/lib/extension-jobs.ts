@@ -14,6 +14,7 @@ import {
   compileMusic,
   compileRestyle,
   compileSpeech,
+  compileSwap,
   compileImageUpscale,
   compileUpscale,
   compileVoiceChange,
@@ -23,12 +24,13 @@ import {
   type Aspect,
   type Library,
   type RestyleReference,
+  type SwapPoint,
 } from '@montagio/presets';
 import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } from '@montagio/registry';
 
 /**
  * In the order a session runs them, the priority order of 2026-10-19 (the motion transfer,
- * added on 2026-10-20, then the restyle on 2026-10-24, last): a hook's edit comes before its
+ * added on 2026-10-20, then the restyle and the object swap on 2026-10-24, last): a hook's edit comes before its
  * transition, the voice before the avatar that speaks it, a composed photo before the effects
  * that animate it, the restyled first frame before the restyle that keeps it.
  */
@@ -47,6 +49,7 @@ export const EXTENSION_JOBS = [
   'motion',
   'restyle-edit',
   'restyle',
+  'swap',
 ] as const;
 export type ExtensionJobName = (typeof EXTENSION_JOBS)[number];
 
@@ -65,20 +68,23 @@ const TASKS: Record<ExtensionJobName, ExtensionTask> = {
   motion: 'motion-transfer',
   'restyle-edit': 'i2i-edit',
   restyle: 'v2v-restyle',
+  swap: 'v2v-swap',
 };
 
 /**
  * The jobs that read a text: the edit instruction, the effects' subject, the words to say, the
- * music description, the motion's description, the restyle's new look (its edit reads it too).
+ * music description, the motion's description, the restyle's new look (its edit reads it too), the
+ * swap's new object.
  */
-export const TEXT_JOBS = ['edit', 'effect', 'voice', 'music', 'motion', 'restyle'] as const satisfies readonly ExtensionJobName[];
+export const TEXT_JOBS = ['edit', 'effect', 'voice', 'music', 'motion', 'restyle', 'swap'] as const satisfies readonly ExtensionJobName[];
 export type TextJobName = (typeof TEXT_JOBS)[number];
 
-const DEFAULT_TEXT: Record<'music' | 'edit' | 'voice' | 'restyle', string> = {
+const DEFAULT_TEXT: Record<'music' | 'edit' | 'voice' | 'restyle' | 'swap', string> = {
   music: 'calm cinematic piano, slow strings',
   edit: 'make it a rainy night scene',
   voice: 'Hello, I am a Montagio avatar, rendered with open weights.',
   restyle: 'a snowy winter evening',
+  swap: 'a red vintage motorbike',
 };
 
 /** The hook of the GPU session S2 when none is named. */
@@ -114,6 +120,12 @@ export type ExtensionJobOptions = {
   restyleFrame?: string;
   /** The restyle's reference image and what it is to the job; none: the text alone. */
   restyleReference?: { path: string; mode: RestyleReference };
+  /** The size of the prepared clip's frames: the swap's points are fractions of it. */
+  motionSize?: { width: number; height: number };
+  /** The swap: points on the object of the clip's first frame, points on what is not it, the new object's photo. */
+  swapPoints?: SwapPoint[];
+  swapExclude?: SwapPoint[];
+  swapImage?: string;
   /** The speech of avatar, and its length in seconds (the caller reads it). */
   audio?: string;
   /** The voice job's sample (mono FLAC, as the app prepares it): the cloned voice. */
@@ -155,6 +167,18 @@ function fileInput(model: ExtensionModel, key: ExtensionBindingKey): { node: str
   const target = Array.isArray(binding) ? binding[0] : binding;
   if (!target) throw new Error(`model ${model.id} has no ${key} binding`);
   return target;
+}
+
+/** "0.5,0.4;0.52,0.6": points in fractions of the frame (--points, --exclude); undefined without the flag. */
+export function parseSwapPoints(value: string | undefined, flag: string): SwapPoint[] | undefined {
+  if (value === undefined) return undefined;
+  return value.split(';').map((pair) => {
+    const [x, y, extra] = pair.split(',').map((part) => Number(part.trim()));
+    if (extra !== undefined || !(x! >= 0 && x! <= 1 && y! >= 0 && y! <= 1)) {
+      throw new Error(`${flag} takes x,y pairs between 0 and 1 joined by ";", such as 0.5,0.4;0.52,0.6 (got "${pair}")`);
+    }
+    return { x: x!, y: y! };
+  });
 }
 
 function need(value: string | undefined, flag: string, job: ExtensionJobName): string {
@@ -305,6 +329,26 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
           ...(reference ? { reference: { imageRef: basename(reference.path), mode: reference.mode } } : {}),
         });
         return [{ name, tag: reference ? `${name}:${reference.mode}` : name, model, ...job, files: [file('video', clip), ...(reference ? [file('image', reference.path)] : [])] }];
+      }
+      case 'swap': {
+        const clip = need(opts.motion, '--motion', name);
+        if (opts.motion_s === undefined || opts.motionAspect === undefined || !opts.motionSize) {
+          throw new Error('the swap job needs the length, the aspect and the size of its prepared clip');
+        }
+        if (!opts.swapPoints?.length) throw new Error('the swap job needs --points x,y on the object of the first frame');
+        const job = compileSwap(model, template, {
+          videoRef: basename(clip),
+          video_s: opts.motion_s,
+          source: opts.motionSize,
+          aspect: opts.motionAspect,
+          seed: opts.seed,
+          prompt: text('swap'),
+          points: opts.swapPoints,
+          ...(opts.swapExclude?.length ? { exclude: opts.swapExclude } : {}),
+          ...(opts.swapImage ? { imageRef: basename(opts.swapImage) } : {}),
+        });
+        const files = [file('video', clip), ...(opts.swapImage ? [file('image', opts.swapImage)] : [])];
+        return [{ name, tag: opts.swapImage ? `${name}:photo` : `${name}:text`, model, ...job, files }];
       }
       case 'upscale': {
         const clip = need(opts.clip, '--clip', name);

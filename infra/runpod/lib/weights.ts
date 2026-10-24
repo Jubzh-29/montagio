@@ -46,9 +46,10 @@ const LOADER_FOLDERS: Record<string, Record<string, string>> = {
   AudioEncoderLoader: { audio_encoder_name: 'audio_encoders' },
   FrameInterpolationModelLoader: { model_name: 'frame_interpolation' },
   LoadDA3Model: { model_name: 'geometry_estimation' },
+  DownloadAndLoadSAM2Model: { model: 'sam2' },
 };
 
-/** ComfyUI models/ folders a weight may go to (the same set as infra/local/src/pins.ts); `tts` holds the voice packs. */
+/** ComfyUI models/ folders a weight may go to (the same set as infra/local/src/pins.ts); `tts` holds the voice packs, `sam2` the object swap's tracker. */
 const COMFY_FOLDERS = new Set([
   'checkpoints',
   'diffusion_models',
@@ -61,6 +62,7 @@ const COMFY_FOLDERS = new Set([
   'audio_encoders',
   'frame_interpolation',
   'geometry_estimation',
+  'sam2',
   'tts',
 ]);
 
