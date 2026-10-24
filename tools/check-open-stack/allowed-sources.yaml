@@ -254,6 +254,31 @@ sources:
     license_file: false
     note: the author's own repository (RIFEv4.26_0921.zip); its card has no license and sends to GitHub hzwer/Practical-RIFE (MIT LICENSE at bbfd2ea9), whose README says the trained models are under the same MIT license
 
+  # Restyle: Wan 2.1 VACE 14B, its 4-step LoRA and the depth model (read on 2026-10-24).
+  - repo: Wan-AI/Wan2.1-VACE-14B
+    license: Apache-2.0
+    role: source
+    revision: 539c162b1387eac9dc4c20bd3f74671309e76a4c
+    license_file: true
+    note: the README adds Wan's user-conduct paragraph (no illegal, harmful or misleading content), as for the other Wan 2.1 sources
+  - repo: lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v
+    license: Apache-2.0
+    role: source
+    revision: f683105866bf9afe574cb2dea6069c7f3d003e54
+    license_file: true
+  - repo: Comfy-Org/Depth-Anything-3
+    license: Apache-2.0
+    role: mirror
+    revision: 1aaeea516f22fb2f4c7fae761c8ed470c6cf9f93
+    license_file: false
+    note: the four DA3 variants converted by its convert_da3.py; only depth_anything_3_small.safetensors is used (DA3-Large and DA3-Giant, not mirrored here, are CC BY-NC 4.0)
+  - repo: depth-anything/DA3-SMALL
+    license: Apache-2.0
+    role: source
+    revision: e08cab65ca0ec38e7826075418411ab90cab4da3
+    license_file: false
+    note: the card metadata and the README's table say Apache 2.0
+
 # Never a source or a download repository, whatever a template or a tutorial fetches from it.
 denied:
   - repo: Kijai/WanVideo_comfy

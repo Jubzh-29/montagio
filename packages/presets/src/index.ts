@@ -70,3 +70,4 @@ export {
 export { compileEffect, type EffectInputs } from './effects';
 export { compileHookEdit, compileHookTransition, compileTransition, type HookEditInputs, type TransitionInputs } from './transitions';
 export { compileMotion, MOTION_DEFAULTS, type MotionInputs } from './motion';
+export { compileRestyle, restyleInstruction, type RestyleInputs, type RestyleReference } from './restyle';

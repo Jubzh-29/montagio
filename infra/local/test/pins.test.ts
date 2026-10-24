@@ -62,7 +62,7 @@ test('parseExtensionsConfig reads registry/extensions.yaml as @montagio/registry
   expect(parseExtensionsConfig(text)).toEqual(
     registryExtensions(text, 'extensions.yaml').map(({ id, priority, requires, gpu_validated }) => ({ id, priority, requires, gpuValidated: gpu_validated })),
   );
-  expect(readExtensions(repoRoot).map((e) => e.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion']);
+  expect(readExtensions(repoRoot).map((e) => e.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle']);
 });
 
 describe('requires: an inline list, as registry/extensions.yaml keeps it', () => {
@@ -114,6 +114,9 @@ describe('selectExtensions agrees with enabledExtensions', () => {
     '    gpu_validated: null',
     '  - id: motion',
     '    priority: 7',
+    '    gpu_validated: null',
+    '  - id: restyle',
+    '    priority: 8',
     '    gpu_validated: null',
     '',
   ].join('\n');

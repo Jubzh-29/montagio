@@ -21,7 +21,7 @@ export type Violation = {
 };
 
 /** What a model makes, in the order the Open Stack page lists them. */
-export const STACK_FUNCTIONS = ['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion'] as const;
+export const STACK_FUNCTIONS = ['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion', 'restyle'] as const;
 export type StackFunction = (typeof STACK_FUNCTIONS)[number];
 
 /** Exhaustive on purpose: a new capability or task does not compile until it says what it makes. */
@@ -37,6 +37,7 @@ const FUNCTION_OF_TASK: Record<ExtensionTask, StackFunction> = {
   'v2v-upscale': 'hd',
   'i2i-upscale': 'hd',
   'motion-transfer': 'motion',
+  'v2v-restyle': 'restyle',
 };
 
 /** A weight file of a model, as the lock fetches it: its licence, its size and the repository it comes from. */

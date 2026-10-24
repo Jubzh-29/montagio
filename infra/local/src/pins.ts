@@ -32,6 +32,7 @@ const COMFY_FOLDERS = new Set([
   'upscale_models',
   'audio_encoders',
   'frame_interpolation',
+  'geometry_estimation',
   'tts',
 ]);
 

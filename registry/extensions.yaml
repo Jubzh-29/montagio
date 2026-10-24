@@ -1,4 +1,4 @@
-# The seven extensions, in their order of priority, and the day a GPU session validated
+# The eight extensions, in their order of priority, and the day a GPU session validated
 # each one (null until then). Their models are in registry/extensions/, apart from the
 # camera-preset models of registry/models/. On 2026-10-19 the order was reoriented toward
 # one-photo hooks: the image edit first (it also makes the transitions' end frames), the
@@ -34,3 +34,8 @@ extensions:
   - id: motion
     priority: 7
     gpu_validated: 2026-10-21
+  # Restyle (2026-10-24): a clip's scene rebuilt around its motion with Wan 2.1 VACE 14B. It needs
+  # no other extension: without the edit, a job has no restyled first frame and follows its text.
+  - id: restyle
+    priority: 8
+    gpu_validated: null

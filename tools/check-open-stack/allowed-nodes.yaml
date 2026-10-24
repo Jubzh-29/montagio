@@ -99,3 +99,13 @@ nodes:
   - { class_type: BasicScheduler, source: comfyui-core, license: GPL-3.0 }
   - { class_type: KSamplerSelect, source: comfyui-core, license: GPL-3.0 }
   - { class_type: GetImageSize, source: comfyui-core, license: GPL-3.0 }
+  # Restyle (workflows/wan21-vace-restyle.api.json, Wan 2.1 VACE 14B), core of ComfyUI v0.41.0:
+  # comfy_extras/nodes_wan.py (WanVaceToVideo), nodes_depth_anything_3.py (LoadDA3Model, DA3Inference,
+  # DA3Render) and nodes.py (ImageScale, ImageBatch, EmptyImage: the first frame and its mask).
+  - { class_type: WanVaceToVideo, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: LoadDA3Model, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: DA3Inference, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: DA3Render, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ImageScale, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ImageBatch, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: EmptyImage, source: comfyui-core, license: GPL-3.0 }

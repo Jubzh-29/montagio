@@ -438,3 +438,35 @@ weights:
     license: MIT
     source: https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K
     extension: motion
+  # Restyle (2026-10-24): Wan 2.1 VACE 14B rebuilds the scene of a clip around its depth. Comfy-Org
+  # publishes it in fp16 only; the workflow casts it to fp8 as it loads (UNETLoader weight_dtype), so
+  # it fits a 24 GB card. Apache-2.0 at the source, with LICENSE.txt and Wan's user-conduct paragraph.
+  - id: wan21-vace-14b-fp16
+    file: wan2.1_vace_14B_fp16.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors
+    sha256: f202a5c59b8a91ada1862c46a038214f1f7f216c61ec8350d25f69b919da4307
+    size: 34675323640
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.1-VACE-14B
+    extension: restyle
+  # The original lightx2v 4-step LoRA of Wan 2.1 T2V 14B, the base VACE 14B was built on (Apache-2.0
+  # with LICENSE.txt), in place of the CausVid LoRA of Kijai the official VACE template fetches.
+  - id: lightx2v-wan21-t2v-4step
+    file: Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors
+    url: https://huggingface.co/lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v/resolve/main/loras/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors
+    sha256: 1c918df9eaa102766d8f99104209ce55fe7a892278a667a63d721c5d1c18efb1
+    size: 631344264
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v
+    extension: restyle
+  # The depth of each frame (the control VACE follows): Depth Anything 3 Small, converted for the core
+  # DA3 nodes by Comfy-Org. Apache-2.0 at the source (card and README, no LICENSE file); the Large and
+  # Giant variants are under a non-commercial license and are not used.
+  - id: depth-anything-3-small
+    file: depth_anything_3_small.safetensors
+    url: https://huggingface.co/Comfy-Org/Depth-Anything-3/resolve/main/geometry_estimation/depth_anything_3_small.safetensors
+    sha256: 9c0a53d157c5b315d4c82908a43d93eeaa3a9ac3de9d15c2b4242ef46b5508ad
+    size: 137254980
+    license: Apache-2.0
+    source: https://huggingface.co/depth-anything/DA3-SMALL
+    extension: restyle

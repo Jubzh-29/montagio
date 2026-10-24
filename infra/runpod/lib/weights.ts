@@ -45,6 +45,7 @@ const LOADER_FOLDERS: Record<string, Record<string, string>> = {
   CLIPVisionLoader: { clip_name: 'clip_vision' },
   AudioEncoderLoader: { audio_encoder_name: 'audio_encoders' },
   FrameInterpolationModelLoader: { model_name: 'frame_interpolation' },
+  LoadDA3Model: { model_name: 'geometry_estimation' },
 };
 
 /** ComfyUI models/ folders a weight may go to (the same set as infra/local/src/pins.ts); `tts` holds the voice packs. */
@@ -59,6 +60,7 @@ const COMFY_FOLDERS = new Set([
   'upscale_models',
   'audio_encoders',
   'frame_interpolation',
+  'geometry_estimation',
   'tts',
 ]);
 

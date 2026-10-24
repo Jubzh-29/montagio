@@ -51,8 +51,9 @@ test('clean repo passes', async () => {
 test('the repository report lists every weight it ships, each under what it makes', async () => {
   const r = await checkOpenStack(repoRoot(), { configDir: toolDir });
   // Every function the Studio offers, in the order of the Open Stack page.
-  expect([...new Set(r.models.map((model) => model.function))]).toEqual(['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion']);
+  expect([...new Set(r.models.map((model) => model.function))]).toEqual(['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion', 'restyle']);
   expect(r.models.find((model) => model.id === 'wan-animate2-motion')).toMatchObject({ function: 'motion', extension: 'motion' });
+  expect(r.models.find((model) => model.id === 'wan21-vace-restyle')).toMatchObject({ function: 'restyle', extension: 'restyle' });
   expect(r.models.find((model) => model.id === 'z-image-turbo')).toMatchObject({ function: 'photo' });
   expect(r.models.find((model) => model.id === 'z-image-turbo')).not.toHaveProperty('extension');
   // Nothing fetched goes unlisted: each lock weight is a weight of a listed model, with its size and source.
@@ -118,7 +119,7 @@ test('a workflow of an extension may load only the weights of its own model', as
       'schema: montagio/extensions@0.1\nextensions:\n  - { id: edit, priority: 1, gpu_validated: null }\n  - { id: effects, priority: 2, gpu_validated: null }\n' +
       '  - { id: transitions, priority: 3, requires: [edit], gpu_validated: null }\n  - { id: avatar, priority: 4, gpu_validated: null }\n' +
       '  - { id: music, priority: 5, gpu_validated: null }\n  - { id: upscale, priority: 6, gpu_validated: null }\n' +
-      '  - { id: motion, priority: 7, gpu_validated: null }\n',
+      '  - { id: motion, priority: 7, gpu_validated: null }\n  - { id: restyle, priority: 8, gpu_validated: null }\n',
     'registry/extensions/ace-music.yaml': [
       'schema: montagio/extension-model@0.1',
       'id: ace-music',
