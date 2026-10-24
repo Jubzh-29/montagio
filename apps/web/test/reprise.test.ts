@@ -1,5 +1,5 @@
 import type { HistoryItem } from '@/lib/api-types';
-import { applyReprise, canReproduce, historyFilter, REPRODUCIBLE_TABS, repriseHref, reproducibleResult } from '@/lib/reprise';
+import { applyReprise, canReproduce, historyFilter, replayOn, REPRODUCIBLE_TABS, repriseHref, reproducibleResult } from '@/lib/reprise';
 
 const item = (over: Partial<HistoryItem> = {}): HistoryItem => ({
   key: 'generation:g-1',
@@ -112,5 +112,12 @@ describe('Reproduce: the same choices with the same seed', () => {
     expect(reproducibleResult('effects', 'effect')).toBe(true);
     expect(reproducibleResult('effects', 'ad')).toBe(false);
     expect(reproducibleResult('avatar', 'voice-change')).toBe(false);
+  });
+
+  test('the seed brought back holds on its own tab only: another tab draws its own', () => {
+    const replay = { tab: 'camera' as const, seed: 1234 };
+    expect(replayOn(replay, 'camera')).toBe(replay);
+    expect(replayOn(replay, 'effects')).toBeNull();
+    expect(replayOn(null, 'camera')).toBeNull();
   });
 });

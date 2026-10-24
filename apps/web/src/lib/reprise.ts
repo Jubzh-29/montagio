@@ -32,6 +32,14 @@ export type StudioRestore = {
 export const REPRODUCIBLE_TABS: ReadonlySet<Reprise['tab']> = new Set(['camera', 'film', 'effects', 'avatar', 'motion']);
 const NOT_REPRODUCIBLE = new Set<HistoryItem['task']>(['ad', 'voice-change', 'music']);
 
+/** What Reproduce brought back: the seed to send again, on the tab it came from. */
+export type Replay = { tab: Reprise['tab']; seed?: number; shotSeeds?: number[]; recipeUrl?: string };
+
+/** The replay that holds on `tab`: on another tab the choices are other ones, and so is the seed. */
+export function replayOn<T extends Pick<Replay, 'tab'>>(replay: T | null, tab: string): T | null {
+  return replay && replay.tab === tab ? replay : null;
+}
+
 /** A result on screen the Studio can reproduce: its tab is reopened whole, and its task is not an ad. */
 export function reproducibleResult(tab: string, jobTask?: string): boolean {
   return REPRODUCIBLE_TABS.has(tab as Reprise['tab']) && (jobTask === undefined || !NOT_REPRODUCIBLE.has(jobTask as HistoryItem['task']));
