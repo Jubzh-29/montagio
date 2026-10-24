@@ -64,6 +64,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 | `wan22-flf2v-transition.api.json` | `templates/video_wan2_2_14B_flf2v.json` | Wan 2.2 I2V A14B fp8 (high and low noise) | node 61, MP4 |
 | `wan-animate2-motion.api.json` | `templates/video_wan_animate2_distilled.json` | Wan2.2-Animate-2 distilled, int8 | node 246, MP4 |
 | `wan21-vace-restyle.api.json` | `templates/video_wan_vace_14B_v2v.json`, its control made a depth pass | Wan 2.1 VACE 14B (fp16, cast to fp8), Depth Anything 3 Small | node 35, MP4 |
+| `wan21-vace-swap.api.json` | `templates/video_wan_vace_14B_v2v.json`, its control made the clip with the object painted grey | Wan 2.1 VACE 14B (fp16, cast to fp8), SAM 2.1 base+ | node 35, MP4 |
 
 ### ace-step15-music
 
@@ -124,7 +125,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 
 ### wan-animate2-motion
 
-- The template's active subgraph, flattened with its inner ids (`672:587` becomes `587`), as one 81-frame window; its bypassed copy for chaining windows is left out (the v0.1 clip lasts 5 s at most, prepared at 16 fps by `prepareMotionClip`).
+- The template's active subgraph, flattened with its inner ids (`672:587` becomes `587`); its bypassed copy for chaining windows is left out. Past one 81-frame window, the template's own switch is on: `ContextWindowsManual` (610) samples the whole clip in one pass, 21 latent frames per window overlapping by 8, up to 30 s (481 frames, 9 windows). `compileMotion` bypasses it for a clip of 81 frames or fewer.
 - The raw frames of the clip feed `WanAnimate2ToVideo.pose_video` (no pose extractor, no mask, no LoRA): 10 steps, cfg 1, lcm, shift 5, as the template.
 - `VAELoader` (584) loads the lock's `wan_2.1_vae` instead of the template's `Wan2_1_VAE_bf16` (a copy of Kijai's file); `WanAnimate2Cache` (594) runs on the CPU instead of the GPU, as the template's note advises against VRAM spikes; `CreateVideo` (245) writes 16 fps without the reference clip's sound.
 - The size follows the clip's aspect at 480p (bound on the clip's `ResizeImageMaskNode`, 600); the photo is cropped to it through `GetImageSize` (596).
@@ -135,6 +136,12 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 - `UNETLoader` (10) loads the fp16 file Comfy-Org publishes with `weight_dtype: fp8_e4m3fn`: about 17 GB on the card, a peak of 20.4 to 22.2 GB on an L4 in the spike of 2026-10-24.
 - The reference image (20, scaled by 21) has two uses. A look to follow goes to `WanVaceToVideo.reference_image`. The clip's first frame restyled by the edit is also put before the depth of the other frames (`ImageFromBatch` 22, `ImageBatch` 23), under a mask that is 0 on it and 1 elsewhere (`EmptyImage` 24 and 25, `ImageBatch` 26, `ImageToMask` 27): VACE keeps that frame and rebuilds the others along the depth. `compileRestyle` removes nodes 22 to 27 for a look, and 20 to 27 for a text alone.
 - `TrimVideoLatent` (32) drops the reference's latent frame before decoding; `CreateVideo` (34) writes 16 fps without the clip's sound, `SaveVideo` (35) `montagio/restyle`.
+
+### wan21-vace-swap
+
+- The restyle's VACE pass (nodes 10 to 16 and 30 to 35, same weights, 4 steps), with a different control. `DownloadAndLoadSAM2Model` (40) loads SAM 2.1 base+ in fp32 from `models/sam2`, the lock's file under the name the workflow gives (in fp16 the node would load a `-fp16` file of another name). `Sam2VideoSegmentationAddPoints` (41) takes the points on the object of frame 0, in pixels of the scaled frames (and points on what is not it, `coordinates_negative`, only when there are some: the node reads an empty list as one point), and `Sam2VideoSegmentation` (42) follows it through every frame. These three nodes come from kijai/ComfyUI-segment-anything-2, pinned at `0c35fff5` by `infra/runpod/bootstrap.sh`.
+- `GrowMask` (43) widens the mask by 12 px so that the object's edge goes too; `ImageCompositeMasked` (45) paints it grey (`EmptyImage` 44, 0x808080, VACE's "nothing here") over the frames, and that clip with the mask is VACE's control: what is outside the mask is kept, what is inside is redrawn.
+- The photo of the new object (20) is fitted on white by `ResizeAndPadImage` (21), so that a square product photo is not cropped, and goes to `reference_image`; `compileSwap` removes both nodes for a text alone. `SaveVideo` (35) `montagio/swap`.
 
 ## Bindings
 
@@ -158,3 +165,4 @@ Extension models (a binding with several inputs gets the same value in each):
 | `wan22-flf2v-transition` | image 68.image; end_image 62.image; prompt 6.text; negative 7.text; seed 57.noise_seed; width / height / frames 67.width / height / length | 61 (video) |
 | `wan-animate2-motion` | image 189.image; video 240.file; prompt 582.text; motion_prompt 585.text; negative 581.text; seed 597.noise_seed; width / height 600.resize_type.width / height; frames 587.length | 246 (video) |
 | `wan21-vace-restyle` | video 1.file; image 20.image; prompt 14.text; negative 15.text; seed 31.seed; width / height 3, 21, 24, 25 and 30; frames 30.length | 35 (video) |
+| `wan21-vace-swap` | video 1.file; image 20.image; prompt 14.text; negative 15.text; seed 31.seed; points 41.coordinates_positive; exclude_points 41.coordinates_negative; width / height 3, 44, 30 and 21.target_width / target_height; frames 7.length, 30.length | 35 (video) |

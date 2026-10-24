@@ -240,3 +240,23 @@ Avec l'accord de l'utilisateur (≈ 0,30 $) : une `series` de trois runs du vrai
 
 - **Daté** : `gpu_validated: 2026-10-24`. Le texte seul ne sert que sans l'extension d'édition ; un style demandé tient avec la 1re image restylisée (le chemin par défaut) ou une image à suivre.
 - Les définitions `/object_info` du GPU (`object_info-extensions.json`) couvrent les classes du workflow.
+
+## 15. Mouvement 30 s, personnage composé, bibliothèque Motion (24/10), remplacement d'objet (25/10)
+
+Sur le compte Modal montagio-2, avec l'accord de l'utilisateur (« Oui, utilise montagio-2 »), lot par lot. Relevé : les 8 apps lancées de 19:40 à 22:04 (heure de Paris) ont coûté 5,15 $, dont 1,70 $ pour la série du transfert de 30 s ; au-delà des ≈ 2 $ visés, ce qui a été dit à l'utilisateur. Le compte affichait 21,13 $ sur le mois le 24/10 au soir. Résultats hors dépôt, sur le volume `montagio-results` (`runs/20261024-…`).
+
+| Job | Entrées | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|---|
+| Bibliothèque Motion, un clip de 5 s (Wan 2.1 I2V 480p 14B, depuis une photo Z-Image) | 7 personnages fictifs | 154 s par clip | — | ✅ sept mouvements, dont une danse de 30 s en six clips enchaînés |
+| `compose:3refs` personnage + tenue + produit (Qwen-Image-Edit-2511, 4 pas) | garçon cartoon, une tenue, une petite voiture en jouet | — | — | ✅ visage, coiffure et tenue gardés, en pied ; ❌ la voiture devient une bouteille |
+| `motion` du personnage composé, 5 s | la danse hip-hop | 425 s | 22,6 Go | ✅ |
+| `compose:3refs`, consigne corrigée (« the very object of image 3 ») | les mêmes | 84 s | 21,9 Go | ❌ la voiture devient un téléphone |
+| `motion` 30 s (481 images, 9 fenêtres de contexte) | garçon cartoon, hip-hop long de la bibliothèque | 3 425 s | 22,6 Go | ✅ même personnage du début à la fin, poses de la référence suivies image par image jusqu'au bras levé final |
+
+- Comme pour Restyle, le smoke enregistre deux vidéos par job de mouvement : `…__r1.mp4` est le clip d'entrée que le node `LoadVideo` renvoie aussi, `…__r1-1.mp4` le résultat (le nœud de sortie du modèle, celui que l'app prend).
+- 30 s prennent 1,86 fois 9 fois le temps d'une fenêtre sur une RTX 4090 (`estimate_s` 205) : l'estimation du Studio et du MCP (une fenêtre fois `motionWindows`) tient.
+- **Daté** : le transfert de mouvement l'était déjà (21/10) ; ses 30 s et le personnage composé sont validés le 24/10. Le produit à côté d'une tenue reste une limite écrite.
+
+### Remplacement d'objet : vérifié sur CPU, GPU à faire
+
+Aucun rendu GPU encore (accord de dépense à demander). Sur le ComfyUI v0.41.0 CPU (`../comfyui-cpu-v0.41.0`), le pack `kijai/ComfyUI-segment-anything-2` au commit `0c35fff5`, installé depuis l'archive de ce commit, s'est chargé en 0,9 s sans rien ajouter au venv ; les définitions `/object_info` de ses trois nodes et de `GrowMask` et `ResizeAndPadImage` sont celles du fixture des tests. Les workflows compilés (photo du nouvel objet, texte seul) passent `/prompt`. La partie suivi a tourné pour de bon : 17 images de « Boxe dans le vide », deux points sur les gants, SAM 2.1 base+ en fp32 sur le CPU, 314 s ; les deux gants sont couverts de gris, marge comprise, sur toutes les images, pendant que le boxeur pivote. Coût prévu sur GPU : la reconstruction de l'image Modal (le script d'amorçage a changé) puis deux rendus de 5 s (photo, texte seul), de l'ordre de 0,40 $.
