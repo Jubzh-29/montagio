@@ -5,13 +5,14 @@ import type { InputSlot } from '@montagio/recipe';
 import { POST as postEffects } from '@/app/api/effects/route';
 import { POST as postGeneration } from '@/app/api/generations/route';
 import { POST as postHooks } from '@/app/api/hooks/route';
+import { GET as getRecipe } from '@/app/api/recipes/[source]/[id]/route';
 import { GET as getJob } from '@/app/api/jobs/[id]/route';
 import { POST as postSequence } from '@/app/api/sequences/route';
 import { GET as getSequence } from '@/app/api/sequences/[id]/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import { jobs } from '@/server/jobs';
 import { getServices } from '@/server/services';
-import { readInputs, readRecord } from '@/server/store';
+import { readInputs, readRecord, readWorkflow } from '@/server/store';
 import { generationRequest, params, setupTempData } from './helpers';
 
 const dataDir = setupTempData();
@@ -61,6 +62,25 @@ describe('the input files of each step, by sha256', () => {
     expect(froms).toContain('step:0');
     expect(froms).toContain('imageRef');
     expect(stepInputs(job.id, 1).every((slot) => /^[a-f0-9]{64}$/.test(slot.sha256 ?? ''))).toBe(true);
+  });
+});
+
+describe('the negative prompt of a showcase clip, given again', () => {
+  test('a camera clip renders on the negative it is sent, and its recipe asks for it again', async () => {
+    const imageRef = await sampleRef();
+    const negative = 'blurry, transparent boat, ghost';
+    const record = (await (await postGeneration(generationRequest({ presetId: 'slow-push', imageRef, negative }, 'neg'))).json()) as { id: string; modelId: string };
+    const binding = (await getServices().library).models.get(record.modelId)!.bindings.negative!;
+    expect((await readWorkflow(record.id))![binding.node]!.inputs[binding.field]).toBe(negative);
+    const recipe = (await (await getRecipe(new Request('http://localhost/x'), params({ source: 'generation', id: record.id }))).json()) as { request: { body: Record<string, unknown> } };
+    expect(recipe.request.body.negative).toBe(negative);
+  });
+
+  test('a negative longer than 500 characters is cut, as the description is', async () => {
+    const imageRef = await sampleRef();
+    const record = (await (await postGeneration(generationRequest({ presetId: 'slow-push', imageRef, negative: 'x'.repeat(600) }, 'neg-long'))).json()) as { id: string; modelId: string };
+    const binding = (await getServices().library).models.get(record.modelId)!.bindings.negative!;
+    expect(String((await readWorkflow(record.id))![binding.node]!.inputs[binding.field])).toHaveLength(500);
   });
 });
 

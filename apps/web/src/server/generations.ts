@@ -63,6 +63,8 @@ export type CreateGenerationInput = {
   modelId?: string;
   imageRef: string;
   userPrompt?: string;
+  /** The negative prompt in place of the preset's: a showcase clip's own, given again by its recipe. */
+  negative?: string;
   seed?: number;
   idempotencyKey: string;
 };
@@ -106,6 +108,11 @@ async function resolveJob(input: Omit<CreateGenerationInput, 'idempotencyKey'>, 
       seed,
       aspect: upload.aspect,
     });
+    if (input.negative !== undefined) {
+      const binding = model.bindings.negative;
+      if (!binding) throw new GenerationError('model-incompatible');
+      compiled.workflow[binding.node]!.inputs[binding.field] = input.negative;
+    }
     return { preset, model, upload, compiled };
   } catch (error) {
     if (error instanceof CompileError) throw new GenerationError('model-incompatible');
@@ -160,6 +167,7 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
     modelId: model.id,
     imageRef: input.imageRef,
     ...(input.userPrompt ? { userPrompt: input.userPrompt } : {}),
+    ...(input.negative !== undefined ? { negative: input.negative } : {}),
     ...(input.presetYaml !== undefined ? { remix: true as const } : {}),
     seed,
     aspect: upload.aspect,

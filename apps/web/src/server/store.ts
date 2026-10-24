@@ -13,6 +13,8 @@ export type GenerationRecord = {
   modelId: string;
   imageRef: string;
   userPrompt?: string;
+  /** The negative prompt sent in place of the preset's (a showcase clip's recipe). */
+  negative?: string;
   seed: number;
   aspect: Aspect;
   state: JobState;

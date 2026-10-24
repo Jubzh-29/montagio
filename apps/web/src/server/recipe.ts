@@ -104,11 +104,13 @@ async function generationDraft(id: string): Promise<RecipeDraft | null> {
         ...(record.remix && text !== null ? { presetYaml: text } : { presetId: record.presetId }),
         modelId: record.modelId,
         ...(record.userPrompt ? { userPrompt: record.userPrompt } : {}),
+        ...(record.negative !== undefined ? { negative: record.negative } : {}),
         seed: record.seed,
       },
       files: [{ field: 'imageRef', sha256: sha256From(inputs, 'imageRef') }],
     },
     steps: [{ name: 'camera', workflow, inputs }],
+    modelIds: [record.modelId],
     post: ['tag'],
   };
 }
@@ -148,6 +150,7 @@ async function sequenceDraft(id: string): Promise<RecipeDraft | null> {
       files: [{ field: 'imageRef', sha256: sha256From(steps[0]!.inputs, 'imageRef') }],
     },
     steps,
+    modelIds: [...new Set(shots.flatMap((shot) => shot.modelIds ?? []))],
     post: ['tag', 'last-frame', 'concat', 'vertical'],
   };
 }
@@ -245,6 +248,7 @@ async function jobDraft(id: string): Promise<RecipeDraft | null> {
     ...(item ? { reprise: shareable(item.reprise) } : {}),
     ...(request ? { request } : {}),
     steps,
+    modelIds: [...(parent?.modelIds ?? []), record.modelId],
     post,
   };
 }

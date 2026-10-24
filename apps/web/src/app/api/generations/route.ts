@@ -8,6 +8,7 @@ type Body = {
   modelId?: unknown;
   imageRef?: unknown;
   userPrompt?: unknown;
+  negative?: unknown;
   seed?: unknown;
 };
 
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
       imageRef: body.imageRef,
       modelId: optionalString(body.modelId),
       userPrompt: optionalString(body.userPrompt)?.slice(0, 500),
+      negative: optionalString(body.negative)?.slice(0, 500),
       seed: replaySeed(body.seed),
       idempotencyKey: idempotencyKey.slice(0, 200),
     });
