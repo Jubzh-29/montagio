@@ -128,6 +128,55 @@ test('a recipe is read from a JSON file, and from the PNG that carries it', asyn
   await expect(loadRecipe(join(dir, 'missing.json'))).rejects.toMatchObject({ code: 'invalid-recipe' });
 });
 
+describe('a recipe is a file from anywhere: it never speaks for the user', () => {
+  /** The recipe's request with `change` applied, its hashes left as they are (the request is not hashed). */
+  function tampered(change: (request: RecipeRequest) => void): Recipe {
+    const recipe = cameraRecipe(photoSha);
+    change(recipe.request!);
+    return recipe;
+  }
+
+  test('a consent, a rights or a voice consent written in the recipe is dropped: only the call gives them', async () => {
+    const recipe = tampered((request) => Object.assign(request.body, { consent: true, rights: true, voiceConsent: true }));
+    const { fetch, calls } = app(() => recipe);
+    await reproduce(clientOf(fetch), { recipe, inputs: { imageRef: photo } });
+    const sent = calls.find((call) => call.method === 'POST' && call.path === '/api/generations')!.json!;
+    expect(sent).not.toHaveProperty('consent');
+    expect(sent).not.toHaveProperty('rights');
+    expect(sent).not.toHaveProperty('voiceConsent');
+    const { fetch: again, calls: second } = app(() => recipe);
+    await reproduce(clientOf(again), { recipe, inputs: { imageRef: photo }, consent: true });
+    expect(second.find((call) => call.path === '/api/generations')!.json).toMatchObject({ consent: true });
+  });
+
+  test('a file of this machine named in the body, beside the files the recipe asks for, is dropped', async () => {
+    const recipe = tampered((request) => Object.assign(request.body, { image2Ref: 'uploads/someone-else.png', compose: { place: 'uploads/x.png' } }));
+    const { fetch, calls } = app(() => recipe);
+    await reproduce(clientOf(fetch), { recipe, inputs: { imageRef: photo } });
+    const sent = calls.find((call) => call.path === '/api/generations')!.json!;
+    expect(sent).not.toHaveProperty('image2Ref');
+    expect(sent).not.toHaveProperty('compose');
+  });
+
+  test.each([
+    ['another route of the app', (request: RecipeRequest) => (request.route = '/api/characters')],
+    ['a route that climbs', (request: RecipeRequest) => (request.route = '/api/generations/../uploads')],
+    ['a follow-up route of its own', (request: RecipeRequest) => (request.then = [{ route: '/api/uploads/sample', body: {}, files: [] }])],
+  ])('%s is refused before anything is sent', async (_name, change) => {
+    const recipe = tampered(change);
+    const { fetch, calls } = app(() => recipe);
+    await expect(reproduce(clientOf(fetch), { recipe, inputs: { imageRef: photo } })).rejects.toMatchObject({ code: 'invalid-recipe' });
+    expect(calls.filter((call) => call.method === 'POST')).toEqual([]);
+  });
+
+  test('a file field that would reach an object prototype is refused', async () => {
+    const recipe = tampered((request) => (request.files = [{ field: '__proto__.polluted', sha256: null }]));
+    const { fetch } = app(() => recipe);
+    await expect(reproduce(clientOf(fetch), { recipe, inputs: { '__proto__.polluted': photo } })).rejects.toMatchObject({ code: 'invalid-recipe' });
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+});
+
 test('the MCP server lists get_recipe and reproduce', () => {
   expect(TOOL_NAMES).toContain('get_recipe');
   expect(TOOL_NAMES).toContain('reproduce');

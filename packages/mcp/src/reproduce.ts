@@ -3,6 +3,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 import { parseRecipe, sameWorkflows, type CompactRecipe, type Recipe } from '@montagio/recipe';
 import { readImageTags, readTags, RECIPE_TAG } from '@montagio/sequence';
+import type { RecipeRequest } from '@montagio/recipe';
 import type { RenderStatus, MontagioClient, WaitOptions } from './client';
 import { ToolFailure } from './errors';
 
@@ -69,12 +70,52 @@ async function fileSha256(path: string): Promise<string | null> {
   }
 }
 
-/** Set `body.a.b` for the field "a.b" (a composed photo's references). */
+// A recipe is a file from anywhere: it may name only the app's creation routes, its own input files, and never the user's word.
+/** The creation routes a recipe's request may name, and what may follow on what it made. */
+const ROUTES = new Set(['/api/generations', '/api/sequences', '/api/images', '/api/images/upscale', '/api/edits', '/api/effects', '/api/hooks', '/api/avatars', '/api/motion', '/api/ads']);
+const FOLLOW_UPS = new Set(['/api/generations/:parent/upscale', '/api/jobs/:parent/upscale', '/api/sequences/:parent/music']);
+/** Only the user says that the person agreed, or that they hold the rights: never a recipe. */
+const USER_ONLY = new Set(['consent', 'rights', 'voiceConsent']);
+/** A file field: a name, or a composed photo's role ("compose.place"). */
+const FILE_FIELD = /^[A-Za-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9]*)?$/;
+const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function refuse(why: string): never {
+  throw new ToolFailure('invalid-recipe', `This recipe cannot be replayed: ${why}.`);
+}
+
+function checkRequest(request: RecipeRequest): void {
+  if (!ROUTES.has(request.route)) refuse(`${request.route} is not a creation route of Montagio`);
+  for (const file of request.files) {
+    if (!FILE_FIELD.test(file.field) || file.field.split('.').some((part) => PROTOTYPE_KEYS.has(part))) refuse(`"${file.field}" is not a file field`);
+  }
+  for (const next of request.then ?? []) {
+    if (!FOLLOW_UPS.has(next.route) || next.files.length > 0 || (next.then?.length ?? 0) > 0) refuse(`${next.route} cannot follow it`);
+  }
+}
+
+/**
+ * The body without what only the user gives (consent, rights) and without any file of the app (a ref,
+ * a composition, another render): the request's files are set from the inputs given, and nothing else.
+ */
+function cleanBody(body: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(structuredClone(body)).filter(
+      ([key]) => !USER_ONLY.has(key) && !PROTOTYPE_KEYS.has(key) && !/Ref$/.test(key) && key !== 'compose' && key !== 'sourceJobId',
+    ),
+  );
+}
+
+/** Set `body.a.b` for the field "a.b" (a composed photo's references); fields are checked by checkRequest. */
 function setField(body: Record<string, unknown>, field: string, value: string): void {
-  const parts = field.split('.');
-  let target = body;
-  for (const part of parts.slice(0, -1)) target = (target[part] ??= {}) as Record<string, unknown>;
-  target[parts.at(-1)!] = value;
+  const [head, tail] = field.split('.') as [string, string | undefined];
+  if (tail === undefined) {
+    body[head] = value;
+    return;
+  }
+  const inner = Object.hasOwn(body, head) && body[head] && typeof body[head] === 'object' ? (body[head] as Record<string, unknown>) : {};
+  inner[tail] = value;
+  body[head] = inner;
 }
 
 /** Wait for a render to end; anything but success is the tool's failure. */
@@ -95,6 +136,7 @@ export async function reproduce(client: MontagioClient, args: ReproduceArgs, opt
   const recipe = await loadRecipe(args.recipe);
   const request = recipe.request;
   if (!request) throw new ToolFailure('not-replayable');
+  checkRequest(request);
   const missing = request.files.filter((file) => !args.inputs[file.field]).map((file) => file.field);
   if (missing.length > 0) {
     throw new ToolFailure('inputs-required', `Give ${missing.join(', ')}: the recipe renders on the file the user has, never on one it carries.`, {
@@ -103,7 +145,7 @@ export async function reproduce(client: MontagioClient, args: ReproduceArgs, opt
     });
   }
 
-  const body = structuredClone(request.body);
+  const body = cleanBody(request.body);
   const sameInputs: Record<string, boolean | null> = {};
   for (const file of request.files) {
     const given = args.inputs[file.field]!;
@@ -121,7 +163,7 @@ export async function reproduce(client: MontagioClient, args: ReproduceArgs, opt
 
   let done = await settled(client, await client.startRequest(request.route, body), options);
   for (const next of request.then ?? []) {
-    done = await settled(client, await client.startRequest(next.route.replace(':parent', encodeURIComponent(done.id)), next.body), options);
+    done = await settled(client, await client.startRequest(next.route.replace(':parent', encodeURIComponent(done.id)), cleanBody(next.body)), options);
   }
 
   const fresh = await client
