@@ -741,10 +741,19 @@ export function Studio() {
   }, []);
 
   const generate = () => {
-    if (submitting.current || !canGenerate || upload.status !== 'ready') return;
+    if (submitting.current || !canGenerate) return;
+    // A composed start photo needs no photo of its own: the composition is the start.
+    const composed = composing && selectedEffect !== undefined && !selectedHook ? selectedEffect : null;
+    if (!composed && upload.status !== 'ready') return;
     followJob.current = true;
     setTake({ expected_s: mode === 'sequence' && !remix ? filmEstimate : estimate });
     moveCanvas('generate');
+    if (composed) {
+      const body = { compose: composeBody(compose), effectId: composed.id, subject: subject.trim(), ...(askConsent ? { consent } : {}) };
+      void submit('job', body, undefined, '/api/effects');
+      return;
+    }
+    if (upload.status !== 'ready') return;
     const userPrompt = prompt.trim() || undefined;
     if (tab === 'motion') {
       if (motionVideo.status !== 'ready') return;
@@ -770,8 +779,7 @@ export function Studio() {
         return;
       }
       if (!selectedEffect) return;
-      const start = composing ? { compose: composeBody(compose) } : { imageRef: upload.imageRef };
-      const body = { ...start, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}) };
+      const body = { imageRef: upload.imageRef, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}) };
       void submit('job', body, undefined, '/api/effects');
       return;
     }
@@ -1196,7 +1204,7 @@ export function Studio() {
                     )}
                   </div>
                 )}
-                {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
+                {upload.status !== 'ready' && !composing && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
                 {upload.status === 'ready' && missingScene && <p className={styles.hint}>{t('sceneNeeded')}</p>}
                 {tab === 'effects' && upload.status === 'ready' && needsOutfit && outfit.status !== 'ready' && <p className={styles.hint}>{t('hookNeedsOutfit')}</p>}
                 {tab === 'motion' && upload.status === 'ready' && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('motionNeedsVideo')}</p>}
