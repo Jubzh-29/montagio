@@ -112,18 +112,18 @@ export async function readTags(media: string): Promise<Record<string, string>> {
 }
 
 /**
- * Copy a clip into an MP4 that carries the AI mention, without re-encoding.
+ * Copy a clip into an MP4 that carries the AI mention (and `extra` tags: its recipe), without re-encoding.
  * Whatever the source container (ComfyUI's SaveWEBM writes WebM), the result is
  * an MP4; it is written next to `out` first, so `out` is never half-written.
  */
-export async function tagClip(input: string, out: string): Promise<void> {
+export async function tagClip(input: string, out: string, extra: VideoTags = {}): Promise<void> {
   const partial = `${out}.part`;
   try {
     await run(ffmpeg(), [
       '-loglevel', 'error', '-y',
       '-i', input,
       '-map', '0:v', '-map', '0:a?', '-c', 'copy',
-      ...metadataArgs(AI_METADATA),
+      ...metadataArgs({ ...AI_METADATA, ...extra }),
       '-movflags', '+faststart',
       '-f', 'mp4', partial,
     ]);
@@ -155,6 +155,7 @@ export async function concatClips(
   out: string,
   size: { width: number; height: number },
   fps: number,
+  opts: { tags?: VideoTags } = {},
 ): Promise<void> {
   if (clips.length === 0) throw new SequenceToolError('concatClips needs at least one clip');
   const { width: w, height: h } = size;
@@ -173,7 +174,7 @@ export async function concatClips(
     '-map', '[out]',
     '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast',
     '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an',
-    ...metadataArgs(AI_METADATA),
+    ...metadataArgs(opts.tags ?? AI_METADATA),
     out,
   ]);
 }

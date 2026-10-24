@@ -11,7 +11,7 @@ import {
 import { CompileError, type ApiWorkflow, type Aspect, type Library } from '@montagio/presets';
 import type { InputSlot } from '@montagio/recipe';
 import type { ExtensionId } from '@montagio/registry';
-import { ensureTools, probe, tagAudio, tagClip, tagImage } from '@montagio/sequence';
+import { AI_IMAGE_METADATA, ensureTools, probe, tagAudio, tagClip, tagImage } from '@montagio/sequence';
 import type { JobSummary } from '@/lib/api-types';
 import { getEnv } from './env';
 import { JobError } from './errors';
@@ -250,16 +250,18 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
         return false;
       }
     }
+    // recipe.ts reads this module: imported when needed, not at load.
+    const recipeTags = async (kind: 'video' | 'image') => (await import('./recipe')).recipeTags('job', record.id, kind);
     try {
       if (step.output === 'video') {
         const out = join(dir, 'output.mp4');
-        await access(out).catch(() => tagClip(outputPath, out));
+        await access(out).catch(async () => tagClip(outputPath, out, await recipeTags('video')));
         const info = await probe(out);
         record.frames = Math.round(info.duration_s * info.fps);
         record.outputUrl = mediaUrlFor(out);
       } else if (step.output === 'image') {
         const out = join(dir, 'output.png');
-        await access(out).catch(() => tagImage(outputPath, out));
+        await access(out).catch(async () => tagImage(outputPath, out, { ...AI_IMAGE_METADATA, ...(await recipeTags('image')) }));
         const provenance = (await taskOf(record.task).imageOrigin?.(record)) ?? UNKNOWN_PROVENANCE;
         const upload = await saveUploadFromFile(out, provenance);
         record.outputImageRef = upload.imageRef;

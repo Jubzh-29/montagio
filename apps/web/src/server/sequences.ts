@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { isBackendError, type JobState } from '@montagio/comfy-adapter';
 import type { Aspect } from '@montagio/presets';
 import {
+  AI_METADATA,
   concatClips,
   ensureTools,
   exportVertical,
@@ -301,8 +302,10 @@ async function assemble(id: string): Promise<void> {
   const film = join(sequenceDir(id), 'film.mp4');
   const vertical = join(sequenceDir(id), 'film-9x16.mp4');
   await mkdir(sequenceDir(id), { recursive: true });
-  await concatClips(clips, film, { width: first.width, height: first.height }, Math.round(first.fps) || 16);
-  await exportVertical(film, vertical);
+  // recipe.ts reads this module: imported when needed, not at load.
+  const tags = { ...AI_METADATA, ...(await (await import('./recipe')).recipeTags('sequence', id, 'video')) };
+  await concatClips(clips, film, { width: first.width, height: first.height }, Math.round(first.fps) || 16, { tags });
+  await exportVertical(film, vertical, { tags });
 
   await withLock(id, async () => {
     const latest = await readSequence(id);

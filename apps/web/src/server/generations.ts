@@ -274,7 +274,8 @@ function deliverClip(id: string, outputPath: string): Promise<string | undefined
   if (!delivery) {
     delivery = (async () => {
       try {
-        await access(clip).catch(() => tagClip(outputPath, clip));
+        // recipe.ts reads this module: imported when needed, not at load.
+        await access(clip).catch(async () => tagClip(outputPath, clip, await (await import('./recipe')).recipeTags('generation', id, 'video')));
         return mediaUrlFor(clip);
       } catch (error) {
         console.error(`[montagio] generation ${id}: the AI-generated mention could not be written, clip delivered untagged`, error);

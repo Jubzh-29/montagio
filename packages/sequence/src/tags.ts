@@ -25,6 +25,13 @@ export const PLACEHOLDER_METADATA = {
   description: 'Placeholder: the camera move is simulated by FFmpeg from the sample photo; it is not a model output.',
 } as const;
 
+/**
+ * Where a delivered file carries its compact recipe (@montagio/recipe), beside the mention: MP4's standard
+ * `synopsis` atom (no `use_metadata_tags`, so `comment` and `description` stay where players read them),
+ * and a PNG tEXt chunk.
+ */
+export const RECIPE_TAG = { video: 'synopsis', image: 'Montagio-Recipe' } as const;
+
 /** Drop the source's tags (a pod path, an encoder string) and write `tags` as standard MP4 tags. */
 export function metadataArgs(tags: VideoTags): string[] {
   return ['-map_metadata', '-1', ...Object.entries(tags).flatMap(([key, value]) => ['-metadata', `${key}=${value}`])];

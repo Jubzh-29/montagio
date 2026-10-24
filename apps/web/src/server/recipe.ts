@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { buildRecipe, findLocalPath, readStack, sha256Hex, type ApiWorkflow, type InputSlot, type Recipe, type RecipeDraft, type RecipeRequest, type RecipeStack } from '@montagio/recipe';
+import { buildRecipe, compactRecipe, findLocalPath, readStack, sha256Hex, type ApiWorkflow, type InputSlot, type Recipe, type RecipeDraft, type RecipeRequest, type RecipeStack } from '@montagio/recipe';
+import { RECIPE_TAG, type VideoTags } from '@montagio/sequence';
 import type { Reprise } from '@/lib/api-types';
 import type { RecipeSource } from '@/lib/recipe-url';
 import { getEnv } from './env';
@@ -264,6 +265,20 @@ export async function recipeOf(source: RecipeSource, id: string): Promise<Recipe
     models: [...lib.models.values(), ...lib.extensionModels.values()],
     stack: await stackOf(getEnv().root),
   });
+}
+
+/**
+ * The tag a delivered file carries its compact recipe in, beside the AI-generated mention. Never fails
+ * the delivery: without a recipe the file goes out with the mention alone, and the log says why.
+ */
+export async function recipeTags(source: RecipeSource, id: string, kind: keyof typeof RECIPE_TAG): Promise<VideoTags> {
+  try {
+    const recipe = await recipeOf(source, id);
+    return recipe ? { [RECIPE_TAG[kind]]: compactRecipe(recipe) } : {};
+  } catch (error) {
+    console.error(`[montagio] ${source} ${id}: the recipe could not be written in the file`, error);
+    return {};
+  }
 }
 
 /** sha256 of the file a result delivered, or null before it is delivered. */
