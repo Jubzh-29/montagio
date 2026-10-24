@@ -109,13 +109,14 @@ export type ExtensionsInfo = {
   extensions: string[];
   effects: { id: string; name: string; description: string; previewUrl?: string; estimate_s: number; subjectMax: number; modelName: string; license: string }[];
   hooks: { id: string; name: string; description: string; previewUrl?: string; estimate_s: number; references: 1 | 2; modelName: string; license: string }[];
-  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; motion?: number; restyle?: number };
+  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; motion?: number; restyle?: number; swap?: number };
   editModel?: Named;
   avatarModel?: Named;
   musicModel?: Named;
   upscaleModel?: Named & { maxFrames: number };
   motionModel?: Named;
   restyleModel?: Named;
+  swapModel?: Named;
 };
 
 /** GET /api/history: one finished creation, newest first. */
@@ -334,7 +335,7 @@ export class MontagioClient {
     return { ...value, ...(value.url ? { url: this.absolute(value.url) } : {}) };
   }
 
-  /** Start a job (/api/images, /api/edits, /api/effects, /api/hooks, /api/avatars, /api/motion, /api/restyle). */
+  /** Start a job (/api/images, /api/edits, /api/effects, /api/hooks, /api/avatars, /api/motion, /api/restyle, /api/swap). */
   async startJob(route: string, body: Record<string, unknown>): Promise<RenderStatus> {
     return this.fromJob((await this.call<JobSummary>('POST', route, { json: body }, true)).value);
   }

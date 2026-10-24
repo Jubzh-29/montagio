@@ -57,6 +57,7 @@ describe('MCP tools', () => {
         'list_motion_library',
         'motion_transfer',
         'restyle_video',
+        'swap_object',
         'talking_avatar',
         'text_to_image',
         'upload_photo',
@@ -185,6 +186,46 @@ describe('MCP tools', () => {
     client = await connect(testConfig(), { fetch: look.fetch, ...fakeClock() });
     await callTool(client, 'restyle_video', { videoRef: 'videos/v1', prompt: 'a watercolor painting', imageRef: 'samples/s.png', rights: true });
     expect(look.calls.find((call) => call.path === '/api/restyle')!.json).toEqual({ videoRef: 'videos/v1', prompt: 'a watercolor painting', imageRef: 'samples/s.png', rights: true });
+  });
+
+  it('swap_object sends nothing without rights: true, nor without a point on the object', async () => {
+    const app = fakeFetch(() => reply({}));
+    client = await connect(testConfig(), { fetch: app.fetch });
+    const noRights = await callTool(client, 'swap_object', { videoRef: 'videos/v1', prompt: 'a red motorbike', points: [{ x: 0.5, y: 0.5 }] });
+    expect(noRights.isError).toBe(true);
+    expect(noRights.data.error).toBe('rights-required');
+    const noPoint = await callTool(client, 'swap_object', { videoRef: 'videos/v1', prompt: 'a red motorbike', points: [], rights: true });
+    expect(noPoint.isError).toBe(true);
+    const offFrame = await callTool(client, 'swap_object', { videoRef: 'videos/v1', prompt: 'a red motorbike', points: [{ x: 412, y: 300 }], rights: true });
+    expect(offFrame.isError).toBe(true);
+    expect(app.calls).toHaveLength(0);
+  });
+
+  it('swap_object sends the clip, the points, the text, and the photo and excluded points only when given', async () => {
+    const app = jobApp('swap', [{ state: 'succeeded', progress: 1, outputUrl: '/media/data/jobs/j1/out.mp4' }]);
+    client = await connect(testConfig(), { fetch: app.fetch, ...fakeClock() });
+    const plain = await callTool(client, 'swap_object', { videoRef: 'videos/v1', prompt: ' a red motorbike ', points: [{ x: 0.4, y: 0.6 }], rights: true });
+    expect(plain.isError).toBeFalsy();
+    expect(app.calls.find((call) => call.path === '/api/swap')!.json).toEqual({ videoRef: 'videos/v1', prompt: 'a red motorbike', points: [{ x: 0.4, y: 0.6 }], rights: true });
+
+    const full = jobApp('swap', [{ state: 'succeeded', progress: 1, outputUrl: '/media/data/jobs/j1/out.mp4' }]);
+    client = await connect(testConfig(), { fetch: full.fetch, ...fakeClock() });
+    await callTool(client, 'swap_object', {
+      videoRef: 'videos/v1',
+      prompt: 'a golden retriever',
+      points: [{ x: 0.4, y: 0.6 }],
+      exclude: [{ x: 0.9, y: 0.1 }],
+      imageRef: 'samples/dog.png',
+      rights: true,
+    });
+    expect(full.calls.find((call) => call.path === '/api/swap')!.json).toEqual({
+      videoRef: 'videos/v1',
+      prompt: 'a golden retriever',
+      points: [{ x: 0.4, y: 0.6 }],
+      exclude: [{ x: 0.9, y: 0.1 }],
+      imageRef: 'samples/dog.png',
+      rights: true,
+    });
   });
 
   it('a motion of the library is picked as the clip, then animated; the library lists its motions', async () => {

@@ -8,7 +8,7 @@ const MESSAGES: Record<string, string> = {
   'consent-required':
     'This photo was imported, so it may show a real person. Ask the user to confirm that they are the person in the photo, or that this person has agreed, then call again with consent: true. Never set it on their behalf.',
   'rights-required':
-    'A motion transfer or a restyle needs the user\'s word that they hold the rights on its video and its image. Ask them, then call again with rights: true. Never set it on their behalf.',
+    'A motion transfer, a restyle or an object swap needs the user\'s word that they hold the rights on its video and its image (and, for a swap, that the people filmed agree). Ask them, then call again with rights: true. Never set it on their behalf.',
   'blocked-name': 'The text names a well-known person. Montagio does not make images of real people without their consent.',
   'extension-disabled': 'This feature, effect or hook is not available on this installation. list_effects_and_hooks shows what is.',
   'invalid-input': 'This request cannot be rendered. Check the text (its length too) and the options, then try again.',

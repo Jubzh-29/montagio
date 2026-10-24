@@ -24,6 +24,7 @@ export const TOOL_NAMES = [
   'talking_avatar',
   'motion_transfer',
   'restyle_video',
+  'swap_object',
   'upscale_to_1080p',
   'get_job',
   'list_history',
@@ -124,7 +125,7 @@ async function photoOf(client: MontagioClient, args: PhotoArgs, names = { ref: '
   throw new ToolFailure('invalid-arguments', `Give the photo: ${names.ref} (from upload_photo, use_sample_photo, text_to_image…) or ${names.path} (a local image file).`);
 }
 
-/** The clip of a motion transfer or a restyle: a local file, an earlier videoRef, or a motion of the library. */
+/** The clip of a motion transfer, a restyle or a swap: a local file, an earlier videoRef, or a motion of the library. */
 type ClipArgs = { videoPath?: string; videoRef?: string; libraryMotion?: string };
 async function clipOf(client: MontagioClient, args: ClipArgs): Promise<{ videoRef: string; video?: Record<string, unknown> }> {
   const given = [args.videoPath, args.videoRef, args.libraryMotion].filter(Boolean).length;
@@ -262,7 +263,7 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
             }),
           ),
           estimates_s: info.estimates,
-          models: defined({ edit: info.editModel, avatar: info.avatarModel, upscale: info.upscaleModel, motion: info.motionModel, restyle: info.restyleModel }),
+          models: defined({ edit: info.editModel, avatar: info.avatarModel, upscale: info.upscaleModel, motion: info.motionModel, restyle: info.restyleModel, swap: info.swapModel }),
         });
       }),
   );
@@ -273,7 +274,7 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
       title: 'List the motion library',
       description:
         'List the reference motions of the library (a dance, jumping jacks, a ballet spin, a 30 s dance…): made by Montagio itself from ' +
-        'fictional characters, so no rights to clear. Give an id as libraryMotion to motion_transfer or restyle_video.',
+        'fictional characters, so no rights to clear. Give an id as libraryMotion to motion_transfer, restyle_video or swap_object.',
       annotations: readOnly,
     },
     async () =>
@@ -617,6 +618,64 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
         return render(client, extra, { timeoutMinutes: args.timeoutMinutes, more }, () =>
           client.startJob('/api/restyle', { videoRef, prompt: args.prompt.trim(), ...(look ? { imageRef: look.imageRef } : {}), rights: args.rights }),
         );
+      }),
+  );
+
+  // A point of the clip's first frame, in fractions of its width and height.
+  const point = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) });
+
+  server.registerTool(
+    'swap_object',
+    {
+      title: 'Swap an object in a video',
+      description:
+        'Replace one object of a short clip ("a red vintage motorbike", "a golden retriever"): the object the points mark on the clip\'s first ' +
+        'frame is followed through the clip by SAM 2.1, then redrawn; everything else stays as filmed. Its first 5 s are used, without sound. ' +
+        'An optional photo of the new object makes it more faithful; without one, the text alone draws it. Points are fractions of the first ' +
+        'frame (x from the left, y from the top, 0 to 1): one or a few on the object, and optionally on what is not it. Never replace a real ' +
+        'person in a real video without their consent. Needs rights: true, the user\'s word that they hold the rights on the clip and the photo ' +
+        'and that the people filmed agree; checked before anything is uploaded. Blocks until the clip is ready. Needs the swap extension.',
+      inputSchema: {
+        prompt: z.string().min(1).max(500).describe('What replaces the object, in a few words.'),
+        points: z.array(point).min(1).max(8).describe('Points on the object to replace, on the clip\'s first frame, in fractions of its width and height.'),
+        exclude: z.array(point).max(8).optional().describe('Points on what is not the object (optional), when the tracker would take too much.'),
+        videoPath: z.string().min(1).optional().describe('The clip, a local MP4, WebM or MOV file (50 MB at most). Give one of videoPath, videoRef, libraryMotion.'),
+        videoRef: z.string().min(1).optional().describe('A clip already uploaded (the videoRef of an earlier swap_object, restyle_video or motion_transfer).'),
+        libraryMotion: z.string().min(1).optional().describe('A motion of the library (an id from list_motion_library), generated from a fictional character.'),
+        imageRef: z.string().min(1).optional().describe('A photo of the new object, already in the app (optional). Give this, path, or neither.'),
+        path: z.string().min(1).optional().describe('A photo of the new object, a local file (optional). Give this, imageRef, or neither.'),
+        rights: z
+          .boolean()
+          .default(false)
+          .describe('The user holds the rights on the clip and the photo, and the people filmed agree. Defaults to false. Set it to true only when the user has said so; never assume it.'),
+        timeoutMinutes,
+      },
+      annotations: renders,
+    },
+    async (args, extra) =>
+      guard(async () => {
+        // Nothing is sent without the user's word: the app would refuse the same way (rights-required).
+        if (args.rights !== true) throw new ToolFailure('rights-required');
+        const photo = args.imageRef || args.path ? await photoOf(client, args) : undefined;
+        let clip: Awaited<ReturnType<typeof clipOf>>;
+        try {
+          clip = await clipOf(client, args);
+        } catch (error) {
+          throw photo ? annotate(error, { inputImageRef: photo.imageRef }) : error;
+        }
+        const { videoRef } = clip;
+        const video = clip.video ? { video: clip.video } : {};
+        const estimate_s = await estimateOf(client, (info) => info.estimates.swap);
+        const more = { ...(photo ? { inputImageRef: photo.imageRef } : {}), videoRef, ...video, estimate_s };
+        const body = {
+          videoRef,
+          prompt: args.prompt.trim(),
+          points: args.points,
+          ...(args.exclude?.length ? { exclude: args.exclude } : {}),
+          ...(photo ? { imageRef: photo.imageRef } : {}),
+          rights: args.rights,
+        };
+        return render(client, extra, { timeoutMinutes: args.timeoutMinutes, more }, () => client.startJob('/api/swap', body));
       }),
   );
 
