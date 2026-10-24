@@ -72,3 +72,4 @@ export { compileHookEdit, compileHookTransition, compileTransition, type HookEdi
 export { compileMotion, MOTION_DEFAULTS, type MotionInputs } from './motion';
 export { motionFrames, motionWindows } from './motion-windows';
 export { compileRestyle, restyleInstruction, type RestyleInputs, type RestyleReference } from './restyle';
+export { compileSwap, framePoint, MAX_SWAP_POINTS, type SwapInputs, type SwapPoint } from './swap';

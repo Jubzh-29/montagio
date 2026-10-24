@@ -19,6 +19,7 @@ export const EXTENSION_TASKS = [
   'flf2v',
   'motion-transfer',
   'v2v-restyle',
+  'v2v-swap',
 ] as const;
 export type ExtensionTask = (typeof EXTENSION_TASKS)[number];
 
@@ -49,6 +50,8 @@ export const EXTENSION_BINDING_KEYS = [
   'motion_prompt',
   'mask',
   'voice',
+  'points',
+  'exclude_points',
 ] as const;
 export type ExtensionBindingKey = (typeof EXTENSION_BINDING_KEYS)[number];
 
@@ -65,6 +68,8 @@ export const REQUIRED_EXTENSION_BINDINGS: Record<ExtensionTask, ExtensionBinding
   'motion-transfer': ['image', 'video', 'prompt', 'motion_prompt', 'negative', 'seed', 'width', 'height', 'frames'],
   // `image` is the optional reference: the compiler removes its nodes when a job has none
   'v2v-restyle': ['video', 'image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames'],
+  // `image` (the new object) is optional as well; `exclude_points` is set only when a job has some
+  'v2v-swap': ['video', 'image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames', 'points'],
 };
 
 export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
@@ -79,6 +84,7 @@ export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
   flf2v: 'video',
   'motion-transfer': 'video',
   'v2v-restyle': 'video',
+  'v2v-swap': 'video',
 };
 
 const binding = z.object({ node: z.string().min(1), field: z.string().min(1) }).strict();

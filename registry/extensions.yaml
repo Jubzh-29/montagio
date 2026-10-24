@@ -1,4 +1,4 @@
-# The eight extensions, in their order of priority, and the day a GPU session validated
+# The nine extensions, in their order of priority, and the day a GPU session validated
 # each one (null until then). Their models are in registry/extensions/, apart from the
 # camera-preset models of registry/models/. On 2026-10-19 the order was reoriented toward
 # one-photo hooks: the image edit first (it also makes the transitions' end frames), the
@@ -40,3 +40,10 @@ extensions:
   - id: restyle
     priority: 8
     gpu_validated: 2026-10-24
+  # Object swap (2026-10-24): an object marked on a clip's first frame, followed through the clip by
+  # SAM 2.1 (a pinned third-party node pack, kijai/ComfyUI-segment-anything-2), then replaced by VACE
+  # from a photo or a text. It runs on the restyle's weights, so it requires it.
+  - id: swap
+    priority: 9
+    requires: [restyle]
+    gpu_validated: null

@@ -69,12 +69,18 @@ async function exists(path: string): Promise<boolean> {
  * The `extension:` mark of the lock against who loads each weight. The installer
  * downloads a marked weight only for its extension, so a weight a preset model
  * needs must stay unmarked, and a weight only one extension needs must carry it.
+ * An extension may also load the weights of an extension it requires (the swap, the
+ * restyle's VACE): they are fetched with the requirement, which is always there.
  */
 function lockExtensionProblems(
   lock: Map<string, LockEntry>,
   models: Map<string, ModelEntry>,
   extensionModels: Map<string, ExtensionModel>,
+  extensions: ExtensionsConfig | null,
 ): string[] {
+  const requires = new Map((extensions ?? []).map((entry) => [entry.id, entry.requires]));
+  /** Whether a model of extension `user` may load a weight of extension `owner`. */
+  const reaches = (user: ExtensionId, owner: ExtensionId) => user === owner || (requires.get(user) ?? []).includes(owner);
   const problems: string[] = [];
   const presetUsers = new Map<string, string[]>();
   for (const model of models.values()) {
@@ -93,15 +99,17 @@ function lockExtensionProblems(
       for (const preset of presets) {
         problems.push(`lock entry ${entry.id} belongs to extension ${entry.extension} but preset model ${preset} loads it`);
       }
-      for (const user of users.filter((u) => u.extension !== entry.extension)) {
+      for (const user of users.filter((u) => !reaches(u.extension, entry.extension!))) {
         problems.push(`lock entry ${entry.id} belongs to extension ${entry.extension} but extension model ${user.model} (${user.extension}) loads it`);
       }
     }
     if (presets.length > 0) continue;
     const kinds = [...new Set(users.map((user) => user.extension))];
-    if (kinds.length > 1) problems.push(`lock entry ${entry.id} is shared by extensions ${kinds.join(' and ')}`);
-    else if (kinds.length === 1 && !entry.extension) {
-      problems.push(`lock entry ${entry.id} is loaded only by extension ${kinds[0]}: mark it "extension: ${kinds[0]}"`);
+    // the one the others require, when they share it
+    const owner = kinds.find((kind) => kinds.every((other) => reaches(other, kind)));
+    if (kinds.length > 1 && !owner) problems.push(`lock entry ${entry.id} is shared by extensions ${kinds.join(' and ')}`);
+    else if (owner && !entry.extension) {
+      problems.push(`lock entry ${entry.id} is loaded only by extension ${owner}: mark it "extension: ${owner}"`);
     }
   }
   return problems;
@@ -249,7 +257,7 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
       );
     }
   }
-  problems.push(...lockExtensionProblems(lock, models, extensionModels));
+  problems.push(...lockExtensionProblems(lock, models, extensionModels, extensions));
 
   for (const effect of effects.values()) {
     const model = extensionModels.get(effect.models.preferred);

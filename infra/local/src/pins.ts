@@ -20,7 +20,7 @@ export type Versions = {
 /** `folder` is relative to ComfyUI's models/; `extension` is null for the weights of the camera presets. */
 export type LockWeight = { id: string; file: string; url: string; sha256: string; size: number; folder: string; extension: string | null };
 
-/** ComfyUI models/ folders a lock file can go to (the same set as infra/runpod/lib/weights.ts); `tts` holds the voice packs. */
+/** ComfyUI models/ folders a lock file can go to (the same set as infra/runpod/lib/weights.ts); `tts` holds the voice packs, `sam2` the object swap's tracker. */
 const COMFY_FOLDERS = new Set([
   'checkpoints',
   'diffusion_models',
@@ -33,6 +33,7 @@ const COMFY_FOLDERS = new Set([
   'audio_encoders',
   'frame_interpolation',
   'geometry_estimation',
+  'sam2',
   'tts',
 ]);
 

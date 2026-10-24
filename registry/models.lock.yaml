@@ -470,3 +470,18 @@ weights:
     license: Apache-2.0
     source: https://huggingface.co/depth-anything/DA3-SMALL
     extension: restyle
+  # Object swap (2026-10-24): SAM 2.1 base+ follows the object a few points mark on the first frame,
+  # through the whole clip; the swap's VACE weights are the restyle's (the extension requires it).
+  # Kijai's safetensors of Meta's checkpoint (Apache-2.0 at both ends): its 615 tensors are those of
+  # sam2.1_hiera_base_plus.pt, bit for bit (checked on 2026-10-24). The fp32 file, the one whose name
+  # the node loads as written (in fp16 it loads a "-fp16" file of another name). Never fetched by the
+  # node itself: Hugging Face is offline once ComfyUI runs.
+  - id: sam21-hiera-base-plus
+    file: sam2.1_hiera_base_plus.safetensors
+    url: https://huggingface.co/Kijai/sam2-safetensors/resolve/main/sam2.1_hiera_base_plus.safetensors
+    sha256: eb4b5f725c8b68205aa05bbe6b27efc628b18b4b9c7b9bb8218991b86b9a4932
+    size: 323474320
+    license: Apache-2.0
+    source: https://huggingface.co/facebook/sam2.1-hiera-base-plus
+    extension: swap
+    folder: sam2

@@ -57,7 +57,7 @@ test('the real repository library loads', async () => {
   const lib = await loadLibrary(repoRoot());
   expect([...lib.models.keys()].sort()).toEqual(['wan22-i2v-a14b-fun-camera', 'wan22-ti2v-5b', 'z-image-turbo']);
   expect(lib.presets.size).toBeGreaterThanOrEqual(3);
-  expect(lib.extensions?.map((entry) => entry.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle']);
+  expect(lib.extensions?.map((entry) => entry.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
 });
 
 // Extension models (registry/extensions/) load apart from the preset models.
@@ -72,6 +72,7 @@ extensions:
   - { id: upscale, priority: 6, gpu_validated: null }
   - { id: motion, priority: 7, gpu_validated: null }
   - { id: restyle, priority: 8, gpu_validated: null }
+  - { id: swap, priority: 9, requires: [restyle], gpu_validated: null }
 `;
 
 const extModel = (id: string, extension: string, weights: string[], workflow = 'workflows/ext-music.api.json') => `schema: montagio/extension-model@0.1
@@ -132,7 +133,7 @@ test('loads extension models apart from the preset models', async () => {
   expect([...lib.extensionModels.keys()]).toEqual(['ace-music']);
   expect(lib.extensionTemplates.get('workflows/ext-music.api.json')?.['106']?.class_type).toBe('VAELoader');
   expect(lib.templates.has('workflows/ext-music.api.json')).toBe(false);
-  expect(lib.extensions?.map((entry) => entry.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle']);
+  expect(lib.extensions?.map((entry) => entry.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
 });
 
 test('a repository without extensions loads as before', async () => {
@@ -190,6 +191,15 @@ test('a lock entry of one extension that another extension loads is a problem', 
 test('a weight only an extension loads must say so in the lock', async () => {
   const root = musicRepo({}, lockEntry('ace-step15-vae', 'ace_1.5_vae.safetensors'));
   expect(await problemsOf(root)).toContainEqual(expect.stringMatching(/ace-step15-vae is loaded only by extension music: mark it "extension: music"/));
+});
+
+test("an extension may load a weight of the extension it requires, and only that one", async () => {
+  const vace = lockEntry('ace-step15-vae', 'ace_1.5_vae.safetensors', 'music') + lockEntry('vace-w', 'vace.safetensors', 'restyle');
+  const restyle = { 'registry/extensions/vace.yaml': extModel('vace', 'restyle', ['vace-w']) };
+  const lib = await loadLibrary(musicRepo({ ...restyle, 'registry/extensions/swap.yaml': extModel('swap-m', 'swap', ['vace-w']) }, vace));
+  expect(lib.extensionModels.get('swap-m')?.weights).toEqual(['vace-w']);
+  const root = musicRepo({ ...restyle, 'registry/extensions/up.yaml': extModel('up', 'upscale', ['vace-w']) }, vace);
+  expect(await problemsOf(root)).toContainEqual(expect.stringMatching(/vace-w belongs to extension restyle but extension model up \(upscale\) loads it/));
 });
 
 test('a weight shared by two extensions is a problem', async () => {

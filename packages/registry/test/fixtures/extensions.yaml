@@ -25,3 +25,7 @@ extensions:
   - id: restyle
     priority: 8
     gpu_validated: null
+  - id: swap
+    priority: 9
+    requires: [restyle]
+    gpu_validated: null

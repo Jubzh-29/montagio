@@ -279,6 +279,20 @@ sources:
     license_file: false
     note: the card metadata and the README's table say Apache 2.0
 
+  # Object swap: SAM 2.1 base+ (read on 2026-10-24).
+  - repo: Kijai/sam2-safetensors
+    license: Apache-2.0
+    role: mirror
+    revision: f885607d88bb3f9145efa49c3e3c50a9e5bf13eb
+    license_file: false
+    note: the safetensors the pinned node pack loads; sam2.1_hiera_base_plus.safetensors holds the 615 tensors of Meta's sam2.1_hiera_base_plus.pt, bit for bit (checked on 2026-10-24)
+  - repo: facebook/sam2.1-hiera-base-plus
+    license: Apache-2.0
+    role: source
+    revision: b7320756a13354e7530a63935656d35b2f91a290
+    license_file: false
+    note: Meta's checkpoint; the card metadata says Apache 2.0, as does the LICENSE of github.com/facebookresearch/sam2
+
 # Never a source or a download repository, whatever a template or a tutorial fetches from it.
 denied:
   - repo: Kijai/WanVideo_comfy

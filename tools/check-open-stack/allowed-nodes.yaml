@@ -112,3 +112,14 @@ nodes:
   - { class_type: ImageScale, source: comfyui-core, license: GPL-3.0 }
   - { class_type: ImageBatch, source: comfyui-core, license: GPL-3.0 }
   - { class_type: EmptyImage, source: comfyui-core, license: GPL-3.0 }
+  # Object swap (workflows/wan21-vace-swap.api.json, 2026-10-24): the object's mask grown, painted grey over
+  # the frames (ImageCompositeMasked, above) and the new object's photo fitted on white, core of ComfyUI
+  # v0.41.0: comfy_extras/nodes_mask.py (GrowMask) and nodes_images.py (ResizeAndPadImage).
+  - { class_type: GrowMask, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ResizeAndPadImage, source: comfyui-core, license: GPL-3.0 }
+  # Its tracking: the three nodes it uses from kijai/ComfyUI-segment-anything-2 (Apache-2.0, Meta's SAM 2
+  # code vendored), pinned at commit 0c35fff5 by infra/runpod/bootstrap.sh; ComfyUI v0.41.0 has no node
+  # that follows an object through a video. The weights never come from the node's own download.
+  - { class_type: DownloadAndLoadSAM2Model, source: kijai/ComfyUI-segment-anything-2@0c35fff5, license: Apache-2.0 }
+  - { class_type: Sam2VideoSegmentationAddPoints, source: kijai/ComfyUI-segment-anything-2@0c35fff5, license: Apache-2.0 }
+  - { class_type: Sam2VideoSegmentation, source: kijai/ComfyUI-segment-anything-2@0c35fff5, license: Apache-2.0 }
