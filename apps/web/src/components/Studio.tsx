@@ -21,6 +21,7 @@ import {
 import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
+import { entryAsHistoryItem, type CommunityEntry } from '@/lib/community';
 import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
@@ -386,7 +387,7 @@ export function Studio() {
   };
 
   /** The sample photo, copied by the server: its origin is known, so no effect on it asks for consent, and what it shows too. */
-  const loadSample = async () => {
+  const loadSample = async (keepScene = false) => {
     if (busyRef.current) return;
     touched.current = true;
     const token = ++uploadToken.current;
@@ -395,8 +396,8 @@ export function Studio() {
     const localUrl = `/media/demo-assets/images/${sample.file}`;
     setJob({ status: 'idle' });
     setPhotoPrompt(undefined);
-    // The sample comes described, unless the visitor typed a description before it: theirs stays.
-    if (sceneOfPhoto.current || !prompt.trim()) {
+    // The sample comes described, unless the visitor typed a description before it (or a recipe brought one): theirs stays.
+    if (!keepScene && (sceneOfPhoto.current || !prompt.trim())) {
       setPrompt(t(sample.scene));
       sceneOfPhoto.current = true;
     }
@@ -611,7 +612,11 @@ export function Studio() {
     setCanvas({ view: 'gallery', before: 'gallery' });
     if (back.remixGenerationId && back.presetId) {
       void openRemix(back.presetId, `/api/generations/${encodeURIComponent(back.remixGenerationId)}/preset`, back.remixGenerationId);
+    } else if (back.remixPresetUrl && back.presetId) {
+      void openRemix(back.presetId, back.remixPresetUrl);
     }
+    // A community recipe or example brings no photo of its own: the tab's sample photo stands in.
+    if (back.sample && !IS_SHOWCASE) void loadSample(Boolean(back.prompt));
     // The link did its work: the address keeps the tab only. A photo goes to the tab the link asked for.
     window.history.replaceState(null, '', tabHref(item.kind === 'photo' ? tab : back.tab));
   };
@@ -620,10 +625,16 @@ export function Studio() {
     // A Reuse that comes during a render waits for its end: replacing the Studio now would orphan that render.
     if (!from || catalog !== 'ready' || busy || appliedFrom.current === from) return;
     appliedFrom.current = from;
-    apiFetch('/api/history')
-      .then((res) => jsonOrThrow<HistoryItem[]>(res))
-      .then((items) => {
-        const item = items.find((entry) => entry.key === from);
+    // An entry of the community gallery comes from there, a creation of this machine from the history.
+    const lookup = from.startsWith('community:')
+      ? apiFetch(`/api/community/${encodeURIComponent(from.slice('community:'.length))}`)
+          .then((res) => jsonOrThrow<CommunityEntry>(res))
+          .then(entryAsHistoryItem)
+      : apiFetch('/api/history')
+          .then((res) => jsonOrThrow<HistoryItem[]>(res))
+          .then((items) => items.find((entry) => entry.key === from));
+    lookup
+      .then((item) => {
         if (item) restore(item);
       })
       .catch(() => undefined);

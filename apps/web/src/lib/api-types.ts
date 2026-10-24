@@ -255,6 +255,10 @@ export type Reprise = {
   modelId?: string;
   /** A remixed clip: the remix editor reopens on that generation's preset text. */
   remixGenerationId?: string;
+  /** Where the remix editor reads the preset text from, when it is not a generation of this machine (a community entry). */
+  presetUrl?: string;
+  /** No photo of its own: the Studio starts from the tab's sample photo (a community recipe or example). */
+  sample?: true;
   shots?: { presetId: string; prompt?: string }[];
 };
 
@@ -262,7 +266,8 @@ export type Reprise = {
 export type HistoryItem = {
   /** `${source}:${id}`, unique across the list. */
   key: string;
-  source: 'generation' | 'sequence' | 'job';
+  /** "community": an entry of the community gallery, brought back the same way. */
+  source: 'generation' | 'sequence' | 'job' | 'community';
   kind: 'photo' | 'clip' | 'film';
   task: 'camera' | 'film' | JobTask;
   name: string;

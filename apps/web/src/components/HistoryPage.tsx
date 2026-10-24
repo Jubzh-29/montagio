@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
 import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import type { HistoryItem } from '@/lib/api-types';
+import { COMMUNITY_AUTHOR_MAX, COMMUNITY_TITLE_MAX } from '@/lib/community';
 import { historyFilter, historyName, historySubject, repriseHref, type HistoryFilter } from '@/lib/reprise';
+import { refusalMessageKey } from '@/lib/refusals';
 import { useMotionPaused } from '@/lib/use-motion';
 import { Header } from './Header';
 import { ShowcaseFooter } from './ShowcaseFooter';
@@ -46,7 +48,90 @@ function HistoryMedia({ item, paused }: { item: HistoryItem; paused: boolean }) 
   );
 }
 
+const AUTHOR_KEY = 'montagio-author';
+
+/** The name the visitor signed with last time, on this browser only. */
+function rememberedAuthor(): string {
+  try {
+    return window.localStorage.getItem(AUTHOR_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** Publish a creation to the community gallery: a title, a name if you like, its settings with it. */
+function PublishForm({ item, defaultTitle, onClose }: { item: HistoryItem; defaultTitle: string; onClose: () => void }) {
+  const { t } = useI18n();
+  const [title, setTitle] = useState(defaultTitle.slice(0, COMMUNITY_TITLE_MAX));
+  const [author, setAuthor] = useState(rememberedAuthor);
+  const [state, setState] = useState<'idle' | 'saving' | 'done' | { refusal: string }>('idle');
+  const publish = async () => {
+    if (!title.trim() || state === 'saving') return;
+    setState('saving');
+    try {
+      window.localStorage.setItem(AUTHOR_KEY, author.trim());
+    } catch {
+      // The name is a convenience: without storage it is simply asked again.
+    }
+    const res = await apiFetch('/api/community', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ historyKey: item.key, title: title.trim(), ...(author.trim() ? { author: author.trim() } : {}) }),
+    }).catch(() => null);
+    if (res?.ok) return setState('done');
+    const answer = res ? ((await res.json().catch(() => ({}))) as { error?: string }) : {};
+    setState({ refusal: answer.error ?? 'error' });
+  };
+  const id = item.key.replace(':', '-');
+  if (state === 'done') {
+    return (
+      <p className={styles.published} role="status">
+        {t('communityPublished')}{' '}
+        <Link className={styles.inlineLink} href="/community">
+          {t('communityOpen')}
+        </Link>
+      </p>
+    );
+  }
+  return (
+    <form
+      className={styles.publish}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void publish();
+      }}
+    >
+      <label htmlFor={`publish-title-${id}`}>{t('communityTitleLabel')}</label>
+      <input id={`publish-title-${id}`} type="text" maxLength={COMMUNITY_TITLE_MAX} value={title} onChange={(event) => setTitle(event.target.value)} />
+      <label htmlFor={`publish-author-${id}`}>{t('communityAuthorLabel')}</label>
+      <input
+        id={`publish-author-${id}`}
+        type="text"
+        maxLength={COMMUNITY_AUTHOR_MAX}
+        placeholder={t('communityAuthorPlaceholder')}
+        value={author}
+        onChange={(event) => setAuthor(event.target.value)}
+      />
+      <p className={styles.publishNote}>{t('communityPublishNote')}</p>
+      {typeof state === 'object' && (
+        <p className={styles.publishError} role="alert">
+          {t(refusalMessageKey(state.refusal))}
+        </p>
+      )}
+      <div className={styles.cardActions}>
+        <button type="submit" className={styles.action} disabled={!title.trim() || state === 'saving'}>
+          {t('communityPublish')}
+        </button>
+        <button type="button" className={styles.actionGhost} onClick={onClose}>
+          {t('cancel')}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export function HistoryCard({ item, paused }: { item: HistoryItem; paused: boolean }) {
+  const [publishing, setPublishing] = useState(false);
   const { t, lang } = useI18n();
   const date = new Date(item.createdAt).toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' });
   const extension = item.kind === 'photo' ? 'png' : 'mp4';
@@ -72,7 +157,13 @@ export function HistoryCard({ item, paused }: { item: HistoryItem; paused: boole
         <Link className={styles.action} href={repriseHref(item)}>
           {t('historyReuse')}
         </Link>
+        {!IS_SHOWCASE && !publishing && (
+          <button type="button" className={styles.action} onClick={() => setPublishing(true)}>
+            {t('communityPublish')}
+          </button>
+        )}
       </div>
+      {publishing && <PublishForm item={item} defaultTitle={subject ?? name} onClose={() => setPublishing(false)} />}
     </li>
   );
 }

@@ -415,3 +415,16 @@ test('the showcase takes no reference video', async () => {
   const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
   expect(await call(router, 'POST', '/api/uploads/video', {})).toMatchObject({ status: 403, json: { error: 'showcase-upload' } });
 });
+
+test('the community gallery of the showcase: its rendered clips, each remixed on its sample photo', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage, base: '' });
+  const list = await call(router, 'GET', '/api/community');
+  expect(list.status).toBe(200);
+  const entries = list.json as unknown as { id: string; source: string; reprise: { tab: string; presetId?: string; imageRef?: string } }[];
+  // pan-left has only a placeholder: no entry for it.
+  expect(entries.map((entry) => entry.reprise.presetId)).toEqual(['crash-push']);
+  expect(entries[0]).toMatchObject({ source: 'example', reprise: { tab: 'camera', presetId: 'crash-push', imageRef: expect.stringMatching(/^samples\//) } });
+  expect((await call(router, 'GET', `/api/community/${entries[0]!.id}`)).json).toMatchObject({ id: entries[0]!.id });
+  expect((await call(router, 'GET', '/api/community/nope')).status).toBe(404);
+  expect((await call(router, 'POST', '/api/community', { historyKey: 'x', title: 'y' })).status).toBe(404);
+});
