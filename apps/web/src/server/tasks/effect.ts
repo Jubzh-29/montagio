@@ -1,58 +1,15 @@
 import { randomInt } from 'node:crypto';
 import { basename } from 'node:path';
-import { compileCompose, compileEffect, COMPOSE_ROLES, type ComposeRefs, type Library } from '@montagio/presets';
+import { compileEffect } from '@montagio/presets';
 import { JobError } from '../errors';
 import { requireExtension, visibleEffects } from '../extensions';
 import { assertConsent, assertNoBlockedName } from '../guards';
-import type { JobRecord, StepPlan, TaskDef } from '../jobs';
-import { readUploadMeta, type UploadMeta } from '../uploads';
+import type { TaskDef } from '../jobs';
+import { readUploadMeta } from '../uploads';
+import { composeOf, composeStep } from './compose';
 import { extensionFile, uploadPath } from './files';
 
 const SUBJECT_MAX = 120;
-
-/**
- * The references of a composed start photo, two or three of a place, a character and a product,
- * each a known upload; null when the body asks for none.
- */
-async function composeOf(raw: unknown): Promise<{ refs: ComposeRefs; metas: UploadMeta[] } | null> {
-  if (raw === undefined || raw === null) return null;
-  if (typeof raw !== 'object' || Array.isArray(raw)) throw new JobError('invalid-input');
-  const refs: ComposeRefs = {};
-  const metas: UploadMeta[] = [];
-  for (const role of COMPOSE_ROLES) {
-    const ref = (raw as Record<string, unknown>)[role];
-    if (ref === undefined || ref === null || ref === '') continue;
-    const meta = typeof ref === 'string' ? await readUploadMeta(ref) : null;
-    if (!meta) throw new JobError('unknown-image');
-    refs[role] = meta.imageRef;
-    metas.push(meta);
-  }
-  if (metas.length < 2) throw new JobError('invalid-input');
-  return { refs, metas };
-}
-
-function editModelOf(lib: Library) {
-  const model = [...lib.extensionModels.values()].find((entry) => entry.task === 'i2i-edit');
-  const template = model && lib.extensionTemplates.get(model.workflow);
-  if (!model || !template) throw new Error('no edit model or workflow for a composed start photo');
-  return { model, template };
-}
-
-/** The composition step: the edit puts the place, the character and the product in one photo. */
-function composeStep(record: JobRecord, lib: Library): StepPlan {
-  return {
-    name: 'compose',
-    presetId: 'compose',
-    extension: 'edit',
-    compile: async () => {
-      const { model, template } = editModelOf(lib);
-      const refs = record.inputs.compose as ComposeRefs;
-      const { workflow, output, order } = compileCompose(model, template, { refs, seed: record.seed, fast: true }, lib.lock);
-      const keys = ['image', 'image2', 'image3'] as const;
-      return { workflow, output, files: order.map((role, index) => extensionFile(model, keys[index]!, uploadPath(refs[role]!))) };
-    },
-  };
-}
 
 /**
  * A one-photo effect of the pack (Wan 2.1 I2V 480p with the effect's LoRA). The subject says

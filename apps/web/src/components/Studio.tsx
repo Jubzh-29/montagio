@@ -41,7 +41,7 @@ import { ChoiceCard } from './ChoiceCard';
 import { Composer } from './Composer';
 import { ConsentCheck } from './ConsentCheck';
 import { AvatarFields, BUILT_IN_VOICE, type VoiceChoice } from './AvatarFields';
-import { COMPOSE_OFF, composeBody, composePersonal, composeReady, ComposeSlots, type ComposeState } from './ComposeSlots';
+import { COMPOSE_OFF, composeBody, composePersonal, composeReady, ComposeSlots, MOTION_COMPOSE_ROLES, type ComposeState } from './ComposeSlots';
 import { HdPanel } from './HdPanel';
 import { MotionFields, type MotionVideo } from './MotionFields';
 import { MotionModeSwitch, RestyleFields, type MotionMode } from './RestyleFields';
@@ -195,13 +195,16 @@ export function Studio() {
   const [restyleText, setRestyleText] = useState('');
   const [look, setLook] = useState<UploadState>({ status: 'idle' });
   const lookToken = useRef(0);
+  // The Motion tab's character (or a restyle's look) composed by the edit from a character, its outfit, a product.
+  const [motionCompose, setMotionCompose] = useState<ComposeState>(COMPOSE_OFF);
   // A mode shows with its extension; with only one of the two, the tab has that one.
   const hasMotion = extensions?.extensions.includes('motion') ?? false;
   const hasRestyle = extensions?.extensions.includes('restyle') ?? false;
   const motionMode: MotionMode = !hasRestyle ? 'character' : !hasMotion ? 'restyle' : askedMotionMode;
   const restyling = tab === 'motion' && motionMode === 'restyle';
   // Without a look image, the edit restyles the clip's first frame first, when it is installed.
-  const restyleFirstFrame = look.status !== 'ready' && (extensions?.extensions.includes('edit') ?? false);
+  const motionComposing = tab === 'motion' && (extensions?.extensions.includes('edit') ?? false) && composeReady(motionCompose, 'character');
+  const restyleFirstFrame = !motionComposing && look.status !== 'ready' && (extensions?.extensions.includes('edit') ?? false);
   const [rights, setRights] = useState(false);
   const [subject, setSubject] = useState('');
   const [consent, setConsent] = useState(false);
@@ -523,7 +526,11 @@ export function Studio() {
     setConsent(false);
   }
   // The rights box is for this photo (or this look image) and this clip: another one asks again.
-  const rightsKey = `${motionMode}|${restyling ? (look.status === 'ready' ? look.imageRef : '') : upload.status === 'ready' ? upload.imageRef : ''}|${motionVideo.status === 'ready' ? motionVideo.videoRef : ''}`;
+  const rightsKey = [
+    motionMode,
+    motionComposing ? Object.values(composeBody(motionCompose)).join(',') : restyling ? (look.status === 'ready' ? look.imageRef : '') : upload.status === 'ready' ? upload.imageRef : '',
+    motionVideo.status === 'ready' ? motionVideo.videoRef : '',
+  ].join('|');
   const [rightsFor, setRightsFor] = useState(rightsKey);
   // A new photo on Camera shows on the monitor, with the dashed frame of where the chosen move ends:
   // the cause and effect that would otherwise wait behind the Monitor button. It switches when the
@@ -548,9 +555,9 @@ export function Studio() {
   const missingScene = sceneMissing(tab, IS_SHOWCASE, prompt);
   const ready = upload.status === 'ready' && modelId !== null && !busy && !missingScene;
   const canGenerate = restyling
-    ? motionVideo.status === 'ready' && restyleText.trim().length > 0 && (look.status === 'idle' || look.status === 'ready') && rights && !busy
+    ? motionVideo.status === 'ready' && restyleText.trim().length > 0 && (motionComposing || look.status === 'idle' || look.status === 'ready') && rights && !busy
     : tab === 'motion'
-    ? upload.status === 'ready' && motionVideo.status === 'ready' && rights && !busy
+    ? (upload.status === 'ready' || motionComposing) && motionVideo.status === 'ready' && rights && !busy
     : tab === 'avatar'
     ? upload.status === 'ready' && !busy && speechText.trim().length > 0 && (!askConsent || consent) && (!voice.mine || (voice.voiceRef !== null && voice.consent))
     : composing
@@ -780,25 +787,29 @@ export function Studio() {
   }, []);
 
   const generate = () => {
-    if (submitting.current || !canGenerate || (!restyling && upload.status !== 'ready')) return;
+    if (submitting.current || !canGenerate || (tab !== 'motion' && upload.status !== 'ready')) return;
     followJob.current = true;
     setTake({ expected_s: mode === 'sequence' && !remix ? filmEstimate : estimate });
     moveCanvas('generate');
     if (restyling) {
       // No start photo: the clip, the text, and the look image when there is one.
       if (motionVideo.status !== 'ready') return;
-      const body = { videoRef: motionVideo.videoRef, prompt: restyleText.trim(), ...(look.status === 'ready' ? { imageRef: look.imageRef } : {}), rights: true };
+      const reference = motionComposing ? { compose: composeBody(motionCompose) } : look.status === 'ready' ? { imageRef: look.imageRef } : {};
+      const body = { videoRef: motionVideo.videoRef, prompt: restyleText.trim(), ...reference, rights: true };
       void submit('job', body, undefined, '/api/restyle');
+      return;
+    }
+    if (tab === 'motion') {
+      // The character: the start photo, or the one the edit composes first.
+      if (motionVideo.status !== 'ready') return;
+      const character = motionComposing ? { compose: composeBody(motionCompose) } : upload.status === 'ready' ? { imageRef: upload.imageRef } : null;
+      if (!character) return;
+      const texts = { ...(motionCharacter.trim() ? { character: motionCharacter.trim() } : {}), ...(motionAction.trim() ? { motion: motionAction.trim() } : {}) };
+      void submit('job', { ...character, videoRef: motionVideo.videoRef, ...texts, rights: true }, undefined, '/api/motion');
       return;
     }
     if (upload.status !== 'ready') return;
     const userPrompt = prompt.trim() || undefined;
-    if (tab === 'motion') {
-      if (motionVideo.status !== 'ready') return;
-      const texts = { ...(motionCharacter.trim() ? { character: motionCharacter.trim() } : {}), ...(motionAction.trim() ? { motion: motionAction.trim() } : {}) };
-      void submit('job', { imageRef: upload.imageRef, videoRef: motionVideo.videoRef, ...texts, rights: true }, undefined, '/api/motion');
-      return;
-    }
     if (tab === 'avatar') {
       const body = {
         imageRef: upload.imageRef,
@@ -903,9 +914,9 @@ export function Studio() {
   const selectedModel = models.find((model) => model.id === modelId);
   const estimate =
     restyling
-      ? (extensions?.estimates.restyle ?? 0) + (restyleFirstFrame ? (extensions?.estimates.edit ?? 0) : 0)
+      ? (extensions?.estimates.restyle ?? 0) + (restyleFirstFrame || motionComposing ? (extensions?.estimates.edit ?? 0) : 0)
       : tab === 'motion'
-      ? (extensions?.estimates.motion ?? 0)
+      ? (extensions?.estimates.motion ?? 0) + (motionComposing ? (extensions?.estimates.edit ?? 0) : 0)
       : tab === 'avatar'
       ? (extensions?.estimates.avatar ?? 0)
       : tab === 'effects'
@@ -987,6 +998,23 @@ export function Studio() {
   // The names of the choice in hand, in the interface's language.
   const wallChoiceName = wallChoice ? catalogName(lang, wallChoice.item.id, wallChoice.item.name) : undefined;
   const moveName = movePreset ? catalogName(lang, movePreset.id, movePreset.name) : undefined;
+  // The composed character or look, under the Motion tab's fields when the edit is installed.
+  const motionComposeSlots =
+    !IS_SHOWCASE && extensions?.extensions.includes('edit') ? (
+      <ComposeSlots
+        value={motionCompose}
+        onChange={setMotionCompose}
+        disabled={busy}
+        roles={MOTION_COMPOSE_ROLES}
+        required="character"
+        texts={{
+          toggle: 'composeMotionToggle',
+          lead: restyling ? 'composeRestyleLead' : 'composeMotionLead',
+          ready: 'composeMotionReadyHint',
+          needs: 'composeNeedsCharacter',
+        }}
+      />
+    ) : null;
   const slateMove = restyling ? t('restyleTitle') : tab === 'motion' ? t('tabMotion') : tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoiceName : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? moveName : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
   // An avatar lasts as long as its speech: the slate says the estimate, once there is a text.
   const speechSeconds = estimateSpeech(speechText, speechLanguage);
@@ -1162,18 +1190,23 @@ export function Studio() {
                 onLook={(file) => void onLook(file)}
                 onClearLook={clearLook}
                 firstFrame={restyleFirstFrame}
+                lookHidden={motionComposing}
+                compose={motionComposeSlots}
               />
             ) : tab === 'motion' ? (
-              <MotionFields
-                video={motionVideo}
-                disabled={busy}
-                paused={motionPaused}
-                onVideo={(file) => void onMotionVideo(file)}
-                character={motionCharacter}
-                action={motionAction}
-                onCharacter={setMotionCharacter}
-                onAction={setMotionAction}
-              />
+              <>
+                <MotionFields
+                  video={motionVideo}
+                  disabled={busy}
+                  paused={motionPaused}
+                  onVideo={(file) => void onMotionVideo(file)}
+                  character={motionCharacter}
+                  action={motionAction}
+                  onCharacter={setMotionCharacter}
+                  onAction={setMotionAction}
+                />
+                {motionComposeSlots}
+              </>
             ) : tab === 'avatar' ? (
               <AvatarFields text={speechText} language={speechLanguage} max={300} onText={setSpeechText} onLanguage={setSpeechLanguage} voice={voice} onVoice={setVoice} />
             ) : tab === 'effects' ? (
@@ -1270,12 +1303,12 @@ export function Studio() {
                     )}
                   </div>
                 )}
-                {!restyling && upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
+                {!restyling && !motionComposing && upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
                 {restyling && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('restyleNeedsVideo')}</p>}
                 {restyling && motionVideo.status === 'ready' && !restyleText.trim() && <p className={styles.hint}>{t('restyleNeedsText')}</p>}
                 {upload.status === 'ready' && missingScene && <p className={styles.hint}>{t('sceneNeeded')}</p>}
                 {tab === 'effects' && upload.status === 'ready' && needsOutfit && outfit.status !== 'ready' && <p className={styles.hint}>{t('hookNeedsOutfit')}</p>}
-                {tab === 'motion' && !restyling && upload.status === 'ready' && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('motionNeedsVideo')}</p>}
+                {tab === 'motion' && !restyling && (upload.status === 'ready' || motionComposing) && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('motionNeedsVideo')}</p>}
               </div>
               {/* Outside the sticky block: on a phone that block stays one button high over the gallery. */}
               {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}

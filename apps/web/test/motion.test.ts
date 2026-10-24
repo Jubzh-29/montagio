@@ -11,6 +11,7 @@ import type { JobSummary } from '@/lib/api-types';
 import { mediaFileFor } from '@/server/generations';
 import { listHistory } from '@/server/history';
 import { readJobWorkflow } from '@/server/jobs';
+import { getEnv } from '@/server/env';
 import { getServices } from '@/server/services';
 import { videoPath } from '@/server/tasks/files';
 import { MAX_VIDEO_FORM_BYTES } from '@/server/uploads';
@@ -157,4 +158,25 @@ test('a motion clip comes back on the motion tab', async () => {
   const again = (await listHistory()).find((entry) => entry.key === `job:${id}`);
   expect(again?.reprise).toMatchObject({ tab: 'motion', prompt: 'a knight', motion: 'waves' });
   expect(again?.reprise.videoRef).toBeUndefined();
+}, 60_000);
+
+test('a composed character: the edit puts it together full body first, then the motion animates what it made', async () => {
+  const character = await sampleRef();
+  const outfit = await sampleRef();
+  const res = await post({ compose: { character, outfit }, videoRef: await videoRef(), rights: true }, 'mo5');
+  expect(res.status).toBe(201);
+  const { id } = (await res.json()) as JobSummary;
+  expect((await poll(id)).state).toBe('succeeded');
+  const { record } = (await readJobWorkflow(id))!;
+  expect(record.steps.map((step) => step.name)).toEqual(['compose', 'motion']);
+  const composeWorkflow = JSON.parse(readFileSync(join(getEnv().data, 'jobs', id, 'step0.workflow.json'), 'utf8')) as Record<string, { inputs: Record<string, unknown> }>;
+  expect(String(composeWorkflow['151']!.inputs.prompt)).toMatch(/^Show the character from image 1 wearing the outfit from image 2, seen full body from head to feet/);
+}, 60_000);
+
+test('a composition without its character, or with a place, is refused', async () => {
+  const ref = await videoRef();
+  const outfit = await sampleRef();
+  const product = await sampleRef();
+  expect(await (await post({ compose: { outfit, product }, videoRef: ref, rights: true }, 'mo6')).json()).toEqual({ error: 'invalid-input' });
+  expect(await (await post({ compose: { character: outfit, location: product }, videoRef: ref, rights: true }, 'mo7')).json()).toEqual({ error: 'invalid-input' });
 }, 60_000);

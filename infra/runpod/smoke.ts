@@ -73,6 +73,7 @@ const { values: args } = parseArgs({
     input: { type: 'string' },
     input2: { type: 'string' },
     input3: { type: 'string' },
+    outfit: { type: 'string' },
     mask: { type: 'string' },
     end: { type: 'string' },
     effect: { type: 'string', default: 'all' },
@@ -122,6 +123,8 @@ Extensions (instead of presets):
   --hook ID          the hook of hook-edit and transition (default iris-dive)
   --input2 PATH      the second image of a two-reference hook (the outfit of wardrobe-swap), or compose's character
   --input3 PATH      compose: the product (--input is the place); with effect, the effects animate the composed photo
+  --outfit PATH      compose: an outfit the character (--input2) wears, without a place; with motion, the composed
+                     character, seen full body, performs the motion
   --mask PATH        edit: inpaint through this mask (white where the photo changes, the photo's size)
   --end PATH         the end frame of a transition run alone; without it, the hook's edit runs first and makes it
   --quality          the edit, the effects and the transition without their 4-step LoRAs (more steps, slower)
@@ -506,8 +509,8 @@ async function runExtensions(
   // Without an end frame, the transition ends on the hook's edit: the edit runs first.
   const chainedHook = names.includes('transition') && !args.end;
   if (chainedHook && !names.includes('hook-edit')) names.splice(names.indexOf('transition'), 0, 'hook-edit');
-  // With a composition, the effects animate the composed photo: the composition runs first.
-  const chainedCompose = names.includes('compose') && names.includes('effect');
+  // With a composition, the effects animate the composed photo, or its character performs the motion: the composition runs first.
+  const chainedCompose = names.includes('compose') && (names.includes('effect') || names.includes('motion'));
   // With restyle-edit, the restyle keeps the clip's first frame as the edit restyled it.
   const chainedRestyle = names.includes('restyle-edit') && names.includes('restyle');
   // Each text feeds one job (the voice, for an avatar that speaks its output).
@@ -516,6 +519,7 @@ async function runExtensions(
   let input = args.input ? fromCaller(args.input) : join(repoRoot, 'demo-assets', 'images', 'sample-16x9.png');
   const input2 = args.input2 ? fromCaller(args.input2) : undefined;
   const input3 = args.input3 ? fromCaller(args.input3) : undefined;
+  const outfit = args.outfit ? fromCaller(args.outfit) : undefined;
   const mask = args.mask ? fromCaller(args.mask) : undefined;
   let end = args.end ? fromCaller(args.end) : undefined;
   const clip = args.clip ? fromCaller(args.clip) : undefined;
@@ -572,6 +576,8 @@ async function runExtensions(
     input,
     input2,
     input3,
+    outfit,
+    composeFullBody: names.includes('motion'),
     mask,
     ...(args.voice ? { voice: fromCaller(args.voice) } : {}),
     end: end ?? (args['dry-run'] ? 'end.png' : undefined),
@@ -600,7 +606,7 @@ async function runExtensions(
   const first = names.filter(
     (name) =>
       args['dry-run'] ||
-      !((chained && name === 'avatar') || (chainedHook && name === 'transition') || (chainedCompose && name === 'effect') || (chainedRestyle && name === 'restyle')),
+      !((chained && name === 'avatar') || (chainedHook && name === 'transition') || (chainedCompose && (name === 'effect' || name === 'motion')) || (chainedRestyle && name === 'restyle')),
   );
   const jobs = extensionJobs(library, options(first));
   await mkdir(join(outDir, 'workflows'), { recursive: true });
@@ -684,7 +690,7 @@ async function runExtensions(
       input = join(outDir, photo);
       const { width, height } = imageSize(await readFile(input));
       aspect = pickAspect(width, height);
-      for (const effect of extensionJobs(library, options(['effect']))) await run(effect);
+      for (const next of extensionJobs(library, options(names.filter((name) => name === 'effect' || name === 'motion')))) await run(next);
     }
     if (chainedRestyle && job.name === 'restyle-edit' && !args['dry-run']) {
       const frame = record.outputs[0];

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useI18n } from '@/i18n';
 import type { UploadState } from './Monitor';
 import { MotionVideoSlot, type MotionVideo } from './MotionFields';
@@ -45,6 +46,8 @@ export function RestyleFields({
   onLook,
   onClearLook,
   firstFrame,
+  lookHidden = false,
+  compose,
 }: {
   video: MotionVideo;
   disabled: boolean;
@@ -57,6 +60,10 @@ export function RestyleFields({
   onClearLook: () => void;
   /** Without a look image, the edit restyles the clip's first frame first. */
   firstFrame: boolean;
+  /** A look composed from several photos replaces the one image: its slot steps aside. */
+  lookHidden?: boolean;
+  /** The slots of that composed look, under the image's. */
+  compose?: ReactNode;
 }) {
   const { t } = useI18n();
   const lookUrl = look.status === 'idle' ? undefined : look.localUrl;
@@ -69,6 +76,7 @@ export function RestyleFields({
         onVideo={onVideo}
         labels={{ title: 'restyleVideo', empty: 'restyleVideoEmpty', add: 'restyleVideoAdd' }}
       />
+      {!lookHidden && (
       <section className={styles.panelSection} aria-labelledby="restyle-look-title">
         <h2 id="restyle-look-title" className={styles.sectionTitle}>
           {t('restyleLook')}
@@ -109,6 +117,8 @@ export function RestyleFields({
           </p>
         )}
       </section>
+      )}
+      {compose}
       <div className={styles.panelSection}>
         <label htmlFor="restyle-text" className={styles.sectionTitle}>
           {t('restyleText')}

@@ -92,6 +92,10 @@ export type ExtensionJobOptions = {
   input2?: string;
   /** The product of a composition (optional: a place and a character are enough). */
   input3?: string;
+  /** The outfit of a composed character (the Motion tab's): with it, the place is left out. */
+  outfit?: string;
+  /** A composition for a motion transfer: the character seen full body. */
+  composeFullBody?: boolean;
   /** The edit's inpaint mask (white where the photo changes). */
   mask?: string;
   /** The end frame of a transition run on its own (a hook's edit output otherwise). */
@@ -208,21 +212,17 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
         return [{ name, tag: mask ? `${name}:inpaint` : name, model, ...job, files: [file('image', photo), ...(mask ? [file('mask', mask)] : [])] }];
       }
       case 'compose': {
-        // The Studio's composed start photo: a place, a character and a product, in that image order.
-        const place = need(opts.input, '--input', name);
+        // The Studio's composed photo: a place, a character and a product (an effect's start photo), or a
+        // character, its outfit and a product (the Motion tab's character), each in that image order.
+        const outfit = opts.outfit;
+        const place = outfit ? undefined : need(opts.input, '--input', name);
         const character = need(opts.input2, '--input2', name);
         const product = opts.input3;
-        const refs = { location: basename(place), character: basename(character), ...(product ? { product: basename(product) } : {}) };
-        const { order, ...job } = compileCompose(model, template, { refs, seed: opts.seed, fast }, library.lock);
-        return [
-          {
-            name,
-            tag: `${name}:${order.length}refs`,
-            model,
-            ...job,
-            files: [file('image', place), file('image2', character), ...(product ? [file('image3', product)] : [])],
-          },
-        ];
+        const paths = { location: place, character, outfit, product };
+        const refs = Object.fromEntries(Object.entries(paths).flatMap(([role, path]) => (path ? [[role, basename(path)]] : [])));
+        const { order, ...job } = compileCompose(model, template, { refs, seed: opts.seed, fast, fullBody: opts.composeFullBody ?? false }, library.lock);
+        const keys = ['image', 'image2', 'image3'] as const;
+        return [{ name, tag: `${name}:${order.length}refs`, model, ...job, files: order.map((role, index) => file(keys[index]!, paths[role]!)) }];
       }
       case 'effect': {
         const photo = need(opts.input, '--input', name);

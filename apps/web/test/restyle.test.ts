@@ -138,3 +138,14 @@ test('a restyle comes back on the Motion tab in its restyle mode, with its look 
   const item = (await listHistory()).find((entry) => entry.key === `job:${id}`);
   expect(item).toMatchObject({ kind: 'clip', task: 'restyle', reprise: { tab: 'motion', restyle: true, imageRef, videoRef: ref, prompt: 'a watercolor painting' } });
 }, 60_000);
+
+test('a composed look: the edit puts the character, its outfit and a product together, then VACE follows that photo', async () => {
+  const character = await sampleRef();
+  const product = await sampleRef();
+  const { id } = (await (await post({ videoRef: await videoRef(), prompt: 'a busy night market', compose: { character, product }, rights: true }, 're10')).json()) as JobSummary;
+  expect((await poll(id)).state).toBe('succeeded');
+  const { record, workflow } = (await readJobWorkflow(id))!;
+  expect(record.steps.map((step) => step.name)).toEqual(['compose', 'restyle']);
+  expect(workflow['30']!.inputs).toMatchObject({ control_video: ['4', 0], reference_image: ['21', 0] });
+  expect(workflow['30']!.inputs).not.toHaveProperty('control_masks');
+}, 60_000);

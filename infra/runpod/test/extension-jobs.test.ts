@@ -116,6 +116,13 @@ test("a restyle follows its text alone, a look to follow, or the clip's first fr
   expect(() => extensionJobs(library, { ...base, jobs: ['restyle'] })).toThrow(/--motion/);
 });
 
+test("a composed character for a motion: the character, its outfit and a product, seen full body, no place", () => {
+  const [compose] = extensionJobs(library, { ...base, jobs: ['compose'], input: '/data/place.png', input2: '/data/c.png', outfit: '/data/o.png', input3: '/data/p.png', composeFullBody: true });
+  expect(compose!.tag).toBe('compose:3refs');
+  expect(compose!.files.map((file) => file.path)).toEqual(['/data/c.png', '/data/o.png', '/data/p.png']);
+  expect(compose!.params.instruction).toMatch(/^Show the character from image 1 wearing the outfit from image 2, holding the product from image 3, seen full body from head to feet/);
+});
+
 test('without a list, every effect of the pack runs, each with its own tag', () => {
   const jobs = extensionJobs(library, { ...base, jobs: ['effect'], input: '/p.png' });
   expect(jobs.map((job) => job.tag).sort()).toEqual(['effect:cakeify', 'effect:explode', 'effect:frozen-moment', 'effect:full-circle', 'effect:snap-zoom', 'effect:squish']);

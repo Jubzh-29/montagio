@@ -192,6 +192,34 @@ describe('compileCompose (a start photo from a place, a character, a product)', 
   test('one reference is not a composition', () => {
     expect(() => compose({ character: 'c.png' })).toThrow(CompileError);
   });
+
+  test('an outfit is worn by the character, after it in image order; the character keeps its face and hair only', () => {
+    const { workflow, order } = compose({ product: 'p.png', outfit: 'o.png', character: 'c.png' });
+    expect(order).toEqual(['character', 'outfit', 'product']);
+    expect([workflow['41']!.inputs.image, workflow['42']!.inputs.image, workflow['43']!.inputs.image]).toEqual(['c.png', 'o.png', 'p.png']);
+    expect(workflow['151']!.inputs.prompt).toBe(
+      "Show the character from image 1 wearing the outfit from image 2, holding the product from image 3, in a simple setting. Keep the character's face and hair, the outfit's cut, colors and fabric and the product's exact shape, colors and label. Photorealistic, one coherent photo.",
+    );
+    expect(composeInstruction(['location', 'character', 'outfit'])).toBe(
+      "Show the character from image 2, wearing the outfit from image 3, in the place of image 1. Keep the character's face and hair, the outfit's cut, colors and fabric and the place's look. Light everything like the place. Photorealistic, one coherent photo.",
+    );
+  });
+
+  test('for a motion, the composed character is seen full body; without it, the effects keep their instructions', () => {
+    expect(composeInstruction(['character', 'outfit'], { fullBody: true })).toBe(
+      "Show the character from image 1 wearing the outfit from image 2, seen full body from head to feet, in a simple setting. Keep the character's face and hair and the outfit's cut, colors and fabric. Photorealistic, one coherent photo.",
+    );
+    expect(composeInstruction(['character', 'product'])).toBe(
+      "Show the character from image 1 holding the product from image 2, in a simple setting. Keep the character's face, hair and outfit and the product's exact shape, colors and label. Photorealistic, one coherent photo.",
+    );
+    const { workflow } = compileCompose(edit().model, edit().template, { refs: { character: 'c.png', product: 'p.png' }, seed: 4, fullBody: true }, lib.lock);
+    expect(workflow['151']!.inputs.prompt).toMatch(/^Show the character from image 1 holding the product from image 2, seen full body from head to feet, in a simple setting\./);
+  });
+
+  test('four references, or an outfit without a character, are refused', () => {
+    expect(() => compose({ location: 'l.png', character: 'c.png', outfit: 'o.png', product: 'p.png' })).toThrow(/three/);
+    expect(() => compose({ outfit: 'o.png', product: 'p.png' })).toThrow(/character/);
+  });
 });
 
 describe('adInstruction (the product ad scene)', () => {
