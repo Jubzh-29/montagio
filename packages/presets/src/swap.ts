@@ -59,7 +59,7 @@ export function framePoint(point: SwapPoint, source: { width: number; height: nu
   return { x: Math.min(target.width - 1, Math.round(x)), y: Math.min(target.height - 1, Math.round(y)) };
 }
 
-function validPoints(points: readonly SwapPoint[] | undefined, label: string): SwapPoint[] {
+function validPoints(points: readonly SwapPoint[] | undefined, label: string): readonly SwapPoint[] {
   const list = points ?? [];
   if (list.length > MAX_SWAP_POINTS) throw new CompileError(`${list.length} ${label}, over the ${MAX_SWAP_POINTS} a swap takes`);
   for (const point of list) {
@@ -97,7 +97,7 @@ export function compileSwap(
   const { width, height } = dimensionsFor(inputs.aspect, '480p');
   const target = { width, height };
   if (inputs.points.length === 0) throw new CompileError('a swap needs at least one point on the object');
-  const kept = (list: SwapPoint[]) => list.map((point) => framePoint(point, inputs.source, target)).filter((point) => point !== null);
+  const kept = (list: readonly SwapPoint[]) => list.map((point) => framePoint(point, inputs.source, target)).filter((point) => point !== null);
   const points = kept(validPoints(inputs.points, 'points'));
   const exclude = kept(validPoints(inputs.exclude, 'excluded points'));
   if (points.length === 0) throw new CompileError(`the object's points are all outside the part of the frame a ${inputs.aspect} video keeps`);
