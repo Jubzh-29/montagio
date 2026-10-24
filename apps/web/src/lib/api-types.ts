@@ -179,9 +179,9 @@ export type ExtensionsInfo = {
 
 export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad' | 'voice-change';
 
-import type { CharacterType } from './characters';
+import type { CharacterKind, CharacterType } from './characters';
 
-export type { CharacterType };
+export type { CharacterKind, CharacterType };
 
 /** A picture of a character: its portrait's edit in a new scene (the photodump). */
 export type CharacterPhotoSummary = {
@@ -199,6 +199,8 @@ export type CharacterSummary = {
   id: string;
   name: string;
   type: CharacterType;
+  /** Who the character is; absent on the characters made before the kinds. */
+  kind?: CharacterKind;
   description: string;
   imageRef: string;
   imageUrl: string;

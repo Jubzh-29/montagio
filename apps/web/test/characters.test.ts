@@ -8,7 +8,8 @@ import { GET as getJob } from '@/app/api/jobs/[id]/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import type { CharacterSummary, HistoryItem, JobSummary } from '@/lib/api-types';
-import { characterPrompt, photodumpInstruction, photodumpScene, placeOf, scenePhrase } from '@/lib/characters';
+import { IMAGE_PROMPT_MAX } from '@montagio/presets';
+import { CHARACTER_KINDS, CHARACTER_STYLES, characterPrompt, photodumpInstruction, photodumpScene, placeOf, PORTRAIT_PROMPT_MAX, scenePhrase } from '@/lib/characters';
 import { params, pngFile, setupTempData, uploadRequest } from './helpers';
 
 setupTempData();
@@ -149,4 +150,30 @@ test('the pictures of a photodump that finish together are all kept', async () =
 test('a photodump picture is captioned with its place, read back from what it shows', () => {
   expect(placeOf(photodumpScene('a fox in a green hoodie', scenePhrase('cafe')))).toBe('cafe');
   expect(placeOf('a fox in a green hoodie, somewhere else')).toBeUndefined();
+});
+
+test('a character of another kind: its body, its style, always clothed, and every text within the model limit', () => {
+  expect(PORTRAIT_PROMPT_MAX).toBe(IMAGE_PROMPT_MAX);
+  expect(characterPrompt('cartoon', 'a yellow raincoat', 'frog')).toMatch(/^Full-body portrait of a fictional character, a 3D cartoon anthropomorphic frog with green skin.*: a yellow raincoat\. Fully clothed.*clean 3D animation render/);
+  expect(characterPrompt('everyday', 'a red scarf', 'robot')).toContain('a friendly humanoid robot with a sleek metal body, in everyday clothes: a red scarf.');
+  expect(characterPrompt('everyday', 'a red scarf', 'owl')).toContain('an anthropomorphic owl');
+  expect(characterPrompt('anime', 'x', 'bee')).toMatch(/an anime anthropomorphic bee.*cel shading/);
+  for (const kind of CHARACTER_KINDS) {
+    for (const style of CHARACTER_STYLES) {
+      const prompt = characterPrompt(style, 'y'.repeat(240), kind);
+      expect(prompt.length).toBeLessThanOrEqual(IMAGE_PROMPT_MAX);
+      expect(prompt).toMatch(/Fully clothed/);
+      expect(prompt).toMatch(/no text\.$/);
+    }
+  }
+});
+
+test('a character keeps its kind; a person when none is said, and an unknown kind is refused', async () => {
+  const job = await portrait('c-portrait-kind');
+  const frog = await save({ name: 'Ribbit', type: 'cartoon', kind: 'frog', description: 'a yellow raincoat', imageRef: job.outputImageRef });
+  expect(await frog.json()).toMatchObject({ name: 'Ribbit', type: 'cartoon', kind: 'frog' });
+  const person = await save({ name: 'Ada', type: 'anime', description: 'a red scarf', imageRef: job.outputImageRef });
+  expect(await person.json()).toMatchObject({ type: 'anime', kind: 'human' });
+  const dragon = await save({ name: 'X', type: 'everyday', kind: 'dragon', description: 'scales', imageRef: job.outputImageRef });
+  expect(dragon.status).toBe(400);
 });
