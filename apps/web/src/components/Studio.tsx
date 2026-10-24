@@ -21,6 +21,7 @@ import {
 import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
+import { recipeUrlOf } from '@/lib/recipe-url';
 import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
@@ -45,6 +46,7 @@ import { COMPOSE_OFF, composeBody, composePersonal, composeReady, ComposeSlots, 
 import { HdPanel } from './HdPanel';
 import { MotionFields, type MotionVideo } from './MotionFields';
 import { MusicPanel } from './MusicPanel';
+import { RecipePanel } from './RecipePanel';
 import { ShowcaseTextAtelier } from './ShowcaseTextAtelier';
 import { EffectFields } from './EffectFields';
 import { OutfitSource } from './OutfitSource';
@@ -865,6 +867,9 @@ export function Studio() {
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
   const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
+  // The recipe of the result: the showcase names its file; a placeholder has none.
+  const resultRecipeUrl =
+    tracked && succeeded && !succeeded.placeholder ? (succeeded.recipeUrl ?? (IS_SHOWCASE ? undefined : recipeUrlOf(tracked.kind, succeeded.id))) : undefined;
   // A result on the monitor is the screen's subject: its Download is the lime button, Generate steps back.
   const resultShown = succeeded !== undefined && canvas.view === 'result';
   const elapsed_s = clock && clock.take === take ? clock.ms / 1000 : 0;
@@ -1417,6 +1422,7 @@ export function Studio() {
                   {...(extensions.musicModel ? { model: extensions.musicModel } : {})}
                 />
               )}
+              {resultRecipeUrl && <RecipePanel key={resultRecipeUrl} url={resultRecipeUrl} />}
               {/* What the showcase is, in sight whatever the monitor shows. */}
               {showcaseNote && <p className={styles.stageNote}>{showcaseNote}</p>}
             </>

@@ -50,6 +50,8 @@ export type GenerationRecord = {
   frames?: number;
   /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
   workflowUrl?: string;
+  /** The showcase's recipe; elsewhere the Studio asks /api/recipes/generation/:id. */
+  recipeUrl?: string;
   /** A showcase clip whose camera move FFmpeg simulated, waiting for the GPU session. */
   placeholder?: boolean;
 };
@@ -87,6 +89,8 @@ export type SequenceSummary = {
   music?: { jobId: string };
   /** Showcase: at least one shot is a placeholder clip. */
   placeholder?: boolean;
+  /** Showcase: the film's recipe; elsewhere /api/recipes/sequence/:id. */
+  recipeUrl?: string;
   /** Showcase: what the in-browser montage is doing while the film is assembling. */
   stage?: 'loading-ffmpeg' | 'joining';
 };
@@ -225,6 +229,8 @@ export type JobSummary = {
   error?: string;
   /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
   workflowUrl?: string;
+  /** The showcase's recipe; elsewhere the Studio asks /api/recipes/job/:id. */
+  recipeUrl?: string;
   frames?: number;
   /** A film's 9:16 cut with music. */
   verticalUrl?: string;

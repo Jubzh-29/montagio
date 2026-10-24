@@ -8,6 +8,7 @@ import type { HistoryItem } from '@/lib/api-types';
 import { historyFilter, historyName, historySubject, repriseHref, type HistoryFilter } from '@/lib/reprise';
 import { useMotionPaused } from '@/lib/use-motion';
 import { Header } from './Header';
+import { RecipePanel } from './RecipePanel';
 import { ShowcaseFooter } from './ShowcaseFooter';
 import styles from './history.module.css';
 
@@ -65,6 +66,11 @@ export function HistoryCard({ item, paused }: { item: HistoryItem; paused: boole
           <time dateTime={item.createdAt}>{date}</time>
         </p>
       </div>
+      {item.recipeUrl && (
+        <div className={styles.cardRecipe}>
+          <RecipePanel url={item.recipeUrl} />
+        </div>
+      )}
       <div className={styles.cardActions}>
         <a className={styles.action} href={item.downloadUrl} download={`montagio-${item.key.replace(':', '-')}.${extension}`}>
           {t('historyDownload')}
