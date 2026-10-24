@@ -110,7 +110,7 @@ Running `install` again only does what changed: a new ComfyUI or PyTorch version
 
 ## Reproduce a recipe
 
-Every result carries its recipe. It sits in the Recipe panel under the result, in the Studio and in History. The panel downloads it as JSON, and the MP4 or PNG Montagio exports holds a compact copy beside the `AI-generated` mention: the `synopsis` tag of an MP4, the `Montagio-Recipe` text chunk of a PNG. A recipe holds:
+Every result carries its recipe. It sits in the Recipe panel under the result, in the Studio and in History. The panel downloads it as JSON. A clip, a photo or a film Montagio exports holds a compact copy beside the `AI-generated` mention: the `synopsis` tag of an MP4, the `Montagio-Recipe` text chunk of a PNG. An ad, a film's music and a voice change keep theirs in the panel only. A recipe holds:
 
 - the preset, or the remix YAML;
 - the exact ComfyUI workflow of each step, and its sha256;

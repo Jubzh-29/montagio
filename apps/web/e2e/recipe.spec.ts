@@ -40,7 +40,7 @@ test('Reproduce from History renders with the same seed and says the workflow is
   ]);
   expect((request.postDataJSON() as { seed?: number }).seed).toBe(seed);
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId('recipe-compare')).toHaveText('Same workflow as the original.');
+  await expect(page.getByTestId('recipe-compare')).toHaveText('Same workflow and same input files as the original.');
 });
 
 test('New seed drops the seed: the next render draws its own', async ({ page }) => {

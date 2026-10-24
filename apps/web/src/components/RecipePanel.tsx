@@ -1,7 +1,7 @@
 'use client';
 
 import type { Recipe } from '@montagio/recipe';
-import { sameWorkflows } from '@montagio/recipe/same';
+import { compareRecipes } from '@montagio/recipe/same';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
@@ -13,7 +13,15 @@ import styles from './recipe.module.css';
 const isApi = (url: string) => url.startsWith('/api/');
 const read = (url: string) => (isApi(url) ? apiFetch(url) : fetch(url)).then((res) => jsonOrThrow<Recipe>(res));
 
-type Loaded = { status: 'idle' | 'loading' | 'failed' } | { status: 'ready'; recipe: Recipe; same?: boolean };
+type Verdict = 'recipeSame' | 'recipeSameWorkflow' | 'recipeOtherInput' | 'recipeDiffers';
+type Loaded = { status: 'idle' | 'loading' | 'failed' } | { status: 'ready'; recipe: Recipe; verdict?: Verdict };
+
+/** What a reproduction says of itself: the same workflow, and the same input files when both are known. */
+function verdictOf(original: Recipe, made: Recipe): Verdict {
+  const { workflow, inputs } = compareRecipes(original, made);
+  if (!workflow) return 'recipeDiffers';
+  return inputs === null ? 'recipeSameWorkflow' : inputs ? 'recipeSame' : 'recipeOtherInput';
+}
 
 /**
  * Under a result: its recipe, read on first opening. Everything that made it (preset, model, seed,
@@ -45,7 +53,7 @@ export function RecipePanel({
       read(url),
       compareUrl ? read(compareUrl).catch(() => null) : null,
     ])
-      .then(([recipe, original]) => setLoaded({ status: 'ready', recipe, ...(original ? { same: sameWorkflows(original, recipe) } : {}) }))
+      .then(([recipe, original]) => setLoaded({ status: 'ready', recipe, ...(original ? { verdict: verdictOf(original, recipe) } : {}) }))
       .catch(() => setLoaded({ status: 'failed' }));
   }, [url, compareUrl]);
 
@@ -73,9 +81,9 @@ export function RecipePanel({
         )}
         {loaded.status === 'ready' && (
           <>
-            {loaded.same !== undefined && (
-              <p className={styles.verdict} data-same={loaded.same} data-testid="recipe-compare" role="status">
-                {t(loaded.same ? 'recipeSame' : 'recipeDiffers')}
+            {loaded.verdict && (
+              <p className={styles.verdict} data-same={loaded.verdict === 'recipeSame' || loaded.verdict === 'recipeSameWorkflow'} data-testid="recipe-compare" role="status">
+                {t(loaded.verdict)}
               </p>
             )}
             <dl className={styles.rows}>

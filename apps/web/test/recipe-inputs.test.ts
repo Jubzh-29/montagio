@@ -5,6 +5,7 @@ import type { InputSlot } from '@montagio/recipe';
 import { POST as postEffects } from '@/app/api/effects/route';
 import { POST as postGeneration } from '@/app/api/generations/route';
 import { POST as postHooks } from '@/app/api/hooks/route';
+import { POST as postImages } from '@/app/api/images/route';
 import { GET as getRecipe } from '@/app/api/recipes/[source]/[id]/route';
 import { GET as getJob } from '@/app/api/jobs/[id]/route';
 import { POST as postSequence } from '@/app/api/sequences/route';
@@ -97,6 +98,11 @@ describe('a seed given again', () => {
     const drawn = (await jobs.read(job.id))!.seed;
     expect(Number.isInteger(drawn) && drawn >= 0 && drawn < 2 ** 32).toBe(true);
     expect(drawn).not.toBe(seed);
+  });
+
+  test('a photo made from a text refuses a seed past 2^32 the same way', async () => {
+    const job = (await (await postImages(jsonRequest('/api/images', { prompt: 'A lighthouse', aspect: '16:9', seed: 2 ** 32 }, 'sd-t2i'))).json()) as { id: string };
+    expect((await jobs.read(job.id))!.seed).toBeLessThan(2 ** 32);
   });
 
   test('a camera clip refuses a negative seed the same way', async () => {

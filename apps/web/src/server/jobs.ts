@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { access, copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   IDEMPOTENCY_WINDOW_MS,
@@ -11,7 +11,7 @@ import {
 import { CompileError, type ApiWorkflow, type Aspect, type Library } from '@montagio/presets';
 import type { InputSlot } from '@montagio/recipe';
 import type { ExtensionId } from '@montagio/registry';
-import { AI_IMAGE_METADATA, ensureTools, probe, tagAudio, tagClip, tagImage } from '@montagio/sequence';
+import { AI_IMAGE_METADATA, DEMO_MOVE_METADATA, ensureTools, probe, tagAudio, tagClip, tagImage } from '@montagio/sequence';
 import type { DemoKind, JobSummary } from '@/lib/api-types';
 import { demoKindOf } from './demo-render';
 import { getEnv } from './env';
@@ -69,6 +69,8 @@ export type JobRecord = {
   frames?: number;
   /** A film's 9:16 cut, when the task makes one (music under a film). */
   verticalUrl?: string;
+  /** The backend that rendered it ("demo", "local"): its recipe says so whatever the app runs later. */
+  backendKind?: string;
   /** A demo render: what it is, since no model made it. */
   demo?: DemoKind;
   error?: string;
@@ -247,6 +249,8 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
     if (own) {
       try {
         Object.assign(record, await own(record, outputPath, dir));
+        // Its own delivery (an ad, a film's music, a voice change) writes no tag: the recipe goes beside the record.
+        await (await import('./recipe')).snapshotRecipe('job', record.id);
         return true;
       } catch (error) {
         console.error(`[montagio] job ${record.id}: the ${record.task} delivery failed`, error);
@@ -261,7 +265,7 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
         const demo = demoKindOf(outputPath);
         if (demo) record.demo = demo;
         // A clip FFmpeg moved (demo) keeps its own mention: no model made it.
-        await access(out).catch(async () => (demo === 'moved' ? copyFile(outputPath, out) : tagClip(outputPath, out, await recipeTags('video'))));
+        await access(out).catch(async () => tagClip(outputPath, out, { ...(demo === 'moved' ? DEMO_MOVE_METADATA : {}), ...(await recipeTags('video')) }));
         const info = await probe(out);
         record.frames = Math.round(info.duration_s * info.fps);
         record.outputUrl = mediaUrlFor(out);
@@ -313,6 +317,7 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
       id: randomUUID(),
       task,
       ...prepared,
+      backendKind: getServices().backend.kind,
       steps: [],
       current: 0,
       state: 'queued',

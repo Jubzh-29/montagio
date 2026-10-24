@@ -1,5 +1,5 @@
 import type { HistoryItem } from '@/lib/api-types';
-import { applyReprise, canReproduce, historyFilter, replayOn, REPRODUCIBLE_TABS, repriseHref, reproducibleResult } from '@/lib/reprise';
+import { applyReprise, canReproduce, historyFilter, replayOn, REPRODUCIBLE_TABS, repriseHref, reproducedRecipeUrl, reproducibleResult } from '@/lib/reprise';
 
 const item = (over: Partial<HistoryItem> = {}): HistoryItem => ({
   key: 'generation:g-1',
@@ -119,5 +119,11 @@ describe('Reproduce: the same choices with the same seed', () => {
     expect(replayOn(replay, 'camera')).toBe(replay);
     expect(replayOn(replay, 'effects')).toBeNull();
     expect(replayOn(null, 'camera')).toBeNull();
+  });
+
+  test('an HD clip reproduces the clip it was made from: its recipe is the one compared', () => {
+    const hd = seeded({ task: 'upscale', recipeUrl: '/api/recipes/job/j-hd', reproduces: '/api/recipes/generation/g-1' });
+    expect(reproducedRecipeUrl(hd)).toBe('/api/recipes/generation/g-1');
+    expect(reproducedRecipeUrl(seeded())).toBe('/api/recipes/generation/g-1');
   });
 });

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { findLocalPath, normalizeWorkflow, workflowSha256, type Recipe } from '@montagio/recipe';
 import { POST as postAvatars } from '@/app/api/avatars/route';
@@ -8,14 +8,18 @@ import { POST as postGeneration } from '@/app/api/generations/route';
 import { GET as getGeneration } from '@/app/api/generations/[id]/route';
 import { POST as upscaleGeneration } from '@/app/api/generations/[id]/upscale/route';
 import { GET as getHistory } from '@/app/api/history/route';
+import { POST as postEdits } from '@/app/api/edits/route';
 import { POST as postHooks } from '@/app/api/hooks/route';
+import { POST as postImages } from '@/app/api/images/route';
+import { POST as postMotion } from '@/app/api/motion/route';
 import { GET as getJob } from '@/app/api/jobs/[id]/route';
 import { GET as getRecipe } from '@/app/api/recipes/[source]/[id]/route';
 import { POST as postSequence } from '@/app/api/sequences/route';
 import { GET as getSequence } from '@/app/api/sequences/[id]/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
+import { POST as postSampleVideo } from '@/app/api/uploads/video/sample/route';
 import type { HistoryItem } from '@/lib/api-types';
-import { getServices } from '@/server/services';
+import { getServices, resetServicesForTests } from '@/server/services';
 import { readInputs, readWorkflow } from '@/server/store';
 import { generationRequest, params, setupTempData } from './helpers';
 
@@ -120,6 +124,8 @@ describe('the recipe of a camera clip', () => {
     const imageRef = await sampleRef();
     const { id } = await settledGeneration({ presetId: 'slow-push', imageRef }, 'rc-old');
     rmSync(join(dataDir(), 'generations', id, 'inputs.json'));
+    // Nor was its recipe written at delivery then.
+    rmSync(join(dataDir(), 'generations', id, 'recipe.json'));
     const res = await recipeResponse('generation', id);
     expect(res.status).toBe(200);
     const recipe = (await res.json()) as Recipe;
@@ -133,6 +139,23 @@ describe('the recipe of a camera clip', () => {
     const { id } = await settledGeneration({ presetId: 'slow-push', imageRef }, 'rc-gone');
     rmSync(join(dataDir(), 'uploads'), { recursive: true, force: true });
     expect((await recipeOf('generation', id)).steps[0]!.inputs[0]!.sha256).toBe(photoSha);
+  }, 30_000);
+
+  test('the recipe is the one written at delivery: a later version of Montagio does not change it', async () => {
+    const { id } = await settledGeneration({ presetId: 'slow-push', imageRef: await sampleRef() }, 'rc-snapshot');
+    const before = await recipeOf('generation', id);
+    expect(existsSync(join(dataDir(), 'generations', id, 'recipe.json'))).toBe(true);
+    // A git pull and a restart later: another commit.
+    delete (globalThis as { __montagioStacks?: unknown }).__montagioStacks;
+    process.env.MONTAGIO_COMMIT = 'f'.repeat(40);
+    try {
+      const after = await recipeOf('generation', id);
+      expect(after.stack.montagio.commit).toBe(before.stack.montagio.commit);
+      expect(after.stack.montagio.commit).not.toBe('f'.repeat(40));
+    } finally {
+      delete process.env.MONTAGIO_COMMIT;
+      delete (globalThis as { __montagioStacks?: unknown }).__montagioStacks;
+    }
   }, 30_000);
 
   test('an unknown id or source is not found', async () => {
@@ -152,6 +175,32 @@ describe('the recipe of the other results', () => {
     expectNothingLocal(recipe, imageRef);
   }, 30_000);
 
+  test("a job's recipe names the backend that rendered it, after the app runs on another", async () => {
+    const id = await settledJob(await postEffects(jsonRequest('/api/effects', { imageRef: await sampleRef(), effectId: 'squish' }, 'rc-backend')));
+    // As if made before recipes were written at delivery.
+    rmSync(join(dataDir(), 'jobs', id, 'recipe.json'), { force: true });
+    process.env.MONTAGIO_BACKEND = 'local';
+    process.env.COMFY_BASE_URL = 'http://127.0.0.1:9';
+    resetServicesForTests();
+    try {
+      expect((await recipeOf('job', id)).backend).toBe('demo');
+    } finally {
+      process.env.MONTAGIO_BACKEND = 'demo';
+      delete process.env.COMFY_BASE_URL;
+      resetServicesForTests();
+    }
+  }, 30_000);
+
+  test('a job made before this feature, without its inputs noted, still has its recipe and leaks nothing', async () => {
+    const imageRef = await sampleRef();
+    const id = await settledJob(await postEffects(jsonRequest('/api/effects', { imageRef, effectId: 'squish' }, 'rc-old-job')));
+    rmSync(join(dataDir(), 'jobs', id, 'step0.inputs.json'));
+    rmSync(join(dataDir(), 'jobs', id, 'recipe.json'), { force: true });
+    const recipe = await recipeOf('job', id);
+    expect(recipe.steps[0]!.inputs).toEqual([expect.objectContaining({ from: 'imageRef', sha256: null })]);
+    expectNothingLocal(recipe, imageRef);
+  }, 30_000);
+
   test('a hook: the second step takes the first one output', async () => {
     const imageRef = await sampleRef();
     const id = await settledJob(await postHooks(jsonRequest('/api/hooks', { imageRef, hookId: 'iris-dive' }, 'rc-hook')));
@@ -160,6 +209,20 @@ describe('the recipe of the other results', () => {
     expect(recipe.steps[1]!.inputs.map((slot) => slot.from)).toContain('step:0');
     expectNothingLocal(recipe, imageRef);
   }, 30_000);
+
+  test('a photo from a text, an edit and a motion transfer leak nothing either', async () => {
+    const t2i = await settledJob(await postImages(jsonRequest('/api/images', { prompt: 'A lighthouse at dusk', aspect: '16:9' }, 'rc-t2i')));
+    expect(findLocalPath(await recipeOf('job', t2i))).toBeNull();
+    const imageRef = await sampleRef();
+    const edit = await settledJob(await postEdits(jsonRequest('/api/edits', { imageRef, instruction: 'make the sky purple' }, 'rc-edit')));
+    expectNothingLocal(await recipeOf('job', edit), imageRef);
+    const { videoRef } = (await (await postSampleVideo()).json()) as { videoRef: string };
+    const motion = await settledJob(await postMotion(jsonRequest('/api/motion', { imageRef, videoRef }, 'rc-motion')));
+    const recipe = await recipeOf('job', motion);
+    expectNothingLocal(recipe, imageRef);
+    expect(JSON.stringify(recipe)).not.toContain(videoRef);
+    expect(recipe.request?.files.map((file) => file.field)).toEqual(['imageRef', 'videoRef']);
+  }, 60_000);
 
   test('an avatar: its text, its language and its seed', async () => {
     const imageRef = await sampleRef();
@@ -181,6 +244,9 @@ describe('the recipe of the other results', () => {
     expect(recipe.request).toMatchObject({ route: '/api/generations', then: [{ route: '/api/generations/:parent/upscale', body: { smooth: true, seed: recipe.seed } }] });
     expect(recipe.weights.map((weight) => weight.id)).toContain('rife-v4-26');
     expectNothingLocal(recipe, imageRef);
+    // Reproduce on this HD clip reopens its clip: that clip's recipe is the one a new render compares with.
+    const items = (await (await getHistory()).json()) as HistoryItem[];
+    expect(items.find((item) => item.key === `job:${id}`)?.reproduces).toBe(`/api/recipes/generation/${clip}`);
   }, 60_000);
 
   test('a film: one step per shot, each shot after the first starts on the last frame of the one before', async () => {

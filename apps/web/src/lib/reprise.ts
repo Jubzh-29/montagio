@@ -32,6 +32,9 @@ export type StudioRestore = {
 export const REPRODUCIBLE_TABS: ReadonlySet<Reprise['tab']> = new Set(['camera', 'film', 'effects', 'avatar', 'motion']);
 const NOT_REPRODUCIBLE = new Set<HistoryItem['task']>(['ad', 'voice-change', 'music']);
 
+/** The recipe a reproduction of the item is compared with: its own, or its parent's (an HD clip reopens its clip). */
+export const reproducedRecipeUrl = (item: HistoryItem): string | undefined => item.reproduces ?? item.recipeUrl;
+
 /** What Reproduce brought back: the seed to send again, on the tab it came from. */
 export type Replay = { tab: Reprise['tab']; seed?: number; shotSeeds?: number[]; recipeUrl?: string };
 

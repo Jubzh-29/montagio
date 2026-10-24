@@ -22,7 +22,7 @@ import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
 import { recipeUrlOf } from '@/lib/recipe-url';
-import { applyReprise, replayOn, reproducibleResult, type Replay } from '@/lib/reprise';
+import { applyReprise, replayOn, reproducedRecipeUrl, reproducibleResult, type Replay } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { useMotionPaused } from '@/lib/use-motion';
@@ -634,7 +634,7 @@ export function Studio() {
   /** A history item's "Reuse": its tab, photo, choice and texts come back, ready to render again. */
   const restore = (item: HistoryItem, opts: { reproduce?: boolean } = {}) => {
     const back = applyReprise(item, opts);
-    setReplay(back.seed !== undefined || back.shotSeeds ? { tab: back.tab, seed: back.seed, shotSeeds: back.shotSeeds, recipeUrl: item.recipeUrl } : null);
+    setReplay(back.seed !== undefined || back.shotSeeds ? { tab: back.tab, seed: back.seed, shotSeeds: back.shotSeeds, recipeUrl: reproducedRecipeUrl(item) } : null);
     touched.current = true;
     ++uploadToken.current;
     setJob({ status: 'idle' });

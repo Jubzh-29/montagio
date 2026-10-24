@@ -4,5 +4,5 @@ export { buildRecipe, loadedWeights } from './build';
 export { COMPACT_MAX_BYTES, compactRecipe } from './compact';
 export { parseRecipe } from './parse';
 export { checkRecipe, OPEN_LICENSES } from './check';
-export { sameWorkflows } from './same';
+export { compareRecipes, sameWorkflows } from './same';
 export { readStack } from './stack';

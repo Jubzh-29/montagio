@@ -1,9 +1,9 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import { access, copyFile } from 'node:fs/promises';
+import { access } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { IDEMPOTENCY_WINDOW_MS, isBackendError, type BackendErrorCode } from '@montagio/comfy-adapter';
 import { compileJob, CompileError, validatePreset, type Preset } from '@montagio/presets';
-import { ensureTools, probe, tagClip } from '@montagio/sequence';
+import { DEMO_MOVE_METADATA, ensureTools, probe, tagClip } from '@montagio/sequence';
 import { MAX_PRESET_YAML_BYTES, MAX_REQUEST_BYTES } from '@/lib/limits';
 import { demoKindOf } from './demo-render';
 import { getEnv } from './env';
@@ -285,9 +285,10 @@ function deliverClip(id: string, outputPath: string, moved = false): Promise<str
   if (!delivery) {
     delivery = (async () => {
       try {
-        // recipe.ts reads this module: imported when needed, not at load.
+        // recipe.ts reads this module: imported when needed, not at load. A clip FFmpeg moved (demo)
+        // keeps its own mention, and carries its recipe as any other.
         await access(clip).catch(async () =>
-          moved ? copyFile(outputPath, clip) : tagClip(outputPath, clip, await (await import('./recipe')).recipeTags('generation', id, 'video')),
+          tagClip(outputPath, clip, { ...(moved ? DEMO_MOVE_METADATA : {}), ...(await (await import('./recipe')).recipeTags('generation', id, 'video')) }),
         );
         return mediaUrlFor(clip);
       } catch (error) {

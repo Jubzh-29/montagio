@@ -234,6 +234,7 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
         task: 'upscale',
         name: parent ? `${parent.name} · HD` : base.name,
         reprise: parent?.reprise ?? { tab: 'camera' },
+        ...(parent?.recipeUrl ? { reproduces: parent.recipeUrl } : {}),
       };
     }
     default:

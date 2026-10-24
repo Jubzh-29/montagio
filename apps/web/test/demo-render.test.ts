@@ -64,6 +64,22 @@ test('the avatar of the sample portrait, and the motion of the sample character 
   expect(demoKindOf(await render({ presetId: 'motion', output: 'video', files: [...files(character), other] }))).toBe('moved');
 }, 60_000);
 
+test("a clip moved from the user's photo keeps its demo mention and carries its recipe", async () => {
+  process.env.MONTAGIO_DEMO_DURATION_MS = '0';
+  resetServicesForTests();
+  const { imageRef } = await ownPhoto();
+  const { id } = (await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'moved-recipe'))).json()) as { id: string };
+  let record: { state: string; outputUrl?: string } = { state: 'queued' };
+  for (let i = 0; i < 100 && record.state !== 'succeeded'; i++) {
+    record = await (await getGeneration(new Request('http://localhost/x'), params({ id }))).json();
+    if (record.state !== 'succeeded') await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  expect(record.state).toBe('succeeded');
+  const tags = await readTags(mediaFileFor(record.outputUrl)!);
+  expect(tags.comment).toBe('Montagio demo render');
+  expect(JSON.parse(tags.synopsis!)).toMatchObject({ compact: true, backend: 'demo', task: 'camera' });
+}, 60_000);
+
 test('nothing for a job without a photo or that makes no video', async () => {
   const { imageRef } = await sample();
   expect(await render({ presetId: 'crash-push', output: 'image', files: files(photoFile(imageRef)) })).toBeUndefined();

@@ -512,8 +512,10 @@
   "recipeNotRecorded": "not recorded",
   "recipeLoading": "Loading the recipe…",
   "recipeFailed": "The recipe could not be loaded. Open it again to retry.",
-  "recipeSame": "Same workflow as the original.",
-  "recipeDiffers": "The workflow differs from the original (another photo, or another version of Montagio).",
+  "recipeSame": "Same workflow and same input files as the original.",
+  "recipeDiffers": "The workflow differs from the original: other choices, or another version of Montagio.",
   "recipeSeedChip": "Seed {seed} · reproduction",
-  "recipeNewSeed": "New seed"
+  "recipeNewSeed": "New seed",
+  "recipeSameWorkflow": "Same workflow as the original; its input files could not be compared.",
+  "recipeOtherInput": "Same workflow, on other input files: the result differs."
 }

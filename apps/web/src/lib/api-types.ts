@@ -298,4 +298,6 @@ export type HistoryItem = {
   reprise: Reprise;
   /** Its recipe (GET): the workflow, the weights, the seed and the stack that made it. */
   recipeUrl?: string;
+  /** The recipe a Reproduce of this item makes again, when it is not its own: an HD clip reopens the clip it was made from. */
+  reproduces?: string;
 };

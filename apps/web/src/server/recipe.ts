@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { buildRecipe, compactRecipe, findLocalPath, readStack, sha256Hex, type ApiWorkflow, type InputSlot, type Recipe, type RecipeDraft, type RecipeRequest, type RecipeStack } from '@montagio/recipe';
 import { RECIPE_TAG, type VideoTags } from '@montagio/sequence';
@@ -11,7 +11,7 @@ import { fileSha256 } from './inputs';
 import { jobs, readJobSteps, type JobRecord } from './jobs';
 import { readSequence } from './sequences';
 import { getServices } from './services';
-import { readInputs, readPresetText, readRecord, readWorkflow } from './store';
+import { readInputs, readPresetText, readRecord, readWorkflow, writeAtomic } from './store';
 
 // The pinned stack is read once per checkout, shared by every route bundle of this process.
 const holder = globalThis as typeof globalThis & { __montagioStacks?: Map<string, Promise<RecipeStack>> };
@@ -25,6 +25,32 @@ function stackOf(root: string): Promise<RecipeStack> {
     stack.catch(() => stacks.delete(root));
   }
   return stack;
+}
+
+const SAFE_ID = /^[A-Za-z0-9-]{1,64}$/;
+const FOLDERS: Record<RecipeSource, string> = { generation: 'generations', job: 'jobs', sequence: 'sequences' };
+/** The recipe written when a result was delivered, beside its record: what made it, not what the app is now. */
+const snapshotFile = (source: RecipeSource, id: string) => join(getEnv().data, FOLDERS[source], id, 'recipe.json');
+
+async function readSnapshot(source: RecipeSource, id: string): Promise<Recipe | null> {
+  if (!SAFE_ID.test(id)) return null;
+  try {
+    return JSON.parse(await readFile(snapshotFile(source, id), 'utf8')) as Recipe;
+  } catch {
+    return null;
+  }
+}
+
+/** A recipe as a draft again: what a film or an HD clip made from it starts with. */
+function draftFromRecipe(recipe: Recipe): RecipeDraft {
+  // What buildRecipe works out again: the hashes, the weights, the models, the stack of the new render.
+  const rest: Partial<Recipe> = { ...recipe };
+  for (const key of ['schema', 'steps', 'models', 'weights', 'stack', 'output'] as const) delete rest[key];
+  return {
+    ...(rest as Omit<RecipeDraft, 'steps'>),
+    steps: recipe.steps.map(({ name, workflow, inputs }) => ({ name, workflow, inputs })),
+    modelIds: recipe.models.map((model) => model.id),
+  };
 }
 
 /** What the recipe never carries of the Studio's choices: this machine's photo and clip, its own remix id. */
@@ -223,7 +249,8 @@ async function jobDraft(id: string): Promise<RecipeDraft | null> {
       : {};
   let request = jobRequest(record, steps.flatMap((step) => step.inputs));
   let post = ['tag'];
-  let backend: string = getServices().backend.kind;
+  // The backend that rendered it; a job made before it was noted: its demo mark, else the app's now.
+  let backend: string = record.backendKind ?? (record.demo ? 'demo' : getServices().backend.kind);
 
   // An HD clip or a film's music: the steps of what it was made from come first.
   const parent = record.parent ? await draftOf(record.parent.source, record.parent.id) : null;
@@ -253,15 +280,18 @@ async function jobDraft(id: string): Promise<RecipeDraft | null> {
   };
 }
 
-function draftOf(source: RecipeSource | 'job', id: string): Promise<RecipeDraft | null> {
+/** The draft of a result: from the recipe written at its delivery, else from its record as it is now. */
+async function draftOf(source: RecipeSource, id: string): Promise<RecipeDraft | null> {
+  const snapshot = await readSnapshot(source, id);
+  if (snapshot) return draftFromRecipe(snapshot);
   if (source === 'generation') return generationDraft(id);
   if (source === 'sequence') return sequenceDraft(id);
   return jobDraft(id);
 }
 
-/** The recipe of a result, finished or still rendering; null when it is unknown or nothing was submitted yet. */
-export async function recipeOf(source: RecipeSource, id: string): Promise<Recipe | null> {
-  const draft = await draftOf(source, id);
+/** The recipe made from the record now: the stack, the presets and the lock of this checkout. */
+async function liveRecipe(source: RecipeSource, id: string): Promise<Recipe | null> {
+  const draft = source === 'generation' ? await generationDraft(id) : source === 'sequence' ? await sequenceDraft(id) : await jobDraft(id);
   if (!draft) return null;
   const lib = await getServices().library;
   return buildRecipe(draft, {
@@ -272,13 +302,39 @@ export async function recipeOf(source: RecipeSource, id: string): Promise<Recipe
 }
 
 /**
- * The tag a delivered file carries its compact recipe in, beside the AI-generated mention. Never fails
- * the delivery: without a recipe the file goes out with the mention alone, and the log says why.
+ * The recipe of a result: the one written at its delivery, else (a result made before recipes were
+ * written, or still rendering) the one its record gives now. Null when it is unknown or nothing was submitted.
  */
-export async function recipeTags(source: RecipeSource, id: string, kind: keyof typeof RECIPE_TAG): Promise<VideoTags> {
+export async function recipeOf(source: RecipeSource, id: string): Promise<Recipe | null> {
+  return (await readSnapshot(source, id)) ?? liveRecipe(source, id);
+}
+
+/**
+ * Write a result's recipe beside its record, when it is delivered: later versions of Montagio, presets or
+ * lock do not change what made it. The first one written stays. Never fails the delivery: the log says why.
+ */
+export async function snapshotRecipe(source: RecipeSource, id: string): Promise<Recipe | null> {
   try {
-    const recipe = await recipeOf(source, id);
-    return recipe ? { [RECIPE_TAG[kind]]: compactRecipe(recipe) } : {};
+    const written = await readSnapshot(source, id);
+    if (written) return written;
+    const recipe = await liveRecipe(source, id);
+    if (recipe) {
+      await mkdir(join(getEnv().data, FOLDERS[source], id), { recursive: true });
+      await writeAtomic(snapshotFile(source, id), JSON.stringify(recipe, null, 2));
+    }
+    return recipe;
+  } catch (error) {
+    console.error(`[montagio] ${source} ${id}: the recipe could not be written`, error);
+    return null;
+  }
+}
+
+/** The tag a delivered file carries its compact recipe in, beside the AI-generated mention; the recipe is written beside the record too. */
+export async function recipeTags(source: RecipeSource, id: string, kind: keyof typeof RECIPE_TAG): Promise<VideoTags> {
+  const recipe = await snapshotRecipe(source, id);
+  if (!recipe) return {};
+  try {
+    return { [RECIPE_TAG[kind]]: compactRecipe(recipe) };
   } catch (error) {
     console.error(`[montagio] ${source} ${id}: the recipe could not be written in the file`, error);
     return {};
