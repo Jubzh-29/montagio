@@ -1,0 +1,1875 @@
+{
+  "id": "cb7510ab-d483-4632-bb3d-d923b459ecea",
+  "revision": 0,
+  "last_node_id": 201,
+  "last_link_id": 35,
+  "nodes": [
+    {
+      "id": 91,
+      "type": "VAELoader",
+      "pos": [
+        580,
+        0
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "vae_name",
+          "name": "vae_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "vae_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VAE",
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            6,
+            22
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "wan_2.1_vae.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "wan_2.1_vae.safetensors"
+      }
+    },
+    {
+      "id": 92,
+      "type": "UNETLoader",
+      "pos": [
+        580,
+        118
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "unet_name",
+          "name": "unet_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "unet_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "weight_dtype",
+          "name": "weight_dtype",
+          "type": "COMBO",
+          "widget": {
+            "name": "weight_dtype"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "MODEL",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 95,
+      "type": "UNETLoader",
+      "pos": [
+        580,
+        260
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "unet_name",
+          "name": "unet_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "unet_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "weight_dtype",
+          "name": "weight_dtype",
+          "type": "COMBO",
+          "widget": {
+            "name": "weight_dtype"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "MODEL",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 96,
+      "type": "CLIPLoader",
+      "pos": [
+        580,
+        402
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "clip_name",
+          "name": "clip_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "clip_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "type",
+          "name": "type",
+          "type": "COMBO",
+          "widget": {
+            "name": "type"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "device",
+          "name": "device",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "device"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "CLIP",
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            10,
+            27
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "wan",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "type": "wan",
+        "device": "default"
+      }
+    },
+    {
+      "id": 97,
+      "type": "LoadImage",
+      "pos": [
+        580,
+        568
+      ],
+      "size": [
+        282.798828125,
+        102
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "COMBO",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            7,
+            35
+          ]
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "landscape-a.jpg",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "landscape-a.jpg",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 98,
+      "type": "WanCameraImageToVideo",
+      "pos": [
+        1842.798828125,
+        0
+      ],
+      "size": [
+        274.10703125,
+        230
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 4
+        },
+        {
+          "localized_name": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 5
+        },
+        {
+          "localized_name": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 6
+        },
+        {
+          "localized_name": "clip_vision_output",
+          "name": "clip_vision_output",
+          "shape": 7,
+          "type": "CLIP_VISION_OUTPUT",
+          "link": null
+        },
+        {
+          "localized_name": "start_image",
+          "name": "start_image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 7
+        },
+        {
+          "localized_name": "camera_conditions",
+          "name": "camera_conditions",
+          "shape": 7,
+          "type": "WAN_CAMERA_EMBEDDING",
+          "link": 8
+        },
+        {
+          "localized_name": "width",
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": 1
+        },
+        {
+          "localized_name": "height",
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": 2
+        },
+        {
+          "localized_name": "length",
+          "name": "length",
+          "type": "INT",
+          "widget": {
+            "name": "length"
+          },
+          "link": 3
+        },
+        {
+          "localized_name": "batch_size",
+          "name": "batch_size",
+          "type": "INT",
+          "widget": {
+            "name": "batch_size"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            14,
+            18
+          ]
+        },
+        {
+          "localized_name": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            15,
+            19
+          ]
+        },
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "WanCameraImageToVideo"
+      },
+      "widgets_values": [
+        832,
+        480,
+        81,
+        1
+      ],
+      "widgets_values_named": {
+        "width": 832,
+        "height": 480,
+        "length": 81,
+        "batch_size": 1
+      }
+    },
+    {
+      "id": 99,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1382.798828125,
+        0
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "clip",
+          "name": "clip",
+          "type": "CLIP",
+          "link": 10
+        },
+        {
+          "localized_name": "text",
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "CONDITIONING",
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "widgets_values_named": {
+        "text": ""
+      }
+    },
+    {
+      "id": 100,
+      "type": "ModelSamplingSD3",
+      "pos": [
+        922.798828125,
+        0
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 11
+        },
+        {
+          "localized_name": "shift",
+          "name": "shift",
+          "type": "FLOAT",
+          "widget": {
+            "name": "shift"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "MODEL",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ModelSamplingSD3"
+      },
+      "widgets_values": [
+        8
+      ],
+      "widgets_values_named": {
+        "shift": 8
+      }
+    },
+    {
+      "id": 101,
+      "type": "ModelSamplingSD3",
+      "pos": [
+        922.798828125,
+        118
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 12
+        },
+        {
+          "localized_name": "shift",
+          "name": "shift",
+          "type": "FLOAT",
+          "widget": {
+            "name": "shift"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "MODEL",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ModelSamplingSD3"
+      },
+      "widgets_values": [
+        8
+      ],
+      "widgets_values_named": {
+        "shift": 8
+      }
+    },
+    {
+      "id": 102,
+      "type": "KSamplerAdvanced",
+      "pos": [
+        2176.905859375,
+        0
+      ],
+      "size": [
+        312.353515625,
+        334
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 13
+        },
+        {
+          "localized_name": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 14
+        },
+        {
+          "localized_name": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 15
+        },
+        {
+          "localized_name": "latent_image",
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 16
+        },
+        {
+          "localized_name": "add_noise",
+          "name": "add_noise",
+          "type": "COMBO",
+          "widget": {
+            "name": "add_noise"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "noise_seed",
+          "name": "noise_seed",
+          "type": "INT",
+          "widget": {
+            "name": "noise_seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "steps",
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "cfg",
+          "name": "cfg",
+          "type": "FLOAT",
+          "widget": {
+            "name": "cfg"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "sampler_name",
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "scheduler",
+          "name": "scheduler",
+          "type": "COMBO",
+          "widget": {
+            "name": "scheduler"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "start_at_step",
+          "name": "start_at_step",
+          "type": "INT",
+          "widget": {
+            "name": "start_at_step"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "end_at_step",
+          "name": "end_at_step",
+          "type": "INT",
+          "widget": {
+            "name": "end_at_step"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "return_with_leftover_noise",
+          "name": "return_with_leftover_noise",
+          "type": "COMBO",
+          "widget": {
+            "name": "return_with_leftover_noise"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "LATENT",
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            20
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSamplerAdvanced"
+      },
+      "widgets_values": [
+        "enable",
+        42,
+        "fixed",
+        20,
+        3.5,
+        "euler",
+        "simple",
+        0,
+        10,
+        "enable"
+      ],
+      "widgets_values_named": {
+        "add_noise": "enable",
+        "noise_seed": 42,
+        "control_after_generate": "fixed",
+        "steps": 20,
+        "cfg": 3.5,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "start_at_step": 0,
+        "end_at_step": 10,
+        "return_with_leftover_noise": "enable"
+      }
+    },
+    {
+      "id": 103,
+      "type": "KSamplerAdvanced",
+      "pos": [
+        2549.259375,
+        0
+      ],
+      "size": [
+        312.353515625,
+        334
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 17
+        },
+        {
+          "localized_name": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 18
+        },
+        {
+          "localized_name": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 19
+        },
+        {
+          "localized_name": "latent_image",
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 20
+        },
+        {
+          "localized_name": "add_noise",
+          "name": "add_noise",
+          "type": "COMBO",
+          "widget": {
+            "name": "add_noise"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "noise_seed",
+          "name": "noise_seed",
+          "type": "INT",
+          "widget": {
+            "name": "noise_seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "steps",
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "cfg",
+          "name": "cfg",
+          "type": "FLOAT",
+          "widget": {
+            "name": "cfg"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "sampler_name",
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "scheduler",
+          "name": "scheduler",
+          "type": "COMBO",
+          "widget": {
+            "name": "scheduler"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "start_at_step",
+          "name": "start_at_step",
+          "type": "INT",
+          "widget": {
+            "name": "start_at_step"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "end_at_step",
+          "name": "end_at_step",
+          "type": "INT",
+          "widget": {
+            "name": "end_at_step"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "return_with_leftover_noise",
+          "name": "return_with_leftover_noise",
+          "type": "COMBO",
+          "widget": {
+            "name": "return_with_leftover_noise"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "LATENT",
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            21
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSamplerAdvanced"
+      },
+      "widgets_values": [
+        "disable",
+        0,
+        "fixed",
+        20,
+        3.5,
+        "euler",
+        "simple",
+        10,
+        10000,
+        "disable"
+      ],
+      "widgets_values_named": {
+        "add_noise": "disable",
+        "noise_seed": 0,
+        "control_after_generate": "fixed",
+        "steps": 20,
+        "cfg": 3.5,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "start_at_step": 10,
+        "end_at_step": 10000,
+        "return_with_leftover_noise": "disable"
+      }
+    },
+    {
+      "id": 104,
+      "type": "VAEDecode",
+      "pos": [
+        2921.612890625,
+        0
+      ],
+      "size": [
+        140,
+        46
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "samples",
+          "name": "samples",
+          "type": "LATENT",
+          "link": 21
+        },
+        {
+          "localized_name": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 22
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      }
+    },
+    {
+      "id": 105,
+      "type": "CreateVideo",
+      "pos": [
+        3121.612890625,
+        0
+      ],
+      "size": [
+        270,
+        150
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 24
+        },
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": null
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "FLOAT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": 23
+        },
+        {
+          "localized_name": "bit_depth",
+          "name": "bit_depth",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "bit_depth"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "color_space",
+          "name": "color_space",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "color_space"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            25
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CreateVideo"
+      },
+      "widgets_values": [
+        30,
+        "auto",
+        "sRGB",
+        "none"
+      ],
+      "widgets_values_named": {
+        "fps": 30,
+        "bit_depth": "auto",
+        "color_space": "sRGB",
+        "codec": "none"
+      }
+    },
+    {
+      "id": 106,
+      "type": "SaveVideo",
+      "pos": [
+        3451.612890625,
+        0
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 25
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "encoding",
+          "name": "format.codec.encoding",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec.encoding"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "montagio/camera-preset",
+        "mp4",
+        "h264",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "montagio/camera-preset",
+        "format": "mp4",
+        "format.codec": "h264",
+        "format.codec.encoding": "auto",
+        "codec": "auto"
+      }
+    },
+    {
+      "id": 107,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1382.798828125,
+        260
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "clip",
+          "name": "clip",
+          "type": "CLIP",
+          "link": 27
+        },
+        {
+          "localized_name": "text",
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": 26
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "CONDITIONING",
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "widgets_values_named": {
+        "text": ""
+      }
+    },
+    {
+      "id": 108,
+      "type": "MontagioCameraEmbedding",
+      "pos": [
+        1382.798828125,
+        520
+      ],
+      "size": [
+        285.4478515625,
+        358
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "camera_pose",
+          "name": "camera_pose",
+          "type": "COMBO",
+          "widget": {
+            "name": "camera_pose"
+          },
+          "link": 28
+        },
+        {
+          "localized_name": "camera_pose_2",
+          "name": "camera_pose_2",
+          "type": "COMBO",
+          "widget": {
+            "name": "camera_pose_2"
+          },
+          "link": 29
+        },
+        {
+          "localized_name": "combine",
+          "name": "combine",
+          "type": "COMBO",
+          "widget": {
+            "name": "combine"
+          },
+          "link": 30
+        },
+        {
+          "localized_name": "width",
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": 32
+        },
+        {
+          "localized_name": "height",
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": 33
+        },
+        {
+          "localized_name": "length",
+          "name": "length",
+          "type": "INT",
+          "widget": {
+            "name": "length"
+          },
+          "link": 34
+        },
+        {
+          "localized_name": "speed",
+          "name": "speed",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "speed"
+          },
+          "link": 31
+        },
+        {
+          "localized_name": "fx",
+          "name": "fx",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "fx"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "fy",
+          "name": "fy",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "fy"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "cx",
+          "name": "cx",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "cx"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "cy",
+          "name": "cy",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "cy"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "camera_embedding",
+          "name": "camera_embedding",
+          "type": "WAN_CAMERA_EMBEDDING",
+          "links": [
+            8
+          ]
+        },
+        {
+          "localized_name": "width",
+          "name": "width",
+          "type": "INT",
+          "links": [
+            1
+          ]
+        },
+        {
+          "localized_name": "height",
+          "name": "height",
+          "type": "INT",
+          "links": [
+            2
+          ]
+        },
+        {
+          "localized_name": "length",
+          "name": "length",
+          "type": "INT",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MontagioCameraEmbedding"
+      },
+      "widgets_values": [
+        "Static",
+        "Static",
+        "together",
+        832,
+        480,
+        81,
+        1,
+        0.5,
+        0.5,
+        0.5,
+        0.5
+      ],
+      "widgets_values_named": {
+        "camera_pose": "Static",
+        "camera_pose_2": "Static",
+        "combine": "together",
+        "width": 832,
+        "height": 480,
+        "length": 81,
+        "speed": 1,
+        "fx": 0.5,
+        "fy": 0.5,
+        "cx": 0.5,
+        "cy": 0.5
+      }
+    },
+    {
+      "id": 200,
+      "type": "MontagioLoadPreset",
+      "pos": [
+        922.798828125,
+        236
+      ],
+      "size": [
+        400,
+        424
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 35
+        },
+        {
+          "localized_name": "preset",
+          "name": "preset",
+          "type": "COMBO",
+          "widget": {
+            "name": "preset"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "aspect",
+          "name": "aspect",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "resolution",
+          "name": "resolution",
+          "type": "COMBO",
+          "widget": {
+            "name": "resolution"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "camera_mode",
+          "name": "camera_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "camera_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "prompt"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "camera_pose",
+          "name": "camera_pose",
+          "type": "COMBO",
+          "links": [
+            28
+          ]
+        },
+        {
+          "localized_name": "speed",
+          "name": "speed",
+          "type": "FLOAT",
+          "links": [
+            31
+          ]
+        },
+        {
+          "localized_name": "width",
+          "name": "width",
+          "type": "INT",
+          "links": [
+            32
+          ]
+        },
+        {
+          "localized_name": "height",
+          "name": "height",
+          "type": "INT",
+          "links": [
+            33
+          ]
+        },
+        {
+          "localized_name": "length",
+          "name": "length",
+          "type": "INT",
+          "links": [
+            34
+          ]
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "FLOAT",
+          "links": [
+            23
+          ]
+        },
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "type": "STRING",
+          "links": [
+            26
+          ]
+        },
+        {
+          "localized_name": "negative",
+          "name": "negative",
+          "type": "STRING",
+          "links": [
+            9
+          ]
+        },
+        {
+          "localized_name": "duration_s",
+          "name": "duration_s",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "localized_name": "resolution",
+          "name": "resolution",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "localized_name": "info",
+          "name": "info",
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "localized_name": "camera_pose_2",
+          "name": "camera_pose_2",
+          "type": "COMBO",
+          "links": [
+            29
+          ]
+        },
+        {
+          "localized_name": "combine",
+          "name": "combine",
+          "type": "COMBO",
+          "links": [
+            30
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MontagioLoadPreset"
+      },
+      "widgets_values": [
+        "rise-and-push.yaml",
+        "auto",
+        "preset",
+        "combined",
+        "a quiet fishing harbor at golden hour, a weathered wooden boat in the foreground, colorful houses on a green hillside"
+      ],
+      "widgets_values_named": {
+        "preset": "rise-and-push.yaml",
+        "aspect": "auto",
+        "resolution": "preset",
+        "camera_mode": "combined",
+        "prompt": "a quiet fishing harbor at golden hour, a weathered wooden boat in the foreground, colorful houses on a green hillside"
+      }
+    },
+    {
+      "id": 201,
+      "type": "MarkdownNote",
+      "pos": [
+        0,
+        0
+      ],
+      "size": [
+        520,
+        760
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "## Montagio · Camera presets (two moves at once)\n\nA photo and a Montagio camera preset give a 5 s clip with a controlled camera move. **Load Montagio Preset** reads the preset file and feeds **Montagio Camera Embedding**, which runs two moves at once or one after the other (here Rise & Push: Pan Up and Zoom In together). Pick another preset in its menu.\n\n**Tip:** Write what the photo shows in the preset node's `prompt`: without it, the model invents and the clip turns ghostly.\n\n**Models**, under `ComfyUI/models/`:\n- `vae/wan_2.1_vae.safetensors` (Apache-2.0, from Wan-AI/Wan2.1-I2V-14B-480P)\n- `diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors` (Apache-2.0, from alibaba-pai/Wan2.2-Fun-A14B-Control-Camera)\n- `diffusion_models/wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors` (Apache-2.0, from alibaba-pai/Wan2.2-Fun-A14B-Control-Camera)\n- `text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors` (Apache-2.0, from google/umt5-xxl)\n\nNeeds the **Montagio** node pack. 480p, 20 steps: 1,110 to 1,170 s on an NVIDIA L4 (24 GB), peak 18 to 21 GB.\n\nOpen weights only: every file is Apache-2.0 or MIT, pinned by sha256 in Montagio's `registry/models.lock.yaml`."
+      ],
+      "widgets_values_named": {
+        "text": "## Montagio · Camera presets (two moves at once)\n\nA photo and a Montagio camera preset give a 5 s clip with a controlled camera move. **Load Montagio Preset** reads the preset file and feeds **Montagio Camera Embedding**, which runs two moves at once or one after the other (here Rise & Push: Pan Up and Zoom In together). Pick another preset in its menu.\n\n**Tip:** Write what the photo shows in the preset node's `prompt`: without it, the model invents and the clip turns ghostly.\n\n**Models**, under `ComfyUI/models/`:\n- `vae/wan_2.1_vae.safetensors` (Apache-2.0, from Wan-AI/Wan2.1-I2V-14B-480P)\n- `diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors` (Apache-2.0, from alibaba-pai/Wan2.2-Fun-A14B-Control-Camera)\n- `diffusion_models/wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors` (Apache-2.0, from alibaba-pai/Wan2.2-Fun-A14B-Control-Camera)\n- `text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors` (Apache-2.0, from google/umt5-xxl)\n\nNeeds the **Montagio** node pack. 480p, 20 steps: 1,110 to 1,170 s on an NVIDIA L4 (24 GB), peak 18 to 21 GB.\n\nOpen weights only: every file is Apache-2.0 or MIT, pinned by sha256 in Montagio's `registry/models.lock.yaml`."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    }
+  ],
+  "links": [
+    [
+      1,
+      108,
+      1,
+      98,
+      6,
+      "INT"
+    ],
+    [
+      2,
+      108,
+      2,
+      98,
+      7,
+      "INT"
+    ],
+    [
+      3,
+      108,
+      3,
+      98,
+      8,
+      "INT"
+    ],
+    [
+      4,
+      107,
+      0,
+      98,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      5,
+      99,
+      0,
+      98,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      6,
+      91,
+      0,
+      98,
+      2,
+      "VAE"
+    ],
+    [
+      7,
+      97,
+      0,
+      98,
+      4,
+      "IMAGE"
+    ],
+    [
+      8,
+      108,
+      0,
+      98,
+      5,
+      "WAN_CAMERA_EMBEDDING"
+    ],
+    [
+      9,
+      200,
+      7,
+      99,
+      1,
+      "STRING"
+    ],
+    [
+      10,
+      96,
+      0,
+      99,
+      0,
+      "CLIP"
+    ],
+    [
+      11,
+      92,
+      0,
+      100,
+      0,
+      "MODEL"
+    ],
+    [
+      12,
+      95,
+      0,
+      101,
+      0,
+      "MODEL"
+    ],
+    [
+      13,
+      100,
+      0,
+      102,
+      0,
+      "MODEL"
+    ],
+    [
+      14,
+      98,
+      0,
+      102,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      15,
+      98,
+      1,
+      102,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      16,
+      98,
+      2,
+      102,
+      3,
+      "LATENT"
+    ],
+    [
+      17,
+      101,
+      0,
+      103,
+      0,
+      "MODEL"
+    ],
+    [
+      18,
+      98,
+      0,
+      103,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      19,
+      98,
+      1,
+      103,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      20,
+      102,
+      0,
+      103,
+      3,
+      "LATENT"
+    ],
+    [
+      21,
+      103,
+      0,
+      104,
+      0,
+      "LATENT"
+    ],
+    [
+      22,
+      91,
+      0,
+      104,
+      1,
+      "VAE"
+    ],
+    [
+      23,
+      200,
+      5,
+      105,
+      2,
+      "FLOAT"
+    ],
+    [
+      24,
+      104,
+      0,
+      105,
+      0,
+      "IMAGE"
+    ],
+    [
+      25,
+      105,
+      0,
+      106,
+      0,
+      "VIDEO"
+    ],
+    [
+      26,
+      200,
+      6,
+      107,
+      1,
+      "STRING"
+    ],
+    [
+      27,
+      96,
+      0,
+      107,
+      0,
+      "CLIP"
+    ],
+    [
+      28,
+      200,
+      0,
+      108,
+      0,
+      "COMBO"
+    ],
+    [
+      29,
+      200,
+      11,
+      108,
+      1,
+      "COMBO"
+    ],
+    [
+      30,
+      200,
+      12,
+      108,
+      2,
+      "COMBO"
+    ],
+    [
+      31,
+      200,
+      1,
+      108,
+      6,
+      "FLOAT"
+    ],
+    [
+      32,
+      200,
+      2,
+      108,
+      3,
+      "INT"
+    ],
+    [
+      33,
+      200,
+      3,
+      108,
+      4,
+      "INT"
+    ],
+    [
+      34,
+      200,
+      4,
+      108,
+      5,
+      "INT"
+    ],
+    [
+      35,
+      97,
+      0,
+      200,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.0964912280701755,
+      "offset": [
+        -543.52,
+        66.47999999999999
+      ]
+    }
+  },
+  "version": 0.4
+}
