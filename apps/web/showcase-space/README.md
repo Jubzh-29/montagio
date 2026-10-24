@@ -12,6 +12,7 @@ models:
   - Comfy-Org/Wan_2.2_ComfyUI_Repackaged
   - Comfy-Org/Wan_2.1_ComfyUI_repackaged
   - Comfy-Org/z_image_turbo
+  - Comfy-Org/SeedVR2
 tags:
   - video-generation
   - comfyui
@@ -22,7 +23,7 @@ tags:
 
 Montagio is an open-source studio for cinematic camera moves: a photo plus a camera preset give a clip, and every preset compiles into a ComfyUI workflow you can open, remix and run yourself.
 
-This Space is a **static showcase**. Its clips were pre-generated with Montagio on open-weights models (Wan 2.2 Fun Camera, Apache-2.0); the films of the Sequence mode are assembled in your browser by FFmpeg (ffmpeg.wasm). It renders nothing on a GPU and collects nothing: no account, no cookie, no analytics.
+This Space is a **static showcase**. Its clips were pre-generated with Montagio on open-weights models (Wan 2.2 Fun Camera, Apache-2.0) and restored to 1080p by Montagio's HD pass (SeedVR2, Apache-2.0); the films of the Sequence mode are assembled in your browser by FFmpeg (ffmpeg.wasm). It renders nothing on a GPU and collects nothing: no account, no cookie, no analytics.
 
 To animate your own photo, run Montagio on your machine or on a GPU you rent: the source code, the presets and the instructions are in the project repository, linked at the bottom of the showcase page.
 
