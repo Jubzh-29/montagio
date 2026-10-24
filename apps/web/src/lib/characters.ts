@@ -43,6 +43,9 @@ const SCENE_PHRASE: Record<Scene, string> = {
 export const sceneKey = (scene: Scene) => `scene${scene[0]!.toUpperCase()}${scene.slice(1)}` as MessageKey;
 export const scenePhrase = (scene: Scene) => SCENE_PHRASE[scene];
 
+/** The place of a photodump picture, read back from what it shows (its text ends with the place's phrase). */
+export const placeOf = (shows: string): Scene | undefined => SCENES.find((scene) => shows.endsWith(SCENE_PHRASE[scene]));
+
 /** The edit's instruction for one photodump picture. */
 export function photodumpInstruction(where: string): string {
   return `Show this same character ${where.trim()}. Keep the exact same face, hair, body and outfit. A natural, candid photo, as if taken by a friend, realistic light.`;

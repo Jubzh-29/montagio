@@ -12,12 +12,14 @@ import {
   DEFAULT_SCENES,
   photodumpInstruction,
   photodumpScene,
+  placeOf,
   SCENES,
   sceneKey,
   scenePhrase,
   type CharacterType,
   type Scene,
 } from '@/lib/characters';
+import { formatDuration } from '@/lib/duration';
 import { refusalMessageKey } from '@/lib/refusals';
 import { visibleTabs, type Tab } from '@/lib/tabs';
 import { useExtensions } from '@/lib/use-extensions';
@@ -107,7 +109,7 @@ function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (charac
       <p className={studio.counter}>{t('charCount', { n: details.length, max: DETAILS_MAX })}</p>
 
       <button type="button" className={studio.buttonPrimary} disabled={!details.trim() || busy} onClick={create}>
-        {done ? t('characterAgain', { s: estimate }) : t('characterCreate', { s: estimate })}
+        {done ? t('characterAgain', { d: formatDuration(estimate) }) : t('characterCreate', { d: formatDuration(estimate) })}
       </button>
 
       {busy && job && (
@@ -300,7 +302,7 @@ function CharacterDetail({
               ))}
             </div>
             <button type="button" className={studio.buttonPrimary} disabled={scenes.length === 0} onClick={make}>
-              {t('photodumpMake', { n: scenes.length, s: scenes.length * editEstimate })}
+              {t(scenes.length === 1 ? 'photodumpMakeOne' : 'photodumpMake', { n: scenes.length, d: formatDuration(scenes.length * editEstimate) })}
             </button>
           </>
         ) : (
@@ -329,14 +331,18 @@ function CharacterDetail({
           <p className={styles.photoScene}>{t('characterPortrait')}</p>
           <AnimateLinks historyKey={character.portraitHistoryKey} tabs={tabs} imageRef={character.imageRef} hdEstimate={hdEstimate} />
         </li>
-        {[...character.photos].reverse().map((photo) => (
-          <li key={photo.imageRef} className={styles.photo}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- a photodump picture */}
-            <img src={photo.url} alt="" />
-            <p className={styles.photoScene}>{photo.scene}</p>
-            <AnimateLinks historyKey={photo.historyKey} tabs={tabs} imageRef={photo.imageRef} hdEstimate={hdEstimate} />
-          </li>
-        ))}
+        {[...character.photos].reverse().map((photo) => {
+          // The caption names the place; the full text stays the photo's description for the camera moves.
+          const place = placeOf(photo.scene);
+          return (
+            <li key={photo.imageRef} className={styles.photo}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- a photodump picture */}
+              <img src={photo.url} alt="" />
+              <p className={styles.photoScene}>{place ? t(sceneKey(place)) : photo.scene}</p>
+              <AnimateLinks historyKey={photo.historyKey} tabs={tabs} imageRef={photo.imageRef} hdEstimate={hdEstimate} />
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

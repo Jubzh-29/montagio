@@ -8,7 +8,7 @@ import { GET as getJob } from '@/app/api/jobs/[id]/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import type { CharacterSummary, HistoryItem, JobSummary } from '@/lib/api-types';
-import { characterPrompt, photodumpInstruction, photodumpScene, scenePhrase } from '@/lib/characters';
+import { characterPrompt, photodumpInstruction, photodumpScene, placeOf, scenePhrase } from '@/lib/characters';
 import { params, pngFile, setupTempData, uploadRequest } from './helpers';
 
 setupTempData();
@@ -144,4 +144,9 @@ test('the pictures of a photodump that finish together are all kept', async () =
   await Promise.all(edits.map((done) => postPhoto(request({ imageRef: done.outputImageRef, scene: 'x', jobId: done.id }), params({ id: character.id }))));
   const after = (await (await getCharacter(new Request('http://localhost/x'), params({ id: character.id }))).json()) as CharacterSummary;
   expect(after.photos).toHaveLength(6);
+});
+
+test('a photodump picture is captioned with its place, read back from what it shows', () => {
+  expect(placeOf(photodumpScene('a fox in a green hoodie', scenePhrase('cafe')))).toBe('cafe');
+  expect(placeOf('a fox in a green hoodie, somewhere else')).toBeUndefined();
 });
