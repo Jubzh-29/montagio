@@ -97,6 +97,19 @@ test('a run made from another photo is skipped, and says why', async () => {
   ]);
 }, FFMPEG_TIMEOUT_MS);
 
+test('a withheld example is skipped: a run of it again does not bring it back', async () => {
+  const manifestPath = showcasePath(root, 'manifest.yaml');
+  writeFileSync(manifestPath, `${readFileSync(manifestPath, 'utf8')}withheld:\n  - { effect: squish, sample: landscape-a, reason: 'hands crush a person' }\n`);
+  writeSmoke([
+    { job: 'effect:squish', model: 'wan21-i2v-effects' },
+    { job: 'effect:explode', model: 'wan21-i2v-effects' },
+  ]);
+  const result = await ingestExamples(root, smoke, 'landscape-a', {});
+  expect(result.added).toEqual(['effects/explode--landscape-a.mp4']);
+  expect(result.skipped).toEqual(['effect:squish run 1: withheld from the showcase on landscape-a (hands crush a person)']);
+  expect((await loadManifest(root)).effects.map((entry) => entry.effect)).toEqual(['explode']);
+}, FFMPEG_TIMEOUT_MS);
+
 test('--pick does not apply to examples: one smoke folder per call instead', async () => {
   writeSmoke([{ job: 'effect:squish', model: 'wan21-i2v-effects' }]);
   const out: string[] = [];

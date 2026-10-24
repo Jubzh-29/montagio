@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { dimensionsFor, loadLibrary, type ApiWorkflow, type CompiledParams, type Preset } from '@montagio/presets';
-import { AI_METADATA, normalizeClip } from '@montagio/sequence';
+import { dimensionsFor, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type CompiledParams, type Library, type Preset } from '@montagio/presets';
+import { AI_METADATA, normalizeClip, probe } from '@montagio/sequence';
 import { isMap, isSeq, parseDocument, YAMLSeq } from 'yaml';
 import {
   clipFile,
@@ -11,12 +11,17 @@ import {
   loadManifest,
   parseManifest,
   SHOWCASE_DIR,
+  withheldReason,
   type ClipEntry,
   type EffectExample,
+  type HdPass,
   type HookExample,
+  type Manifest,
+  type RenderKind,
+  type SampleEntry,
 } from './manifest';
 import { sha256File } from './verify';
-import { showcaseJob, showcaseWorkflow, workflowSha256 } from './workflow';
+import { hdWorkflow, showcaseJob, workflowSha256 } from './workflow';
 
 /** The part of a smoke.jsonl record (infra/runpod/smoke.ts) that ingest reads. */
 type SmokeRecord = {
@@ -36,6 +41,8 @@ type SmokeRecord = {
   image_sha256?: string;
   /** The text the model got: the photo's (--prompt), then the preset's. */
   prompt?: string;
+  /** The negative prompt the model got: the preset's, or --negative's. */
+  negative?: string;
 };
 
 export type IngestResult = { added: string[]; replaced: string[]; skipped: string[] };
@@ -62,13 +69,72 @@ const format = (v: { width: number; height: number; frames: number; fps: number 
 const sameCamera = (a: SmokeRecord['camera'] | undefined, b: ReturnType<typeof cameraOf>) =>
   !!a && a.mode === b.mode && a.pose === b.pose && a.pose_2 === b.pose_2 && a.combine === b.combine && a.speed === b.speed;
 
+/** What a camera run vouches for in its manifest entry: its seed, texts, photo and workflow. */
+type CameraFields = Pick<ClipEntry, 'seed' | 'description' | 'negative' | 'image_sha256' | 'workflow_sha256' | 'rendered_at'>;
+
+/**
+ * A successful camera run of smoke.ts against the showcase: made from the sample's exact photo,
+ * on the manifest's model, with the preset's own camera, size and length, and with a
+ * description of the photo before the preset's text. That description, when it is not the
+ * sample's prompt, and a negative that replaced the preset's are kept in the entry, so that
+ * the workflow it vouches for is the one that rendered the clip.
+ */
+function checkCameraRun(
+  library: Library,
+  manifest: Manifest,
+  record: SmokeRecord,
+  sample: SampleEntry,
+  sampleSha: string,
+): { preset: Preset; fields: CameraFields } | { skip: string } {
+  const label = `${record.preset} run ${record.run}`;
+  const preset = library.presets.get(record.preset);
+  if (!preset) return { skip: `${label}: preset "${record.preset}" is not in the library` };
+  if (record.image_sha256 !== sampleSha) return { skip: `${label}: made from another image (${record.image ?? 'not recorded'}), not ${sample.file}` };
+  if (record.model !== manifest.model) return { skip: `${label}: rendered on ${record.model}, the showcase shows ${manifest.model}` };
+  const { params } = showcaseJob(library, manifest, preset, sample, record.seed);
+  const expected = cameraOf(params);
+  if (!sameCamera(record.camera, expected)) {
+    return { skip: `${label}: its camera ${JSON.stringify(record.camera)} is not the preset's ${JSON.stringify(expected)}` };
+  }
+  if (format(record) !== format(params)) {
+    // A --resolution 720p render, say: normalizing would shrink it, and its workflow would not be the showcase's.
+    return { skip: `${label}: rendered at ${format(record)}; the preset makes ${format(params)} for ${sample.id}` };
+  }
+  // smoke.ts joins the photo's text (--prompt) and the preset's with ", ".
+  const text = record.prompt ?? '';
+  const suffix = preset.prompt.suffix.trim();
+  const description = !suffix ? text : text === suffix ? '' : text.endsWith(`, ${suffix}`) ? text.slice(0, -(suffix.length + 2)) : null;
+  if (description === '' && sample.prompt) {
+    // Rendered without the photo's text (smoke --prompt), the clip is the ghost of the first GPU render.
+    return { skip: `${label}: rendered without a description of the photo (the text was ${JSON.stringify(text)}); run smoke.ts with --prompt` };
+  }
+  const texts = {
+    ...(description && description !== sample.prompt ? { description } : {}),
+    ...(record.negative !== undefined && record.negative !== params.negative ? { negative: record.negative } : {}),
+  };
+  const job = description === null ? null : showcaseJob(library, manifest, preset, sample, record.seed, texts);
+  if (!job || job.params.prompt !== record.prompt) {
+    return { skip: `${label}: rendered from the text ${JSON.stringify(record.prompt ?? null)}, which does not end with the preset's ${JSON.stringify(suffix)}` };
+  }
+  if (!record.outputs?.[0]) return { skip: `${label}: no output file` };
+  return {
+    preset,
+    fields: {
+      seed: record.seed,
+      ...texts,
+      image_sha256: sampleSha,
+      workflow_sha256: workflowSha256(job.workflow),
+      rendered_at: record.at.slice(0, 10),
+    },
+  };
+}
+
 /**
  * Bring the clips of a GPU session into the showcase: the successful runs of
- * `smoke.ts` made from `sampleId`'s exact photo, on the manifest's model, with
- * the preset's own camera and the photo's text before the preset's. Each clip
- * is re-encoded in the showcase encoding with the AI-generated mention, and its
- * manifest entry ties it to its seed and to the workflow that rendered it.
- * `picks` chooses among several runs of one preset.
+ * `smoke.ts` that `checkCameraRun` accepts for `sampleId`, except the withheld
+ * ones. Each clip is re-encoded in the showcase encoding with the AI-generated
+ * mention, and its manifest entry ties it to its seed, its texts and the
+ * workflow that rendered it. `picks` chooses among several runs of one preset.
  */
 export async function ingestSmoke(
   root: string,
@@ -90,74 +156,54 @@ export async function ingestSmoke(
 
   const sampleSha = await sha256File(join(dir, sample.file));
   const skipped: string[] = [];
-  const runsByPreset = new Map<string, SmokeRecord[]>();
+  const runsByPreset = new Map<string, { record: SmokeRecord; fields: CameraFields }[]>();
   for (const record of records) {
     if (record.status !== 'succeeded') continue;
-    const label = `${record.preset} run ${record.run}`;
-    const preset = library.presets.get(record.preset);
-    if (!preset) {
-      skipped.push(`${label}: preset "${record.preset}" is not in the library`);
-    } else if (record.image_sha256 !== sampleSha) {
-      skipped.push(`${label}: made from another image (${record.image ?? 'not recorded'}), not ${sample.file}`);
-    } else if (record.model !== manifest.model) {
-      skipped.push(`${label}: rendered on ${record.model}, the showcase shows ${manifest.model}`);
-    } else {
-      const { params } = showcaseJob(library, manifest, preset, sample, record.seed);
-      const expected = cameraOf(params);
-      if (!sameCamera(record.camera, expected)) {
-        skipped.push(`${label}: its camera ${JSON.stringify(record.camera)} is not the preset's ${JSON.stringify(expected)}`);
-      } else if (format(record) !== format(params)) {
-        // A --resolution 720p render, say: normalizing would shrink it, and its workflow would not be the showcase's.
-        skipped.push(`${label}: rendered at ${format(record)}; the preset makes ${format(params)} for ${sample.id}`);
-      } else if (record.prompt !== params.prompt) {
-        // Rendered without the photo's text (smoke --prompt), the clip is the ghost of the first GPU render;
-        // with another text, its workflow is not the one the manifest would vouch for.
-        skipped.push(`${label}: rendered from the text ${JSON.stringify(record.prompt ?? null)}; the showcase compiles ${JSON.stringify(params.prompt)} for ${sample.id}`);
-      } else if (!record.outputs?.[0]) {
-        skipped.push(`${label}: no output file`);
-      } else {
-        runsByPreset.set(record.preset, [...(runsByPreset.get(record.preset) ?? []), record]);
-      }
-    }
+    const checked = checkCameraRun(library, manifest, record, sample, sampleSha);
+    const withheld = withheldReason(manifest, 'clip', record.preset, sample.id);
+    if ('skip' in checked) skipped.push(checked.skip);
+    else if (withheld) skipped.push(`${record.preset} run ${record.run}: withheld from the showcase on ${sample.id} (${withheld})`);
+    else runsByPreset.set(record.preset, [...(runsByPreset.get(record.preset) ?? []), { record, fields: checked.fields }]);
   }
 
   const problems: string[] = [];
-  const chosen: { preset: Preset; record: SmokeRecord }[] = [];
+  const chosen: { preset: Preset; record: SmokeRecord; fields: CameraFields }[] = [];
   for (const [presetId, pick] of Object.entries(picks)) {
     if (!runsByPreset.has(presetId)) problems.push(`--pick ${presetId}=${pick}: no successful run of ${presetId} for ${sample.id}`);
   }
   for (const preset of library.presets.values()) {
     const runs = runsByPreset.get(preset.id);
     if (!runs) continue;
-    const listing = runs.map((r) => `  run ${r.run}, seed ${r.seed}, ${r.outputs[0]}`).join('\n');
+    const listing = runs.map(({ record: r }) => `  run ${r.run}, seed ${r.seed}, ${r.outputs[0]}`).join('\n');
     const pick = picks[preset.id];
     if (pick !== undefined) {
-      const matches = runs.filter((r) => r.run === pick);
-      if (matches.length === 1) chosen.push({ preset, record: matches[0]! });
+      const matches = runs.filter((r) => r.record.run === pick);
+      if (matches.length === 1) chosen.push({ preset, ...matches[0]! });
       // smoke.ts numbers runs from 1 on every call: one folder per call keeps them apart.
       else problems.push(`${preset.id}: ${matches.length === 0 ? `no run ${pick}` : `run ${pick} appears ${matches.length} times (use one --out folder per smoke call)`}:\n${listing}`);
     } else if (runs.length > 1) {
       problems.push(`${preset.id}: ${runs.length} successful runs, choose one with --pick ${preset.id}=<run>:\n${listing}`);
     } else {
-      chosen.push({ preset, record: runs[0]! });
+      chosen.push({ preset, ...runs[0]! });
     }
   }
   if (problems.length > 0) throw new IngestError(problems);
 
   const entries: ClipEntry[] = [];
-  for (const { preset, record } of chosen) {
+  for (const { preset, record, fields } of chosen) {
     const out = join(dir, clipFile(preset.id, sample.id));
     await mkdir(dirname(out), { recursive: true });
     const size = dimensionsFor(sample.aspect, preset.defaults.resolution);
     await normalizeClip(join(smokeDir, record.outputs[0]!), out, { ...size, fps: preset.defaults.fps, tags: AI_METADATA });
+    const { seed, description, negative, ...rest } = fields;
     entries.push({
       preset: preset.id,
       sample: sample.id,
-      seed: record.seed,
+      seed,
+      ...(description !== undefined ? { description } : {}),
+      ...(negative !== undefined ? { negative } : {}),
       sha256: await sha256File(out),
-      image_sha256: sampleSha,
-      workflow_sha256: workflowSha256(showcaseWorkflow(library, manifest, preset, sample, record.seed)),
-      rendered_at: record.at.slice(0, 10),
+      ...rest,
     });
   }
 
@@ -177,6 +223,8 @@ type ExtensionRun = {
   run: number;
   status: string;
   params?: { width?: number; height?: number; seed?: number };
+  /** The files the job loaded, by name: an upscale's clip (--clip), an effect's photo. */
+  inputs?: string[];
   outputs?: string[];
   image_sha256?: string | null;
 };
@@ -215,8 +263,11 @@ export async function ingestExamples(
     const id = match[2]!;
     const label = `${record.job} run ${record.run}`;
     const { width, height } = record.params ?? {};
+    const withheld = withheldReason(manifest, kind, id, sample.id);
     if (!(kind === 'effect' ? library.effects : library.hooks).has(id)) {
       skipped.push(`${label}: "${id}" is not ${kind === 'effect' ? 'an effect' : 'a hook'} of the library`);
+    } else if (withheld) {
+      skipped.push(`${label}: withheld from the showcase on ${sample.id} (${withheld})`);
     } else if (record.image_sha256 !== sampleSha) {
       skipped.push(`${label}: made from another image, not ${sample.file}`);
     } else if (width !== size.width || height !== size.height) {
@@ -279,6 +330,164 @@ export async function ingestExamples(
     { section: 'effects', idKey: 'effect', fileOf: effectFile, entries: effects },
     { section: 'hooks', idKey: 'hook', fileOf: hookFile, entries: hooks },
   ]);
+  return { added, replaced, skipped };
+}
+
+/** Where the clips an upscale run took can be found and traced back to their photo. */
+export type HdSources = {
+  /** The folder holding each clip the run upscaled, under the name the run loaded it (smoke.ts --clip). */
+  inputs: string;
+  /** smoke.ts results folders of camera runs whose outputs were upscaled as they came out. */
+  renders: string[];
+};
+
+/** A render of the showcase an upscale run may have taken: its entry, without its file's sha256 and HD pass. */
+type HdTarget = { kind: RenderKind; id: string; sample: SampleEntry; base: { id: string; sample: string } & Record<string, unknown> };
+
+const SECTION = { clip: 'clips', effect: 'effects', hook: 'hooks' } as const;
+const ID_KEY = { clip: 'preset', effect: 'effect', hook: 'hook' } as const;
+const FILE_OF = { clip: clipFile, effect: effectFile, hook: hookFile } as const;
+
+/** An entry with its fields in the manifest's order: the file's sha256 before the photo's, the HD pass last. */
+function withFile(base: { sample: string } & Record<string, unknown>, sha256: string, hd: HdPass): { sample: string } & Record<string, unknown> {
+  const { image_sha256, workflow_sha256, rendered_at, ...head } = base;
+  return { ...head, sha256, image_sha256, workflow_sha256, rendered_at, hd };
+}
+
+/**
+ * Bring the 1080p pass of a GPU session into the showcase: the successful runs of
+ * `smoke.ts --extension upscale --clip <480p clip>` whose clip is a rendered clip or an
+ * example of the showcase as ingest wrote it, or the output of a camera run of
+ * `sources.renders` that `checkCameraRun` accepts. smoke.jsonl names the upscaled clip
+ * without its sha256, so the chain photo → 480p run → upscale run is checked on the bytes of
+ * the copy in `sources.inputs`. Each 1080p output is re-encoded in the showcase encoding with
+ * the AI-generated mention and takes the place of the 480p file; its entry keeps what ties
+ * the 480p render to its photo, seed and workflow, and adds the `hd` pass.
+ */
+export async function ingestHd(root: string, smokeDir: string, sources: HdSources): Promise<IngestResult> {
+  const dir = join(root, SHOWCASE_DIR);
+  const [library, manifest] = await Promise.all([loadLibrary(root), loadManifest(root)]);
+  const records = ((await readSmoke(smokeDir)) as ExtensionRun[]).filter((r) => r.kind === 'extension' && r.job === 'upscale' && r.status === 'succeeded');
+  const samples = new Map(manifest.samples.map((sample) => [sample.id, sample]));
+  const sampleBySha = new Map<string, SampleEntry>();
+  for (const sample of manifest.samples) sampleBySha.set(await sha256File(join(dir, sample.file)), sample);
+
+  // The 480p files of the showcase, by sha256: an entry with an HD pass remembers the clip it took.
+  const known = new Map<string, HdTarget>();
+  const entries = [
+    ...manifest.clips.map((entry) => ({ kind: 'clip' as const, id: entry.preset, entry })),
+    ...manifest.effects.map((entry) => ({ kind: 'effect' as const, id: entry.effect, entry })),
+    ...manifest.hooks.map((entry) => ({ kind: 'hook' as const, id: entry.hook, entry })),
+  ];
+  for (const { kind, id, entry } of entries) {
+    const { sha256, hd, ...base } = entry;
+    known.set(hd ? hd.source_sha256 : sha256, { kind, id, sample: samples.get(entry.sample)!, base: { id, ...base } });
+  }
+  // The outputs of the camera runs, by sha256, checked only when an upscale took one.
+  const rendered = new Map<string, SmokeRecord>();
+  for (const folder of sources.renders) {
+    for (const record of (await readSmoke(folder)) as SmokeRecord[]) {
+      if ((record as { kind?: string }).kind !== undefined || record.status !== 'succeeded' || !record.outputs?.[0]) continue;
+      try {
+        rendered.set(await sha256File(join(folder, record.outputs[0])), record);
+      } catch {
+        // a clip that did not come down with its folder: no upscale can be traced to it
+      }
+    }
+  }
+
+  const skipped: string[] = [];
+  const problems: string[] = [];
+  const chosen = new Map<string, { target: HdTarget; record: ExtensionRun; input: string; inputSha: string; output: string; fps: number }>();
+  for (const record of records) {
+    const input = record.inputs?.[0];
+    const label = `upscale of ${input ?? '(no clip)'}`;
+    if (!input) {
+      skipped.push(`${label}: the record names no clip`);
+      continue;
+    }
+    let inputSha: string;
+    try {
+      inputSha = await sha256File(join(sources.inputs, input));
+    } catch {
+      skipped.push(`${label}: no ${input} in ${sources.inputs}, so it cannot be traced to a render`);
+      continue;
+    }
+    let target = known.get(inputSha);
+    const camera = target ? undefined : rendered.get(inputSha);
+    if (camera) {
+      const sample = camera.image_sha256 ? sampleBySha.get(camera.image_sha256) : undefined;
+      const checked = sample ? checkCameraRun(library, manifest, camera, sample, camera.image_sha256!) : { skip: `${camera.preset} run ${camera.run}: made from none of the sample photos` };
+      if ('skip' in checked) {
+        skipped.push(`${label}: its clip is the render of ${checked.skip}`);
+        continue;
+      }
+      const { seed, description, negative, ...rest } = checked.fields;
+      const base = { id: checked.preset.id, preset: checked.preset.id, sample: sample!.id, seed, ...(description !== undefined ? { description } : {}), ...(negative !== undefined ? { negative } : {}), ...rest };
+      target = { kind: 'clip', id: checked.preset.id, sample: sample!, base };
+    }
+    if (!target) {
+      skipped.push(`${label}: its clip is neither a render of the showcase nor the output of a camera run of --renders`);
+      continue;
+    }
+    const pair = `${target.id} × ${target.sample.id}`;
+    const withheld = withheldReason(manifest, target.kind, target.id, target.sample.id);
+    const model = library.extensionModels.get(record.model);
+    const size = UPSCALE_TARGETS[target.sample.aspect];
+    const fps = target.kind === 'clip' ? library.presets.get(target.id)?.defaults.fps : EXAMPLE_FPS;
+    if (withheld) {
+      skipped.push(`${label} (${pair}): withheld from the showcase (${withheld})`);
+      continue;
+    }
+    if (fps === undefined) {
+      skipped.push(`${label} (${pair}): preset "${target.id}" is not in the library`);
+      continue;
+    }
+    if (model?.task !== 'v2v-upscale') {
+      skipped.push(`${label} (${pair}): "${record.model}" is not a clip upscaler of the registry`);
+      continue;
+    }
+    if (record.params?.width !== size.width || record.params?.height !== size.height || record.params?.seed === undefined) {
+      skipped.push(`${label} (${pair}): rendered at ${record.params?.width}x${record.params?.height}; the HD pass makes ${size.width}x${size.height} for ${target.sample.id}`);
+      continue;
+    }
+    // smoke.ts lists the clip it uploaded among the outputs: the 1080p file is the one at the HD size.
+    let output: string | undefined;
+    for (const candidate of record.outputs ?? []) {
+      const info = await probe(join(smokeDir, candidate)).catch(() => null);
+      if (info?.width === size.width && info.height === size.height) output = candidate;
+    }
+    if (!output) {
+      skipped.push(`${label} (${pair}): no ${size.width}x${size.height} output`);
+      continue;
+    }
+    const key = `${target.kind}:${pair}`;
+    const previous = chosen.get(key);
+    if (previous) {
+      problems.push(`${target.kind} ${pair}: upscaled twice in ${smokeDir} (${previous.input}, ${input}); ingest the folder of the pass to keep alone`);
+      continue;
+    }
+    chosen.set(key, { target, record, input, inputSha, output, fps });
+  }
+  if (problems.length > 0) throw new IngestError(problems);
+
+  const groups: EntryGroup[] = (['clip', 'effect', 'hook'] as const).map((kind) => ({ section: SECTION[kind], idKey: ID_KEY[kind], fileOf: FILE_OF[kind], entries: [] }));
+  for (const { target, record, input, inputSha, output, fps } of chosen.values()) {
+    const out = join(dir, FILE_OF[target.kind](target.id, target.sample.id));
+    await mkdir(dirname(out), { recursive: true });
+    const size = UPSCALE_TARGETS[target.sample.aspect];
+    await normalizeClip(join(smokeDir, output), out, { ...size, fps, tags: AI_METADATA });
+    const pass = { model: record.model, seed: record.params!.seed!, input };
+    const hd: HdPass = {
+      ...pass,
+      source_sha256: inputSha,
+      workflow_sha256: workflowSha256(hdWorkflow(library, pass, target.sample.aspect)),
+      rendered_at: record.at.slice(0, 10),
+    };
+    const { id, ...base } = target.base;
+    groups.find((group) => group.idKey === ID_KEY[target.kind])!.entries.push({ id, ...withFile(base, await sha256File(out), hd) });
+  }
+  const { added, replaced } = await writeEntries(join(dir, 'manifest.yaml'), groups);
   return { added, replaced, skipped };
 }
 
