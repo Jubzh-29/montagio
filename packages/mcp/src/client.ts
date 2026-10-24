@@ -37,7 +37,10 @@ export type UploadResult = {
   personal: boolean;
 };
 
-/** POST /api/uploads/video: the reference clip of a motion transfer, or the clip of a restyle, cut to 5 s at most. */
+/** A reference motion of the library (GET /api/motions): made by Montagio from a fictional character. */
+export type LibraryMotion = { id: string; name: string; description: string; duration_s: number; previewUrl: string; posterUrl?: string };
+
+/** POST /api/uploads/video: the reference clip of a motion transfer, or the clip of a restyle, cut to 30 s at most. */
 export type VideoUploadResult = {
   videoRef: string;
   duration_s: number;
@@ -301,6 +304,7 @@ export class MontagioClient {
   models = () => this.get<ModelSummary[]>('/api/models');
   extensions = () => this.get<ExtensionsInfo>('/api/extensions');
   history = () => this.get<HistoryItem[]>('/api/history');
+  motions = () => this.get<LibraryMotion[]>('/api/motions');
 
   /** A local photo sent to the app (field "image"): an upload is personal, its edits ask for consent. */
   async uploadPhoto(path: string): Promise<UploadResult> {
@@ -321,6 +325,12 @@ export class MontagioClient {
     const form = new FormData();
     form.append('video', file.blob, file.name);
     const { value } = await this.call<VideoUploadResult>('POST', '/api/uploads/video', { form });
+    return { ...value, ...(value.url ? { url: this.absolute(value.url) } : {}) };
+  }
+
+  /** A motion of the library taken as the clip, as if it had been sent. */
+  async pickLibraryMotion(id: string): Promise<VideoUploadResult> {
+    const { value } = await this.call<VideoUploadResult>('POST', '/api/uploads/video/library', { json: { id } });
     return { ...value, ...(value.url ? { url: this.absolute(value.url) } : {}) };
   }
 

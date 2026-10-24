@@ -13,6 +13,7 @@ type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 export const TOOL_NAMES = [
   'list_camera_presets',
   'list_effects_and_hooks',
+  'list_motion_library',
   'upload_photo',
   'use_sample_photo',
   'text_to_image',
@@ -121,6 +122,17 @@ async function photoOf(client: MontagioClient, args: PhotoArgs, names = { ref: '
     return { imageRef: uploaded.imageRef, uploaded };
   }
   throw new ToolFailure('invalid-arguments', `Give the photo: ${names.ref} (from upload_photo, use_sample_photo, text_to_image…) or ${names.path} (a local image file).`);
+}
+
+/** The clip of a motion transfer or a restyle: a local file, an earlier videoRef, or a motion of the library. */
+type ClipArgs = { videoPath?: string; videoRef?: string; libraryMotion?: string };
+async function clipOf(client: MontagioClient, args: ClipArgs): Promise<{ videoRef: string; video?: Record<string, unknown> }> {
+  const given = [args.videoPath, args.videoRef, args.libraryMotion].filter(Boolean).length;
+  if (given > 1) throw new ToolFailure('invalid-arguments', 'Give one of videoPath, videoRef and libraryMotion.');
+  if (given === 0) throw new ToolFailure('invalid-arguments', 'Give the clip: videoPath (a local file), videoRef, or libraryMotion (list_motion_library).');
+  if (args.videoRef) return { videoRef: args.videoRef };
+  const made = args.videoPath ? await client.uploadVideo(args.videoPath) : await client.pickLibraryMotion(args.libraryMotion!);
+  return { videoRef: made.videoRef, video: { duration_s: made.duration_s, sourceDuration_s: made.sourceDuration_s, frames: made.frames, aspect: made.aspect } };
 }
 
 /** An estimate in seconds from GET /api/extensions; none when the app does not give one. */
@@ -253,6 +265,23 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
           models: defined({ edit: info.editModel, avatar: info.avatarModel, upscale: info.upscaleModel, motion: info.motionModel, restyle: info.restyleModel }),
         });
       }),
+  );
+
+  server.registerTool(
+    'list_motion_library',
+    {
+      title: 'List the motion library',
+      description:
+        'List the reference motions of the library (a dance, jumping jacks, a ballet spin, a 30 s dance…): made by Montagio itself from ' +
+        'fictional characters, so no rights to clear. Give an id as libraryMotion to motion_transfer or restyle_video.',
+      annotations: readOnly,
+    },
+    async () =>
+      guard(async () =>
+        (await client.motions()).map((motion) =>
+          defined({ id: motion.id, name: motion.name, description: motion.description, duration_s: motion.duration_s, previewUrl: client.absolute(motion.previewUrl) }),
+        ),
+      ),
   );
 
   server.registerTool(
@@ -502,7 +531,8 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
         imageRef,
         path,
         videoPath: z.string().min(1).optional().describe('The reference video, a local MP4, WebM or MOV file (50 MB at most). Give this or videoRef.'),
-        videoRef: z.string().min(1).optional().describe('A reference video already uploaded (the videoRef of an earlier motion_transfer). Give this or videoPath.'),
+        videoRef: z.string().min(1).optional().describe('A reference video already uploaded (the videoRef of an earlier motion_transfer). Give one of videoPath, videoRef, libraryMotion.'),
+        libraryMotion: z.string().min(1).optional().describe('A motion of the library (an id from list_motion_library), generated from a fictional character.'),
         character: z.string().max(500).optional().describe('Who the character of the photo is, in a few words (optional).'),
         motion: z.string().max(500).optional().describe('What the character does in the video, in a few words (optional).'),
         rights: z
@@ -517,22 +547,17 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
       guard(async () => {
         // Nothing is sent without the user's word: the app would refuse the same way (rights-required).
         if (args.rights !== true) throw new ToolFailure('rights-required');
-        if (args.videoPath && args.videoRef) throw new ToolFailure('invalid-arguments', 'Give videoPath or videoRef, not both.');
-        if (!args.videoPath && !args.videoRef) throw new ToolFailure('invalid-arguments', 'Give the reference video: videoPath (a local file) or videoRef.');
         const photo = await photoOf(client, args);
-        let videoRef = args.videoRef;
-        let video: Record<string, unknown> = {};
-        if (args.videoPath) {
-          try {
-            const uploaded = await client.uploadVideo(args.videoPath);
-            videoRef = uploaded.videoRef;
-            video = { video: { duration_s: uploaded.duration_s, sourceDuration_s: uploaded.sourceDuration_s, frames: uploaded.frames, aspect: uploaded.aspect } };
-          } catch (error) {
-            throw annotate(error, { inputImageRef: photo.imageRef });
-          }
+        let clip: Awaited<ReturnType<typeof clipOf>>;
+        try {
+          clip = await clipOf(client, args);
+        } catch (error) {
+          throw annotate(error, { inputImageRef: photo.imageRef });
         }
+        const { videoRef } = clip;
+        const video = clip.video ? { video: clip.video } : {};
         // A clip past one window of 5 s is sampled in context windows: the estimate scales with them.
-        const seconds = typeof (video.video as { duration_s?: unknown } | undefined)?.duration_s === 'number' ? (video.video as { duration_s: number }).duration_s : 5;
+        const seconds = typeof clip.video?.duration_s === 'number' ? clip.video.duration_s : 5;
         const estimate_s = await estimateOf(client, (info) => (info.estimates.motion === undefined ? undefined : info.estimates.motion * motionWindowsOf(seconds)));
         const more = { inputImageRef: photo.imageRef, videoRef, ...video, estimate_s };
         return render(client, extra, { timeoutMinutes: args.timeoutMinutes, more }, () =>
@@ -559,7 +584,8 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
       inputSchema: {
         prompt: z.string().min(1).max(500).describe('What the scene becomes, in a few words.'),
         videoPath: z.string().min(1).optional().describe('The clip, a local MP4, WebM or MOV file (50 MB at most). Give this or videoRef.'),
-        videoRef: z.string().min(1).optional().describe('A clip already uploaded (the videoRef of an earlier restyle_video or motion_transfer). Give this or videoPath.'),
+        videoRef: z.string().min(1).optional().describe('A clip already uploaded (the videoRef of an earlier restyle_video or motion_transfer). Give one of videoPath, videoRef, libraryMotion.'),
+        libraryMotion: z.string().min(1).optional().describe('A motion of the library (an id from list_motion_library), generated from a fictional character.'),
         imageRef: z.string().min(1).optional().describe('An image whose look to follow, already in the app (optional). Give this, path, or neither.'),
         path: z.string().min(1).optional().describe('An image whose look to follow, a local file (optional). Give this, imageRef, or neither.'),
         rights: z
@@ -574,20 +600,15 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
       guard(async () => {
         // Nothing is sent without the user's word: the app would refuse the same way (rights-required).
         if (args.rights !== true) throw new ToolFailure('rights-required');
-        if (args.videoPath && args.videoRef) throw new ToolFailure('invalid-arguments', 'Give videoPath or videoRef, not both.');
-        if (!args.videoPath && !args.videoRef) throw new ToolFailure('invalid-arguments', 'Give the clip: videoPath (a local file) or videoRef.');
         const look = args.imageRef || args.path ? await photoOf(client, args) : undefined;
-        let videoRef = args.videoRef;
-        let video: Record<string, unknown> = {};
-        if (args.videoPath) {
-          try {
-            const uploaded = await client.uploadVideo(args.videoPath);
-            videoRef = uploaded.videoRef;
-            video = { video: { duration_s: uploaded.duration_s, sourceDuration_s: uploaded.sourceDuration_s, frames: uploaded.frames, aspect: uploaded.aspect } };
-          } catch (error) {
-            throw look ? annotate(error, { inputImageRef: look.imageRef }) : error;
-          }
+        let clip: Awaited<ReturnType<typeof clipOf>>;
+        try {
+          clip = await clipOf(client, args);
+        } catch (error) {
+          throw look ? annotate(error, { inputImageRef: look.imageRef }) : error;
         }
+        const { videoRef } = clip;
+        const video = clip.video ? { video: clip.video } : {};
         // The restyle, and the edit of its first frame when there is no look image and the edit is on.
         const estimate_s = await estimateOf(client, (info) =>
           info.estimates.restyle === undefined ? undefined : info.estimates.restyle + (!look && info.extensions.includes('edit') ? (info.estimates.edit ?? 0) : 0),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useI18n, type MessageKey } from '@/i18n';
 import styles from './studio.module.css';
 
@@ -100,6 +100,7 @@ export function MotionFields({
   action,
   onCharacter,
   onAction,
+  library,
 }: {
   video: MotionVideo;
   disabled: boolean;
@@ -110,11 +111,14 @@ export function MotionFields({
   action: string;
   onCharacter: (value: string) => void;
   onAction: (value: string) => void;
+  /** The motion library, under the clip slot. */
+  library?: ReactNode;
 }) {
   const { t } = useI18n();
   return (
     <>
       <MotionVideoSlot video={video} disabled={disabled} paused={paused} onVideo={onVideo} />
+      {library}
       <div className={styles.panelSection}>
         <label htmlFor="motion-character" className={styles.sectionTitle}>
           {t('motionCharacter')}

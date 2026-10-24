@@ -49,6 +49,7 @@ export function RestyleFields({
   lookHidden = false,
   compose,
   cut = false,
+  library,
 }: {
   video: MotionVideo;
   disabled: boolean;
@@ -67,6 +68,8 @@ export function RestyleFields({
   compose?: ReactNode;
   /** The clip lasts more than the 5 s a restyle rebuilds. */
   cut?: boolean;
+  /** The motion library, under the clip slot. */
+  library?: ReactNode;
 }) {
   const { t } = useI18n();
   const lookUrl = look.status === 'idle' ? undefined : look.localUrl;
@@ -79,6 +82,7 @@ export function RestyleFields({
         onVideo={onVideo}
         labels={{ title: 'restyleVideo', empty: 'restyleVideoEmpty', add: 'restyleVideoAdd' }}
       />
+      {library}
       {cut && (
         <p className={styles.hint} data-testid="restyle-cut">
           {t('restyleFirstSeconds')}

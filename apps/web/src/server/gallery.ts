@@ -4,7 +4,7 @@ import { join } from 'node:path';
 export { GALLERY_ORDER, galleryOrder } from '@/lib/gallery-order';
 
 /** The folder of a preview: an effect, a hook, an extension's example; a camera preset's when absent. */
-export type PreviewKind = 'effects' | 'transitions' | 'extensions';
+export type PreviewKind = 'effects' | 'transitions' | 'extensions' | 'motions';
 
 /**
  * Public URL of a preset preview, or undefined while its file does not exist:

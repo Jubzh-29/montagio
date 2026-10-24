@@ -54,6 +54,7 @@ describe('MCP tools', () => {
         'list_camera_presets',
         'list_effects_and_hooks',
         'list_history',
+        'list_motion_library',
         'motion_transfer',
         'restyle_video',
         'talking_avatar',
@@ -184,6 +185,24 @@ describe('MCP tools', () => {
     client = await connect(testConfig(), { fetch: look.fetch, ...fakeClock() });
     await callTool(client, 'restyle_video', { videoRef: 'videos/v1', prompt: 'a watercolor painting', imageRef: 'samples/s.png', rights: true });
     expect(look.calls.find((call) => call.path === '/api/restyle')!.json).toEqual({ videoRef: 'videos/v1', prompt: 'a watercolor painting', imageRef: 'samples/s.png', rights: true });
+  });
+
+  it('a motion of the library is picked as the clip, then animated; the library lists its motions', async () => {
+    const app = jobApp('motion', [{ state: 'succeeded', progress: 1, outputUrl: '/media/data/jobs/j1/out.mp4' }], (call) => {
+      if (call.path === '/api/uploads/video/library') return reply({ videoRef: 'videos/lib.mp4', duration_s: 30, sourceDuration_s: 30, frames: 480, width: 480, height: 832, aspect: '9:16' }, 201);
+      return undefined;
+    });
+    client = await connect(testConfig(), { fetch: app.fetch, ...fakeClock() });
+    const { isError, data } = await callTool(client, 'motion_transfer', { imageRef: 'samples/s.png', libraryMotion: 'hip-hop-30s', rights: true });
+    expect(isError).toBeFalsy();
+    expect(app.calls.find((call) => call.path === '/api/uploads/video/library')!.json).toEqual({ id: 'hip-hop-30s' });
+    expect(app.calls.find((call) => call.path === '/api/motion')!.json).toMatchObject({ imageRef: 'samples/s.png', videoRef: 'videos/lib.mp4', rights: true });
+    expect(data.video).toMatchObject({ duration_s: 30 });
+
+    const listing = fakeFetch((call) => (call.path === '/api/motions' ? reply([{ id: 'hip-hop', name: 'Hip-hop', description: 'A dance', duration_s: 5, previewUrl: '/media/presets/motions/previews/hip-hop.mp4' }]) : reply({ error: 'not-found' }, 404)));
+    client = await connect(testConfig(), { fetch: listing.fetch });
+    const listed = await callTool(client, 'list_motion_library', {});
+    expect(JSON.stringify(listed.data)).toMatch(/hip-hop/);
   });
 
   it('camera_move sends the description as userPrompt and polls the generation', async () => {

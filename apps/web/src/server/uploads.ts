@@ -276,6 +276,35 @@ async function storeSpeech(source: string): Promise<SpeechMeta> {
   }
 }
 
+/**
+ * A motion of the library taken as the reference clip: prepared like a sent clip (it already is 16 fps
+ * and silent), so that the motion transfer and the restyle read it as any other.
+ */
+export async function saveLibraryVideo(clip: string): Promise<VideoMeta> {
+  const id = randomUUID();
+  const dir = videosDir();
+  await mkdir(dir, { recursive: true });
+  const out = join(dir, `${id}.mp4`);
+  const metaFile = join(dir, `${id}.json`);
+  try {
+    const prepared = await prepareMotionClip(clip, out, { max_s: MAX_REFERENCE_S });
+    const meta: VideoMeta = {
+      videoRef: `videos/${id}.mp4`,
+      duration_s: prepared.duration_s,
+      sourceDuration_s: prepared.duration_s,
+      frames: prepared.frames,
+      width: prepared.width,
+      height: prepared.height,
+      aspect: pickAspect(prepared.width, prepared.height),
+    };
+    await writeFile(metaFile, JSON.stringify(meta));
+    return meta;
+  } catch (error) {
+    await Promise.all([rm(out, { force: true }), rm(metaFile, { force: true })]);
+    throw error;
+  }
+}
+
 /** A video sent for a voice change (MP4, WebM or QuickTime, 50 MB at most). */
 export async function saveSpeechUpload(file: File): Promise<SpeechMeta> {
   const ext = VIDEO_TYPES[file.type];

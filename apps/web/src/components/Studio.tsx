@@ -11,6 +11,7 @@ import {
   type HistoryItem,
   type JobState,
   type JobSummary,
+  type LibraryMotionSummary,
   type ModelSummary,
   type PresetSummary,
   type SampleSummary,
@@ -45,6 +46,7 @@ import { AvatarFields, BUILT_IN_VOICE, type VoiceChoice } from './AvatarFields';
 import { COMPOSE_OFF, composeBody, composePersonal, composeReady, ComposeSlots, MOTION_COMPOSE_ROLES, type ComposeState } from './ComposeSlots';
 import { HdPanel } from './HdPanel';
 import { MotionFields, type MotionVideo } from './MotionFields';
+import { MotionLibrary } from './MotionLibrary';
 import { MotionModeSwitch, RestyleFields, type MotionMode } from './RestyleFields';
 import { MusicPanel } from './MusicPanel';
 import { ShowcaseTextAtelier } from './ShowcaseTextAtelier';
@@ -199,6 +201,8 @@ export function Studio() {
   const [restyleText, setRestyleText] = useState('');
   const [look, setLook] = useState<UploadState>({ status: 'idle' });
   const lookToken = useRef(0);
+  // The motion of the library taken as the clip, if the clip came from there.
+  const [libraryId, setLibraryId] = useState<string | null>(null);
   // The Motion tab's character (or a restyle's look) composed by the edit from a character, its outfit, a product.
   const [motionCompose, setMotionCompose] = useState<ComposeState>(COMPOSE_OFF);
   // A mode shows with its extension; with only one of the two, the tab has that one.
@@ -403,6 +407,24 @@ export function Studio() {
     setOutfit({ status: 'uploading', localUrl });
     const next = await sendUpload(file, localUrl, t);
     if (token === outfitToken.current) setOutfit(next);
+  };
+
+  /** A motion of the library as the clip: the server prepares it as a sent clip. */
+  const onLibraryMotion = async (motion: LibraryMotionSummary) => {
+    if (busyRef.current) return;
+    const token = ++motionToken.current;
+    setLibraryId(motion.id);
+    setMotionVideo({ status: 'uploading' });
+    let next: MotionVideo;
+    try {
+      const res = await apiFetch('/api/uploads/video/library', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: motion.id }) });
+      if (!res.ok) throw new Error(String(res.status));
+      const meta = (await res.json()) as { videoRef: string; url: string; duration_s: number; sourceDuration_s: number };
+      next = { status: 'ready', videoRef: meta.videoRef, url: meta.url, duration_s: meta.duration_s, sourceDuration_s: meta.sourceDuration_s };
+    } catch {
+      next = { status: 'error', message: t('motionVideoRefused') };
+    }
+    if (token === motionToken.current) setMotionVideo(next);
   };
 
   /** The restyle's look image: an ordinary upload, which a new one or Remove replaces. */
@@ -1003,6 +1025,9 @@ export function Studio() {
   // The names of the choice in hand, in the interface's language.
   const wallChoiceName = wallChoice ? catalogName(lang, wallChoice.item.id, wallChoice.item.name) : undefined;
   const moveName = movePreset ? catalogName(lang, movePreset.id, movePreset.name) : undefined;
+  const motionLibrary = !IS_SHOWCASE ? (
+    <MotionLibrary disabled={busy} pickedId={motionVideo.status === 'ready' || motionVideo.status === 'uploading' ? libraryId : null} onPick={(motion) => void onLibraryMotion(motion)} />
+  ) : null;
   // The composed character or look, under the Motion tab's fields when the edit is installed.
   const motionComposeSlots =
     !IS_SHOWCASE && extensions?.extensions.includes('edit') ? (
@@ -1198,6 +1223,7 @@ export function Studio() {
                 cut={motionVideo.status === 'ready' && (motionVideo.duration_s ?? 0) > RESTYLE_SECONDS + 0.05}
                 lookHidden={motionComposing}
                 compose={motionComposeSlots}
+                library={motionLibrary}
               />
             ) : tab === 'motion' ? (
               <>
@@ -1210,6 +1236,7 @@ export function Studio() {
                   action={motionAction}
                   onCharacter={setMotionCharacter}
                   onAction={setMotionAction}
+                  library={motionLibrary}
                 />
                 {motionComposeSlots}
               </>
