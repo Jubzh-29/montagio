@@ -67,8 +67,31 @@ def write_repo_tar(root: Path, files: list[tuple[str, int]], dest: Path) -> None
 
 
 def split_jobs(jobs: str) -> list[str]:
-    """`--preset crash-push; --preset crane-up` → one smoke argument string per container."""
-    items = [item.strip() for item in jobs.split(";")]
+    """`--preset crash-push; --preset crane-up` → one smoke argument string per container.
+
+    A ';' inside quotes belongs to its text (an edit instruction may hold one), not to the list.
+    """
+    items: list[str] = []
+    current: list[str] = []
+    quote = ""
+    escaped = False
+    for char in jobs:
+        if escaped:
+            escaped = False
+        elif quote:
+            if char == "\\" and quote == '"':
+                escaped = True
+            elif char == quote:
+                quote = ""
+        elif char in "\"'":
+            quote = char
+        elif char == ";":
+            items.append("".join(current))
+            current = []
+            continue
+        current.append(char)
+    items.append("".join(current))
+    items = [item.strip() for item in items]
     items = [item for item in items if item]
     if not items:
         raise ValueError("no job: give smoke arguments separated by ';'")
