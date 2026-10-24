@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 import { compileJob, compileUpscale, type ApiWorkflow, type Aspect, type Library, type Preset } from '@montagio/presets';
 import type { ClipEntry, HdPass, Manifest, SampleEntry } from './manifest';
@@ -62,20 +61,5 @@ export function showcaseWorkflow(...args: Parameters<typeof showcaseJob>): ApiWo
   return showcaseJob(...args).workflow;
 }
 
-/** The same value with every object's keys sorted, so equal workflows serialize the same way. */
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort()
-        .map((key) => [key, canonical((value as Record<string, unknown>)[key])]),
-    );
-  }
-  return value;
-}
-
-/** sha256 of the canonical JSON of a workflow (sorted keys, no whitespace). */
-export function workflowSha256(workflow: ApiWorkflow): string {
-  return createHash('sha256').update(JSON.stringify(canonical(workflow))).digest('hex');
-}
+/** sha256 of the canonical JSON of a workflow (sorted keys, no whitespace): the recipe's own hash. */
+export { workflowSha256 } from '@montagio/recipe';

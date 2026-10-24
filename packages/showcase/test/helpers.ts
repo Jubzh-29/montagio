@@ -37,6 +37,10 @@ export function makeRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'montagio-showcase-'));
   cpSync(join(repoRoot, 'registry'), join(root, 'registry'), { recursive: true });
   cpSync(join(repoRoot, 'workflows'), join(root, 'workflows'), { recursive: true });
+  // What a recipe's stack is read from: the version, the pinned ComfyUI and node packs.
+  cpSync(join(repoRoot, 'package.json'), join(root, 'package.json'));
+  cpSync(join(repoRoot, 'infra', 'runpod', 'versions.env'), join(root, 'infra', 'runpod', 'versions.env'));
+  cpSync(join(repoRoot, 'comfy-nodes', 'pyproject.toml'), join(root, 'comfy-nodes', 'pyproject.toml'));
   mkdirSync(join(root, 'presets'));
   for (const id of ['crash-push', 'pan-left']) cpSync(join(repoRoot, 'presets', `${id}.yaml`), join(root, 'presets', `${id}.yaml`));
   mkdirSync(showcasePath(root, 'samples'), { recursive: true });

@@ -9,6 +9,10 @@ import { apiFetch, jsonOrThrow } from '@/lib/api';
 import { recipeRows, weightRows } from '@/lib/recipe-view';
 import styles from './recipe.module.css';
 
+/** The app answers /api; a recipe of the showcase is a static file, read with plain fetch. */
+const isApi = (url: string) => url.startsWith('/api/');
+const read = (url: string) => (isApi(url) ? apiFetch(url) : fetch(url)).then((res) => jsonOrThrow<Recipe>(res));
+
 type Loaded = { status: 'idle' | 'loading' | 'failed' } | { status: 'ready'; recipe: Recipe; same?: boolean };
 
 /**
@@ -19,7 +23,8 @@ type Loaded = { status: 'idle' | 'loading' | 'failed' } | { status: 'ready'; rec
  */
 export function RecipePanel({
   url,
-  downloadHref = `${url}?download=1`,
+  // The app's route saves it as a file; the showcase's recipe is a file already.
+  downloadHref = isApi(url) ? `${url}?download=1` : url,
   reproduceHref,
   homeHref,
   compareUrl,
@@ -37,8 +42,8 @@ export function RecipePanel({
   const load = useCallback(() => {
     setLoaded({ status: 'loading' });
     Promise.all([
-      apiFetch(url).then((res) => jsonOrThrow<Recipe>(res)),
-      compareUrl ? apiFetch(compareUrl).then((res) => jsonOrThrow<Recipe>(res)).catch(() => null) : null,
+      read(url),
+      compareUrl ? read(compareUrl).catch(() => null) : null,
     ])
       .then(([recipe, original]) => setLoaded({ status: 'ready', recipe, ...(original ? { same: sameWorkflows(original, recipe) } : {}) }))
       .catch(() => setLoaded({ status: 'failed' }));

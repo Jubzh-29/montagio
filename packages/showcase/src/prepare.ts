@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import type { OpenStackReport } from '@montagio/check-open-stack';
 import { dimensionsFor, frameCount, loadLibrary, type Library } from '@montagio/presets';
+import { readStack } from '@montagio/recipe';
 import {
   AI_METADATA,
   concatCopy,
@@ -18,9 +19,10 @@ import {
   SHOWCASE_X264,
 } from '@montagio/sequence';
 import type { ShowcaseData, ShowcaseExampleItem, ShowcaseHdModel } from './data';
-import { effectFile, exampleWorkflowFile, hookFile, loadManifest, SHOWCASE_DIR, type HdPass } from './manifest';
+import { effectFile, exampleWorkflowFile, hookFile, loadManifest, recipeFile, SHOWCASE_DIR, type HdPass } from './manifest';
 import { motionKeyframes, toZoompan } from './motion';
 import { planClips, type PlannedClip } from './plan';
+import { showcaseRecipe } from './recipe';
 import { sha256File, verifyShowcase } from './verify';
 import { DEFAULT_PLACEHOLDER_SEED, showcaseWorkflow } from './workflow';
 
@@ -101,7 +103,7 @@ export async function prepareShowcase(
     throw new PrepareError([`apps/web/public/open-stack-report.json is missing or unreadable: run "npm run check:open-stack" first`]);
   }
 
-  const [library, manifest] = await Promise.all([loadLibrary(root), loadManifest(root)]);
+  const [library, manifest, stack] = await Promise.all([loadLibrary(root), loadManifest(root), readStack(root)]);
   const planned = planClips(manifest, library);
   let cache: Record<string, string> = {};
   try {
@@ -151,6 +153,15 @@ export async function prepareShowcase(
     produced.add(item.workflow);
     await mkdir(dirname(workflowPath), { recursive: true });
     await writeFile(workflowPath, `${JSON.stringify(workflow, null, 2)}\n`);
+    // A rendered clip's recipe: its photo, render and HD pass by sha256, and the request that renders it at home.
+    if (item.rendered) {
+      const yaml = await readFile(join(root, ...(library.presetFiles.get(item.preset.id) ?? `presets/${item.preset.id}.yaml`).split('/')), 'utf8');
+      const recipe = showcaseRecipe(library, manifest, item.rendered, item.sample, yaml, stack);
+      const file = recipeFile(item.preset.id, item.sample.id);
+      produced.add(file);
+      await mkdir(dirname(join(outDir, file)), { recursive: true });
+      await writeFile(join(outDir, file), `${JSON.stringify(recipe, null, 2)}\n`);
+    }
   }
 
   // The effect and hook examples, copied as ingest wrote them, with their workflows.
@@ -242,6 +253,7 @@ export async function prepareShowcase(
         url: item.file,
         verticalUrl: item.vertical,
         workflowUrl: item.workflow,
+        ...(item.rendered ? { recipeUrl: recipeFile(item.preset.id, item.sample.id) } : {}),
         placeholder: item.rendered === null,
         ...(hd ? { hd } : {}),
       };

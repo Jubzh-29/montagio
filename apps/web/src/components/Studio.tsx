@@ -1512,6 +1512,7 @@ export function Studio() {
                   key={resultRecipeUrl}
                   url={resultRecipeUrl}
                   {...(resultReproduceHref ? { reproduceHref: resultReproduceHref } : {})}
+                  {...(IS_SHOWCASE && repoUrl ? { homeHref: `${repoUrl}/blob/main/docs/INSTALL.md#reproduce-a-recipe` } : {})}
                   {...(compareWith && compareWith !== resultRecipeUrl ? { compareUrl: compareWith } : {})}
                 />
               )}

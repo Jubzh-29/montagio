@@ -34,6 +34,7 @@ function showcaseData(): ShowcaseData {
     url: `clips/${presetId}--landscape-a.mp4`,
     verticalUrl: `clips/${presetId}--landscape-a.9x16.mp4`,
     workflowUrl: `workflows/${presetId}--landscape-a.json`,
+    ...(placeholder ? {} : { recipeUrl: `recipes/${presetId}--landscape-a.json` }),
     placeholder,
   });
   return {
@@ -173,6 +174,16 @@ test("refuses another model, an unknown pair, an upload and a remix render with 
   expect(await generate({ presetYaml: 'id: x', imageRef: 'samples/landscape-a' })).toMatchObject({ status: 403, json: { error: 'showcase-remix' } });
   expect(await call(router, 'POST', '/api/uploads')).toMatchObject({ status: 403, json: { error: 'showcase-upload' } });
   expect(await call(router, 'GET', '/api/nowhere')).toMatchObject({ status: 404, json: { error: 'not-found' } });
+});
+
+test('a rendered clip comes with its recipe, in the Studio and in the visit history; a placeholder has none', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage, base: '' });
+  const rendered = await call(router, 'POST', '/api/generations', { presetId: 'crash-push', imageRef: 'samples/landscape-a' });
+  expect(rendered.json.recipeUrl).toBe('/showcase/recipes/crash-push--landscape-a.json');
+  const placeholder = await call(router, 'POST', '/api/generations', { presetId: 'pan-left', imageRef: 'samples/landscape-a' });
+  expect(placeholder.json).not.toHaveProperty('recipeUrl');
+  const visit = (await call(router, 'GET', '/api/history')).json as unknown as HistoryItem[];
+  expect(visit.map((item) => item.recipeUrl)).toEqual([undefined, '/showcase/recipes/crash-push--landscape-a.json']);
 });
 
 test('validates a preset in the page: valid, invalid lines, too large', async () => {

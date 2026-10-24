@@ -204,6 +204,8 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       progress: 1,
       outputUrl: showcaseUrl(shot.clip.url),
       workflowUrl: showcaseUrl(shot.clip.workflowUrl),
+      // A rendered clip's recipe, a file of the showcase: its Recipe panel reads it as it is.
+      ...(shot.clip.recipeUrl ? { recipeUrl: showcaseUrl(shot.clip.recipeUrl) } : {}),
       placeholder: shot.clip.placeholder,
       ...(shot.clip.hd ? { hdModel: shot.clip.hd } : {}),
     };
@@ -220,6 +222,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
         previewUrl: record.outputUrl!,
         downloadUrl: record.outputUrl!,
         reprise: { tab: 'camera', imageRef: input.imageRef, personal: false, presetId: input.presetId, modelId: data.model.id },
+        ...(record.recipeUrl ? { recipeUrl: record.recipeUrl } : {}),
       },
       ...visit,
     ];

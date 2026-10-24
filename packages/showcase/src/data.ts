@@ -37,8 +37,8 @@ export type ShowcaseData = {
   library: { models: [string, ModelEntry][]; templates: [string, ApiWorkflow][]; lock: [string, LockEntry][] };
   /** `prompt`: the text the photo was made from, offered by the showcase's Text to image. */
   samples: { id: string; title: { en: string; fr: string }; aspect: Aspect; url: string; placeholder: boolean; credit: string; prompt?: string }[];
-  /** `hd`: the clip had an HD pass (absent in data written before it, or for a 480p clip). */
-  clips: { preset: string; sample: string; url: string; verticalUrl: string; workflowUrl: string; placeholder: boolean; hd?: ShowcaseHdModel }[];
+  /** `hd`: the clip had an HD pass (absent in data written before it, or for a 480p clip); `recipeUrl`: a rendered clip's recipe. */
+  clips: { preset: string; sample: string; url: string; verticalUrl: string; workflowUrl: string; recipeUrl?: string; placeholder: boolean; hd?: ShowcaseHdModel }[];
   /** The effects and hooks rendered on a sample in a GPU session; one without an example is not listed. */
   effects: ShowcaseExampleItem[];
   hooks: (ShowcaseExampleItem & { references: 1 | 2 })[];
