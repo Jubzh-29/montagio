@@ -198,7 +198,7 @@ describe('compileCompose (a start photo from a place, a character, a product)', 
     expect(order).toEqual(['character', 'outfit', 'product']);
     expect([workflow['41']!.inputs.image, workflow['42']!.inputs.image, workflow['43']!.inputs.image]).toEqual(['c.png', 'o.png', 'p.png']);
     expect(workflow['151']!.inputs.prompt).toBe(
-      "Show the character from image 1 wearing the outfit from image 2, holding the product from image 3, in a simple setting. Keep the character's face and hair, the outfit's cut, colors and fabric and the product's exact shape, colors and label. Photorealistic, one coherent photo.",
+      "Show the character from image 1 wearing the outfit from image 2, holding in one hand the very object of image 3, in a simple setting. Keep the character's face and hair, the outfit's cut, colors and fabric and the object's exact shape and colors. Photorealistic, one coherent photo.",
     );
     expect(composeInstruction(['location', 'character', 'outfit'])).toBe(
       "Show the character from image 2, wearing the outfit from image 3, in the place of image 1. Keep the character's face and hair, the outfit's cut, colors and fabric and the place's look. Light everything like the place. Photorealistic, one coherent photo.",

@@ -311,11 +311,12 @@ export function composeInstruction(order: readonly ComposeRole[], opts: { fullBo
   const keep = [
     has('character') ? (has('outfit') ? "the character's face and hair" : "the character's face, hair and outfit") : '',
     has('outfit') ? "the outfit's cut, colors and fabric" : '',
-    has('product') ? "the product's exact shape, colors and label" : '',
+    // With an outfit (a motion's character), the product is any object in hand: "label" made the edit draw a bottle.
+    has('product') ? (has('outfit') ? "the object's exact shape and colors" : "the product's exact shape, colors and label") : '',
     has('location') ? "the place's look" : '',
   ].filter(Boolean);
   const keeps = `Keep ${keep.length > 1 ? `${keep.slice(0, -1).join(', ')} and ${keep.at(-1)}` : keep[0]}.`;
-  const holding = has('product') ? `, holding the product from ${n('product')}` : '';
+  const holding = has('product') ? (has('outfit') ? `, holding in one hand the very object of ${n('product')}` : `, holding the product from ${n('product')}`) : '';
   const body = opts.fullBody ? ', seen full body from head to feet' : '';
   let scene: string;
   if (has('character') && has('location')) {
