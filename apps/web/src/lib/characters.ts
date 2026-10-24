@@ -73,13 +73,18 @@ export const PORTRAIT_PROMPT_MAX = 500;
 export function characterPrompt(type: CharacterType, details: string, kind: CharacterKind = 'human'): string {
   const who = kind === 'human' ? TYPE_PHRASE[type] : KIND_LOOK[type](KIND_NOUN[kind]);
   const head = `Full-body portrait of a fictional character, ${who}: `;
-  const tail = `. Fully clothed, facing the camera, plain light grey background, soft even light, ${FINISH[type]}, no text.`;
+  // "Fully clothed" alone let an open jacket show skin (GPU, 2026-10-24): the outfit is asked modest too.
+  const tail = `. Fully clothed in a modest outfit, facing the camera, plain light grey background, soft even light, ${FINISH[type]}, no text.`;
   return `${head}${details.trim().slice(0, PORTRAIT_PROMPT_MAX - head.length - tail.length).trim()}${tail}`;
 }
 
 export const characterTypeKey = (type: CharacterType) => `characterType${type[0]!.toUpperCase()}${type.slice(1)}` as MessageKey;
-/** The kinds whose sample portrait ships in public/characters/kinds/<kind>.webp (made by Z-Image-Turbo). */
-export const KINDS_WITH_PICTURE: readonly CharacterKind[] = [];
+/**
+ * The kinds whose sample portrait ships in public/characters/kinds/<kind>.webp: Z-Image-Turbo
+ * (Apache-2.0) portraits of fictional characters made from characterPrompt on an L4 (2026-10-22 and
+ * 2026-10-24), cropped to 240x320.
+ */
+export const KINDS_WITH_PICTURE: readonly CharacterKind[] = CHARACTER_KINDS;
 export const kindPicture = (kind: CharacterKind) => `/characters/kinds/${kind}.webp`;
 
 export const characterKindKey = (kind: CharacterKind) => `characterKind${kind[0]!.toUpperCase()}${kind.slice(1)}` as MessageKey;
