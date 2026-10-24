@@ -22,17 +22,24 @@ export function loadedWeights(workflows: readonly ApiWorkflow[], lock: readonly 
 }
 
 /**
- * The weights of the recipe, each with the model that brings it: the model of the registry that
- * declares most of these weights comes first, so a text encoder shared by several models goes to the
- * one that ran. Only models that bring at least one weight are named.
+ * The weights of the recipe, each with the model that brings it: the models that ran (`ran`) first,
+ * then the model of the registry that declares most of these weights, so a text encoder shared by
+ * several models goes to the one that ran. Only models that bring at least one weight are named.
  */
-function resolveWeights(workflows: readonly ApiWorkflow[], lock: readonly LockLike[], models: readonly ModelLike[]): { weights: RecipeWeight[]; models: RecipeModel[] } {
+function resolveWeights(
+  workflows: readonly ApiWorkflow[],
+  lock: readonly LockLike[],
+  models: readonly ModelLike[],
+  ran: readonly string[] = [],
+): { weights: RecipeWeight[]; models: RecipeModel[] } {
   const loaded = loadedWeights(workflows, lock);
   const ids = new Set(loaded.map((entry) => entry.id));
+  // The models that ran come first, then the others by how many of these weights they declare.
+  const rank = (model: ModelLike) => (ran.includes(model.id) ? ran.indexOf(model.id) - ran.length : 0);
   const ranked = models
     .map((model) => ({ model, count: model.weights.filter((id) => ids.has(id)).length }))
     .filter(({ count }) => count > 0)
-    .sort((a, b) => b.count - a.count)
+    .sort((a, b) => rank(a.model) - rank(b.model) || b.count - a.count)
     .map(({ model }) => model);
   const weights = loaded.map((entry): RecipeWeight => {
     const modelId = ranked.find((model) => model.weights.includes(entry.id))?.id;
@@ -63,6 +70,7 @@ export function buildRecipe(draft: RecipeDraft, ctx: RecipeContext): Recipe {
     steps.map((step) => step.workflow),
     lock,
     [...ctx.models],
+    draft.modelIds,
   );
   const recipe: Recipe = {
     schema: RECIPE_SCHEMA,

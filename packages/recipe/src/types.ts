@@ -96,6 +96,8 @@ export type CompactRecipe = Pick<Recipe, 'schema' | 'kind' | 'task' | 'name' | '
 /** A recipe before its workflows are normalized and hashed and its weights looked up. */
 export type RecipeDraft = Omit<Recipe, 'schema' | 'steps' | 'models' | 'weights' | 'stack' | 'output'> & {
   steps: { name: string; workflow: ApiWorkflow; inputs: InputSlot[] }[];
+  /** The models that ran, as the records name them: a weight several models declare goes to one of these first. */
+  modelIds?: string[];
 };
 
 /** An entry of registry/models.lock.yaml (the registry's LockEntry, without depending on it). */

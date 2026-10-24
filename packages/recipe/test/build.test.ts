@@ -52,6 +52,21 @@ describe('buildRecipe', () => {
     expect(recipe.models.map((model) => model.id)).toEqual(['chatterbox-mtl-voice']);
   });
 
+  it('credits a weight two models share to the model that ran, when the caller names it', () => {
+    const twins = [
+      { id: 'photo-upscale', name: 'SeedVR2 photo', license: 'Apache-2.0', weights: ['umt5-xxl-fp8', 'wan21-vae'] },
+      { id: 'clip-upscale', name: 'SeedVR2 clip', license: 'Apache-2.0', weights: ['umt5-xxl-fp8', 'wan21-vae'] },
+    ];
+    const workflow = { '1': { class_type: 'Loader', inputs: { a: 'umt5_xxl_fp8_e4m3fn_scaled.safetensors', b: 'wan_2.1_vae.safetensors' } } };
+    const draft = cameraDraft({ steps: [{ name: 'upscale', workflow, inputs: [] }] });
+    const context = { ...CONTEXT, models: twins };
+    expect(buildRecipe(draft, context).models.map((model) => model.id)).toEqual(['photo-upscale']);
+    const named = buildRecipe({ ...draft, modelIds: ['clip-upscale'] }, context);
+    expect(named.models.map((model) => model.id)).toEqual(['clip-upscale']);
+    expect(named.weights.every((weight) => weight.modelId === 'clip-upscale')).toBe(true);
+    expect(named).not.toHaveProperty('modelIds');
+  });
+
   it('refuses a local path that no input slot covers', () => {
     const workflow = cameraWorkflow();
     workflow['58']!.inputs.image = 'C:\\Users\\julien\\Pictures\\me.jpg';
