@@ -17,6 +17,23 @@ test('an avatar from the sample photo: the clip and its caption', async ({ page 
   await expect(page.getByTestId('ai-caption')).toHaveText(/S2V/);
 });
 
+test('Sample writes the line its example says; without a line, Generate says what it waits for', async ({ page }) => {
+  await page.goto(AVATAR);
+  await expect(page.getByRole('link', { name: 'Avatar', exact: true })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  const line = page.getByRole('textbox', { name: 'What the photo says' });
+  await expect(line).toHaveValue('Hello, this is a test of the Montagio avatar.');
+  const generate = page.getByRole('button', { name: /^Generate/ });
+  await expect(generate).toBeEnabled();
+  await line.fill('');
+  await expect(generate).toBeDisabled();
+  await expect(generate).toHaveAccessibleDescription('Write what the avatar says to generate.');
+  await line.fill('Hello, this is a test of the Montagio avatar.');
+  await generate.click();
+  await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('ai-caption')).toHaveText(/^Demo render: no model ran here\. On a GPU, .*S2V.* made this clip of the same sample photo · AI-generated$/);
+});
+
 test('a long French text warns before Generate', async ({ page }) => {
   await page.goto(AVATAR);
   await page.getByRole('button', { name: 'Sample', exact: true }).click();

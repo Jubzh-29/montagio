@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./data": "./src/data.ts"
+    "./data": "./src/data.ts",
+    "./motion": "./src/motion.ts"
   },
   "scripts": {
     "test": "vitest run --globals",

@@ -4,12 +4,12 @@ for (const { tab, kind, file } of [
   { tab: 'avatar', kind: 'Talking photo · up to 15 s', file: 'avatar' },
   { tab: 'motion', kind: 'Reference video · up to 5 s', file: 'motion' },
 ]) {
-  test(`${tab}: a looping example in its card and on the empty monitor, and the card says what it makes`, async ({ page }) => {
+  test(`${tab}: a looping example on the empty monitor, once, and the choice row says what it makes`, async ({ page }) => {
     await page.goto(`/?tab=${tab}`);
     const card = page.getByTestId('choice-card');
-    await expect(card.locator('video')).toHaveAttribute('src', new RegExp(`/extensions/previews/${file}\\.mp4$`));
-    await expect(card.locator('video')).toHaveAttribute('poster', new RegExp(`/extensions/previews/${file}\\.jpg$`));
     await expect(card).toContainText(kind);
+    // The monitor plays the example large: the choice row does not loop it a second time.
+    await expect(card.locator('video')).toHaveCount(0);
     const monitor = page.getByTestId('monitor');
     await expect(monitor.locator('video')).toHaveAttribute('src', new RegExp(`/extensions/previews/${file}\\.mp4$`));
     await expect(monitor).toContainText('Example made with Montagio · AI-generated');

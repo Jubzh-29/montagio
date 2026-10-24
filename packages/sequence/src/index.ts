@@ -28,5 +28,5 @@ export {
   tagClip,
   type ZoompanExpr,
 } from './ffmpeg';
-export { AI_AUDIO_METADATA, AI_IMAGE_METADATA, metadataArgs, PLACEHOLDER_METADATA, type VideoTags } from './tags';
+export { AI_AUDIO_METADATA, AI_IMAGE_METADATA, DEMO_MOVE_METADATA, metadataArgs, PLACEHOLDER_METADATA, type VideoTags } from './tags';
 export { ImageTagError, readImageTags, tagImage } from './image-tags';

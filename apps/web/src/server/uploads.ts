@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { pickAspect, type Aspect } from '@montagio/presets';
 import { prepareMotionClip, prepareSpeechVideo, prepareVoiceSample, probe } from '@montagio/sequence';
@@ -108,9 +108,34 @@ export type VideoMeta = {
   width: number;
   height: number;
   aspect: Aspect;
+  /** The sample dance of demo-assets (made by Montagio, no one's rights at stake); absent for an import. */
+  origin?: 'sample';
 };
 
 const videosDir = () => join(getEnv().data, 'uploads', 'videos');
+
+/** The sample reference clip, already prepared (5 s, 16 fps, silent): copied as it is, so the demo knows it. */
+export async function saveSampleVideo(): Promise<VideoMeta> {
+  const sample = join(getEnv().root, 'demo-assets', 'videos', 'sample-dance.mp4');
+  const id = randomUUID();
+  const dir = videosDir();
+  await mkdir(dir, { recursive: true });
+  const out = join(dir, `${id}.mp4`);
+  await copyFile(sample, out);
+  const info = await probe(out);
+  const meta: VideoMeta = {
+    videoRef: `videos/${id}.mp4`,
+    duration_s: info.duration_s,
+    sourceDuration_s: info.duration_s,
+    frames: Math.round(info.duration_s * info.fps),
+    width: info.width,
+    height: info.height,
+    aspect: pickAspect(info.width, info.height),
+    origin: 'sample',
+  };
+  await writeFile(join(dir, `${id}.json`), JSON.stringify(meta));
+  return meta;
+}
 
 /**
  * Keep the first 5 s of a reference clip at 16 fps, without its sound (it may be music the

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useI18n } from '@/i18n';
 import { IS_SHOWCASE } from '@/lib/api';
+import type { DemoKind } from '@/lib/api-types';
 import { useExtensions } from '@/lib/use-extensions';
 import { stackHref } from '@/lib/open-stack';
 import styles from './studio.module.css';
@@ -24,6 +25,7 @@ export function AiCaption({
   testId = 'ai-caption',
   as: Tag = 'p',
   prefix,
+  demoKind,
 }: {
   /** Without an id (an unknown model), the name is plain text. */
   model: CaptionModel;
@@ -33,14 +35,26 @@ export function AiCaption({
   /** A figure's caption, styled by its figure. */
   as?: 'p' | 'figcaption';
   prefix?: string;
+  /** What a demo result is: the GPU render of the same sample photo, or the photo moved by FFmpeg. */
+  demoKind?: DemoKind;
 }) {
   const { t } = useI18n();
   // Without a GPU (the demo backend) no model made the result: the caption says what would make it.
   const demo = useExtensions()?.demo === true && !IS_SHOWCASE;
-  const parts = t(demo && text === 'aiCaption' ? 'demoCaption' : text, { license: model.license, hdLicense: hd?.license ?? '' }).split(/(\{model\}|\{hd\})/);
-  const name = (named: CaptionModel, key: number) =>
+  const key =
+    text !== 'aiCaption'
+      ? text
+      : demoKind === 'example'
+        ? 'demoExampleCaption'
+        : demoKind === 'moved'
+          ? 'demoMovedCaption'
+          : demo
+            ? 'demoCaption'
+            : text;
+  const parts = t(key, { license: model.license, hdLicense: hd?.license ?? '' }).split(/(\{model\}|\{hd\})/);
+  const name = (named: CaptionModel, index: number) =>
     named.id ? (
-      <Link key={key} href={stackHref(named.id)} className={styles.captionLink}>
+      <Link key={index} href={stackHref(named.id)} className={styles.captionLink}>
         {named.name}
       </Link>
     ) : (

@@ -37,6 +37,12 @@ export type UploadResult = {
 
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled';
 
+/**
+ * A demo render (no GPU): the clip a GPU session made of the same sample photo, or the photo
+ * moved by FFmpeg. Absent for a model's render.
+ */
+export type DemoKind = 'example' | 'moved';
+
 export type GenerationRecord = {
   id: string;
   presetId: string;
@@ -54,6 +60,7 @@ export type GenerationRecord = {
   placeholder?: boolean;
   /** Showcase: the model that restored the clip to 1080p (its HD pass), named in its caption. */
   hdModel?: HdModelSummary;
+  demo?: DemoKind;
 };
 
 /** The upscaler of a showcase clip's HD pass (SeedVR2). */
@@ -241,6 +248,7 @@ export type JobSummary = {
   placeholder?: boolean;
   /** Showcase: the model that restored the example to 1080p (its HD pass). */
   hdModel?: HdModelSummary;
+  demo?: DemoKind;
   createdAt: string;
 };
 
