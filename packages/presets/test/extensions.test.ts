@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { AD_STYLES, adInstruction, AVATAR_DEFAULT_PROMPT, compileAvatar, compileCompose, compileEdit, composeInstruction, compileImageUpscale, compileMusic, compileSpeech, compileUpscale, compileVoiceChange, CompileError, EDIT_LOOKS, loadLibrary, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
+import { AD_STYLES, adInstruction, AVATAR_DEFAULT_PROMPT, compileAvatar, compileCompose, compileEdit, composeInstruction, compileImageUpscale, compileMusic, compileSpeech, compileUpscale, compileVoiceChange, CompileError, EDIT_LOOKS, loadLibrary, SMOOTH_MULTIPLIER, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -117,6 +117,31 @@ describe('compileUpscale (SeedVR2 3B)', () => {
   test('the shipped workflow cuts the clip in chunks of 33 frames with an overlap of 3', () => {
     const chunk = upscale().template['99']!.inputs;
     expect(chunk).toMatchObject({ chunking_mode: 'manual', 'chunking_mode.frames_per_chunk': 33, temporal_overlap: 3 });
+  });
+
+  test('without smooth, the restored frames go to the video at the clip frame rate, and no RIFE node is left', () => {
+    const { workflow, params } = compile();
+    expect(workflow['75']!.inputs).toMatchObject({ images: ['59', 0], fps: ['74', 2], audio: ['74', 1] });
+    expect(Object.values(workflow).map((node) => node.class_type)).not.toEqual(expect.arrayContaining(['FrameInterpolate']));
+    for (const id of ['101', '102', '103']) expect(workflow[id]).toBeUndefined();
+    expect(params.smooth).toBe(false);
+  });
+
+  test('smooth, RIFE doubles the restored frames and the frame rate read from the clip, the sound kept', () => {
+    const { workflow, params, output } = compile({ smooth: true });
+    expect(workflow['101']!.inputs.model_name).toBe(lib.lock.get('rife-v4-26')!.file);
+    expect(workflow['102']!.inputs).toEqual({ interp_model: ['101', 0], images: ['59', 0], multiplier: SMOOTH_MULTIPLIER });
+    expect(workflow['103']!.inputs).toEqual({ expression: 'a * 2', 'values.a': ['74', 2] });
+    expect(workflow['75']!.inputs).toMatchObject({ images: ['102', 0], fps: ['103', 0], audio: ['74', 1] });
+    expect(SMOOTH_MULTIPLIER).toBe(2);
+    expect(params.smooth).toBe(true);
+    expect(output).toEqual({ node: '76', kind: 'video' });
+  });
+
+  test('a template without its RIFE nodes is a CompileError', () => {
+    const { model, template } = upscale();
+    const { ['102']: _, ...without } = template;
+    expect(() => compileUpscale(model, without, { videoRef: 'clip.mp4', aspect: '16:9', seed: 1 })).toThrow(/no node 102/);
   });
 });
 

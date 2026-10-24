@@ -1,13 +1,16 @@
 # HD upscale (extension "upscale"): a finished clip (480p or 720p) to 1080p with SeedVR2,
 # a one-step video restoration model. The target size is set by the resize before it
 # (scale dimensions, crop center); the frame rate and the frame count of the clip are kept.
+# Smooth motion (2026-10-24), an option of the same pass: RIFE 4.26 (MIT, the core nodes of
+# ComfyUI v0.41.0) puts a frame between each two restored ones, and the video runs at twice
+# the clip's frame rate (16 to 32 fps for Wan), its length and sound unchanged.
 schema: montagio/extension-model@0.1
 id: seedvr2-upscale
 name: SeedVR2 3B (1080p upscale)
 extension: upscale
 task: v2v-upscale
 license: Apache-2.0
-weights: [seedvr2-3b-int8, seedvr2-vae]
+weights: [seedvr2-3b-int8, seedvr2-vae, rife-v4-26]
 workflow: workflows/seedvr2-upscale.api.json
 bindings:
   video: { node: "73", field: file }

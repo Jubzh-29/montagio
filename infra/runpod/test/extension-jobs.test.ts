@@ -122,6 +122,17 @@ test('the upscale job sizes the clip by its own aspect and frame count, not by t
   expect(() => extensionJobs(library, { ...base, jobs: ['upscale'], ...clip, clipFrames: 122 })).toThrow(/a clip of 122 frames is longer than the 121 frames/);
 });
 
+test('--smooth keeps the RIFE nodes of the upscale job; without it they are removed', () => {
+  const clip = { clip: '/data/clip.mp4', clipAspect: '16:9' as const, clipFrames: 81 };
+  const [plain] = extensionJobs(library, { ...base, jobs: ['upscale'], ...clip });
+  const [smooth] = extensionJobs(library, { ...base, jobs: ['upscale'], ...clip, smooth: true });
+  expect(plain!.params.smooth).toBe(false);
+  expect(plain!.workflow['102']).toBeUndefined();
+  expect(smooth!.params.smooth).toBe(true);
+  expect(smooth!.workflow['102']?.class_type).toBe('FrameInterpolate');
+  expect(smooth!.files).toEqual(plain!.files);
+});
+
 test('a job that needs a file not given is refused before anything runs', () => {
   expect(() => extensionJobs(library, { ...base, jobs: ['upscale'] })).toThrow(/--clip/);
   expect(() => extensionJobs(library, { ...base, jobs: ['upscale'], clip: '/c.mp4' })).toThrow(/the upscale job needs the aspect and the frame count of its clip/);

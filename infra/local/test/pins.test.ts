@@ -212,6 +212,11 @@ test('audio_encoders is a ComfyUI folder', () => {
   expect(parseLockWeights(entry(['id: a', 'file: w.safetensors', `url: ${url}`, `sha256: ${'d'.repeat(64)}`, 'size: 3']))[0]?.folder).toBe('audio_encoders');
 });
 
+test('frame_interpolation is a ComfyUI folder (RIFE of the HD pass)', () => {
+  const url = 'https://huggingface.co/Comfy-Org/Frame-Interpolation/resolve/main/frame_interpolation/rife_v4.26.safetensors';
+  expect(parseLockWeights(entry(['id: a', 'file: rife_v4.26.safetensors', `url: ${url}`, `sha256: ${'e'.repeat(64)}`, 'size: 3']))[0]?.folder).toBe('frame_interpolation');
+});
+
 test('an explicit nested folder wins over the URL', () => {
   const url = 'https://huggingface.co/ResembleAI/chatterbox/resolve/main/t3_mtl23ls_v3.safetensors';
   const lines = ['id: a', 'file: t3_mtl23ls_v3.safetensors', `url: ${url}`, `sha256: ${'e'.repeat(64)}`, 'size: 3', 'folder: tts/chatterbox/resembleai-mtl-v3'];

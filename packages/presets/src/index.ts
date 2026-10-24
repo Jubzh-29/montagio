@@ -57,6 +57,7 @@ export {
   compileVoiceChange,
   EDIT_LOOKS,
   IMAGE_UPSCALE_TARGETS,
+  SMOOTH_MULTIPLIER,
   UPSCALE_TARGETS,
   type AvatarInputs,
   type EditInputs,

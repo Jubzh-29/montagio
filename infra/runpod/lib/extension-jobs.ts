@@ -78,6 +78,8 @@ export type ExtensionJobOptions = {
   clip?: string;
   clipAspect?: Aspect;
   clipFrames?: number;
+  /** Upscale: RIFE frames in between, at twice the clip's frame rate (the HD pass's smooth option). */
+  smooth?: boolean;
   /** The reference clip of the motion transfer, prepared by prepareMotionClip, with its length and aspect. */
   motion?: string;
   motion_s?: number;
@@ -261,7 +263,13 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
       case 'upscale': {
         const clip = need(opts.clip, '--clip', name);
         if (opts.clipAspect === undefined || opts.clipFrames === undefined) throw new Error('the upscale job needs the aspect and the frame count of its clip');
-        const job = compileUpscale(model, template, { videoRef: basename(clip), aspect: opts.clipAspect, frames: opts.clipFrames, seed: opts.seed });
+        const job = compileUpscale(model, template, {
+          videoRef: basename(clip),
+          aspect: opts.clipAspect,
+          frames: opts.clipFrames,
+          seed: opts.seed,
+          smooth: opts.smooth ?? false,
+        });
         return [{ name, tag: name, model, ...job, files: [file('video', clip)] }];
       }
       case 'voice-change': {

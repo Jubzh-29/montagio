@@ -12,6 +12,9 @@
   "100": {"class_type": "SeedVR2TemporalMerge", "inputs": {"latents": ["54", 0], "temporal_overlap": ["99", 1]}},
   "55": {"class_type": "VAEDecodeTiled", "inputs": {"tile_size": 512, "overlap": 128, "temporal_size": 64, "temporal_overlap": 8, "samples": ["100", 0], "vae": ["51", 0]}},
   "59": {"class_type": "SeedVR2PostProcessing", "inputs": {"images": ["55", 0], "original_resized_images": ["57", 0], "color_correction_method": "lab"}},
-  "75": {"class_type": "CreateVideo", "inputs": {"images": ["59", 0], "fps": ["74", 2], "audio": ["74", 1], "bit_depth": ["74", 3], "color_space": "sRGB"}},
+  "101": {"class_type": "FrameInterpolationModelLoader", "inputs": {"model_name": "rife_v4.26.safetensors"}},
+  "102": {"class_type": "FrameInterpolate", "inputs": {"interp_model": ["101", 0], "images": ["59", 0], "multiplier": 2}},
+  "103": {"class_type": "ComfyMathExpression", "inputs": {"expression": "a * 2", "values.a": ["74", 2]}},
+  "75": {"class_type": "CreateVideo", "inputs": {"images": ["102", 0], "fps": ["103", 0], "audio": ["74", 1], "bit_depth": ["74", 3], "color_space": "sRGB"}},
   "76": {"class_type": "SaveVideo", "inputs": {"video": ["75", 0], "filename_prefix": "montagio/upscale", "format": "mp4", "format.codec": "h264"}}
 }

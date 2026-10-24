@@ -80,6 +80,7 @@ const { values: args } = parseArgs({
     quality: { type: 'boolean', default: false },
     look: { type: 'string' },
     clip: { type: 'string' },
+    smooth: { type: 'boolean', default: false },
     motion: { type: 'string' },
     audio: { type: 'string' },
     voice: { type: 'string' },
@@ -124,6 +125,7 @@ Extensions (instead of presets):
   --quality          the edit, the effects and the transition without their 4-step LoRAs (more steps, slower)
   --look LOOK        a look of the edit job: infl8, action or angles
   --clip PATH        the clip to upscale (required by upscale)
+  --smooth           upscale: RIFE frames in between, twice the clip's frame rate (16 to 32 fps for Wan)
   --motion PATH      the reference video of the motion transfer (required by motion): its first 5 s are kept, at 16 fps, silent
   --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
   --voice PATH       voice: speak with this sample (a consented recording, mono FLAC) instead of the built-in voice
@@ -560,6 +562,7 @@ async function runExtensions(
     clip,
     clipAspect,
     clipFrames,
+    smooth: args.smooth,
     motion,
     motion_s,
     motionAspect,

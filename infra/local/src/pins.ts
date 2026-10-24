@@ -31,6 +31,7 @@ const COMFY_FOLDERS = new Set([
   'controlnet',
   'upscale_models',
   'audio_encoders',
+  'frame_interpolation',
   'tts',
 ]);
 

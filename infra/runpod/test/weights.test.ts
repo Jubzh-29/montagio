@@ -67,6 +67,7 @@ test('the loaders of the extension workflows give their ComfyUI folder', () => {
       '57': { class_type: 'AudioEncoderLoader', inputs: { audio_encoder_name: 'wav2vec2.safetensors' } },
       '105': { class_type: 'DualCLIPLoader', inputs: { clip_name1: 'qwen_0.6b.safetensors', clip_name2: 'qwen_1.7b.safetensors', type: 'ace' } },
       '107': { class_type: 'LoraLoaderModelOnly', inputs: { lora_name: 'lightx2v.safetensors', strength_model: 1 } },
+      '101': { class_type: 'FrameInterpolationModelLoader', inputs: { model_name: 'rife_v4.26.safetensors' } },
     },
   ]);
   expect(Object.fromEntries(folders)).toEqual({
@@ -74,8 +75,10 @@ test('the loaders of the extension workflows give their ComfyUI folder', () => {
     'qwen_0.6b.safetensors': 'text_encoders',
     'qwen_1.7b.safetensors': 'text_encoders',
     'lightx2v.safetensors': 'loras',
+    'rife_v4.26.safetensors': 'frame_interpolation',
   });
   expect(folderFor('w.safetensors', 'split_files/audio_encoders/w.safetensors', new Map())).toBe('audio_encoders');
+  expect(folderFor('rife.safetensors', 'frame_interpolation/rife.safetensors', new Map())).toBe('frame_interpolation');
 });
 
 test('the folder of the lock wins over the loaders and the repository path', () => {

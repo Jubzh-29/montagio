@@ -17,6 +17,9 @@
  * voice.flac, the placeholder of the avatar's voice sample; start3.png is the third image of a
  * composed start photo (2026-10-22). ChatterboxVC (the voice change), first written from its pinned
  * source, matches the /object_info the GPU session of 2026-10-22 captured (tooltips removed).
+ * FrameInterpolationModelLoader, FrameInterpolate and ComfyMathExpression (the smooth motion of the HD
+ * pass) come from the CPU ComfyUI v0.41.0 on 2026-10-24, its frame_interpolation folder holding the
+ * lock's rife_v4.26.safetensors (tooltips removed).
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -134,11 +137,13 @@ test('the music job compiled for 5, 10 and 60 s is accepted', () => {
   }
 });
 
-test('the upscale job compiled for each aspect is accepted', () => {
+test('the upscale job compiled for each aspect, smooth or not, is accepted', () => {
   const model = library.extensionModels.get('seedvr2-upscale')!;
   for (const aspect of ASPECTS) {
-    const { workflow } = compileUpscale(model, library.extensionTemplates.get(model.workflow)!, { videoRef: 'clip.mp4', aspect, seed: 3 });
-    expect({ aspect, problems: checkWorkflow(workflow, info) }).toEqual({ aspect, problems: [] });
+    for (const smooth of [false, true]) {
+      const { workflow } = compileUpscale(model, library.extensionTemplates.get(model.workflow)!, { videoRef: 'clip.mp4', aspect, seed: 3, smooth });
+      expect({ aspect, smooth, problems: checkWorkflow(workflow, info) }).toEqual({ aspect, smooth, problems: [] });
+    }
   }
 });
 

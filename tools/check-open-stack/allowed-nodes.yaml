@@ -47,6 +47,11 @@ nodes:
   - { class_type: SeedVR2Conditioning, source: comfyui-core, license: GPL-3.0 }
   - { class_type: SeedVR2TemporalMerge, source: comfyui-core, license: GPL-3.0 }
   - { class_type: SeedVR2PostProcessing, source: comfyui-core, license: GPL-3.0 }
+  # Smooth motion of the HD pass (2026-10-24), core of ComfyUI v0.41.0: comfy_extras/nodes_frame_interpolation.py
+  # (RIFE, no node pack to pin) and comfy_extras/nodes_math.py (the doubled frame rate).
+  - { class_type: FrameInterpolationModelLoader, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: FrameInterpolate, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ComfyMathExpression, source: comfyui-core, license: GPL-3.0 }
   # Extension "edit" (2026-10-19), core of ComfyUI v0.41.0: comfy_extras/nodes_flux.py (FluxKontextImageScale,
   # FluxKontextMultiReferenceLatentMethod), comfy_extras/nodes_cfg.py (CFGNorm), comfy_extras/nodes_qwen.py
   # (TextEncodeQwenImageEditPlus) and nodes.py (VAEEncode).

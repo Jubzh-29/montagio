@@ -138,15 +138,30 @@ export type UpscaleInputs = {
   seed: number;
   /** The clip's frame count, when known: over the model's `max_input_frames` it is refused. */
   frames?: number;
+  /** Smooth motion: RIFE frames in between the restored ones, at twice the frame rate (16 to 32 fps for Wan). */
+  smooth?: boolean;
 };
 
-/** A finished clip to 1080p (SeedVR2): same aspect, frame rate and frame count, resized then restored. */
+/** The smooth pass puts one frame between two: twice the frame rate, the same length. */
+export const SMOOTH_MULTIPLIER = 2;
+/**
+ * Nodes of workflows/seedvr2-upscale.api.json that compileUpscale keeps, removes or rewires: the
+ * restored frames, the clip's frame rate, RIFE and its frame rate, and the video they make.
+ */
+const UPSCALE_NODES = { restored: '59', components: '74', interpolationModel: '101', interpolate: '102', fps: '103', video: '75' } as const;
+
+/**
+ * A finished clip to 1080p (SeedVR2): same aspect, frame rate and frame count, resized then restored.
+ * Smooth, RIFE then adds a frame between each two (81 frames at 16 fps become 161 at 32 fps); without
+ * it, the RIFE nodes are removed and the video takes the restored frames at the clip's frame rate.
+ */
 export function compileUpscale(
   model: ExtensionModel,
   template: ApiWorkflow,
   inputs: UpscaleInputs,
-): ExtensionCompiled<{ width: number; height: number; seed: number }> {
+): ExtensionCompiled<{ width: number; height: number; seed: number; smooth: boolean }> {
   expectTask(model, 'v2v-upscale');
+  requireNodes(model, template, Object.values(UPSCALE_NODES));
   const max = model.limits.max_input_frames;
   if (inputs.frames !== undefined && max !== undefined && inputs.frames > max) {
     throw new CompileError(`a clip of ${inputs.frames} frames is longer than the ${max} frames model ${model.id} upscales`);
@@ -154,8 +169,16 @@ export function compileUpscale(
   const target = Object.hasOwn(UPSCALE_TARGETS, inputs.aspect) ? UPSCALE_TARGETS[inputs.aspect] : undefined;
   if (!target) throw new CompileError(`aspect "${inputs.aspect}" has no 1080p size: 16:9, 9:16 or 1:1`);
   const { width, height } = target;
+  const smooth = inputs.smooth ?? false;
   const workflow = bindExtension(model, template, { video: inputs.videoRef, width, height, seed: inputs.seed });
-  return { workflow, output: { ...model.output }, params: { width, height, seed: inputs.seed } };
+  if (smooth) {
+    workflow[UPSCALE_NODES.interpolate]!.inputs.multiplier = SMOOTH_MULTIPLIER;
+    workflow[UPSCALE_NODES.fps]!.inputs.expression = `a * ${SMOOTH_MULTIPLIER}`;
+  } else {
+    Object.assign(workflow[UPSCALE_NODES.video]!.inputs, { images: [UPSCALE_NODES.restored, 0], fps: [UPSCALE_NODES.components, 2] });
+    for (const id of [UPSCALE_NODES.interpolate, UPSCALE_NODES.interpolationModel, UPSCALE_NODES.fps]) delete workflow[id];
+  }
+  return { workflow, output: { ...model.output }, params: { width, height, seed: inputs.seed, smooth } };
 }
 
 /** The HD size of a photo of each aspect: 2560 px on its long side, never stretched to another shape. */

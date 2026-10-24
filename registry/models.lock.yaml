@@ -120,6 +120,17 @@ weights:
     license: Apache-2.0
     source: https://huggingface.co/ByteDance-Seed/SeedVR2-3B
     extension: upscale
+  # Smooth motion of the HD pass (2026-10-24): RIFE 4.26 of hzwer, the ComfyUI repackaging. Its 158
+  # tensors are those of flownet.pkl in RIFEv4.26_0921.zip of hzwer/RIFE, byte for byte (the training
+  # heads teacher and caltime left out); the trained models are MIT, as Practical-RIFE's README says.
+  - id: rife-v4-26
+    file: rife_v4.26.safetensors
+    url: https://huggingface.co/Comfy-Org/Frame-Interpolation/resolve/main/frame_interpolation/rife_v4.26.safetensors
+    sha256: 151874592c877740e5db11522f4514df569eeafb0a0fcb2696f16e9e8d317c94
+    size: 22674688
+    license: MIT
+    source: https://huggingface.co/hzwer/RIFE
+    extension: upscale
   - id: qwen-image-edit-2511-fp8mixed
     file: qwen_image_edit_2511_fp8mixed.safetensors
     url: https://huggingface.co/Comfy-Org/Qwen-Image-Edit_ComfyUI/resolve/main/split_files/diffusion_models/qwen_image_edit_2511_fp8mixed.safetensors

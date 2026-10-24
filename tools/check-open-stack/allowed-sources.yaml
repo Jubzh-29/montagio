@@ -240,6 +240,20 @@ sources:
     license_file: false
     note: the card says Apache-2.0 with no added paragraph; GitHub Wan-Video/Wan-Animate-2 holds the plain Apache-2.0 text
 
+  # Smooth motion of the HD pass: RIFE 4.26 (read on 2026-10-24).
+  - repo: Comfy-Org/Frame-Interpolation
+    license: MIT
+    role: mirror
+    revision: 219da3c9d8c357ceaf457fc1d5932c6e861b8dee
+    license_file: false
+    note: the card says "other" (mit-and-apache-2.0), its README names hzwer/Practical-RIFE (MIT) and google-research/frame-interpolation (Apache-2.0); only rife_v4.26.safetensors is used, the tensors of hzwer's flownet.pkl byte for byte
+  - repo: hzwer/RIFE
+    license: MIT
+    role: source
+    revision: 01fdc7e97404120c243c3ea7b427046e5dc7643e
+    license_file: false
+    note: the author's own repository (RIFEv4.26_0921.zip); its card has no license and sends to GitHub hzwer/Practical-RIFE (MIT LICENSE at bbfd2ea9), whose README says the trained models are under the same MIT license
+
 # Never a source or a download repository, whatever a template or a tutorial fetches from it.
 denied:
   - repo: Kijai/WanVideo_comfy
