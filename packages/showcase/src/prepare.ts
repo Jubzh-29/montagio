@@ -145,7 +145,8 @@ export async function prepareShowcase(
         posterFrame(join(outDir, item.file), path, { width: PREVIEW_WIDTH, comment: tags.comment }),
       );
     }
-    const workflow = showcaseWorkflow(library, manifest, item.preset, item.sample, item.rendered?.seed ?? DEFAULT_PLACEHOLDER_SEED);
+    // The workflow that rendered the clip, with its own texts (the HD pass is in the manifest).
+    const workflow = showcaseWorkflow(library, manifest, item.preset, item.sample, item.rendered?.seed ?? DEFAULT_PLACEHOLDER_SEED, item.rendered ?? {});
     const workflowPath = join(outDir, item.workflow);
     produced.add(item.workflow);
     await mkdir(dirname(workflowPath), { recursive: true });

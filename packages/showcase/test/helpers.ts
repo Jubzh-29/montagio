@@ -48,10 +48,10 @@ export function makeRoot(): string {
 
 export const removeRoot = (root: string) => rmSync(root, { recursive: true, force: true, maxRetries: 5 });
 
-/** What ComfyUI hands back for a 5 s preset: 81 frames of 832x480 at 16 fps. */
-export function rawRender(path: string, source = 'testsrc2', frames = 81): void {
+/** What ComfyUI hands back for a 5 s preset: 81 frames of 832x480 at 16 fps (1920x1080 after an HD pass). */
+export function rawRender(path: string, source = 'testsrc2', frames = 81, size = '832x480'): void {
   execFileSync('ffmpeg', [
-    '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `${source}=size=832x480:rate=16`, '-frames:v', String(frames),
+    '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `${source}=size=${size}:rate=16`, '-frames:v', String(frames),
     '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', path,
   ]);
 }

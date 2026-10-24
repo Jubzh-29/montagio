@@ -34,6 +34,8 @@ type Run = {
   size?: { width: number; height: number; frames: number; fps: number };
   /** The text the model got: the showcase's for the preset on landscape-a unless overridden. */
   prompt?: string;
+  /** smoke.ts --negative; absent, the record has no negative (older smoke.jsonl). */
+  negative?: string;
 };
 
 /** The text the showcase compiles for `preset` on landscape-a: the photo's, when the manifest has one, then the preset's. */
@@ -63,6 +65,7 @@ async function writeSmoke(runs: Run[]): Promise<void> {
       duration_s: 5,
       seed: r.seed ?? 42,
       prompt: prompts[index],
+      ...(r.negative !== undefined ? { negative: r.negative } : {}),
       outputs: [output],
       image: 'landscape-a.jpg',
       image_sha256: r.imageSha ?? sampleSha,
@@ -162,16 +165,17 @@ test('skips a run rendered at another size or length than the preset makes for t
   expect((await loadManifest(root)).clips).toEqual([]);
 }, FFMPEG_TIMEOUT_MS);
 
-test('a photo with a text: a run is kept only when the model got that text before the preset', async () => {
+test('a photo with a text: a run is kept only when the model got a description of the photo before the preset', async () => {
   const manifestFile = showcasePath(root, 'manifest.yaml');
   writeFileSync(manifestFile, readFileSync(manifestFile, 'utf8').replace('    status: placeholder\n', '    status: placeholder\n    prompt: a quiet harbour at dawn, fishing boats\n'));
   // smoke.ts without --prompt: the model got the preset's text alone.
   const bare = await showcasePrompt('pan-left', false);
-  await writeSmoke([{ preset: 'crash-push' }, { preset: 'pan-left', prompt: bare }]);
+  await writeSmoke([{ preset: 'crash-push' }, { preset: 'pan-left', prompt: bare }, { preset: 'pan-left', run: 2, prompt: 'a harbour, the preset text lost' }]);
   const result = await ingestSmoke(root, smoke, 'landscape-a', {});
   expect(result.added).toEqual(['clips/crash-push--landscape-a.mp4']);
   expect(result.skipped).toEqual([
-    `pan-left run 1: rendered from the text ${JSON.stringify(bare)}; the showcase compiles ${JSON.stringify(await showcasePrompt('pan-left'))} for landscape-a`,
+    `pan-left run 1: rendered without a description of the photo (the text was ${JSON.stringify(bare)}); run smoke.ts with --prompt`,
+    expect.stringMatching(/^pan-left run 2: rendered from the text "a harbour, the preset text lost", which does not end with the preset's ".+"$/),
   ]);
   expect(await showcasePrompt('crash-push')).toMatch(/^a quiet harbour at dawn, fishing boats, /);
   // The workflow the manifest vouches for, the one "Open in ComfyUI" hands out, carries the photo's text.
@@ -180,6 +184,44 @@ test('a photo with a text: a run is kept only when the model got that text befor
   expect(JSON.stringify(workflow)).toContain('a quiet harbour at dawn, fishing boats');
   expect(manifest.clips[0]).toMatchObject({ preset: 'crash-push', workflow_sha256: workflowSha256(workflow) });
   expect((await verifyShowcase(root, { strict: false })).errors).toEqual([]);
+}, FFMPEG_TIMEOUT_MS);
+
+test('a run with its own description of the photo and its own negative keeps both, and its workflow carries them', async () => {
+  const manifestFile = showcasePath(root, 'manifest.yaml');
+  writeFileSync(manifestFile, readFileSync(manifestFile, 'utf8').replace('    status: placeholder\n', '    status: placeholder\n    prompt: a quiet harbour at dawn, fishing boats\n'));
+  const [library, before] = await Promise.all([loadLibrary(root), loadManifest(root)]);
+  const preset = library.presets.get('crash-push')!;
+  const description = 'a quiet harbour at dawn. The boat stays solid and still';
+  const negative = 'blurry, transparent boat, ghosting';
+  const { params } = showcaseJob(library, before, preset, before.samples[0]!, 7, { description });
+  // smoke.ts --prompt "<description>" --negative "<negative>": the record repeats the preset's negative when there is none.
+  await writeSmoke([
+    { preset: 'crash-push', seed: 7, prompt: params.prompt, negative },
+    { preset: 'pan-left', negative: library.presets.get('pan-left')!.prompt.negative },
+  ]);
+  const result = await ingestSmoke(root, smoke, 'landscape-a', {});
+  expect(result.skipped).toEqual([]);
+
+  const manifest = await loadManifest(root);
+  const workflow = showcaseWorkflow(library, manifest, preset, manifest.samples[0]!, 7, { description, negative });
+  expect(manifest.clips[0]).toMatchObject({ preset: 'crash-push', seed: 7, description, negative, workflow_sha256: workflowSha256(workflow) });
+  expect(JSON.stringify(workflow)).toContain('The boat stays solid and still');
+  expect(JSON.stringify(workflow)).toContain('transparent boat, ghosting');
+  // The same seed with the sample's texts is another workflow: a description changes workflow_sha256.
+  expect(workflowSha256(showcaseWorkflow(library, manifest, preset, manifest.samples[0]!, 7))).not.toBe(manifest.clips[0]!.workflow_sha256);
+  // A run with the sample's own texts keeps none.
+  expect(manifest.clips[1]).not.toHaveProperty('description');
+  expect(manifest.clips[1]).not.toHaveProperty('negative');
+  expect((await verifyShowcase(root, { strict: true })).errors.filter((line) => /workflow/.test(line))).toEqual([]);
+}, FFMPEG_TIMEOUT_MS);
+
+test('a withheld clip is skipped, and says why', async () => {
+  const manifestFile = showcasePath(root, 'manifest.yaml');
+  writeFileSync(manifestFile, `${readFileSync(manifestFile, 'utf8')}withheld:\n  - { preset: crash-push, sample: landscape-a, reason: 'the car drives out of the frame' }\n`);
+  await writeSmoke([{ preset: 'crash-push' }, { preset: 'pan-left' }]);
+  const result = await ingestSmoke(root, smoke, 'landscape-a', {});
+  expect(result.added).toEqual(['clips/pan-left--landscape-a.mp4']);
+  expect(result.skipped).toEqual(['crash-push run 1: withheld from the showcase on landscape-a (the car drives out of the frame)']);
 }, FFMPEG_TIMEOUT_MS);
 
 test('keeps the comments of the manifest and replaces an entry ingested again', async () => {
