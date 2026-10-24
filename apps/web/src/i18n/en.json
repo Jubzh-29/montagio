@@ -83,6 +83,8 @@
   "localNote": "Runs on your GPU or a GPU you rent. Nothing leaves your machine.",
   "openStackTitle": "Open stack",
   "openStackIntro": "Every model Montagio can run, grouped by what it makes, is open weights under Apache-2.0 or MIT, and no closed API sits in the render path. This page shows the latest automated check, weight file by weight file.",
+  "openStackSdk": "Built on the Comfy SDK (@comfyorg/sdk) and comfy-api-proxy, both installed with Montagio: they send the Studio’s ComfyUI workflows to a ComfyUI on the same machine, never to a hosted service.",
+  "openStackNodePack": "The Montagio node pack for ComfyUI (GPL-3.0): Montagio Camera Embedding runs two camera moves in one Wan 2.2 Fun Camera clip, and Load Montagio Preset turns a preset file into the inputs of a graph.",
   "openStackUnavailable": "The latest check could not be loaded. Reload the page to try again.",
   "openStackSummary": "{models} models · {files} weight files · {size} GB",
   "stackCamera": "Camera moves",
