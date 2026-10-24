@@ -209,7 +209,11 @@ test('a camera clip gets its HD version', async ({ page }) => {
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
+  // Smooth motion is ticked by default, and the HD job is asked for with it
+  await expect(page.getByRole('checkbox', { name: /^Smooth motion/ })).toBeChecked();
+  const hd = page.waitForRequest((request) => request.method() === 'POST' && request.url().endsWith('/upscale'));
   await page.getByRole('button', { name: /^HD 1080p/ }).click();
+  expect((await hd).postDataJSON()).toEqual({ smooth: true });
   await expect(page.getByRole('link', { name: 'Download in HD' })).toHaveAttribute('href', /\/media\/data\/jobs\/.+\/output\.mp4$/, { timeout: 15_000 });
   await expect(page.getByTestId('hd-caption')).toHaveText(/SeedVR2/);
 });
