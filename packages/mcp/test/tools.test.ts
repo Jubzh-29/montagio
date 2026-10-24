@@ -55,6 +55,7 @@ describe('MCP tools', () => {
         'list_effects_and_hooks',
         'list_history',
         'motion_transfer',
+        'restyle_video',
         'talking_avatar',
         'text_to_image',
         'upload_photo',
@@ -160,6 +161,29 @@ describe('MCP tools', () => {
     expect(isError).toBe(true);
     expect(data.error).toBe('rights-required');
     expect(app.calls).toHaveLength(0);
+  });
+
+  it('restyle_video sends nothing without rights: true', async () => {
+    const app = fakeFetch(() => reply({}));
+    client = await connect(testConfig(), { fetch: app.fetch });
+    const { isError, data } = await callTool(client, 'restyle_video', { videoRef: 'videos/v1', prompt: 'a snowy winter evening' });
+
+    expect(isError).toBe(true);
+    expect(data.error).toBe('rights-required');
+    expect(app.calls).toHaveLength(0);
+  });
+
+  it('restyle_video sends the clip and the text, and a look image only when given', async () => {
+    const app = jobApp('restyle', [{ state: 'succeeded', progress: 1, outputUrl: '/media/data/jobs/j1/out.mp4' }]);
+    client = await connect(testConfig(), { fetch: app.fetch, ...fakeClock() });
+    const plain = await callTool(client, 'restyle_video', { videoRef: 'videos/v1', prompt: ' a snowy winter evening ', rights: true });
+    expect(plain.isError).toBeFalsy();
+    expect(app.calls.find((call) => call.path === '/api/restyle')!.json).toEqual({ videoRef: 'videos/v1', prompt: 'a snowy winter evening', rights: true });
+
+    const look = jobApp('restyle', [{ state: 'succeeded', progress: 1, outputUrl: '/media/data/jobs/j1/out.mp4' }]);
+    client = await connect(testConfig(), { fetch: look.fetch, ...fakeClock() });
+    await callTool(client, 'restyle_video', { videoRef: 'videos/v1', prompt: 'a watercolor painting', imageRef: 'samples/s.png', rights: true });
+    expect(look.calls.find((call) => call.path === '/api/restyle')!.json).toEqual({ videoRef: 'videos/v1', prompt: 'a watercolor painting', imageRef: 'samples/s.png', rights: true });
   });
 
   it('camera_move sends the description as userPrompt and polls the generation', async () => {

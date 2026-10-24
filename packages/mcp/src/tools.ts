@@ -22,6 +22,7 @@ export const TOOL_NAMES = [
   'apply_hook',
   'talking_avatar',
   'motion_transfer',
+  'restyle_video',
   'upscale_to_1080p',
   'get_job',
   'list_history',
@@ -209,7 +210,7 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
       description:
         'List what this installation renders beyond camera moves: the one-photo effects (Squish, Explode…) for apply_effect, the hooks (keyframe ' +
         'transitions; references: 2 means a second photo, an outfit) for apply_hook, the extensions switched on (edit, effects, transitions, avatar, ' +
-        'upscale, motion…), and the time estimates in seconds.',
+        'upscale, motion, restyle…), and the time estimates in seconds.',
       annotations: readOnly,
     },
     async () =>
@@ -240,7 +241,7 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
             }),
           ),
           estimates_s: info.estimates,
-          models: defined({ edit: info.editModel, avatar: info.avatarModel, upscale: info.upscaleModel, motion: info.motionModel }),
+          models: defined({ edit: info.editModel, avatar: info.avatarModel, upscale: info.upscaleModel, motion: info.motionModel, restyle: info.restyleModel }),
         });
       }),
   );
@@ -535,11 +536,63 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
   );
 
   server.registerTool(
+    'restyle_video',
+    {
+      title: 'Restyle a video',
+      description:
+        'Rebuild the whole scene of a short clip from a text ("a snowy winter evening", "a watercolor painting"), keeping its motion, camera move ' +
+        'and timing. The clip is cut to its first 5 s, without sound. An optional image gives a look to follow; without one, the edit first ' +
+        'restyles the clip\'s first frame from the text (when the edit extension is on). Needs rights: true, the user\'s word that they hold the ' +
+        'rights on the clip and the image; checked before anything is uploaded. Blocks until the clip is ready. Needs the restyle extension.',
+      inputSchema: {
+        prompt: z.string().min(1).max(500).describe('What the scene becomes, in a few words.'),
+        videoPath: z.string().min(1).optional().describe('The clip, a local MP4, WebM or MOV file (50 MB at most). Give this or videoRef.'),
+        videoRef: z.string().min(1).optional().describe('A clip already uploaded (the videoRef of an earlier restyle_video or motion_transfer). Give this or videoPath.'),
+        imageRef: z.string().min(1).optional().describe('An image whose look to follow, already in the app (optional). Give this, path, or neither.'),
+        path: z.string().min(1).optional().describe('An image whose look to follow, a local file (optional). Give this, imageRef, or neither.'),
+        rights: z
+          .boolean()
+          .default(false)
+          .describe('The user holds the rights on the clip (and the image). Defaults to false. Set it to true only when the user has said so; never assume it.'),
+        timeoutMinutes,
+      },
+      annotations: renders,
+    },
+    async (args, extra) =>
+      guard(async () => {
+        // Nothing is sent without the user's word: the app would refuse the same way (rights-required).
+        if (args.rights !== true) throw new ToolFailure('rights-required');
+        if (args.videoPath && args.videoRef) throw new ToolFailure('invalid-arguments', 'Give videoPath or videoRef, not both.');
+        if (!args.videoPath && !args.videoRef) throw new ToolFailure('invalid-arguments', 'Give the clip: videoPath (a local file) or videoRef.');
+        const look = args.imageRef || args.path ? await photoOf(client, args) : undefined;
+        let videoRef = args.videoRef;
+        let video: Record<string, unknown> = {};
+        if (args.videoPath) {
+          try {
+            const uploaded = await client.uploadVideo(args.videoPath);
+            videoRef = uploaded.videoRef;
+            video = { video: { duration_s: uploaded.duration_s, sourceDuration_s: uploaded.sourceDuration_s, frames: uploaded.frames, aspect: uploaded.aspect } };
+          } catch (error) {
+            throw look ? annotate(error, { inputImageRef: look.imageRef }) : error;
+          }
+        }
+        // The restyle, and the edit of its first frame when there is no look image and the edit is on.
+        const estimate_s = await estimateOf(client, (info) =>
+          info.estimates.restyle === undefined ? undefined : info.estimates.restyle + (!look && info.extensions.includes('edit') ? (info.estimates.edit ?? 0) : 0),
+        );
+        const more = { ...(look ? { inputImageRef: look.imageRef } : {}), videoRef, ...video, estimate_s };
+        return render(client, extra, { timeoutMinutes: args.timeoutMinutes, more }, () =>
+          client.startJob('/api/restyle', { videoRef, prompt: args.prompt.trim(), ...(look ? { imageRef: look.imageRef } : {}), rights: args.rights }),
+        );
+      }),
+  );
+
+  server.registerTool(
     'upscale_to_1080p',
     {
       title: 'Upscale to 1080p',
       description:
-        'Make an HD 1080p copy of a finished clip: a camera_move clip, or an effect, hook, avatar or motion clip. The clip must be 121 frames at ' +
+        'Make an HD 1080p copy of a finished clip: a camera_move clip, or an effect, hook, avatar, motion or restyle clip. The clip must be 121 frames at ' +
         'most (upscale model\'s maxFrames in list_effects_and_hooks). Blocks until done. Needs the upscale extension.',
       inputSchema: {
         id: z.string().min(1).describe('The id of the finished clip (returned by the tool that made it, or from list_history).'),

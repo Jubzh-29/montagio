@@ -37,7 +37,7 @@ export type UploadResult = {
   personal: boolean;
 };
 
-/** POST /api/uploads/video: the reference clip of a motion transfer, cut to 5 s at most. */
+/** POST /api/uploads/video: the reference clip of a motion transfer, or the clip of a restyle, cut to 5 s at most. */
 export type VideoUploadResult = {
   videoRef: string;
   duration_s: number;
@@ -106,12 +106,13 @@ export type ExtensionsInfo = {
   extensions: string[];
   effects: { id: string; name: string; description: string; previewUrl?: string; estimate_s: number; subjectMax: number; modelName: string; license: string }[];
   hooks: { id: string; name: string; description: string; previewUrl?: string; estimate_s: number; references: 1 | 2; modelName: string; license: string }[];
-  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; motion?: number };
+  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; motion?: number; restyle?: number };
   editModel?: Named;
   avatarModel?: Named;
   musicModel?: Named;
   upscaleModel?: Named & { maxFrames: number };
   motionModel?: Named;
+  restyleModel?: Named;
 };
 
 /** GET /api/history: one finished creation, newest first. */
@@ -323,7 +324,7 @@ export class MontagioClient {
     return { ...value, ...(value.url ? { url: this.absolute(value.url) } : {}) };
   }
 
-  /** Start a job (/api/images, /api/edits, /api/effects, /api/hooks, /api/avatars, /api/motion). */
+  /** Start a job (/api/images, /api/edits, /api/effects, /api/hooks, /api/avatars, /api/motion, /api/restyle). */
   async startJob(route: string, body: Record<string, unknown>): Promise<RenderStatus> {
     return this.fromJob((await this.call<JobSummary>('POST', route, { json: body }, true)).value);
   }

@@ -15,7 +15,7 @@ const INSTRUCTIONS = [
   'camera_move takes a preset (list_camera_presets) and, strongly recommended, a description of what the photo shows.',
   'apply_effect and apply_hook take ids from list_effects_and_hooks.',
   'Renders block until done (minutes on a GPU) and return the clip URL and its id; past the timeout, follow the render with get_job.',
-  'Consent: edit_photo, apply_effect, apply_hook and talking_avatar on an imported photo need consent: true, and motion_transfer needs rights: true.',
+  'Consent: edit_photo, apply_effect, apply_hook and talking_avatar on an imported photo need consent: true, and motion_transfer and restyle_video need rights: true.',
   'Set them only when the user has confirmed it (the person in the photo is them, or has agreed; they hold the rights); never on their behalf.',
 ].join(' ');
 
