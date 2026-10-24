@@ -376,7 +376,8 @@ describe('downloads and catalog', () => {
 
   test('models list exposes licenses', async () => {
     const list = await (await getModels()).json();
-    expect(list.map((m: { license: string }) => m.license)).toEqual(['Apache-2.0', 'Apache-2.0', 'Apache-2.0']);
+    expect(list.map((m: { license: string }) => m.license)).toEqual(['Apache-2.0', 'Apache-2.0', 'Apache-2.0', 'Apache-2.0']);
+    expect(list.map((m: { tier: string }) => m.tier)).toEqual(['quality', 'turbo', 'fast', 'fast']);
   });
 
   test('open-stack report is ok for the repository', async () => {

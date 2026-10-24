@@ -109,7 +109,7 @@ test('lists presets in gallery order with their light preview', async () => {
   expect(presets[0]).toMatchObject({ previewUrl: '/montagio/showcase/previews/crash-push.mp4', poses: ['zoom_in'] });
   // The tile says when its loop is a placeholder (crash-push is rendered in this fixture, pan-left is not).
   expect(presets.map((p) => (p as { previewPlaceholder?: boolean }).previewPlaceholder)).toEqual([false, true]);
-  expect((await call(router, 'GET', '/api/models')).json).toHaveLength(3);
+  expect((await call(router, 'GET', '/api/models')).json).toHaveLength(4);
   expect((await call(router, 'GET', '/api/open-stack')).json).toMatchObject({ ok: true });
   const yaml = await call(router, 'GET', '/api/presets/crash-push/yaml');
   expect(yaml.type).toMatch(/^application\/yaml/);

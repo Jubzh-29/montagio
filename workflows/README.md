@@ -7,6 +7,7 @@ They are converted from the official ComfyUI templates of [Comfy-Org/workflow_te
 | Workflow | Template | Model |
 |---|---|---|
 | `wan22-fun-camera.api.json` | `templates/video_wan2_2_14B_fun_camera.json` | Wan 2.2 Fun Camera 14B (high and low noise) |
+| `wan22-fun-camera-turbo.api.json` | `templates/video_wan2_2_14B_fun_camera.json`, its 4-step group | Wan 2.2 Fun Camera 14B with the 4-step LoRAs of lightx2v |
 | `wan22-ti2v-5b.api.json` | `templates/video_wan2_2_5B_ti2v.json` | Wan 2.2 TI2V 5B |
 | `z-image-turbo.api.json` | `templates/image_z_image_turbo.json` | Z-Image-Turbo |
 
@@ -33,7 +34,7 @@ All models:
 
 Wan 2.2 Fun Camera:
 - only the 20-step group is kept: two `KSamplerAdvanced`, 10 steps on the high-noise model then 10 on the low-noise model, cfg 3.5, euler/simple, and `ModelSamplingSD3` with shift 8 on both models;
-- the template's second group (4 steps, with the LightX2V LoRAs) is left out until GPU session S2 has checked that the camera move survives it (see `docs/S1_ANALYSE.md`). Its own note says these LoRAs lose some of the motion.
+- the template's second group (4 steps, with the LightX2V LoRAs) is the Turbo workflow, `wan22-fun-camera-turbo.api.json` (below). Its own note says these LoRAs lose some of the motion.
 - The template's negative prompt is the default Wan negative (Chinese text, node 99 of the template). The compiler replaces the negative with the preset's, so it is not kept here. GPU session S2 compares the two.
 
 Wan 2.2 5B:
@@ -43,6 +44,11 @@ Wan 2.2 5B:
 Z-Image-Turbo:
 - the negative is `ConditioningZeroOut` of the positive, as in the template. At cfg 1 there is no negative prompt, so the model has no `negative` binding;
 - `ModelSamplingAuraFlow` with shift 3, `KSampler` 8 steps, cfg 1, res_multistep/simple.
+
+Wan 2.2 Fun Camera Turbo (2026-10-24), the template's 4-step group:
+- `LoraLoaderModelOnly` 88 and 90 (the template's ids) put `wan2.2_i2v_lightx2v_4steps_lora_v1_{high,low}_noise` at strength 1 on the high- and low-noise models, before `ModelSamplingSD3` (shift 8 on both, as in the group);
+- two `KSamplerAdvanced`, 4 steps at cfg 1, euler/simple, split at step 2;
+- every other node keeps the id it has in `wan22-fun-camera.api.json` (the template's 20-step group), so both models share their bindings, and the changes listed above for the 20-step workflow apply as well. The template measures 536 s at 20 steps and 71 s warm at 4 steps on an RTX 4090D (640×640).
 
 ## Combined camera moves
 
@@ -133,6 +139,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 | Model | image | prompt | negative | seed | width / height / frames | fps | camera_pose / camera_speed |
 |---|---|---|---|---|---|---|---|
 | `wan22-i2v-a14b-fun-camera` | 97.image | 107.text | 99.text | 102.noise_seed | 108.width / height / length | 105.fps | 108.camera_pose / speed |
+| `wan22-i2v-a14b-fun-camera-turbo` | 97.image | 107.text | 99.text | 102.noise_seed | 108.width / height / length | 105.fps | 108.camera_pose / speed |
 | `wan22-ti2v-5b` | 56.image | 6.text | 7.text | 3.seed | 55.width / height / length | 57.fps | (camera in the prompt) |
 | `z-image-turbo` | | 27.text | | 3.seed | 13.width / height | | |
 

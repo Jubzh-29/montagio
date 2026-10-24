@@ -5,7 +5,7 @@ One command checks your machine, installs everything Montagio needs and opens it
 - [ComfyUI](https://github.com/Comfy-Org/ComfyUI) v0.41.0, in its own Python environment, with a pinned CUDA build of PyTorch, started with `--disable-partner-nodes`;
 - [comfy-api-proxy](https://github.com/Comfy-Org/comfy-api-proxy) 0.1.6 (MIT), which gives the app the Comfy API in front of that ComfyUI;
 - the Montagio node pack (`comfy-nodes`), linked into ComfyUI;
-- the open weights of [`registry/models.lock.yaml`](../registry/models.lock.yaml), about 70 GB, all Apache-2.0, each checked against its sha256;
+- the open weights of [`registry/models.lock.yaml`](../registry/models.lock.yaml), about 72 GB, all Apache-2.0, each checked against its sha256;
 - the Montagio app, built and served on `127.0.0.1`.
 
 The install downloads from GitHub, PyPI, the PyTorch index, npm and Hugging Face. Once installed, Montagio runs on your machine: every service listens on `127.0.0.1` only, there is no account, no key and no paid API, and your images and clips never leave it.
@@ -20,7 +20,7 @@ If you just want to see Montagio, the demo link needs no install at all.
 | GPU | NVIDIA with 24 GB of VRAM (RTX 3090, RTX 4090, L4, A10, A5000, …) |
 | NVIDIA driver | R580 or newer (CUDA 13.0); R570 (CUDA 12.8) works with an older PyTorch |
 | RAM | 32 GB or more recommended |
-| Disk | about 110 GB free by default: 70 GB of weights for the camera presets, 21 GB for the effects pack, ComfyUI and PyTorch, the app; about 90 GB with `--extensions none`, about 200 GB with `--extensions all` |
+| Disk | about 112 GB free by default: 72 GB of weights for the camera presets (their Turbo LoRAs included), 21 GB for the effects pack, ComfyUI and PyTorch, the app; about 92 GB with `--extensions none`, about 200 GB with `--extensions all` |
 | Node.js | 22.18 or newer |
 | Python | 3.10 to 3.13, with `venv` (3.12 is preferred; 3.14 is not used yet) |
 | git and FFmpeg | `git`, `ffmpeg` and `ffprobe` on the `PATH` |
@@ -58,7 +58,7 @@ powershell -ExecutionPolicy Bypass -File .\montagio.ps1 install
 
 To see what would happen first, add `--dry-run`: the installer checks the machine and prints every step with its exact commands, and changes nothing.
 
-The first install takes a while. Most of it is the download of the weights: 64.9 GiB for the camera presets and 19.2 GiB for the effects pack, about 30 minutes at 50 MB/s. `--extensions all` adds the other extensions, about 87 GiB more. PyTorch is about 3 GB more. Then it starts ComfyUI, comfy-api-proxy and the app, and opens `http://127.0.0.1:3000`.
+The first install takes a while. Most of it is the download of the weights: 67.2 GiB for the camera presets and 19.2 GiB for the effects pack, about 30 minutes at 50 MB/s. `--extensions all` adds the other extensions, about 85 GiB more. PyTorch is about 3 GB more. Then it starts ComfyUI, comfy-api-proxy and the app, and opens `http://127.0.0.1:3000`.
 
 A download that stops (network, Ctrl+C, a closed window) resumes where it was: run the same command again.
 
@@ -147,13 +147,13 @@ Without a 24 GB GPU, `install --app-only` installs the app alone: no ComfyUI, no
 
 ### Extensions
 
-Seven extensions run models of their own, beyond the camera presets, in their order of priority: photo edit (Qwen-Image-Edit-2511, 4 steps with a Lightning LoRA, three looks and a second image), a pack of six one-photo effects (Wan 2.1 I2V 480p with effect LoRAs), keyframe transitions (Wan 2.2 FLF2V; the edit makes their end frame, so `transitions` requires `edit`), the talking avatar (Wan 2.2 S2V and a Chatterbox voice), film music (ACE-Step 1.5) HD upscale (SeedVR2) and, last, motion transfer (Wan2.2-Animate-2 distilled: the character of a photo moves like a short reference video). Their weights are in the lock, marked with their extension, and the installer fetches them only for the extensions asked for. By default that is the ones a GPU session validated, listed with a date in `registry/extensions.yaml` (GPU session S2 dated all seven on 2026-10-21). A plain install takes the **effects pack** alone, the most shareable one and among the lightest; `--extensions all` takes the seven, about 114 GB more (the avatar aside, see below), and `--extensions none` keeps the 70 GB of the camera presets. Extra disk space, all Apache-2.0 or MIT (the effect LoRAs declare it in their card metadata only):
+Seven extensions run models of their own, beyond the camera presets, in their order of priority: photo edit (Qwen-Image-Edit-2511, 4 steps with a Lightning LoRA, three looks and a second image), a pack of six one-photo effects (Wan 2.1 I2V 480p with effect LoRAs), keyframe transitions (Wan 2.2 FLF2V; the edit makes their end frame, so `transitions` requires `edit`), the talking avatar (Wan 2.2 S2V and a Chatterbox voice), film music (ACE-Step 1.5) HD upscale (SeedVR2) and, last, motion transfer (Wan2.2-Animate-2 distilled: the character of a photo moves like a short reference video). Their weights are in the lock, marked with their extension, and the installer fetches them only for the extensions asked for. By default that is the ones a GPU session validated, listed with a date in `registry/extensions.yaml` (GPU session S2 dated all seven on 2026-10-21). A plain install takes the **effects pack** alone, the most shareable one and among the lightest; `--extensions all` takes the seven, about 112 GB more (the avatar aside, see below), and `--extensions none` keeps the 72 GB of the camera presets. Extra disk space, all Apache-2.0 or MIT (the effect LoRAs declare it in their card metadata only):
 
 | Extension | Weights |
 |---|---|
 | `edit` | 31.9 GB |
 | `effects` | 20.6 GB |
-| `transitions` | 31.0 GB |
+| `transitions` | 28.6 GB (its two 4-step LoRAs come with the camera presets) |
 | `avatar` | 23.6 GB |
 | `music` | 10.0 GB |
 | `upscale` | 4.0 GB |
@@ -191,7 +191,7 @@ The logs of the three services are in `<install folder>/logs/`.
 
 1. Stop Montagio: `./montagio.sh stop` (or `… .\montagio.ps1 stop`).
 2. Remove the link to the node pack first, so that nothing deletes the repository's `comfy-nodes` through it. On Windows: `cmd /c rmdir "%LOCALAPPDATA%\Montagio\ComfyUI\custom_nodes\montagio"` (`rmdir` without `/s` removes the junction only; Windows PowerShell 5.1's `Remove-Item -Recurse` may follow it into the repository). On Linux: `rm ~/.local/share/montagio/ComfyUI/custom_nodes/montagio`. Adapt the path if you installed with `--dir`.
-3. Delete the install folder (see [where](#what-gets-installed-and-where)). It holds the weights: about 65 GiB for the camera presets, 84 GiB with the effects pack, about 170 GiB with every extension.
+3. Delete the install folder (see [where](#what-gets-installed-and-where)). It holds the weights: about 67 GiB for the camera presets, 86 GiB with the effects pack, about 170 GiB with every extension.
 4. Delete the repository folder. Keep its `data/` folder first if you want your clips.
 
 Nothing else is changed on your machine: no service, no setting, no file outside these two folders, apart from pip's and npm's download caches.

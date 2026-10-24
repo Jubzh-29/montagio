@@ -50,7 +50,7 @@ import { EffectFields } from './EffectFields';
 import { OutfitSource } from './OutfitSource';
 import { EffectWall } from './EffectWall';
 import { Header } from './Header';
-import { ModelPicker } from './ModelPicker';
+import { ModelPicker, TIER_LABEL } from './ModelPicker';
 import { Monitor, type GenerationState, type TrackedJob, type UploadState } from './Monitor';
 import { DrawAtelier } from './DrawAtelier';
 import { PhotoAtelier, type AtelierPhoto } from './PhotoAtelier';
@@ -943,7 +943,7 @@ export function Studio() {
   const speechSeconds = estimateSpeech(speechText, speechLanguage);
   const slate = slateMove && [
     slateMove,
-    tab !== 'effects' && tab !== 'avatar' && tab !== 'motion' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
+    tab !== 'effects' && tab !== 'avatar' && tab !== 'motion' && selectedModel && t(TIER_LABEL[selectedModel.tier]),
     tab === 'motion'
       ? motionVideo.status === 'ready' && motionVideo.duration_s !== undefined && t('slateSpec', { s: Math.round(motionVideo.duration_s * 10) / 10 })
       : tab === 'avatar'

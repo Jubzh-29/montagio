@@ -43,7 +43,8 @@ export const ModelSchema = z
     id: kebabId,
     name: z.string().min(1).max(60),
     kind: z.enum(['video', 'image']),
-    tier: z.enum(['quality', 'fast']),
+    /** quality: every step; turbo: the same model in a few distilled steps; fast: a smaller model. */
+    tier: z.enum(['quality', 'turbo', 'fast']),
     capabilities: z.array(z.enum(CAPABILITIES)).min(1),
     license: z.enum(ALLOWED_WEIGHT_LICENSES),
     weights: z.array(kebabId).min(1),

@@ -165,7 +165,8 @@ test('a changed package-lock reinstalls npm and rebuilds the app', () => {
 
 test('diskNeed counts the weights to fetch, the environment and the margins', () => {
   const total = lock.reduce((sum, w) => sum + w.size, 0);
-  expect(total).toBe(69_691_750_955);
+  // the presets' weights, with the two 4-step LoRAs of the Turbo since 2026-10-24
+  expect(total).toBe(72_145_705_803);
   const need = diskNeed(buildPlan(fresh()), lock, () => 0);
   expect(need.installDir).toBe(total + 12 * GiB + 0.5 * GiB + 2 * GiB);
   expect(need.repo).toBe(2 * GiB + 1 * GiB + 2 * GiB);

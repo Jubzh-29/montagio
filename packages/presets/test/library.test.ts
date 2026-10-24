@@ -55,7 +55,8 @@ test('CRLF files load', async () => {
 
 test('the real repository library loads', async () => {
   const lib = await loadLibrary(repoRoot());
-  expect([...lib.models.keys()].sort()).toEqual(['wan22-i2v-a14b-fun-camera', 'wan22-ti2v-5b', 'z-image-turbo']);
+  expect([...lib.models.keys()].sort()).toEqual(['wan22-i2v-a14b-fun-camera', 'wan22-i2v-a14b-fun-camera-turbo', 'wan22-ti2v-5b', 'z-image-turbo']);
+  expect(lib.models.get('wan22-i2v-a14b-fun-camera-turbo')?.tier).toBe('turbo');
   expect(lib.presets.size).toBeGreaterThanOrEqual(3);
   expect(lib.extensions?.map((entry) => entry.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion']);
 });

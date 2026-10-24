@@ -17,7 +17,7 @@ export type ModelSummary = {
   id: string;
   name: string;
   kind: 'video' | 'image';
-  tier: 'quality' | 'fast';
+  tier: 'quality' | 'turbo' | 'fast';
   license: string;
   estimate_s: { '480p': number; '720p'?: number };
 };
