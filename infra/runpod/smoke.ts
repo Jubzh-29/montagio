@@ -132,7 +132,7 @@ Extensions (instead of presets):
   --clip PATH        the clip to upscale (required by upscale)
   --smooth           upscale: RIFE frames in between, twice the clip's frame rate (16 to 32 fps for Wan)
   --motion PATH      the reference video of the motion transfer, or the clip to restyle (required by motion and restyle):
-                     its first 5 s are kept, at 16 fps, silent
+                     its first 30 s are kept, at 16 fps, silent (a restyle rebuilds the first 5 s)
   --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
   --voice PATH       voice: speak with this sample (a consented recording, mono FLAC) instead of the built-in voice
   --text [JOB=]TEXT  the edit instruction, the effects' subject, the words to say, the music description or the
@@ -551,7 +551,7 @@ async function runExtensions(
     } else if (args.motion) {
       await mkdir(join(outDir, 'inputs'), { recursive: true });
       motion = join(outDir, 'inputs', 'motion.mp4');
-      const prepared = await prepareMotionClip(fromCaller(args.motion), motion);
+      const prepared = await prepareMotionClip(fromCaller(args.motion), motion, { max_s: 30 });
       motion_s = prepared.duration_s;
       motionAspect = pickAspect(prepared.width, prepared.height);
       if (names.includes('restyle-edit')) {

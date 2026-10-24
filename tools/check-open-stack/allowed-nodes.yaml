@@ -99,6 +99,9 @@ nodes:
   - { class_type: BasicScheduler, source: comfyui-core, license: GPL-3.0 }
   - { class_type: KSamplerSelect, source: comfyui-core, license: GPL-3.0 }
   - { class_type: GetImageSize, source: comfyui-core, license: GPL-3.0 }
+  # Motion transfer up to 30 s (2026-10-24): comfy_extras/nodes_context_windows.py, the context windows
+  # the official template switches on for clips longer than one window.
+  - { class_type: ContextWindowsManual, source: comfyui-core, license: GPL-3.0 }
   # Restyle (workflows/wan21-vace-restyle.api.json, Wan 2.1 VACE 14B), core of ComfyUI v0.41.0:
   # comfy_extras/nodes_wan.py (WanVaceToVideo), nodes_depth_anything_3.py (LoadDA3Model, DA3Inference,
   # DA3Render) and nodes.py (ImageScale, ImageBatch, EmptyImage: the first frame and its mask).

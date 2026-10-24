@@ -97,8 +97,10 @@ export const MAX_VIDEO_FORM_BYTES = MAX_VIDEO_BYTES + 64 * 1024;
 const VIDEO_TYPES: Record<string, string> = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov' };
 /** The shortest reference clip the motion model animates. */
 const MIN_VIDEO_S = 1;
+/** The longest one it animates in one pass (context windows); a restyle rebuilds its first 5 s. */
+export const MAX_REFERENCE_S = 30;
 
-/** A reference clip for a motion transfer, prepared once at upload: 5 s at most, 16 fps, silent. */
+/** A reference clip for a motion transfer or a restyle, prepared once at upload: 30 s at most, 16 fps, silent. */
 export type VideoMeta = {
   videoRef: string;
   /** What is kept, and how long the clip sent was. */
@@ -113,7 +115,7 @@ export type VideoMeta = {
 const videosDir = () => join(getEnv().data, 'uploads', 'videos');
 
 /**
- * Keep the first 5 s of a reference clip at 16 fps, without its sound (it may be music the
+ * Keep the first 30 s of a reference clip at 16 fps, without its sound (it may be music the
  * user cannot share), in the folder of the uploads. A file that is not a readable video, or
  * shorter than 1 s, is refused.
  */
@@ -133,7 +135,7 @@ export async function saveVideoUpload(file: File): Promise<VideoMeta> {
     let prepared: Awaited<ReturnType<typeof prepareMotionClip>>;
     try {
       sourceDuration_s = (await probe(source)).duration_s;
-      prepared = await prepareMotionClip(source, out);
+      prepared = await prepareMotionClip(source, out, { max_s: MAX_REFERENCE_S });
     } catch {
       throw new UploadError(400, 'the file is not a readable video');
     }

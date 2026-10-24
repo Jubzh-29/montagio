@@ -48,6 +48,7 @@ export function RestyleFields({
   firstFrame,
   lookHidden = false,
   compose,
+  cut = false,
 }: {
   video: MotionVideo;
   disabled: boolean;
@@ -64,6 +65,8 @@ export function RestyleFields({
   lookHidden?: boolean;
   /** The slots of that composed look, under the image's. */
   compose?: ReactNode;
+  /** The clip lasts more than the 5 s a restyle rebuilds. */
+  cut?: boolean;
 }) {
   const { t } = useI18n();
   const lookUrl = look.status === 'idle' ? undefined : look.localUrl;
@@ -76,6 +79,11 @@ export function RestyleFields({
         onVideo={onVideo}
         labels={{ title: 'restyleVideo', empty: 'restyleVideoEmpty', add: 'restyleVideoAdd' }}
       />
+      {cut && (
+        <p className={styles.hint} data-testid="restyle-cut">
+          {t('restyleFirstSeconds')}
+        </p>
+      )}
       {!lookHidden && (
       <section className={styles.panelSection} aria-labelledby="restyle-look-title">
         <h2 id="restyle-look-title" className={styles.sectionTitle}>

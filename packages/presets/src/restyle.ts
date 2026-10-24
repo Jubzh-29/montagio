@@ -54,8 +54,9 @@ export function restyleInstruction(prompt: string): string {
 /**
  * A restyle (Wan 2.1 VACE 14B): the scene of the clip rebuilt from the text, and the reference when
  * there is one, along the depth of its frames, so that its motion, camera move and timing stay; at
- * 480p and 16 fps. The window is 4n+1 frames covering the clip, 81 at most; VACE pads the up to 3
- * frames that round it up with no control.
+ * 480p and 16 fps. The window is 4n+1 frames covering the clip's first 5 s, 81 at most (a longer
+ * clip, up to the motion transfer's 30 s, is cut there); VACE pads the up to 3 frames that round
+ * it up with no control.
  */
 export function compileRestyle(
   model: ExtensionModel,
@@ -64,7 +65,7 @@ export function compileRestyle(
 ): ExtensionCompiled<{ width: number; height: number; frames: number; seed: number; prompt: string; reference: RestyleReference | null }> {
   if (model.task !== 'v2v-restyle') throw new CompileError(`model ${model.id} runs task ${model.task}, not v2v-restyle`);
   requireNodes(model, template, Object.values(RESTYLE_NODES));
-  const { min_duration_s: shortest = 1, max_duration_s: longest = 5, max_chars } = model.limits;
+  const { min_duration_s: shortest = 1, max_duration_s: longest = 30, max_chars } = model.limits;
   // the prepared clip of a 5 s source may probe a few milliseconds over 5 s
   if (!(inputs.video_s >= shortest && inputs.video_s <= longest + 0.05)) {
     throw new CompileError(`the clip lasts ${inputs.video_s} s; a restyle takes ${shortest} to ${longest} s`);

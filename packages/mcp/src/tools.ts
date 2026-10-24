@@ -31,6 +31,15 @@ export const TOOL_NAMES = [
 
 const CODE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+/**
+ * The windows a motion transfer of `seconds` is sampled in, as motionWindows of @montagio/presets counts them
+ * (81 frames at 16 fps in one; past that, 21 latent frames overlapping by 8): what its time scales with.
+ */
+function motionWindowsOf(seconds: number): number {
+  const frames = Math.min(481, 4 * Math.ceil((Math.floor(seconds * 16) - 1) / 4) + 1);
+  return frames <= 81 ? 1 : Math.ceil(((frames - 1) / 4 + 1 - 21) / 13) + 1;
+}
+
 // ---------------------------------------------------------------- shared schemas
 
 const imageRef = z
@@ -485,7 +494,8 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
     {
       title: 'Motion transfer',
       description:
-        'Make the character of a photo move like a reference video (a dance, a gesture). The video is cut to its first 5 s, without sound. ' +
+        'Make the character of a photo move like a reference video (a dance, a gesture). The video is cut to its first 30 s, without sound; ' +
+        'past 5 s the render takes about that many times longer, window by window. ' +
         'Needs rights: true, the user\'s word that they hold the rights on the photo and the video; checked before anything is uploaded. ' +
         'Blocks until the clip is ready. Needs the motion extension.',
       inputSchema: {
@@ -521,7 +531,9 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
             throw annotate(error, { inputImageRef: photo.imageRef });
           }
         }
-        const estimate_s = await estimateOf(client, (info) => info.estimates.motion);
+        // A clip past one window of 5 s is sampled in context windows: the estimate scales with them.
+        const seconds = typeof (video.video as { duration_s?: unknown } | undefined)?.duration_s === 'number' ? (video.video as { duration_s: number }).duration_s : 5;
+        const estimate_s = await estimateOf(client, (info) => (info.estimates.motion === undefined ? undefined : info.estimates.motion * motionWindowsOf(seconds)));
         const more = { inputImageRef: photo.imageRef, videoRef, ...video, estimate_s };
         return render(client, extra, { timeoutMinutes: args.timeoutMinutes, more }, () =>
           client.startJob('/api/motion', {
@@ -541,7 +553,7 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
       title: 'Restyle a video',
       description:
         'Rebuild the whole scene of a short clip from a text ("a snowy winter evening", "a watercolor painting"), keeping its motion, camera move ' +
-        'and timing. The clip is cut to its first 5 s, without sound. An optional image gives a look to follow; without one, the edit first ' +
+        'and timing. Its first 5 s are rebuilt, without sound. An optional image gives a look to follow; without one, the edit first ' +
         'restyles the clip\'s first frame from the text (when the edit extension is on). Needs rights: true, the user\'s word that they hold the ' +
         'rights on the clip and the image; checked before anything is uploaded. Blocks until the clip is ready. Needs the restyle extension.',
       inputSchema: {

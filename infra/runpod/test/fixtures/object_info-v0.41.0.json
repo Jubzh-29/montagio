@@ -5816,5 +5816,153 @@
   "output_node": false,
   "has_intermediate_output": false,
   "search_aliases": []
+ },
+ "ContextWindowsManual": {
+  "input": {
+   "required": {
+    "model": [
+     "MODEL",
+     {}
+    ],
+    "context_length": [
+     "INT",
+     {
+      "default": 16,
+      "min": 1
+     }
+    ],
+    "context_overlap": [
+     "INT",
+     {
+      "default": 4,
+      "min": 0
+     }
+    ],
+    "context_schedule": [
+     "COMBO",
+     {
+      "default": "standard_static",
+      "multiselect": false,
+      "options": [
+       "standard_static",
+       "standard_uniform",
+       "looped_uniform",
+       "batched"
+      ]
+     }
+    ],
+    "context_stride": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1
+     }
+    ],
+    "closed_loop": [
+     "BOOLEAN",
+     {
+      "default": false
+     }
+    ],
+    "fuse_method": [
+     "COMBO",
+     {
+      "default": "pyramid",
+      "multiselect": false,
+      "options": [
+       "pyramid",
+       "relative",
+       "flat",
+       "overlap-linear"
+      ]
+     }
+    ],
+    "dim": [
+     "INT",
+     {
+      "default": 0,
+      "min": 0,
+      "max": 5
+     }
+    ],
+    "freenoise": [
+     "BOOLEAN",
+     {
+      "default": false
+     }
+    ],
+    "cond_retain_index_list": [
+     "STRING",
+     {
+      "default": "",
+      "multiline": false
+     }
+    ],
+    "split_conds_to_windows": [
+     "BOOLEAN",
+     {
+      "default": false
+     }
+    ],
+    "latent_retain_index_list": [
+     "STRING",
+     {
+      "default": "",
+      "multiline": false
+     }
+    ],
+    "causal_window_fix": [
+     "BOOLEAN",
+     {
+      "default": true
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model",
+    "context_length",
+    "context_overlap",
+    "context_schedule",
+    "context_stride",
+    "closed_loop",
+    "fuse_method",
+    "dim",
+    "freenoise",
+    "cond_retain_index_list",
+    "split_conds_to_windows",
+    "latent_retain_index_list",
+    "causal_window_fix"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "MODEL"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "MODEL"
+  ],
+  "output_tooltips": [
+   "The model with context windows applied during sampling."
+  ],
+  "output_matchtypes": null,
+  "name": "ContextWindowsManual",
+  "display_name": "Context Windows (Manual)",
+  "description": "Manually set context windows.",
+  "python_module": "comfy_extras.nodes_context_windows",
+  "category": "model/patch",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": true,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
  }
 }

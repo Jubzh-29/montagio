@@ -24,6 +24,7 @@ import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
 import { applyReprise } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
+import { motionFrames, motionWindows } from '@montagio/presets/browser';
 import { useMotionPaused } from '@/lib/use-motion';
 import { needsConsent } from '@/lib/consent';
 import { defaultSubject, forSample, pickWallChoice } from '@/lib/effect-choice';
@@ -148,6 +149,9 @@ const SAMPLE_OF_TAB: Record<Tab, { file: string; scene: MessageKey; forTab?: 'ef
   avatar: { file: 'sample-portrait.png', scene: 'samplePortraitScene', forTab: 'avatar' },
   motion: { file: 'sample-character.png', scene: 'sampleCharacterScene', forTab: 'motion' },
 };
+
+/** The part of a longer clip a restyle rebuilds: one VACE window. */
+const RESTYLE_SECONDS = 5;
 
 /** Under the promise: what each tab makes, in one line. */
 const TAB_LEDES: Record<Tab, MessageKey> = {
@@ -916,7 +920,8 @@ export function Studio() {
     restyling
       ? (extensions?.estimates.restyle ?? 0) + (restyleFirstFrame || motionComposing ? (extensions?.estimates.edit ?? 0) : 0)
       : tab === 'motion'
-      ? (extensions?.estimates.motion ?? 0) + (motionComposing ? (extensions?.estimates.edit ?? 0) : 0)
+      ? (extensions?.estimates.motion ?? 0) * motionWindows(motionFrames(motionVideo.status === 'ready' ? (motionVideo.duration_s ?? 5) : 5)) +
+        (motionComposing ? (extensions?.estimates.edit ?? 0) : 0)
       : tab === 'avatar'
       ? (extensions?.estimates.avatar ?? 0)
       : tab === 'effects'
@@ -1022,7 +1027,7 @@ export function Studio() {
     slateMove,
     tab !== 'effects' && tab !== 'avatar' && tab !== 'motion' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
     tab === 'motion'
-      ? motionVideo.status === 'ready' && motionVideo.duration_s !== undefined && t('slateSpec', { s: Math.round(motionVideo.duration_s * 10) / 10 })
+      ? motionVideo.status === 'ready' && motionVideo.duration_s !== undefined && t('slateSpec', { s: Math.round(Math.min(motionVideo.duration_s, restyling ? RESTYLE_SECONDS : Infinity) * 10) / 10 })
       : tab === 'avatar'
       ? speechSeconds > 0 && t('slateSpec', { s: speechSeconds })
       : t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
@@ -1081,7 +1086,7 @@ export function Studio() {
                   name={t(restyling ? 'restyleTitle' : 'tabMotion')}
                   kindLabel={
                     motionVideo.status === 'ready' && motionVideo.duration_s !== undefined
-                      ? t(restyling ? 'restyleKind' : 'motionKind', { s: Math.round(motionVideo.duration_s * 10) / 10 })
+                      ? t(restyling ? 'restyleKind' : 'motionKind', { s: Math.round(Math.min(motionVideo.duration_s, restyling ? RESTYLE_SECONDS : Infinity) * 10) / 10 })
                       : t(restyling ? 'restyleKindEmpty' : 'motionKindEmpty')
                   }
                   previewUrl={extensions?.examples?.[restyling ? 'restyle' : 'motion']?.previewUrl}
@@ -1190,6 +1195,7 @@ export function Studio() {
                 onLook={(file) => void onLook(file)}
                 onClearLook={clearLook}
                 firstFrame={restyleFirstFrame}
+                cut={motionVideo.status === 'ready' && (motionVideo.duration_s ?? 0) > RESTYLE_SECONDS + 0.05}
                 lookHidden={motionComposing}
                 compose={motionComposeSlots}
               />

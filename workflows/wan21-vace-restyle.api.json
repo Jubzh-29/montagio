@@ -1,7 +1,8 @@
 {
   "1": {"class_type": "LoadVideo", "inputs": {"file": "clip.mp4"}},
   "2": {"class_type": "GetVideoComponents", "inputs": {"video": ["1", 0]}},
-  "3": {"class_type": "ImageScale", "inputs": {"image": ["2", 0], "upscale_method": "area", "width": 832, "height": 480, "crop": "center"}},
+  "7": {"class_type": "ImageFromBatch", "inputs": {"image": ["2", 0], "batch_index": 0, "length": 81}},
+  "3": {"class_type": "ImageScale", "inputs": {"image": ["7", 0], "upscale_method": "area", "width": 832, "height": 480, "crop": "center"}},
   "5": {"class_type": "LoadDA3Model", "inputs": {"model_name": "depth_anything_3_small.safetensors", "weight_dtype": "default"}},
   "6": {"class_type": "DA3Inference", "inputs": {"da3_model": ["5", 0], "image": ["3", 0], "resolution": 504, "resize_method": "upper_bound_resize", "mode": "mono"}},
   "4": {"class_type": "DA3Render", "inputs": {"da3_geometry": ["6", 0], "output": "depth", "output.normalization": "v2_style", "output.apply_sky_clip": false}},

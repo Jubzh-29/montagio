@@ -34,9 +34,13 @@ bindings:
     - { node: "24", field: height }
     - { node: "25", field: height }
     - { node: "30", field: height }
-  frames: { node: "30", field: length }
+  # the frames kept from the clip (its first 5 s at most), and VACE's length
+  frames:
+    - { node: "7", field: length }
+    - { node: "30", field: length }
 output: { node: "35", kind: video }
-limits: { min_duration_s: 1, max_duration_s: 5, max_chars: 500 }
+# a clip of up to 30 s (the motion transfer's): its first 5 s are rebuilt, one VACE window
+limits: { min_duration_s: 1, max_duration_s: 30, max_chars: 500 }
 # GPU seconds for 5 s on an RTX 4090 (4 steps, the depth pass included). Spike of 2026-10-24 on an L4
 # (about half as fast): 187 to 247 s a clip, the loading of VACE included; peak 20.4 to 22.2 GB.
 estimate_s: 120

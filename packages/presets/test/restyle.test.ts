@@ -100,10 +100,14 @@ describe('compileRestyle (Wan 2.1 VACE 14B on the depth of a clip)', () => {
     expect(() => compile({ prompt: 'a'.repeat(500) })).not.toThrow();
   });
 
-  test('a clip under 1 s or over 5 s is refused; a few milliseconds over 5 s pass', () => {
+  test('a longer clip, up to 30 s, is cut to its first 5 s; under 1 s or over 30 s is refused', () => {
     expect(() => compile({ video_s: 0.5 })).toThrow(CompileError);
-    expect(() => compile({ video_s: 5.5 })).toThrow(/5 s/);
-    expect(compile({ video_s: 5.04 }).params.frames).toBe(81);
+    expect(() => compile({ video_s: 31 })).toThrow(/30 s/);
+    const { workflow, params } = compile({ video_s: 12 });
+    expect(params.frames).toBe(81);
+    expect(workflow['7']!.inputs).toMatchObject({ image: ['2', 0], batch_index: 0, length: 81 });
+    expect(workflow['3']!.inputs.image).toEqual(['7', 0]);
+    expect(compile({ video_s: 3.2 }).workflow['7']!.inputs.length).toBe(53);
   });
 
   test('the shipped workflow loads VACE cast to fp8, with its 4-step LoRA, and saves node 35', () => {

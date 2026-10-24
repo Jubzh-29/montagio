@@ -24,10 +24,12 @@
  * restyle) come from the same CPU ComfyUI on 2026-10-24, its geometry_estimation folder holding the
  * lock's depth_anything_3_small.safetensors; UNETLoader and LoraLoaderModelOnly list the lock's VACE
  * 14B and its T2V LoRA (tooltips removed). The same graphs ran on an L4 in the restyle spike.
+ * ContextWindowsManual (the motion transfer past one window, up to 30 s) comes from the same CPU
+ * ComfyUI on 2026-10-24 (tooltips removed).
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { compileAvatar, compileEdit, compileEffect, compileImageUpscale, compileHookEdit, compileHookTransition, compileJob, compileMusic, compileRestyle, compileSpeech, compileTransition, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
+import { compileAvatar, compileEdit, compileEffect, compileImageUpscale, compileHookEdit, compileHookTransition, compileJob, compileMotion, compileMusic, compileRestyle, compileSpeech, compileTransition, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -222,6 +224,15 @@ test('the avatar job compiled for 1, 2 and 3 chunks is accepted', () => {
       seed: 3,
     });
     expect({ audio_s, problems: checkWorkflow(workflow, info) }).toEqual({ audio_s, problems: [] });
+  }
+});
+
+test.each(['16:9', '9:16', '1:1'] as Aspect[])('the motion job is accepted for one window and for 30 s through context windows (%s)', (aspect) => {
+  const model = library.extensionModels.get('wan-animate2-motion')!;
+  const template = library.extensionTemplates.get(model.workflow)!;
+  for (const video_s of [5, 12.3, 30]) {
+    const { workflow } = compileMotion(model, template, { imageRef: 'start.png', videoRef: 'clip.mp4', video_s, aspect, seed: 3 });
+    expect({ video_s, problems: checkWorkflow(workflow, info) }).toEqual({ video_s, problems: [] });
   }
 });
 

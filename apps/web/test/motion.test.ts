@@ -70,13 +70,13 @@ async function poll(id: string): Promise<JobSummary> {
 const sampleRef = async () => ((await (await postSampleUpload()).json()) as { imageRef: string }).imageRef;
 const videoRef = async () => ((await (await upload(clip(3, 'ref.mp4'))).json()) as { videoRef: string }).videoRef;
 
-test('a reference video is kept for 5 s at 16 fps, silent, with its aspect', async () => {
-  const res = await upload(clip(8, 'long.mp4'));
+test('a reference video is kept for 30 s at 16 fps, silent, with its aspect', async () => {
+  const res = await upload(clip(32, 'long.mp4'));
   expect(res.status).toBe(201);
   const meta = (await res.json()) as { videoRef: string; duration_s: number; sourceDuration_s: number; aspect: string; width: number; url: string };
   expect(meta).toMatchObject({ videoRef: expect.stringMatching(/^videos\/[0-9a-f-]{36}\.mp4$/), aspect: '16:9', width: 832 });
-  expect(meta.duration_s).toBeCloseTo(5, 0);
-  expect(meta.sourceDuration_s).toBeCloseTo(8, 0);
+  expect(meta.duration_s).toBeCloseTo(30, 0);
+  expect(meta.sourceDuration_s).toBeCloseTo(32, 0);
   const file = mediaFileFor(meta.url)!;
   expect(await probeAudio(file)).toBeNull();
   expect((await probe(file)).fps).toBe(16);
