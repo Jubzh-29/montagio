@@ -67,6 +67,17 @@ export type JobSummary = {
   createdAt?: string;
 };
 
+/** GET /api/sequences/:id and POST /api/sequences: a film of two or three shots. */
+export type SequenceRecord = {
+  id: string;
+  state: 'running' | 'assembling' | 'succeeded' | 'failed' | 'canceled';
+  progress: number;
+  outputUrl?: string;
+  verticalUrl?: string;
+  error?: string;
+  createdAt?: string;
+};
+
 /** GET /api/generations/:id and POST /api/generations: a camera clip. */
 export type GenerationRecord = {
   id: string;
@@ -128,13 +139,13 @@ export type HistoryItem = {
   reprise?: { imageRef?: string; presetId?: string; effectId?: string; hookId?: string; prompt?: string };
 };
 
-export type RenderKind = 'job' | 'generation';
+export type RenderKind = 'job' | 'generation' | 'sequence';
 
 /** A render as the tools return it: a job or a camera clip, its URLs absolute. */
 export type RenderStatus = {
   kind: RenderKind;
   id: string;
-  /** The job's task, or "camera" for a camera clip. */
+  /** The job's task, "camera" for a camera clip, "film" for a film. */
   task: string;
   state: JobState;
   progress: number;
@@ -295,6 +306,21 @@ export class MontagioClient {
     };
   }
 
+  fromSequence(record: SequenceRecord): RenderStatus {
+    return {
+      kind: 'sequence',
+      id: record.id,
+      task: 'film',
+      // The montage after the last shot is part of the render.
+      state: record.state === 'assembling' ? 'running' : record.state,
+      progress: record.progress,
+      outputUrl: this.absolute(record.outputUrl),
+      verticalUrl: this.absolute(record.verticalUrl),
+      error: record.error,
+      createdAt: record.createdAt,
+    };
+  }
+
   // Read-only catalogue.
   presets = () => this.get<PresetSummary[]>('/api/presets');
   models = () => this.get<ModelSummary[]>('/api/models');
@@ -341,9 +367,22 @@ export class MontagioClient {
 
   /** One poll: the app moves the render forward when it is asked. */
   async status(kind: RenderKind, id: string): Promise<RenderStatus> {
-    return kind === 'generation'
-      ? this.fromGeneration(await this.get<GenerationRecord>(`/api/generations/${encodeURIComponent(id)}`))
-      : this.fromJob(await this.get<JobSummary>(`/api/jobs/${encodeURIComponent(id)}`));
+    if (kind === 'generation') return this.fromGeneration(await this.get<GenerationRecord>(`/api/generations/${encodeURIComponent(id)}`));
+    if (kind === 'sequence') return this.fromSequence(await this.get<SequenceRecord>(`/api/sequences/${encodeURIComponent(id)}`));
+    return this.fromJob(await this.get<JobSummary>(`/api/jobs/${encodeURIComponent(id)}`));
+  }
+
+  /** Any creation route of the app (a recipe's request): a camera clip, a film, or a job. */
+  async startRequest(route: string, body: Record<string, unknown>): Promise<RenderStatus> {
+    const { value } = await this.call<unknown>('POST', route, { json: body }, true);
+    if (route === '/api/generations') return this.fromGeneration(value as GenerationRecord);
+    if (route === '/api/sequences') return this.fromSequence(value as SequenceRecord);
+    return this.fromJob(value as JobSummary);
+  }
+
+  /** The recipe of a render (GET /api/recipes/:kind/:id): its workflow, weights, seed and stack. */
+  recipe(kind: RenderKind, id: string): Promise<unknown> {
+    return this.get<unknown>(`/api/recipes/${kind}/${encodeURIComponent(id)}`);
   }
 
   /** A render by id alone: a job, else a camera clip. */

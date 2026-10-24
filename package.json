@@ -23,7 +23,8 @@
     "check:open-stack": "tsx tools/check-open-stack/src/cli.ts . --out apps/web/public/open-stack-report.json",
     "montagio": "tsx packages/presets/src/montagio.ts",
     "showcase": "tsx packages/showcase/src/showcase.ts",
-    "mcp": "tsx packages/mcp/src/server.ts"
+    "mcp": "tsx packages/mcp/src/server.ts",
+    "reproduce": "tsx packages/mcp/src/reproduce-cli.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

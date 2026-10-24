@@ -40,6 +40,12 @@ const MESSAGES: Record<string, string> = {
   'unsupported-file': 'This kind of file is not accepted.',
   'file-too-large': 'This file is too large.',
   'download-failed': 'The finished file could not be downloaded.',
+  // Reproducing a recipe.
+  'invalid-recipe': 'This is not a Montagio recipe (montagio/recipe@1): give its JSON file, or the MP4 or PNG Montagio exported, which carries it.',
+  'not-replayable':
+    'This recipe holds no request the app can send again (a voice change, or a recipe cut short in a file\'s tags). Its workflow can still be loaded in ComfyUI.',
+  'inputs-required': 'The recipe needs its input files: give the photo (and the other files it names) to render it again.',
+  'recipe-unavailable': 'The app could not make this recipe. Its log says why.',
   aborted: 'The call was canceled before the render ended. The render goes on in the app; get_job follows it.',
 };
 

@@ -1,0 +1,134 @@
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildRecipe, compactRecipe, type Recipe, type RecipeRequest } from '@montagio/recipe';
+import { AI_IMAGE_METADATA, RECIPE_TAG, tagImage } from '@montagio/sequence';
+import { MontagioClient } from '../src/client';
+import { ToolFailure } from '../src/errors';
+import { loadRecipe, reproduce } from '../src/reproduce';
+import { TOOL_NAMES } from '../src/tools';
+import { fakeClock, fakeFetch, reply, testConfig, type Call } from './fake-app';
+
+let dir: string;
+let photo: string;
+let photoSha: string;
+beforeEach(async () => {
+  dir = await mkdtemp(join(tmpdir(), 'montagio-mcp-reproduce-'));
+  photo = join(dir, 'harbour.png');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:s=16x9', '-frames:v', '1', photo]);
+  photoSha = createHash('sha256').update(await readFile(photo)).digest('hex');
+});
+afterEach(() => rm(dir, { recursive: true, force: true }));
+
+const STACK = { montagio: { version: '0.1.0', commit: 'a'.repeat(40) }, comfyui: { tag: 'v0.41.0', commit: 'b'.repeat(40) }, proxy: '0.1.6', nodes: [] };
+const WORKFLOW = { '1': { class_type: 'LoadImage', inputs: { image: 'uploads/x.png' } }, '2': { class_type: 'KSamplerAdvanced', inputs: { noise_seed: 42 } } };
+
+/** A camera clip's recipe, its request asking for `photoSha`; `then` follows on what it made. */
+function cameraRecipe(sha: string | null, then?: RecipeRequest[]): Recipe {
+  return buildRecipe(
+    {
+      kind: 'clip',
+      task: 'camera',
+      name: 'Slow Push',
+      createdAt: '2026-10-24T18:00:00.000Z',
+      backend: 'local',
+      seed: 42,
+      request: {
+        route: '/api/generations',
+        body: { presetId: 'slow-push', modelId: 'wan22-i2v-a14b-fun-camera', userPrompt: 'A harbour at dawn', seed: 42 },
+        files: [{ field: 'imageRef', sha256: sha }],
+        ...(then ? { then } : {}),
+      },
+      steps: [{ name: 'camera', workflow: WORKFLOW, inputs: [{ node: '1', field: 'image', from: 'imageRef', sha256: sha }] }],
+      post: ['tag'],
+    },
+    { lock: [], models: [], stack: STACK },
+  );
+}
+
+/** A fake Montagio: an upload, a camera clip g2 done at the first poll, an HD job j1, and the recipes it would give. */
+function app(recipeHere: (path: string) => Recipe) {
+  return fakeFetch((call: Call) => {
+    if (call.method === 'POST' && call.path === '/api/uploads') {
+      return reply({ imageRef: 'uploads/new.png', width: 16, height: 9, aspect: '16:9', origin: 'upload', personal: true }, 201);
+    }
+    if (call.method === 'POST' && call.path === '/api/generations') return reply({ id: 'g2', presetId: 'slow-push', modelId: 'm', state: 'queued', progress: 0 }, 201);
+    if (call.path === '/api/generations/g2') return reply({ id: 'g2', presetId: 'slow-push', modelId: 'm', state: 'succeeded', progress: 1, outputUrl: '/media/data/generations/g2/clip.mp4' });
+    if (call.method === 'POST' && call.path === '/api/generations/g2/upscale') return reply({ id: 'j1', task: 'upscale', state: 'queued', progress: 0, label: {}, modelId: 'seedvr2-upscale' }, 201);
+    if (call.path === '/api/jobs/j1') return reply({ id: 'j1', task: 'upscale', state: 'succeeded', progress: 1, label: {}, modelId: 'seedvr2-upscale', outputUrl: '/media/data/jobs/j1/output.mp4' });
+    if (call.path.startsWith('/api/recipes/')) return reply(recipeHere(call.path));
+    return reply({ error: 'not-found' }, 404);
+  });
+}
+
+const clientOf = (fetch: ReturnType<typeof app>['fetch']) => {
+  const clock = fakeClock();
+  return new MontagioClient(testConfig(), { fetch, sleep: clock.sleep, now: clock.now });
+};
+
+test('a camera recipe is sent again with the same seed, preset, model and text, on the photo given', async () => {
+  const recipe = cameraRecipe(photoSha);
+  const { fetch, calls } = app(() => recipe);
+  const result = await reproduce(clientOf(fetch), { recipe, inputs: { imageRef: photo } });
+  const sent = calls.find((call) => call.method === 'POST' && call.path === '/api/generations')!;
+  expect(sent.json).toEqual({ presetId: 'slow-push', modelId: 'wan22-i2v-a14b-fun-camera', userPrompt: 'A harbour at dawn', seed: 42, imageRef: 'uploads/new.png' });
+  expect(sent.headers['idempotency-key']).toBeTruthy();
+  expect(result).toMatchObject({ render: { kind: 'generation', id: 'g2', state: 'succeeded' }, sameInputs: { imageRef: true }, sameWorkflow: true });
+  expect(result.note).toMatch(/identical result on the same setup/);
+});
+
+test('the workflow made here is compared with the recipe: another one says so', async () => {
+  const recipe = cameraRecipe(photoSha);
+  const other = structuredClone(recipe);
+  other.steps[0]!.workflowSha256 = 'f'.repeat(64);
+  const { fetch } = app(() => other);
+  expect((await reproduce(clientOf(fetch), { recipe, inputs: { imageRef: photo } })).sameWorkflow).toBe(false);
+});
+
+test('another photo than the recipe one is said to differ', async () => {
+  const recipe = cameraRecipe('0'.repeat(64));
+  const { fetch } = app(() => recipe);
+  expect((await reproduce(clientOf(fetch), { recipe, inputs: { imageRef: photo } })).sameInputs).toEqual({ imageRef: false });
+});
+
+test('the HD pass is asked for on the clip just made, smooth as in the recipe', async () => {
+  const then = [{ route: '/api/generations/:parent/upscale', body: { smooth: true, seed: 5 }, files: [] }];
+  const recipe = cameraRecipe(photoSha, then);
+  const { fetch, calls } = app(() => recipe);
+  const result = await reproduce(clientOf(fetch), { recipe, inputs: { imageRef: photo } });
+  expect(calls.find((call) => call.path === '/api/generations/g2/upscale')?.json).toEqual({ smooth: true, seed: 5 });
+  expect(result.render).toMatchObject({ kind: 'job', id: 'j1', task: 'upscale' });
+  expect(calls.some((call) => call.path === '/api/recipes/job/j1')).toBe(true);
+});
+
+test('a recipe without a request cannot be replayed here', async () => {
+  const { request: _none, ...recipe } = cameraRecipe(photoSha);
+  const { fetch } = app(() => cameraRecipe(photoSha));
+  await expect(reproduce(clientOf(fetch), { recipe, inputs: {} })).rejects.toMatchObject({ code: 'not-replayable' });
+});
+
+test('without the photo it asks for, the recipe says which file it needs', async () => {
+  const { fetch } = app(() => cameraRecipe(photoSha));
+  const failure = await reproduce(clientOf(fetch), { recipe: cameraRecipe(photoSha), inputs: {} }).catch((error: unknown) => error);
+  expect(failure).toBeInstanceOf(ToolFailure);
+  expect(failure).toMatchObject({ code: 'inputs-required', details: { fields: ['imageRef'] } });
+});
+
+test('a recipe is read from a JSON file, and from the PNG that carries it', async () => {
+  const recipe = cameraRecipe(photoSha);
+  const json = join(dir, 'recipe.json');
+  await writeFile(json, JSON.stringify(recipe));
+  expect((await loadRecipe(json)).seed).toBe(42);
+  const tagged = join(dir, 'tagged.png');
+  await tagImage(photo, tagged, { ...AI_IMAGE_METADATA, [RECIPE_TAG.image]: compactRecipe(recipe) });
+  const read = await loadRecipe(tagged);
+  expect(read).toMatchObject({ compact: true, seed: 42, request: { route: '/api/generations' } });
+  await expect(loadRecipe(join(dir, 'missing.json'))).rejects.toMatchObject({ code: 'invalid-recipe' });
+});
+
+test('the MCP server lists get_recipe and reproduce', () => {
+  expect(TOOL_NAMES).toContain('get_recipe');
+  expect(TOOL_NAMES).toContain('reproduce');
+});
