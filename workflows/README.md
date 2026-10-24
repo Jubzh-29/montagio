@@ -55,7 +55,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 | Workflow | Template | Model | Output |
 |---|---|---|---|
 | `ace-step15-music.api.json` | `templates/audio_ace_step_1_5_split.json` | ACE-Step 1.5 turbo (2B) | node 107, FLAC |
-| `seedvr2-upscale.api.json` | `templates/utility_seedvr2_3b_int8_upscale_video.json` | SeedVR2 3B int8 | node 76, MP4 |
+| `seedvr2-upscale.api.json` | `templates/utility_seedvr2_3b_int8_upscale_video.json`, then RIFE written for Montagio | SeedVR2 3B int8, RIFE 4.26 | node 76, MP4 |
 | `qwen-image-edit-2511.api.json` | `templates/image_qwen_image_edit_2511.json` | Qwen-Image-Edit-2511 fp8mixed | node 9, PNG |
 | `chatterbox-mtl-voice.api.json` | none (no official template: ComfyUI has no local text-to-speech node) | Chatterbox Multilingual V3 | node 3, FLAC |
 | `chatterbox-vc.api.json` | none (no official template: ComfyUI has no local voice conversion node) | Chatterbox VC (S3Gen) | node 3, FLAC |
@@ -79,6 +79,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 - The temporal chunking is wired in, in `manual` mode: chunks of 33 frames, overlap 3 (a real crossfade). Unchunked, 81 frames at 1080p need about 35 GiB; `auto` mode would cut by the free VRAM of the moment, so its seams would move from run to run.
 - `SeedVR2PostProcessing` corrects colours with `lab` (the node's default) instead of the template's `none`; GPU session S2 compares `none`, `lab` and `wavelet`.
 - `CreateVideo` takes the frame rate, the audio and the bit depth of the source clip (node 74), so a 16 fps clip stays 16 fps. `SaveVideo` writes `montagio/upscale`, MP4 in H.264. The seed is 0, one step, cfg 1, euler/simple, as in the template.
+- Smooth motion (2026-10-24), written for Montagio on three core nodes of v0.41.0: `FrameInterpolationModelLoader` (101) loads `rife_v4.26.safetensors`, the file `templates/utility_video_frame_interpolation.json` lists from `Comfy-Org/Frame-Interpolation`; `FrameInterpolate` (102) puts one RIFE frame between each two restored ones (multiplier 2, so 81 frames become 161); `ComfyMathExpression` (103, `a * 2` on the clip's frame rate, `values.a` = 74.2) gives `CreateVideo` twice the frame rate, so the length and the sound stay. RIFE runs after SeedVR2, on the 1080p frames, and the clip is encoded once. `compileUpscale` keeps these nodes with `smooth`, and otherwise removes them and gives `CreateVideo` the restored frames (59) at the clip's frame rate (74.2).
 
 ### qwen-image-edit-2511
 

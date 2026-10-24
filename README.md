@@ -58,7 +58,7 @@ The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan
 | **Hooks** | a keyframe transition: the edit makes the end frame, the video model animates the way there. Wardrobe Swap, which takes an outfit photo too, and Ignite are validated. | Wan 2.2 FLF2V (Apache-2.0) |
 | **Talking avatar** | the Avatar tab: a photo and a text (English or French) give a talking clip, in the built-in voice or in a **voice sample** given with its speaker's consent | Wan 2.2 S2V (Apache-2.0), voice by Chatterbox Multilingual (MIT) |
 | **Music** | "Add music" under a finished film, mixed into the film and its 9:16 cut | ACE-Step 1.5 (MIT) |
-| **HD** | "HD 1080p" under a finished clip; "HD 2560 px" on a photo of the atelier or of a character | SeedVR2 3B (Apache-2.0) |
+| **HD** | "HD 1080p" under a finished clip, with **smooth motion** ticked by default: RIFE puts a frame between each two, so a 16 fps clip comes out at 32 fps; "HD 2560 px" on a photo of the atelier or of a character | SeedVR2 3B (Apache-2.0), RIFE 4.26 (MIT) |
 | **Motion transfer** | the Motion tab: the character of a photo moves like a reference video of up to 5 s | Wan2.2-Animate-2, distilled (Apache-2.0) |
 
 Relight, inpaint, the HD photo, the photodump and the voice sample were added on 2026-10-22 on these same models and weights, and rendered on the L4 the same day: inpaint changes only the painted area, the HD photo takes 14 s to 1440×2560, a voice sample moves the voice from 131 Hz (built-in) to the sample's register. An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
@@ -173,7 +173,7 @@ Montagio covers a one-click studio's main ground today. The next steps follow th
 | Voice | Chatterbox Multilingual, built-in voice or a consented voice sample | Qwen3-TTS (Apache-2.0) |
 | Music and sound | ACE-Step 1.5, instrumental | songs with lyrics on ACE-Step 1.5; foley waits for a permissive model, as none passes the rule yet |
 | Motion transfer | Animate-2 distilled, 5 s | longer clips; dance driven by the film's music (Wan-Dancer, once its license is read) |
-| Finishing | SeedVR2: HD 1080p clips, HD 2560 px photos | frame interpolation (RIFE) and background removal (BiRefNet), both pending a license check at the source |
+| Finishing | SeedVR2: HD 1080p clips, smooth at twice the frame rate with RIFE 4.26; HD 2560 px photos | background removal (BiRefNet), pending a license check at the source |
 | Director | — | an open LLM of the Qwen3 family (Apache-2.0) that turns a short script into a shot list of presets; Qwen3-VL to describe an uploaded photo for you |
 | Sharing and provenance | visible "AI-generated" label | C2PA manifests (c2pa-python, Apache-2.0); the node pack on the Comfy Registry; a community preset library |
 | Running elsewhere | a remote GPU through `--app-only --proxy-url`, the Modal tooling | a container image; one adapter that runs these same open weights on any rented GPU |
@@ -208,7 +208,7 @@ Security issues: [SECURITY.md](SECURITY.md).
 - Wan-AI and alibaba-pai (Wan 2.1 and Wan 2.2: Fun Camera, TI2V 5B, I2V, FLF2V, S2V, Animate-2), Apache-2.0;
 - Tongyi-MAI (Z-Image-Turbo) and Qwen (Qwen-Image-Edit-2511, Qwen-Image, Qwen2.5-VL, Qwen3 encoders), Apache-2.0;
 - ByteDance-Seed (SeedVR2), Google (umt5-xxl), Black Forest Labs (FLUX.1-schnell autoencoder), Apache-2.0;
-- ACE-Step (ACE-Step 1.5), Resemble AI (Chatterbox) and LAION (CLIP ViT-H-14), MIT;
+- ACE-Step (ACE-Step 1.5), Resemble AI (Chatterbox), LAION (CLIP ViT-H-14) and hzwer (RIFE 4.26), MIT;
 - lightx2v (Lightning LoRAs), Remade-AI (effect LoRAs), systms and fal (edit looks), and the wav2vec2 authors, Apache-2.0.
 
 Every file, with its source, revision and sha256, is in [registry/models.lock.yaml](registry/models.lock.yaml).
