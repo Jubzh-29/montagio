@@ -136,3 +136,11 @@ describe('the community gallery', () => {
     expect(await (await postImport(json(recipe({ title: 'Kamala Harris remix' })))).json()).toEqual({ error: 'blocked-name' });
   });
 });
+
+test('another site cannot publish nor import: plain text or a cross-site request is refused', async () => {
+  const plain = new Request('http://localhost/api/x', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(recipe()) });
+  expect((await postImport(plain)).status).toBe(403);
+  expect((await postImport(json(recipe(), { 'sec-fetch-site': 'cross-site' }))).status).toBe(403);
+  expect((await publish(json({ historyKey: 'job:x', title: 'x' }, { 'sec-fetch-site': 'cross-site' }))).status).toBe(403);
+  expect((await postImport(json(recipe(), { 'sec-fetch-site': 'same-origin' }))).status).toBe(201);
+});

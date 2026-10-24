@@ -1,5 +1,5 @@
 import { MAX_REQUEST_BYTES } from '@/lib/limits';
-import { readJsonBody } from '@/server/body';
+import { fromThisSite, readJsonBody } from '@/server/body';
 import { listCommunity, publishToCommunity } from '@/server/community';
 import { jobFailureResponse } from '@/server/jobs';
 
@@ -10,6 +10,7 @@ export async function GET() {
 
 /** Publish a creation of the history: `{ historyKey, title, author? }`. */
 export async function POST(request: Request) {
+  if (!fromThisSite(request)) return Response.json({ error: 'cross-site' }, { status: 403 });
   const read = await readJsonBody(request, MAX_REQUEST_BYTES);
   if (!read.ok || !read.value || typeof read.value !== 'object') return Response.json({ error: 'invalid-input' }, { status: 400 });
   try {
