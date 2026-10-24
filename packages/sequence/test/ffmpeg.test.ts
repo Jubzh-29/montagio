@@ -10,6 +10,7 @@ import {
   concatCopy,
   decodeCheck,
   exportVertical,
+  extractFirstFrame,
   extractLastFrame,
   headerHash,
   mixMusic,
@@ -71,6 +72,12 @@ afterEach(() => {
 test('extractLastFrame writes a PNG of the clip size', async () => {
   const png = join(dir, 'last.png');
   await extractLastFrame(clipA, png);
+  expect(await probe(png)).toMatchObject({ width: 832, height: 480 });
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('extractFirstFrame writes a PNG of the clip size', async () => {
+  const png = join(dir, 'first.png');
+  await extractFirstFrame(clipA, png);
   expect(await probe(png)).toMatchObject({ width: 832, height: 480 });
 }, FFMPEG_TEST_TIMEOUT_MS);
 

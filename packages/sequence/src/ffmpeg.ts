@@ -144,6 +144,11 @@ export async function tagAudio(input: string, out: string): Promise<void> {
   }
 }
 
+/** Write the first frame of a clip as a PNG (the frame a restyle's edit changes). */
+export async function extractFirstFrame(video: string, outPng: string): Promise<void> {
+  await run(ffmpeg(), ['-loglevel', 'error', '-y', '-i', video, '-frames:v', '1', '-q:v', '1', outPng]);
+}
+
 /** Write the last frame of a clip as a PNG: seek near the end, keep overwriting until the final frame. */
 export async function extractLastFrame(video: string, outPng: string): Promise<void> {
   await run(ffmpeg(), ['-loglevel', 'error', '-y', '-sseof', '-1', '-i', video, '-update', '1', '-q:v', '1', outPng]);
