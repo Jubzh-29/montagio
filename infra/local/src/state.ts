@@ -19,8 +19,8 @@ export type InstallState = {
   /** App alone with a remote GPU: the comfy-api-proxy URL the app talks to. */
   proxyUrl: string | null;
   /**
-   * Full install: the extensions whose weights it fetched (never the avatar, whose voice node
-   * it does not install), passed to the app as MONTAGIO_EXTENSIONS; null before an install
+   * Full install: the extensions whose weights it fetched (never the avatar nor the object swap,
+   * whose custom nodes it does not install), passed to the app as MONTAGIO_EXTENSIONS; null before an install
    * recorded them, or for the app alone, which keeps the user's variable.
    */
   extensions: string[] | null;

@@ -182,6 +182,11 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     deps.log('note: the avatar extension is left out: its voice node is installed by infra/runpod/bootstrap.sh only, not by this installer yet');
     enabled = enabled.filter((id) => id !== 'avatar');
   }
+  if (enabled.includes('swap')) {
+    // Its tracker runs on a pinned custom node (SAM 2) that only infra/runpod/bootstrap.sh installs for now.
+    deps.log('note: the object swap extension is left out: its SAM 2 tracking node is installed by infra/runpod/bootstrap.sh only, not by this installer yet');
+    enabled = enabled.filter((id) => id !== 'swap');
+  }
   // The weights of the extensions nobody asked for stay out of the plan and of the disk check.
   const lock = weightsFor(readLock(repoRoot), enabled);
   let state: InstallState = readState(L.statePath);

@@ -342,10 +342,11 @@ function withMusicWeight(size: number): void {
   );
   writeFileSync(
     join(repo, 'registry', 'extensions.yaml'),
-    ['schema: montagio/extensions@0.1', 'extensions:', ...['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle'].flatMap((id, i) => [
+    ['schema: montagio/extensions@0.1', 'extensions:', ...['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap'].flatMap((id, i) => [
         `  - id: ${id}`,
         `    priority: ${i + 1}`,
         ...(id === 'transitions' ? ['    requires: [edit]'] : []),
+        ...(id === 'swap' ? ['    requires: [restyle]'] : []),
         '    gpu_validated: null',
       ]),
       '',
@@ -406,6 +407,30 @@ test('the local installer leaves the avatar out, whose voice node it does not in
   expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
   expect(fetchedIds(h.calls).sort()).toEqual(['tiny-music', 'tiny-te', 'tiny-vae']);
   expect(h.output()).toMatch(/avatar.*infra\/runpod\/bootstrap\.sh/);
+});
+
+test('the local installer leaves the object swap out, whose SAM 2 node it does not install yet', async () => {
+  withMusicWeight(5);
+  writeFileSync(
+    join(repo, 'registry', 'models.lock.yaml'),
+    readFileSync(join(repo, 'registry', 'models.lock.yaml'), 'utf8') +
+      `  - id: tiny-sam2
+    file: tiny_sam2.safetensors
+    url: https://huggingface.co/Kijai/x/resolve/main/tiny_sam2.safetensors
+` +
+      `    sha256: ${'b'.repeat(64)}
+    size: 5
+    license: Apache-2.0
+    source: https://huggingface.co/x/y
+    extension: swap
+    folder: sam2
+`,
+  );
+  const h = harness();
+  expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
+  expect(fetchedIds(h.calls)).not.toContain('tiny-sam2');
+  expect(h.output()).toMatch(/object swap.*infra\/runpod\/bootstrap\.sh/);
+  expect(readState(h.L.statePath).extensions).not.toContain('swap');
 });
 
 test('a full install records the extensions it fetched, never the avatar, for the app to show', async () => {
