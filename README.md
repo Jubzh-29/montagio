@@ -86,6 +86,7 @@ Measured on the L4 (an RTX 4090 is about twice as fast, going by the official te
 | Voice (Chatterbox) | 2.5–5 s, warm | 3.3 GB |
 | Music, 60 s (ACE-Step 1.5) | 9.5 s, warm | 10–14.6 GB |
 | HD upscale, 81 frames to 1080p (SeedVR2 3B) | 428 s | 18.4 GB |
+| HD with smooth motion, 81 frames at 16 fps to 161 at 32 fps in 1080p (SeedVR2 3B, then RIFE 4.26) | 410 s, of which RIFE 4.8 s | 8.6 GB |
 | Motion transfer, 5 s (Animate-2 distilled) | 391–415 s | 20.1–22.2 GB |
 
 What the session taught, and changed:

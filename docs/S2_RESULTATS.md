@@ -195,3 +195,17 @@ Une série de 5 jobs dans un seul conteneur L4, le 22/10 à 15:12 : 8 min 24 s, 
 - **Changement de voix** : le node `ChatterboxVC` ouvre le pack par le chargeur « classique », qui construit aussi le TTS anglais à côté du convertisseur. Il lui faut donc le T3 anglais et son tokenizer, deux fichiers du même dépôt Resemble AI (MIT, 2,1 Go). Ils sont ajoutés au lock dans le dossier du pack. La voix multilingue de l'avatar n'est pas touchée : elle choisit son T3 par son nom. Le rattrapage a coûté environ 0,08 $ : `weights --extensions avatar` sans GPU (250 s, les deux fichiers téléchargés et vérifiés), puis le seul job sur la L4 (219 s de conteneur). La parole source est la voix intégrée de la S2 ; l'échantillon, cette même voix montée d'environ 4 demi-tons : aucune vraie personne.
 - **Définition du node** : la série garde maintenant les `/object_info` des nodes qu'elle emploie (`object_info-extensions.json`). Celle de `ChatterboxVC` est identique, infobulles mises à part, à la fixture écrite d'après le code source épinglé.
 - Les photos d'entrée sont fictives : le port et la personne viennent de Z-Image, la petite voiture aussi. Le dessin a été fait pour ce test.
+
+## 13. Mouvement fluide de la passe HD (24/10)
+
+Un job sur une L4 du nouveau compte Modal, le 24/10 à 17:01 : la passe HD avec l'option `--smooth`, sur le Crash Push du port rendu par le pilote du jour (`new--crash-push--landscape-a.mp4` : 832×480, 16 i/s, 81 images, avec description). Environ 9 min de conteneur, soit environ 0,15 $ (estimation ; le chiffre du tableau de bord n'est pas lu). Résultats dans `s3/validation/20261024-150122-smooth-validation/`, hors dépôt.
+
+| Job | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|
+| HD 1080p puis RIFE 4.26 ×2 (SeedVR2 3B, puis `FrameInterpolate`) | 410 s, à froid, chargement compris ; RIFE seul : 4,8 s pour les 80 paires | 8,6 Go | ✅ 1920×1080, **32 i/s, 161 images, 5,03 s** (ffprobe) ; images intercalées nettes, sans fantôme sur les mâts ni les façades |
+
+- **Ce qui est ajouté** : deux nodes du cœur de ComfyUI v0.41.0 (`FrameInterpolationModelLoader`, `FrameInterpolate`) et `ComfyMathExpression`, qui double la cadence lue sur le clip. Aucun pack de nodes à épingler, 0 node partenaire sur les 687 chargés.
+- **Le poids** : `rife_v4.26.safetensors` de `Comfy-Org/Frame-Interpolation` (22,7 Mo). Ses 158 tenseurs sont ceux du `flownet.pkl` de `RIFEv4.26_0921.zip`, publié par l'auteur sur `hzwer/RIFE`, octet pour octet (sans les têtes d'entraînement `teacher` et `caltime`). Le README de `hzwer/Practical-RIFE` dit que les modèles entraînés sont sous la même licence MIT que le code.
+- **Le coût de RIFE est négligeable** : 410 s pour l'ensemble, contre 428 s pour la seule passe HD en S2. Le clip n'est encodé qu'une fois, après RIFE.
+- **Définitions des nodes** : celles du GPU (`object_info-extensions.json`) sont identiques, infobulles mises à part, à la fixture capturée sur le ComfyUI CPU.
+- La durée passe de 5,06 s à 5,03 s : 161 images à 32 i/s, contre 81 à 16. La dernière image source dure 1/32 s au lieu de 1/16.

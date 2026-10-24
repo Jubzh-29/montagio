@@ -22,4 +22,6 @@ output: { node: "76", kind: video }
 limits: { max_input_frames: 121 }
 # GPU seconds for an 81-frame clip on an RTX 4090. Session S2, on an L4 (about half as fast):
 # 428 s to 1080p, the model loading included
+# Smooth, on an L4 on 2026-10-24: 410 s to 161 frames at 32 fps, the loading included, of which
+# RIFE's 80 pairs took 4.8 s; peak VRAM 8.6 GB
 estimate_s: 215
