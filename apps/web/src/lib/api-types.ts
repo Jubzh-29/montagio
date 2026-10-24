@@ -55,7 +55,7 @@ export type GenerationRecord = {
 };
 
 /** What a model makes, in the order of the Open Stack page (as @montagio/check-open-stack lists them). */
-export type StackFunction = 'camera' | 'effects' | 'transitions' | 'photo' | 'avatar' | 'music' | 'hd' | 'motion';
+export type StackFunction = 'camera' | 'effects' | 'transitions' | 'photo' | 'avatar' | 'music' | 'hd' | 'motion' | 'restyle';
 
 export type OpenStackReport = {
   ok: boolean;
@@ -115,7 +115,7 @@ export type ShowcaseInfo = {
 };
 
 /** The seven extensions, as registry/extensions.yaml names them. */
-export type ExtensionId = 'edit' | 'effects' | 'transitions' | 'avatar' | 'music' | 'upscale' | 'motion';
+export type ExtensionId = 'edit' | 'effects' | 'transitions' | 'avatar' | 'music' | 'upscale' | 'motion' | 'restyle';
 
 /** A one-photo effect of the wall (GET /api/extensions). */
 export type EffectSummary = {
@@ -160,7 +160,7 @@ export type ExtensionsInfo = {
   extensions: ExtensionId[];
   effects: EffectSummary[];
   hooks: HookSummary[];
-  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; imageUpscale?: number; motion?: number; voiceChange?: number };
+  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; imageUpscale?: number; motion?: number; voiceChange?: number; restyle?: number };
   /** The photo edit's model, for the caption under an edit (the preset catalogue does not hold it). */
   editModel?: { id: string; name: string; license: string };
   /** The avatar model, for the caption under a talking avatar. */
@@ -171,13 +171,15 @@ export type ExtensionsInfo = {
   upscaleModel?: { id: string; name: string; license: string; maxFrames: number };
   /** The motion transfer model, for the caption under its clip. */
   motionModel?: { id: string; name: string; license: string };
+  /** The restyle model, for the caption under its clip. */
+  restyleModel?: { id: string; name: string; license: string };
   /** The demo backend answers (no GPU): a result is a stand-in clip, and its caption says no model ran. */
   demo?: boolean;
   /** A render of what Avatar and Motion make, looping in their card and on their empty monitor. */
-  examples?: Partial<Record<'avatar' | 'motion', { previewUrl: string; posterUrl?: string }>>;
+  examples?: Partial<Record<'avatar' | 'motion' | 'restyle', { previewUrl: string; posterUrl?: string }>>;
 };
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad' | 'voice-change';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'restyle' | 'ad' | 'voice-change';
 
 import type { CharacterType } from './characters';
 
@@ -250,6 +252,8 @@ export type Reprise = {
   /** A motion transfer's reference clip (absent once it is gone), and what its character does. */
   videoRef?: string;
   motion?: string;
+  /** The Motion tab's restyle: the clip (videoRef) rebuilt from `prompt`, and the look image when there was one (imageRef). */
+  restyle?: true;
   modelId?: string;
   /** A remixed clip: the remix editor reopens on that generation's preset text. */
   remixGenerationId?: string;

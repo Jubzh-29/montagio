@@ -54,4 +54,7 @@ test("an extension's tool shows only when the extension is shown", () => {
   expect(ids([])).toEqual(['camera', 'film', 'characters', 't2i', 'comfy']);
   expect(ids(['edit', 'avatar', 'motion', 'upscale', 'music'])).toEqual(['camera', 'film', 'characters', 'ads', 'avatar', 'motion', 't2i', 'edit', 'hd', 'music', 'comfy']);
   expect(exploreTools([], info(), true).map((tool) => tool.id)).not.toContain('characters');
+  // The restyle opens the Motion tab in its restyle mode.
+  const restyle = exploreTools([], info({ extensions: ['restyle'] })).find((tool) => tool.id === 'restyle');
+  expect(restyle).toMatchObject({ href: '/?tab=motion&mode=restyle', name: 'restyleTitle' });
 });

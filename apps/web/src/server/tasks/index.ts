@@ -7,6 +7,7 @@ import { hookTask } from './hook';
 import { imageUpscaleTask } from './image-upscale';
 import { motionTask } from './motion';
 import { musicTask } from './music';
+import { restyleTask } from './restyle';
 import { t2iTask } from './t2i';
 import { upscaleTask } from './upscale';
 import { voiceChangeTask } from './voice-change';
@@ -22,6 +23,7 @@ export const TASKS: Partial<Record<JobTask, TaskDef>> = {
   upscale: upscaleTask,
   'image-upscale': imageUpscaleTask,
   motion: motionTask,
+  restyle: restyleTask,
   ad: adTask,
   'voice-change': voiceChangeTask,
 };

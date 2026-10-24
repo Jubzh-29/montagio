@@ -44,6 +44,7 @@ import { AvatarFields, BUILT_IN_VOICE, type VoiceChoice } from './AvatarFields';
 import { COMPOSE_OFF, composeBody, composePersonal, composeReady, ComposeSlots, type ComposeState } from './ComposeSlots';
 import { HdPanel } from './HdPanel';
 import { MotionFields, type MotionVideo } from './MotionFields';
+import { MotionModeSwitch, RestyleFields, type MotionMode } from './RestyleFields';
 import { MusicPanel } from './MusicPanel';
 import { ShowcaseTextAtelier } from './ShowcaseTextAtelier';
 import { EffectFields } from './EffectFields';
@@ -189,6 +190,18 @@ export function Studio() {
   const [motionVideo, setMotionVideo] = useState<MotionVideo>({ status: 'idle' });
   const [motionCharacter, setMotionCharacter] = useState('');
   const [motionAction, setMotionAction] = useState('');
+  // Its restyle mode: the clip's scene rebuilt from a text, with an optional image whose look to follow.
+  const [askedMotionMode, setMotionMode] = useState<MotionMode>('character');
+  const [restyleText, setRestyleText] = useState('');
+  const [look, setLook] = useState<UploadState>({ status: 'idle' });
+  const lookToken = useRef(0);
+  // A mode shows with its extension; with only one of the two, the tab has that one.
+  const hasMotion = extensions?.extensions.includes('motion') ?? false;
+  const hasRestyle = extensions?.extensions.includes('restyle') ?? false;
+  const motionMode: MotionMode = !hasRestyle ? 'character' : !hasMotion ? 'restyle' : askedMotionMode;
+  const restyling = tab === 'motion' && motionMode === 'restyle';
+  // Without a look image, the edit restyles the clip's first frame first, when it is installed.
+  const restyleFirstFrame = look.status !== 'ready' && (extensions?.extensions.includes('edit') ?? false);
   const [rights, setRights] = useState(false);
   const [subject, setSubject] = useState('');
   const [consent, setConsent] = useState(false);
@@ -385,6 +398,20 @@ export function Studio() {
     if (token === outfitToken.current) setOutfit(next);
   };
 
+  /** The restyle's look image: an ordinary upload, which a new one or Remove replaces. */
+  const onLook = async (file: File) => {
+    if (busyRef.current) return;
+    const token = ++lookToken.current;
+    const localUrl = URL.createObjectURL(file);
+    setLook({ status: 'uploading', localUrl });
+    const next = await sendUpload(file, localUrl, t);
+    if (token === lookToken.current) setLook(next);
+  };
+  const clearLook = () => {
+    lookToken.current++;
+    setLook({ status: 'idle' });
+  };
+
   /** The sample photo, copied by the server: its origin is known, so no effect on it asks for consent, and what it shows too. */
   const loadSample = async () => {
     if (busyRef.current) return;
@@ -495,8 +522,8 @@ export function Studio() {
     setConsentFor(photoKey);
     setConsent(false);
   }
-  // The rights box is for this photo and this clip: another one asks again.
-  const rightsKey = `${upload.status === 'ready' ? upload.imageRef : ''}|${motionVideo.status === 'ready' ? motionVideo.videoRef : ''}`;
+  // The rights box is for this photo (or this look image) and this clip: another one asks again.
+  const rightsKey = `${motionMode}|${restyling ? (look.status === 'ready' ? look.imageRef : '') : upload.status === 'ready' ? upload.imageRef : ''}|${motionVideo.status === 'ready' ? motionVideo.videoRef : ''}`;
   const [rightsFor, setRightsFor] = useState(rightsKey);
   // A new photo on Camera shows on the monitor, with the dashed frame of where the chosen move ends:
   // the cause and effect that would otherwise wait behind the Monitor button. It switches when the
@@ -520,7 +547,9 @@ export function Studio() {
   const askScene = needsScene(tab, IS_SHOWCASE);
   const missingScene = sceneMissing(tab, IS_SHOWCASE, prompt);
   const ready = upload.status === 'ready' && modelId !== null && !busy && !missingScene;
-  const canGenerate = tab === 'motion'
+  const canGenerate = restyling
+    ? motionVideo.status === 'ready' && restyleText.trim().length > 0 && (look.status === 'idle' || look.status === 'ready') && rights && !busy
+    : tab === 'motion'
     ? upload.status === 'ready' && motionVideo.status === 'ready' && rights && !busy
     : tab === 'avatar'
     ? upload.status === 'ready' && !busy && speechText.trim().length > 0 && (!askConsent || consent) && (!voice.mine || (voice.voiceRef !== null && voice.consent))
@@ -597,9 +626,19 @@ export function Studio() {
     if (back.shots) setShots(back.shots);
     if (back.effectId) setEffectId(back.effectId);
     if (back.hookId) setEffectId(back.hookId);
+    if (back.restyle) {
+      motionToken.current++;
+      lookToken.current++;
+      setMotionMode('restyle');
+      setRestyleText(back.restyle.text);
+      setMotionVideo(back.restyle.videoRef ? { status: 'ready', videoRef: back.restyle.videoRef, url: `/media/data/uploads/${back.restyle.videoRef}` } : { status: 'idle' });
+      const kept = back.restyle.look;
+      setLook(kept ? { status: 'ready', localUrl: `/media/data/${kept.imageRef}`, imageRef: kept.imageRef, personal: kept.personal } : { status: 'idle' });
+    }
     if (back.motion) {
       // An upload still on its way must not replace the clip brought back.
       motionToken.current++;
+      setMotionMode('character');
       setMotionCharacter(back.motion.character);
       setMotionAction(back.motion.action);
       setMotionVideo(back.motion.videoRef ? { status: 'ready', videoRef: back.motion.videoRef, url: `/media/data/uploads/${back.motion.videoRef}` } : { status: 'idle' });
@@ -741,10 +780,18 @@ export function Studio() {
   }, []);
 
   const generate = () => {
-    if (submitting.current || !canGenerate || upload.status !== 'ready') return;
+    if (submitting.current || !canGenerate || (!restyling && upload.status !== 'ready')) return;
     followJob.current = true;
     setTake({ expected_s: mode === 'sequence' && !remix ? filmEstimate : estimate });
     moveCanvas('generate');
+    if (restyling) {
+      // No start photo: the clip, the text, and the look image when there is one.
+      if (motionVideo.status !== 'ready') return;
+      const body = { videoRef: motionVideo.videoRef, prompt: restyleText.trim(), ...(look.status === 'ready' ? { imageRef: look.imageRef } : {}), rights: true };
+      void submit('job', body, undefined, '/api/restyle');
+      return;
+    }
+    if (upload.status !== 'ready') return;
     const userPrompt = prompt.trim() || undefined;
     if (tab === 'motion') {
       if (motionVideo.status !== 'ready') return;
@@ -855,7 +902,9 @@ export function Studio() {
 
   const selectedModel = models.find((model) => model.id === modelId);
   const estimate =
-    tab === 'motion'
+    restyling
+      ? (extensions?.estimates.restyle ?? 0) + (restyleFirstFrame ? (extensions?.estimates.edit ?? 0) : 0)
+      : tab === 'motion'
       ? (extensions?.estimates.motion ?? 0)
       : tab === 'avatar'
       ? (extensions?.estimates.avatar ?? 0)
@@ -938,7 +987,7 @@ export function Studio() {
   // The names of the choice in hand, in the interface's language.
   const wallChoiceName = wallChoice ? catalogName(lang, wallChoice.item.id, wallChoice.item.name) : undefined;
   const moveName = movePreset ? catalogName(lang, movePreset.id, movePreset.name) : undefined;
-  const slateMove = tab === 'motion' ? t('tabMotion') : tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoiceName : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? moveName : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
+  const slateMove = restyling ? t('restyleTitle') : tab === 'motion' ? t('tabMotion') : tab === 'avatar' ? t('tabAvatar') : tab === 'effects' ? wallChoiceName : remix ? t('remixTitle', { name: remix.baseName }) : mode === 'single' ? moveName : shots.length > 0 ? t('slateShots', { n: shots.length }) : undefined;
   // An avatar lasts as long as its speech: the slate says the estimate, once there is a text.
   const speechSeconds = estimateSpeech(speechText, speechLanguage);
   const slate = slateMove && [
@@ -964,6 +1013,8 @@ export function Studio() {
       ? extensions?.avatarModel
     : tracked?.kind === 'job' && tracked.record.task === 'motion'
       ? extensions?.motionModel
+    : tracked?.kind === 'job' && tracked.record.task === 'restyle'
+      ? extensions?.restyleModel
     : tracked?.kind === 'generation'
       ? models.find((model) => model.id === tracked.record.modelId)
       : tracked?.kind === 'sequence'
@@ -979,6 +1030,9 @@ export function Studio() {
             setRequestedTab(value);
           }}
           onFrom={setFrom}
+          onMode={(value) => {
+            if (value === 'restyle' || value === 'character') setMotionMode(value);
+          }}
         />
       </Suspense>
       <Header recording={busy} current={tab} />
@@ -987,25 +1041,28 @@ export function Studio() {
         <div className={styles.intro}>
           <h1 className={styles.promise}>{t('promise')}</h1>
           <p className={styles.lede} data-testid="tab-lede">
-            {t(TAB_LEDES[tab])}
+            {t(restyling ? 'ledeRestyle' : TAB_LEDES[tab])}
           </p>
         </div>
         <Composer
           label={t('composerLabel')}
           choice={
             tab === 'motion' ? (
-              <ChoiceCard
-                name={t('tabMotion')}
-                kindLabel={
-                  motionVideo.status === 'ready' && motionVideo.duration_s !== undefined
-                    ? t('motionKind', { s: Math.round(motionVideo.duration_s * 10) / 10 })
-                    : t('motionKindEmpty')
-                }
-                previewUrl={extensions?.examples?.motion?.previewUrl}
-                posterUrl={extensions?.examples?.motion?.posterUrl}
-                icon="motion"
-                paused={motionPaused}
-              />
+              <>
+                <ChoiceCard
+                  name={t(restyling ? 'restyleTitle' : 'tabMotion')}
+                  kindLabel={
+                    motionVideo.status === 'ready' && motionVideo.duration_s !== undefined
+                      ? t(restyling ? 'restyleKind' : 'motionKind', { s: Math.round(motionVideo.duration_s * 10) / 10 })
+                      : t(restyling ? 'restyleKindEmpty' : 'motionKindEmpty')
+                  }
+                  previewUrl={extensions?.examples?.[restyling ? 'restyle' : 'motion']?.previewUrl}
+                  posterUrl={extensions?.examples?.[restyling ? 'restyle' : 'motion']?.posterUrl}
+                  icon="motion"
+                  paused={motionPaused}
+                />
+                {hasMotion && hasRestyle && <MotionModeSwitch mode={motionMode} onMode={setMotionMode} disabled={busy} />}
+              </>
             ) : tab === 'avatar' ? (
               <ChoiceCard
                 name={t('tabAvatar')}
@@ -1062,6 +1119,7 @@ export function Studio() {
             ) : null
           }
           photo={
+            restyling ? null : (
             <>
             <PhotoSource
               upload={upload}
@@ -1089,9 +1147,23 @@ export function Studio() {
               </p>
             )}
             </>
+            )
           }
           fields={
-            tab === 'motion' ? (
+            restyling ? (
+              <RestyleFields
+                video={motionVideo}
+                disabled={busy}
+                paused={motionPaused}
+                onVideo={(file) => void onMotionVideo(file)}
+                text={restyleText}
+                onText={setRestyleText}
+                look={look}
+                onLook={(file) => void onLook(file)}
+                onClearLook={clearLook}
+                firstFrame={restyleFirstFrame}
+              />
+            ) : tab === 'motion' ? (
               <MotionFields
                 video={motionVideo}
                 disabled={busy}
@@ -1156,7 +1228,9 @@ export function Studio() {
             )
           }
           consent={
-            tab === 'motion' ? (
+            restyling ? (
+              <ConsentCheck id="restyle-rights" label="restyleRights" checked={rights} onChange={setRights} />
+            ) : tab === 'motion' ? (
               <ConsentCheck id="motion-rights" label="motionRights" checked={rights} onChange={setRights} />
             ) : askConsent ? (
               <ConsentCheck id="effect-consent" checked={consent} onChange={setConsent} />
@@ -1196,10 +1270,12 @@ export function Studio() {
                     )}
                   </div>
                 )}
-                {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
+                {!restyling && upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
+                {restyling && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('restyleNeedsVideo')}</p>}
+                {restyling && motionVideo.status === 'ready' && !restyleText.trim() && <p className={styles.hint}>{t('restyleNeedsText')}</p>}
                 {upload.status === 'ready' && missingScene && <p className={styles.hint}>{t('sceneNeeded')}</p>}
                 {tab === 'effects' && upload.status === 'ready' && needsOutfit && outfit.status !== 'ready' && <p className={styles.hint}>{t('hookNeedsOutfit')}</p>}
-                {tab === 'motion' && upload.status === 'ready' && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('motionNeedsVideo')}</p>}
+                {tab === 'motion' && !restyling && upload.status === 'ready' && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('motionNeedsVideo')}</p>}
               </div>
               {/* Outside the sticky block: on a phone that block stays one button high over the gallery. */}
               {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}
@@ -1282,16 +1358,17 @@ export function Studio() {
           result={
             <>
               <Monitor
-                upload={upload}
+                upload={restyling ? look : upload}
                 generation={monitorState}
                 move={move}
                 announcement={announcement}
                 statusRef={statusRef}
                 stepImageUrl={tracked?.kind === 'job' ? tracked.record.stepImageUrl : undefined}
                 autoPlayResult={!(motionPaused && view?.id === arrivalId)}
-                onFile={onFile}
+                onFile={restyling ? (file) => void onLook(file) : onFile}
                 onCancel={cancel}
-                example={tab === 'avatar' || tab === 'motion' ? extensions?.examples?.[tab] : undefined}
+                empty={restyling ? { title: 'restyleMonitorEmpty', hint: 'restyleMonitorEmptyHint' } : undefined}
+                example={restyling ? extensions?.examples?.restyle : tab === 'avatar' || tab === 'motion' ? extensions?.examples?.[tab] : undefined}
                 examplePaused={motionPaused}
                 onRetry={retry}
                 statusLabel={statusLabel}
@@ -1333,13 +1410,17 @@ export function Studio() {
                 <AiCaption text="showcaseCaption" testId="result-caption" model={(resultModel ?? showcase?.model)!} />
               )}
               {!IS_SHOWCASE && succeeded && resultModel && <AiCaption model={resultModel} />}
-              {succeeded && tracked?.kind === 'job' && tracked.record.task === 'motion' && (
+              {succeeded && tracked?.kind === 'job' && (tracked.record.task === 'motion' || tracked.record.task === 'restyle') && (
                 <p className={styles.caption} data-testid="motion-no-sound">
-                  {t('motionNoSound')}
+                  {t(tracked.record.task === 'restyle' ? 'restyleNoSound' : 'motionNoSound')}
                 </p>
               )}
               {busy && tracked?.kind === 'job' && tracked.record.stepImageUrl && extensions?.editModel && (
-                <AiCaption text="hookEndFrame" testId="end-frame-caption" model={extensions.editModel} />
+                <AiCaption
+                  text={tracked.record.task === 'restyle' ? 'restyleFirstFrame' : 'hookEndFrame'}
+                  testId="end-frame-caption"
+                  model={extensions.editModel}
+                />
               )}
               {tracked?.kind === 'generation' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
@@ -1429,10 +1510,20 @@ export function Studio() {
 }
 
 /** Reads ?tab= in its own Suspense boundary: the rest of the Studio prerenders without the URL. */
-function TabParam({ onTab, onFrom }: { onTab: (tab: string | null) => void; onFrom: (key: string | null) => void }) {
+function TabParam({
+  onTab,
+  onFrom,
+  onMode,
+}: {
+  onTab: (tab: string | null) => void;
+  onFrom: (key: string | null) => void;
+  /** ?mode= of the Motion tab: character or restyle. */
+  onMode: (mode: string | null) => void;
+}) {
   const params = useSearchParams();
   const tab = params.get('tab');
   const from = params.get('from');
+  const mode = params.get('mode');
   useEffect(() => {
     onTab(tab);
     // onTab is a new function on every render of the Studio; the URL's tab is what matters.
@@ -1442,5 +1533,9 @@ function TabParam({ onTab, onFrom }: { onTab: (tab: string | null) => void; onFr
     onFrom(from);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from]);
+  useEffect(() => {
+    onMode(mode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
   return null;
 }

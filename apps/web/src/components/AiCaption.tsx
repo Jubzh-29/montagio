@@ -8,7 +8,7 @@ import { stackHref } from '@/lib/open-stack';
 import styles from './studio.module.css';
 
 /** The captions that name a model: each holds `{model}` and `{license}`. */
-type CaptionText = 'aiCaption' | 'demoCaption' | 'showcaseCaption' | 'hookEndFrame';
+type CaptionText = 'aiCaption' | 'demoCaption' | 'showcaseCaption' | 'hookEndFrame' | 'restyleFirstFrame';
 
 /**
  * Under every result: what made it, and that it is AI-generated (the AI Act's visible mention).

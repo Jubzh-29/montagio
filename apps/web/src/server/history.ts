@@ -206,6 +206,22 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
         },
       };
     }
+    case 'restyle': {
+      // Reuse reopens the Motion tab in its restyle mode: the clip, the text, and the look image if any.
+      const videoRef = typeof record.inputs.videoRef === 'string' ? record.inputs.videoRef : '';
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'restyle',
+        reprise: {
+          tab: 'motion',
+          restyle: true,
+          ...(typeof record.inputs.imageRef === 'string' ? await photo(record.inputs.imageRef) : {}),
+          ...((await readVideoMeta(videoRef)) ? { videoRef } : {}),
+          prompt: String(record.inputs.prompt),
+        },
+      };
+    }
     case 'voice-change':
       // A clip in another voice: Reuse goes back to the Avatar tab.
       return { ...base, kind: 'clip', task: 'voice-change', reprise: { tab: 'avatar' } };
