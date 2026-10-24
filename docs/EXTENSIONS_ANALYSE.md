@@ -383,3 +383,45 @@ Nodes expérimentaux, VRAM juste, qualité non mesurée, et un cadrage photo/vid
 - **Textes EN et FR** : `ext.motion.*`. Le libellé dit ce qui sort (« Vidéo générée par IA ») et que le son de la vidéo de référence n'est pas repris.
 - **e2e** : un parcours en mode démo (un MP4 pré-rendu), et un test de la case : sans elle, le bouton reste désactivé.
 
+
+## 10. Restyle, ou remix vidéo (8e extension, 24/10)
+
+Demandé par l'utilisateur le 24/10 : un mode vidéo vers vidéo qui reconstruit toute la scène d'un court clip en gardant son mouvement, son mouvement de caméra et son rythme. Spike d'abord, avec un go/no-go, puis câblage sur un go (accordé le 24/10 : « câble Restyle comme tu le proposes : mode Restyle dans l'onglet Mouvement, contrôle par profondeur, référence facultative »). Hors périmètre : remplacer un seul objet dans un clip (il faudrait des masques par image ; SAM 3.1 est sous licence Meta, refusée).
+
+### Le nœud retenu : Wan 2.1 VACE 14B, nodes du cœur
+
+- `WanVaceToVideo` (cœur de ComfyUI v0.41.0) prend une vidéo de contrôle, des masques par image et une image de référence. Le template officiel `video_wan_vace_14B_v2v` y met des contours Canny et la LoRA CausVid de Kijai (dépôt refusé) ; le template communautaire « Video Restyle » passe par WanVideoWrapper, KJNodes, VHS, DepthAnythingV2 et controlnet_aux : inutilisable ici.
+- Contrôle retenu : la **profondeur** de chaque image, par Depth Anything 3 Small et les nodes DA3 du cœur (`LoadDA3Model`, `DA3Inference` en `mono`, `DA3Render` en `v2_style`). Canny a aussi bien marché dans le spike, mais il recopie les contours fins (les fleurs, le relief) ; la profondeur laisse changer matière, lumière et saison.
+- Accélération : la LoRA 4 étapes de lightx2v pour Wan 2.1 T2V 14B, la base de VACE 14B, prise dans le dépôt de l'auteur (4 étapes, cfg 1, euler, shift 5).
+- Wan 2.2 Fun VACE A14B (alibaba-pai, Apache-2.0, fp8_scaled chez Comfy-Org) est une alternative non essayée : deux experts de 17 Go à charger tour à tour.
+
+### Licences et poids
+
+| Poids | Fichier, taille | Source | Licence |
+|---|---|---|---|
+| `wan21-vace-14b-fp16` | `wan2.1_vace_14B_fp16.safetensors`, 34,7 Go, miroir Comfy-Org/Wan_2.1_ComfyUI_repackaged | Wan-AI/Wan2.1-VACE-14B (`539c162b`) | Apache-2.0 : fiche, LICENSE.txt, et le paragraphe d'usage de Wan |
+| `lightx2v-wan21-t2v-4step` | `Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors`, 631 Mo | lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v (`f6831058`) | Apache-2.0 : fiche, LICENSE.txt |
+| `depth-anything-3-small` | `depth_anything_3_small.safetensors`, 137 Mo, miroir Comfy-Org/Depth-Anything-3 (converti par `convert_da3.py`) | depth-anything/DA3-SMALL (`e08cab65`) | Apache-2.0 : fiche et tableau du README, sans LICENSE. DA3-Large et DA3-Giant sont en CC BY-NC 4.0 : jamais au lock |
+
+Comfy-Org ne publie VACE 14B qu'en fp16 : le workflow le charge avec `weight_dtype: fp8_e4m3fn` (≈ 17 Go sur la carte). L'encodeur UMT5 et la VAE Wan 2.1 sont ceux du lock. `check-open-stack` : 14 modèles, 51 poids (38 Apache-2.0, 13 MIT).
+
+### Le workflow et le contrat
+
+- `workflows/wan21-vace-restyle.api.json`, détaillé dans `workflows/README.md`. Trois chemins, choisis par `compileRestyle` (`@montagio/presets`) :
+  - **texte seul** : la profondeur pilote toutes les images ;
+  - **une image dont suivre le style** (`look`) : l'entrée `reference_image` de VACE, la profondeur pilote toutes les images ;
+  - **la 1re image du clip restylisée** (`first-frame`) : gardée telle quelle comme 1re image (masque 0), la profondeur pilote les autres (masque 1), et l'image sert aussi de référence.
+- 4n+1 images couvrant le clip, 81 au plus (5 s à 16 fps) ; le clip est préparé comme celui du transfert de mouvement (`prepareMotionClip` : 5 s, 16 fps, sans son). Un clip de moins de 1 s ou de plus de 5 s est refusé.
+- `restyleInstruction(texte)` : la consigne d'édition qui restylise la 1re image (« Change the look of this image: … Keep the framing, the camera angle, and the position and pose of every person and object exactly the same. »).
+- Registre : extension `restyle`, priorité 8, tâche `v2v-restyle`, sans prérequis : sans l'édition, un job suit son texte seul.
+- Serveur : `POST /api/restyle` (`videoRef`, `prompt`, `imageRef?`, `rights: true`). Sans image et avec l'édition affichée, deux étapes : la 1re image du clip (extraite une fois à côté du clip) retouchée par Qwen-Image-Edit-2511, puis VACE en `first-frame` ; sinon une étape. Codes : `extension-disabled`, `rights-required`, `invalid-input`, `unknown-image`, `blocked-name`.
+- Studio : l'onglet Mouvement gagne un sélecteur « Animer un personnage / Restyliser le clip » (seulement si les deux extensions sont visibles ; `?mode=restyle` ouvre le second, comme la carte d'Explore). Le mode Restyle a son propre emplacement d'image : la photo de départ partagée par les autres onglets n'est jamais prise. Même case de droits que le transfert de mouvement.
+- Smoke : `--extension restyle --motion <clip>` (texte seul, ou `--input` comme style à suivre), `--extension restyle-edit,restyle` (1re image restylisée puis gardée), `--text restyle=…`. MCP : `restyle_video`.
+
+### VRAM et temps
+
+Spike du 24/10 sur une L4 de 24 Go (détails dans la partie 14 de `docs/S2_RESULTATS.md`) : 187 à 247 s pour un clip de 5 s, chargement de VACE compris, pic de 20,4 à 22,2 Go ; l'édition de la 1re image ajoute 72 à 82 s à froid. Une RTX 4090 va environ deux fois plus vite : `estimate_s` à 120.
+
+### Verdict : go
+
+Sur 3 clips très différents (un Crash Push de voiture, un Rise & Push de port, une danse filmée en poussée), le mouvement, la caméra et le rythme suivent la source image par image, sans scintillement. La limite vue : un style de personnage peu marqué dans la référence (la pâte à modeler) ne tient pas, la personne redevient réaliste. `gpu_validated` est daté une fois le chemin câblé passé sur un GPU.

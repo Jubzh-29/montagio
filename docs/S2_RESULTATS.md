@@ -209,3 +209,20 @@ Un job sur une L4 du nouveau compte Modal, le 24/10 à 17:01 : la passe HD avec 
 - **Le coût de RIFE est négligeable** : 410 s pour l'ensemble, contre 428 s pour la seule passe HD en S2. Le clip n'est encodé qu'une fois, après RIFE.
 - **Définitions des nodes** : celles du GPU (`object_info-extensions.json`) sont identiques, infobulles mises à part, à la fixture capturée sur le ComfyUI CPU.
 - La durée passe de 5,06 s à 5,03 s : 161 images à 32 i/s, contre 81 à 16. La dernière image source dure 1/32 s au lieu de 1/16.
+
+## 14. Restyle : spike VACE 14B (24/10)
+
+Avec l'accord de l'utilisateur (≈ 1,20 $ annoncés, plafond 1,50 $), sur le compte Modal montagio-2 : les poids téléchargés par un conteneur sans GPU (≈ 0,05 $), puis deux conteneurs L4 en parallèle qui ont lancé `infra/modal/spike_restyle.py` (≈ 0,45 $ ; 15,18 $ au relevé du mois avant le spike). Rien n'était câblé : le script fait l'image de référence avec l'extension d'édition (smoke `--extension edit`), puis envoie à ComfyUI des graphes du cœur. Résultats dans `s3/restyle-spike/`, hors dépôt (clips, planches, `results.jsonl`, vidéos côte à côte).
+
+| Job | Clip source | Contrôle | Référence | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|---|---|---|
+| Édition de la 1re image (Qwen-Image-Edit-2511, 4 pas) | — | — | — | 72 à 82 s, à froid | 22,3 Go | ✅ voiture : soir d'hiver enneigé, cadrage gardé ; danse : décor de studio, figurine à peine en pâte à modeler |
+| car-canny-ref | Crash Push de la voiture, 832×480, 81 images | Canny | style à suivre | 239 s, chargement de VACE compris | 20,9 Go | ✅ neige, crépuscule bleu, poussée de caméra identique |
+| car-depth-ref | idem | profondeur | style à suivre | 198 s | 20,4 Go | ✅ idem, moins de fleurs au premier plan |
+| car-depth-first | idem | profondeur | 1re image | 201 s | 20,4 Go | ✅ la 1re image est la référence, puis la scène suit ; petit saut après la 1re image |
+| dance-depth-first | danse du 5B (S2), 480×832, 77 images | profondeur | 1re image | 247 s, chargement compris | 20,9 Go | ✅ poses et poussée exactes, décor repris ; ❌ la pâte à modeler ne tient pas |
+| port-canny-prompt | Rise & Push du port, 832×480, 81 images | Canny | texte seul (« aquarelle ») | 187 s | 22,2 Go | ✅ peinture illustrée, mouvement suivi |
+
+- **Réglages** : VACE 14B fp16 converti en fp8 au chargement, LoRA lightx2v T2V, 4 pas, cfg 1, euler, shift 5, `WanVaceToVideo` à force 1, négatif par défaut des templates Wan.
+- **Scintillement** (écart moyen de luminance d'une image à la suivante, `tblend` + `signalstats`) : voiture 3,5 à 3,6 contre 2,6 pour la source ; port 5,5 contre 2,7 (la texture peinte bouge un peu) ; danse 14 comme la source.
+- **Verdict : go.** Le câblage a retenu la profondeur (Depth Anything 3 Small, Apache-2.0) et les trois chemins (texte seul, style à suivre, 1re image restylisée).

@@ -63,6 +63,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 | `wan21-i2v-effect.api.json` | `templates/image_to_video_wan.json` | Wan 2.1 I2V 14B 480p fp8, an effect LoRA | node 56, MP4 |
 | `wan22-flf2v-transition.api.json` | `templates/video_wan2_2_14B_flf2v.json` | Wan 2.2 I2V A14B fp8 (high and low noise) | node 61, MP4 |
 | `wan-animate2-motion.api.json` | `templates/video_wan_animate2_distilled.json` | Wan2.2-Animate-2 distilled, int8 | node 246, MP4 |
+| `wan21-vace-restyle.api.json` | `templates/video_wan_vace_14B_v2v.json`, its control made a depth pass | Wan 2.1 VACE 14B (fp16, cast to fp8), Depth Anything 3 Small | node 35, MP4 |
 
 ### ace-step15-music
 
@@ -128,6 +129,13 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 - `VAELoader` (584) loads the lock's `wan_2.1_vae` instead of the template's `Wan2_1_VAE_bf16` (a copy of Kijai's file); `WanAnimate2Cache` (594) runs on the CPU instead of the GPU, as the template's note advises against VRAM spikes; `CreateVideo` (245) writes 16 fps without the reference clip's sound.
 - The size follows the clip's aspect at 480p (bound on the clip's `ResizeImageMaskNode`, 600); the photo is cropped to it through `GetImageSize` (596).
 
+### wan21-vace-restyle
+
+- The template's control video was Canny edges and its LoRA the CausVid LoRA of Kijai (a refused repository). Here the control is the depth of each frame: `LoadDA3Model` (5) loads Depth Anything 3 Small, `DA3Inference` (6) runs on every frame in `mono` mode at 504 px, `DA3Render` (4) draws the depth normalised frame by frame (`v2_style`). Depth follows shapes without copying textures, so a scene can change material, light and season. The LoRA is lightx2v's own Wan 2.1 T2V 4-step LoRA (11): 4 steps, cfg 1, euler, shift 5.
+- `UNETLoader` (10) loads the fp16 file Comfy-Org publishes with `weight_dtype: fp8_e4m3fn`: about 17 GB on the card, a peak of 20.4 to 22.2 GB on an L4 in the spike of 2026-10-24.
+- The reference image (20, scaled by 21) has two uses. A look to follow goes to `WanVaceToVideo.reference_image`. The clip's first frame restyled by the edit is also put before the depth of the other frames (`ImageFromBatch` 22, `ImageBatch` 23), under a mask that is 0 on it and 1 elsewhere (`EmptyImage` 24 and 25, `ImageBatch` 26, `ImageToMask` 27): VACE keeps that frame and rebuilds the others along the depth. `compileRestyle` removes nodes 22 to 27 for a look, and 20 to 27 for a text alone.
+- `TrimVideoLatent` (32) drops the reference's latent frame before decoding; `CreateVideo` (34) writes 16 fps without the clip's sound, `SaveVideo` (35) `montagio/restyle`.
+
 ## Bindings
 
 | Model | image | prompt | negative | seed | width / height / frames | fps | camera_pose / camera_speed |
@@ -149,3 +157,4 @@ Extension models (a binding with several inputs gets the same value in each):
 | `wan21-i2v-effects` | image 52.image; prompt 6.text; negative 7.text; seed 3.seed; width / height / frames 50.width / height / length; lora 200.lora_name; lora_strength 200.strength_model | 56 (video) |
 | `wan22-flf2v-transition` | image 68.image; end_image 62.image; prompt 6.text; negative 7.text; seed 57.noise_seed; width / height / frames 67.width / height / length | 61 (video) |
 | `wan-animate2-motion` | image 189.image; video 240.file; prompt 582.text; motion_prompt 585.text; negative 581.text; seed 597.noise_seed; width / height 600.resize_type.width / height; frames 587.length | 246 (video) |
+| `wan21-vace-restyle` | video 1.file; image 20.image; prompt 14.text; negative 15.text; seed 31.seed; width / height 3, 21, 24, 25 and 30; frames 30.length | 35 (video) |
