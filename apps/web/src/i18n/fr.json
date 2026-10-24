@@ -231,6 +231,7 @@
   "musicDownloadVertical": "9:16 avec musique",
   "hdAction": "HD 1080p (~{d})",
   "hdDownload": "Télécharger en HD",
+  "hdSmooth": "Mouvement fluide : deux fois plus d’images par seconde (RIFE)",
   "motionKind": "Vidéo de référence · ≈ {s} s",
   "avatarKindEmpty": "Photo qui parle · jusqu’à 15 s",
   "motionKindEmpty": "Vidéo de référence · jusqu’à 5 s",

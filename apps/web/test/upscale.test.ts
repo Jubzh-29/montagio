@@ -83,6 +83,20 @@ test("HD of an 81-frame clip: a tagged 1080p job on the clip's aspect", async ()
   expect(info.upscaleModel).toMatchObject({ id: 'seedvr2-upscale', maxFrames: 121 });
 }, 30_000);
 
+test('HD with smooth: true keeps the RIFE frames in between; without it, the clip keeps its frame rate', async () => {
+  seedClip(81);
+  const smooth = new Request('http://localhost/x', { method: 'POST', headers: { 'idempotency-key': 'hd-smooth' }, body: JSON.stringify({ smooth: true }) });
+  const smoothed = (await (await upscaleGeneration(smooth, params({ id: CLIP }))).json()) as JobSummary;
+  const plain = (await (await upscaleGeneration(request('hd-plain'), params({ id: CLIP }))).json()) as JobSummary;
+  const smoothFlow = (await readJobWorkflow(smoothed.id))!.workflow;
+  const plainFlow = (await readJobWorkflow(plain.id))!.workflow;
+  expect(smoothFlow['102']?.class_type).toBe('FrameInterpolate');
+  expect(smoothFlow['75']!.inputs.fps).toEqual(['103', 0]);
+  expect(plainFlow['102']).toBeUndefined();
+  expect(plainFlow['75']!.inputs.fps).toEqual(['74', 2]);
+  expect((await poll(smoothed.id)).state).toBe('succeeded');
+}, 30_000);
+
 test('HD of a clip over 121 frames or without a frame count: 400 invalid-input', async () => {
   seedClip(160);
   const over = await upscaleGeneration(request('hd2'), params({ id: CLIP }));

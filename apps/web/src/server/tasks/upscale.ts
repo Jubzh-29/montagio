@@ -27,6 +27,7 @@ async function parentClip(parent: unknown): Promise<{ source: 'generation' | 'jo
 /**
  * A finished clip to 1080p (SeedVR2): same aspect and frame count, 121 frames at most, so
  * a clip whose frame count is unknown (delivered before it was recorded) is refused too.
+ * `smooth: true` adds RIFE frames in between: twice the frame rate (16 to 32 fps), same length.
  */
 export const upscaleTask: TaskDef = {
   async prepare(body, lib) {
@@ -36,7 +37,7 @@ export const upscaleTask: TaskDef = {
     const max = model.limits.max_input_frames ?? Infinity;
     if (!clip || clip.frames === undefined || clip.frames > max) throw new JobError('invalid-input');
     return {
-      inputs: { clipUrl: clip.url, frames: clip.frames },
+      inputs: { clipUrl: clip.url, frames: clip.frames, smooth: body.smooth === true },
       label: { name: model.name },
       modelId: model.id,
       seed: randomInt(0, 2 ** 32),
@@ -60,6 +61,7 @@ export const upscaleTask: TaskDef = {
           aspect: record.aspect ?? '16:9',
           seed: record.seed,
           frames: Number(record.inputs.frames),
+          smooth: record.inputs.smooth === true,
         });
         return { workflow, output, files: [extensionFile(model, 'video', clip)] };
       },
