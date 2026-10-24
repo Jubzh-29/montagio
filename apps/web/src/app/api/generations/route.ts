@@ -1,5 +1,6 @@
 import { readJsonBody } from '@/server/body';
 import { createGeneration, failureResponse, MAX_REQUEST_BYTES } from '@/server/generations';
+import { replaySeed } from '@/server/inputs';
 
 type Body = {
   presetId?: unknown;
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
       imageRef: body.imageRef,
       modelId: optionalString(body.modelId),
       userPrompt: optionalString(body.userPrompt)?.slice(0, 500),
-      seed: Number.isInteger(body.seed) ? (body.seed as number) : undefined,
+      seed: replaySeed(body.seed),
       idempotencyKey: idempotencyKey.slice(0, 200),
     });
     return Response.json(record, { status: created ? 201 : 200 });

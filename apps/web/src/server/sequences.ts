@@ -34,6 +34,8 @@ export type ShotRecord = {
   presetId: string;
   modelId?: string;
   userPrompt?: string;
+  /** The seed asked for (a film reproduced); absent, the shot draws its own. */
+  seed?: number;
   startImageRef?: string;
   generationId?: string;
   state: 'pending' | JobState;
@@ -62,7 +64,7 @@ export type SequenceRecord = {
 
 export type CreateSequenceInput = {
   imageRef: string;
-  shots: { presetId: string; modelId?: string; userPrompt?: string }[];
+  shots: { presetId: string; modelId?: string; userPrompt?: string; seed?: number }[];
   idempotencyKey: string;
 };
 
@@ -158,6 +160,7 @@ async function createSequenceOnce(input: CreateSequenceInput): Promise<CreateRes
       presetId: shot.presetId,
       ...(shot.modelId ? { modelId: shot.modelId } : {}),
       ...(shot.userPrompt ? { userPrompt: shot.userPrompt } : {}),
+      ...(shot.seed !== undefined ? { seed: shot.seed } : {}),
       state: 'pending' as const,
     })),
     currentShot: 0,
@@ -178,6 +181,7 @@ async function startShot(record: SequenceRecord, index: number, imageRef: string
     presetId: shot.presetId,
     modelId: shot.modelId,
     userPrompt: shot.userPrompt,
+    seed: shot.seed,
     imageRef,
     idempotencyKey: shotKey(record, index),
   });

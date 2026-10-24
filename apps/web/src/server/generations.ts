@@ -6,11 +6,13 @@ import { compileJob, CompileError, validatePreset, type Preset } from '@montagio
 import { ensureTools, probe, tagClip } from '@montagio/sequence';
 import { MAX_PRESET_YAML_BYTES, MAX_REQUEST_BYTES } from '@/lib/limits';
 import { getEnv } from './env';
+import { slotsOf } from './inputs';
 import { getServices } from './services';
 import {
   lookupKey,
   readRecord,
   rememberKey,
+  saveInputs,
   savePresetText,
   saveRecord,
   saveWorkflow,
@@ -138,12 +140,16 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
   if (input.presetYaml !== undefined) await savePresetText(id, input.presetYaml);
   // The start image travels as a file: the backend uploads it and binds it to the loader node.
   const imageBinding = model.bindings.image;
+  const imagePath = join(getEnv().data, ...input.imageRef.split('/'));
+  if (imageBinding) {
+    await saveInputs(id, await slotsOf([{ ...imageBinding, path: imagePath }], [{ from: 'imageRef', path: imagePath }]));
+  }
   const { backendJobId } = await backend.submit({
     workflow: compiled.workflow,
     presetId: preset.id,
     idempotencyKey: input.idempotencyKey,
     ...(imageBinding
-      ? { files: [{ node: imageBinding.node, field: imageBinding.field, path: join(getEnv().data, ...input.imageRef.split('/')) }] }
+      ? { files: [{ node: imageBinding.node, field: imageBinding.field, path: imagePath }] }
       : {}),
   });
   const now = new Date().toISOString();
