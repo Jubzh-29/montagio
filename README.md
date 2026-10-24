@@ -49,7 +49,7 @@ The app opens on **Explore**, the clips it makes and a door to every tool. The S
 
 The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan Right and Crane Up, plus five presets with two moves. Rise & Push, Drift Left Push and Pull Back & Tilt Up run both moves at once; Push & Settle and Breathing run one after the other. The core ComfyUI node takes a single move, so the two-move presets go through a node of the Montagio pack, Montagio Camera Embedding.
 
-### Seven extensions, validated on a 24 GB GPU on 2026-10-21
+### Eight extensions, validated on a 24 GB GPU
 
 | Extension | In the Studio | Model (license) |
 |---|---|---|
@@ -60,8 +60,9 @@ The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan
 | **Music** | "Add music" under a finished film, mixed into the film and its 9:16 cut | ACE-Step 1.5 (MIT) |
 | **HD** | "HD 1080p" under a finished clip, with **smooth motion** ticked by default: RIFE puts a frame between each two, so a 16 fps clip comes out at 32 fps; "HD 2560 px" on a photo of the atelier or of a character | SeedVR2 3B (Apache-2.0), RIFE 4.26 (MIT) |
 | **Motion transfer** | the Motion tab: the character of a photo moves like a reference video of up to 5 s | Wan2.2-Animate-2, distilled (Apache-2.0) |
+| **Restyle** | the Motion tab's second mode: a clip of up to 5 s and a few words rebuild its whole scene, its motion, camera move and timing kept. An optional image gives a look to follow; without one, the edit restyles the clip's first frame first | Wan 2.1 VACE 14B with a 4-step lightx2v LoRA, guided by the depth of each frame from Depth Anything 3 Small (Apache-2.0) |
 
-Relight, inpaint, the HD photo, the photodump and the voice sample were added on 2026-10-22 on these same models and weights, and rendered on the L4 the same day: inpaint changes only the painted area, the HD photo takes 14 s to 1440×2560, a voice sample moves the voice from 131 Hz (built-in) to the sample's register. An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
+The first seven were validated on 2026-10-21, Restyle on 2026-10-24. Relight, inpaint, the HD photo, the photodump and the voice sample were added on 2026-10-22 on these same models and weights, and rendered on the L4 the same day: inpaint changes only the painted area, the HD photo takes 14 s to 1440×2560, a voice sample moves the voice from 131 Hz (built-in) to the sample's register. An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
 
 ## Proof, measured
 
@@ -88,12 +89,13 @@ Measured on the L4 (an RTX 4090 is about twice as fast, going by the official te
 | HD upscale, 81 frames to 1080p (SeedVR2 3B) | 428 s | 18.4 GB |
 | HD with smooth motion, 81 frames at 16 fps to 161 at 32 fps in 1080p (SeedVR2 3B, then RIFE 4.26) | 410 s, of which RIFE 4.8 s | 8.6 GB |
 | Motion transfer, 5 s (Animate-2 distilled) | 391–415 s | 20.1–22.2 GB |
+| Restyle, 5 s at 480p (VACE 14B, 4 steps), after the edit of its first frame (73 s) | 186–239 s | 22.2–22.5 GB |
 
 What the session taught, and changed:
 
 - **The photo's description is required.** Without a text saying what the photo shows, Fun Camera invents and the clip turns ghostly: the diagnosis changed one variable per clip, and the description alone fixed it. The Studio now asks for it, and fills it in whenever the photo's text is known.
 - **HD goes through the upscale.** 480p followed by SeedVR2 gives 1080p about three times faster than rendering 720p natively.
-- **Honest limits.** Fun Camera handles push-ins, pull-backs and side moves well, and vertical moves and rotation poorly: Tilt Up became Crane Up, Tilt Down and a Dutch angle were dropped. Two hooks stay hidden: Iris Dive until it gets an intermediate keyframe, Figurine because its change is barely visible. The avatar's built-in voice is male, whatever the face: a consented voice sample replaces it. Motion transfer needs a photo framed like the reference video.
+- **Honest limits.** Fun Camera handles push-ins, pull-backs and side moves well, and vertical moves and rotation poorly: Tilt Up became Crane Up, Tilt Down and a Dutch angle were dropped. Two hooks stay hidden: Iris Dive until it gets an intermediate keyframe, Figurine because its change is barely visible. The avatar's built-in voice is male, whatever the face: a consented voice sample replaces it. Motion transfer needs a photo framed like the reference video. Restyle from a text alone rebuilds the scene but keeps a realistic look: an asked style holds once the edit has restyled the first frame, or with an image to follow.
 
 ## How it works
 
@@ -174,6 +176,7 @@ Montagio covers a one-click studio's main ground today. The next steps follow th
 | Voice | Chatterbox Multilingual, built-in voice or a consented voice sample | Qwen3-TTS (Apache-2.0) |
 | Music and sound | ACE-Step 1.5, instrumental | songs with lyrics on ACE-Step 1.5; foley waits for a permissive model, as none passes the rule yet |
 | Motion transfer | Animate-2 distilled, 5 s | longer clips; dance driven by the film's music (Wan-Dancer, once its license is read) |
+| Restyle | VACE 14B guided by depth, 5 s | swapping one object in a clip, once a segmenter licensed Apache-2.0 or MIT gives its masks; longer clips |
 | Finishing | SeedVR2: HD 1080p clips, smooth at twice the frame rate with RIFE 4.26; HD 2560 px photos | background removal (BiRefNet), pending a license check at the source |
 | Director | — | an open LLM of the Qwen3 family (Apache-2.0) that turns a short script into a shot list of presets; Qwen3-VL to describe an uploaded photo for you |
 | Sharing and provenance | visible "AI-generated" label | C2PA manifests (c2pa-python, Apache-2.0); the node pack on the Comfy Registry; a community preset library |
@@ -188,8 +191,8 @@ Never on the roadmap:
 
 Do not make videos of real people without their consent, and nothing illegal.
 
-- Before an edit, an effect, a hook or an avatar on an uploaded photo, the Studio asks you to confirm that you are the person in it or have their consent. Motion transfer asks you to confirm that you hold the rights on the photo and the video.
-- A [list of well-known names](registry/blocked-names.txt) is refused in text-to-image prompts, edit instructions, effect subjects, avatar texts and motion-transfer descriptions. It is a good-faith guardrail, not a complete filter.
+- Before an edit, an effect, a hook or an avatar on an uploaded photo, the Studio asks you to confirm that you are the person in it or have their consent. Motion transfer and Restyle ask you to confirm that you hold the rights on the video and the image.
+- A [list of well-known names](registry/blocked-names.txt) is refused in text-to-image prompts, edit instructions, effect subjects, avatar texts, motion-transfer descriptions and restyle texts. It is a good-faith guardrail, not a complete filter.
 - Every clip, image and sound is tagged "AI-generated" in its metadata, and the Studio shows the mention under each result with the model and its license.
 - No content filter is imposed on your own machine: what you render locally is your responsibility.
 

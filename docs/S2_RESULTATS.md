@@ -212,7 +212,7 @@ Un job sur une L4 du nouveau compte Modal, le 24/10 à 17:01 : la passe HD avec 
 
 ## 14. Restyle : spike VACE 14B (24/10)
 
-Avec l'accord de l'utilisateur (≈ 1,20 $ annoncés, plafond 1,50 $), sur le compte Modal montagio-2 : les poids téléchargés par un conteneur sans GPU (≈ 0,05 $), puis deux conteneurs L4 en parallèle qui ont lancé `infra/modal/spike_restyle.py` (≈ 0,45 $ ; 15,18 $ au relevé du mois avant le spike). Rien n'était câblé : le script fait l'image de référence avec l'extension d'édition (smoke `--extension edit`), puis envoie à ComfyUI des graphes du cœur. Résultats dans `s3/restyle-spike/`, hors dépôt (clips, planches, `results.jsonl`, vidéos côte à côte).
+Avec l'accord de l'utilisateur (≈ 1,20 $ annoncés, plafond 1,50 $), sur le compte Modal montagio-2 : les poids téléchargés par un conteneur sans GPU (≈ 0,05 $), puis deux conteneurs L4 en parallèle qui ont lancé `infra/modal/spike_restyle.py` (0,25 $ et 0,18 $ au relevé ; 15,18 $ sur le mois avant le spike). Rien n'était câblé : le script fait l'image de référence avec l'extension d'édition (smoke `--extension edit`), puis envoie à ComfyUI des graphes du cœur. Résultats dans `s3/restyle-spike/`, hors dépôt (clips, planches, `results.jsonl`, vidéos côte à côte).
 
 | Job | Clip source | Contrôle | Référence | Temps sur la L4 | Pic de VRAM | Verdict |
 |---|---|---|---|---|---|---|
@@ -226,3 +226,17 @@ Avec l'accord de l'utilisateur (≈ 1,20 $ annoncés, plafond 1,50 $), sur le co
 - **Réglages** : VACE 14B fp16 converti en fp8 au chargement, LoRA lightx2v T2V, 4 pas, cfg 1, euler, shift 5, `WanVaceToVideo` à force 1, négatif par défaut des templates Wan.
 - **Scintillement** (écart moyen de luminance d'une image à la suivante, `tblend` + `signalstats`) : voiture 3,5 à 3,6 contre 2,6 pour la source ; port 5,5 contre 2,7 (la texture peinte bouge un peu) ; danse 14 comme la source.
 - **Verdict : go.** Le câblage a retenu la profondeur (Depth Anything 3 Small, Apache-2.0) et les trois chemins (texte seul, style à suivre, 1re image restylisée).
+
+### Validation du chemin câblé (24/10, 19:29)
+
+Avec l'accord de l'utilisateur (≈ 0,30 $) : une `series` de trois runs du vrai smoke dans un conteneur L4, les workflows compilés par `compileRestyle` (profondeur dans les trois cas). 0,32 $ au relevé ; Restyle a coûté 0,80 $ en tout, spike compris (16,13 $ sur le mois). Résultats dans `s3/restyle-validation/`, hors dépôt ; le résultat est le fichier `…__r1-1.mp4` (81 images), `…__r1.mp4` étant le clip d'entrée préparé (80 images). La session locale s'est arrêtée pendant la série, qui a continué sur Modal (`--detach`).
+
+| Job du smoke | Clip source | Chemin | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|---|---|
+| `restyle-edit` (« a snowy winter evening ») | Crash Push de la voiture | 1re image du clip | 73 s, à froid | 22,2 Go | ✅ |
+| `restyle:first-frame` | idem | 1re image restylisée | 239 s, chargement de VACE compris | 22,5 Go | ✅ soir d'hiver enneigé, phares allumés, poussée suivie image par image |
+| `restyle` (« a watercolor painting of a small fishing harbour ») | Rise & Push du port | texte seul | 186 s | 22,3 Go | ⚠️ scène reconstruite et mouvement suivi, mais rendu réaliste : l'aquarelle n'est pas rendue |
+| `restyle:look` (personnage cartoon de `sample-character.png`, « a cartoon character dancing in a colorful room ») | danse du 5B | style à suivre, image sans rapport avec le clip | 196 s | 22,2 Go | ✅ la danseuse devient le personnage (veste verte, écharpe rouge) dans une chambre colorée, poses et poussée exactes |
+
+- **Daté** : `gpu_validated: 2026-10-24`. Le texte seul ne sert que sans l'extension d'édition ; un style demandé tient avec la 1re image restylisée (le chemin par défaut) ou une image à suivre.
+- Les définitions `/object_info` du GPU (`object_info-extensions.json`) couvrent les classes du workflow.

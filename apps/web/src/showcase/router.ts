@@ -347,7 +347,9 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     if (method === 'POST' && !id && resource === 'effects') return createExample('effect', await body(init));
     if (method === 'POST' && !id && resource === 'hooks') return createExample('hook', await body(init));
     // Edits and avatars have no example in the showcase (spec §3): they answer as the server answers a hidden one.
-    if (method === 'POST' && !id && (resource === 'edits' || resource === 'avatars' || resource === 'motion')) return refuse('extension-disabled', 404);
+    if (method === 'POST' && !id && (resource === 'edits' || resource === 'avatars' || resource === 'motion' || resource === 'restyle')) {
+      return refuse('extension-disabled', 404);
+    }
     if (resource === 'jobs' && id) {
       const record = jobs.get(id);
       if (record && ((method === 'GET' && action === undefined) || (method === 'POST' && action === 'cancel'))) return json(clone(record));

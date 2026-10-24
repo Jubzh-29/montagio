@@ -36,6 +36,7 @@ extensions:
     gpu_validated: 2026-10-21
   # Restyle (2026-10-24): a clip's scene rebuilt around its motion with Wan 2.1 VACE 14B. It needs
   # no other extension: without the edit, a job has no restyled first frame and follows its text.
+  # Its three paths ran through the smoke on an L4 on 2026-10-24 (docs/S2_RESULTATS.md, part 14).
   - id: restyle
     priority: 8
-    gpu_validated: null
+    gpu_validated: 2026-10-24
