@@ -1414,7 +1414,8 @@
       "squish_18.safetensors",
       "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
       "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
-      "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
+      "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
+      "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors"
      ]
     ],
     "strength_model": [
@@ -3030,7 +3031,8 @@
       "wan2.2_s2v_14B_fp8_scaled.safetensors",
       "wan2.2_ti2v_5B_fp16.safetensors",
       "z_image_turbo_bf16.safetensors",
-      "wan_animate_2_distill_int8_convrot.safetensors"
+      "wan_animate_2_distill_int8_convrot.safetensors",
+      "wan2.1_vace_14B_fp16.safetensors"
      ]
     ],
     "weight_dtype": [
@@ -5176,5 +5178,643 @@
   ],
   "essentials_category": null,
   "has_intermediate_output": false
+ },
+ "WanVaceToVideo": {
+  "input": {
+   "required": {
+    "positive": [
+     "CONDITIONING",
+     {}
+    ],
+    "negative": [
+     "CONDITIONING",
+     {}
+    ],
+    "vae": [
+     "VAE",
+     {}
+    ],
+    "width": [
+     "INT",
+     {
+      "default": 832,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "height": [
+     "INT",
+     {
+      "default": 480,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "length": [
+     "INT",
+     {
+      "default": 81,
+      "min": 1,
+      "max": 16384,
+      "step": 4
+     }
+    ],
+    "batch_size": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1,
+      "max": 4096
+     }
+    ],
+    "strength": [
+     "FLOAT",
+     {
+      "default": 1.0,
+      "min": 0.0,
+      "max": 1000.0,
+      "step": 0.01
+     }
+    ]
+   },
+   "optional": {
+    "control_video": [
+     "IMAGE",
+     {}
+    ],
+    "control_masks": [
+     "MASK",
+     {}
+    ],
+    "reference_image": [
+     "IMAGE",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "positive",
+    "negative",
+    "vae",
+    "width",
+    "height",
+    "length",
+    "batch_size",
+    "strength"
+   ],
+   "optional": [
+    "control_video",
+    "control_masks",
+    "reference_image"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "CONDITIONING",
+   "CONDITIONING",
+   "LATENT",
+   "INT"
+  ],
+  "output_is_list": [
+   false,
+   false,
+   false,
+   false
+  ],
+  "output_name": [
+   "positive",
+   "negative",
+   "latent",
+   "trim_latent"
+  ],
+  "output_tooltips": [
+   null,
+   null,
+   null,
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "WanVaceToVideo",
+  "display_name": null,
+  "description": "",
+  "python_module": "comfy_extras.nodes_wan",
+  "category": "model/conditioning/wan/vace",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": [
+   "video conditioning",
+   "video control"
+  ],
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "LoadDA3Model": {
+  "input": {
+   "required": {
+    "model_name": [
+     "COMBO",
+     {
+      "multiselect": false,
+      "options": [
+       "depth_anything_3_small.safetensors"
+      ]
+     }
+    ],
+    "weight_dtype": [
+     "COMBO",
+     {
+      "default": "default",
+      "multiselect": false,
+      "options": [
+       "default",
+       "fp16",
+       "bf16",
+       "fp32"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model_name",
+    "weight_dtype"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "DA3_MODEL"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "DA3_MODEL"
+  ],
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "LoadDA3Model",
+  "display_name": "Load Depth Anything 3",
+  "description": "",
+  "python_module": "comfy_extras.nodes_depth_anything_3",
+  "category": "model/loaders",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "DA3Inference": {
+  "input": {
+   "required": {
+    "da3_model": [
+     "DA3_MODEL",
+     {}
+    ],
+    "image": [
+     "IMAGE",
+     {}
+    ],
+    "resolution": [
+     "INT",
+     {
+      "default": 504,
+      "min": 140,
+      "max": 2520,
+      "step": 14
+     }
+    ],
+    "resize_method": [
+     "COMBO",
+     {
+      "default": "upper_bound_resize",
+      "multiselect": false,
+      "options": [
+       "upper_bound_resize",
+       "lower_bound_resize"
+      ]
+     }
+    ],
+    "mode": [
+     "COMFY_DYNAMICCOMBO_V3",
+     {
+      "options": [
+       {
+        "key": "mono",
+        "inputs": {
+         "required": {}
+        }
+       },
+       {
+        "key": "multiview",
+        "inputs": {
+         "required": {
+          "ref_view_strategy": [
+           "COMBO",
+           {
+            "default": "saddle_balanced",
+            "multiselect": false,
+            "options": [
+             "saddle_balanced",
+             "saddle_sim_range",
+             "first",
+             "middle"
+            ]
+           }
+          ],
+          "pose_method": [
+           "COMBO",
+           {
+            "default": "cam_dec",
+            "multiselect": false,
+            "options": [
+             "cam_dec",
+             "ray_pose"
+            ]
+           }
+          ]
+         }
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "da3_model",
+    "image",
+    "resolution",
+    "resize_method",
+    "mode"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "DA3_GEOMETRY"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "da3_geometry"
+  ],
+  "output_tooltips": [
+   "Dictionary of non-normalized tensors.\nAlways has the keys: depth, image, mode.\nOptional keys: sky (for Mono/Metric), confidence (for Small/Base), extrinsics + intrinsics (for multi-view)."
+  ],
+  "output_matchtypes": null,
+  "name": "DA3Inference",
+  "display_name": "Run Depth Anything 3",
+  "description": "Run Depth Anything 3 on an image. In multi-view mode each image is treated as a separate view of the same scene.",
+  "python_module": "comfy_extras.nodes_depth_anything_3",
+  "category": "image/geometry estimation",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": [
+   "depth",
+   "geometry",
+   "da3",
+   "depth anything",
+   "monocular",
+   "pointmap",
+   "sky",
+   "3d",
+   "metric depth",
+   "disparity"
+  ],
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "DA3Render": {
+  "input": {
+   "required": {
+    "da3_geometry": [
+     "DA3_GEOMETRY",
+     {}
+    ],
+    "output": [
+     "COMFY_DYNAMICCOMBO_V3",
+     {
+      "options": [
+       {
+        "key": "depth",
+        "inputs": {
+         "required": {
+          "normalization": [
+           "COMBO",
+           {
+            "default": "v2_style",
+            "multiselect": false,
+            "options": [
+             "v2_style",
+             "min_max",
+             "raw"
+            ]
+           }
+          ],
+          "apply_sky_clip": [
+           "BOOLEAN",
+           {
+            "default": false
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "depth_colored",
+        "inputs": {
+         "required": {
+          "normalization": [
+           "COMBO",
+           {
+            "default": "v2_style",
+            "multiselect": false,
+            "options": [
+             "v2_style",
+             "min_max",
+             "raw"
+            ]
+           }
+          ],
+          "apply_sky_clip": [
+           "BOOLEAN",
+           {
+            "default": false
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "sky_mask",
+        "inputs": {
+         "required": {
+          "colored": [
+           "BOOLEAN",
+           {
+            "default": false
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "confidence",
+        "inputs": {
+         "required": {
+          "colored": [
+           "BOOLEAN",
+           {
+            "default": false
+           }
+          ]
+         }
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "da3_geometry",
+    "output"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "IMAGE"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "DA3Render",
+  "display_name": "Render Depth Anything 3",
+  "description": "Render a depth map, confidence map, or sky mask from Depth Anything 3 geometry data.",
+  "python_module": "comfy_extras.nodes_depth_anything_3",
+  "category": "image/geometry estimation",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "ImageScale": {
+  "input": {
+   "required": {
+    "image": [
+     "IMAGE"
+    ],
+    "upscale_method": [
+     [
+      "nearest-exact",
+      "bilinear",
+      "area",
+      "bicubic",
+      "lanczos"
+     ]
+    ],
+    "width": [
+     "INT",
+     {
+      "default": 512,
+      "min": 0,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "height": [
+     "INT",
+     {
+      "default": 512,
+      "min": 0,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "crop": [
+     [
+      "disabled",
+      "center"
+     ]
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "image",
+    "upscale_method",
+    "width",
+    "height",
+    "crop"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "IMAGE"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "name": "ImageScale",
+  "display_name": "Upscale Image",
+  "description": "",
+  "python_module": "nodes",
+  "category": "image/upscaling",
+  "output_node": false,
+  "has_intermediate_output": false,
+  "search_aliases": [
+   "resize",
+   "resize image",
+   "scale image",
+   "image resize",
+   "zoom",
+   "zoom in",
+   "change size"
+  ],
+  "essentials_category": "Image Tools"
+ },
+ "ImageBatch": {
+  "input": {
+   "required": {
+    "image1": [
+     "IMAGE"
+    ],
+    "image2": [
+     "IMAGE"
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "image1",
+    "image2"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "IMAGE"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "name": "ImageBatch",
+  "display_name": "Batch Images (DEPRECATED)",
+  "description": "",
+  "python_module": "nodes",
+  "category": "image/batch",
+  "output_node": false,
+  "has_intermediate_output": false,
+  "deprecated": true,
+  "search_aliases": [
+   "combine images",
+   "merge images",
+   "stack images"
+  ]
+ },
+ "EmptyImage": {
+  "input": {
+   "required": {
+    "width": [
+     "INT",
+     {
+      "default": 512,
+      "min": 1,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "height": [
+     "INT",
+     {
+      "default": 512,
+      "min": 1,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "batch_size": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1,
+      "max": 4096
+     }
+    ],
+    "color": [
+     "INT",
+     {
+      "default": 0,
+      "min": 0,
+      "max": 16777215,
+      "step": 1,
+      "display": "color"
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "width",
+    "height",
+    "batch_size",
+    "color"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "IMAGE"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "name": "EmptyImage",
+  "display_name": "Empty Image",
+  "description": "",
+  "python_module": "nodes",
+  "category": "image",
+  "output_node": false,
+  "has_intermediate_output": false,
+  "search_aliases": []
  }
 }

@@ -12,23 +12,42 @@ import {
   compileHookTransition,
   compileMotion,
   compileMusic,
+  compileRestyle,
   compileSpeech,
   compileImageUpscale,
   compileUpscale,
   compileVoiceChange,
   EDIT_LOOK_IDS,
+  restyleInstruction,
   type ApiWorkflow,
   type Aspect,
   type Library,
+  type RestyleReference,
 } from '@montagio/presets';
 import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } from '@montagio/registry';
 
 /**
  * In the order a session runs them, the priority order of 2026-10-19 (the motion transfer,
- * added on 2026-10-20, last): a hook's edit comes before its transition, the voice before the
- * avatar that speaks it, a composed photo before the effects that animate it.
+ * added on 2026-10-20, then the restyle on 2026-10-24, last): a hook's edit comes before its
+ * transition, the voice before the avatar that speaks it, a composed photo before the effects
+ * that animate it, the restyled first frame before the restyle that keeps it.
  */
-export const EXTENSION_JOBS = ['edit', 'compose', 'effect', 'hook-edit', 'transition', 'voice', 'avatar', 'music', 'upscale', 'upscale-image', 'voice-change', 'motion'] as const;
+export const EXTENSION_JOBS = [
+  'edit',
+  'compose',
+  'effect',
+  'hook-edit',
+  'transition',
+  'voice',
+  'avatar',
+  'music',
+  'upscale',
+  'upscale-image',
+  'voice-change',
+  'motion',
+  'restyle-edit',
+  'restyle',
+] as const;
 export type ExtensionJobName = (typeof EXTENSION_JOBS)[number];
 
 const TASKS: Record<ExtensionJobName, ExtensionTask> = {
@@ -44,19 +63,22 @@ const TASKS: Record<ExtensionJobName, ExtensionTask> = {
   'upscale-image': 'i2i-upscale',
   'voice-change': 'a2a-vc',
   motion: 'motion-transfer',
+  'restyle-edit': 'i2i-edit',
+  restyle: 'v2v-restyle',
 };
 
 /**
  * The jobs that read a text: the edit instruction, the effects' subject, the words to say, the
- * music description, the motion's description.
+ * music description, the motion's description, the restyle's new look (its edit reads it too).
  */
-export const TEXT_JOBS = ['edit', 'effect', 'voice', 'music', 'motion'] as const satisfies readonly ExtensionJobName[];
+export const TEXT_JOBS = ['edit', 'effect', 'voice', 'music', 'motion', 'restyle'] as const satisfies readonly ExtensionJobName[];
 export type TextJobName = (typeof TEXT_JOBS)[number];
 
-const DEFAULT_TEXT: Record<'music' | 'edit' | 'voice', string> = {
+const DEFAULT_TEXT: Record<'music' | 'edit' | 'voice' | 'restyle', string> = {
   music: 'calm cinematic piano, slow strings',
   edit: 'make it a rainy night scene',
   voice: 'Hello, I am a Montagio avatar, rendered with open weights.',
+  restyle: 'a snowy winter evening',
 };
 
 /** The hook of the GPU session S2 when none is named. */
@@ -80,10 +102,14 @@ export type ExtensionJobOptions = {
   clipFrames?: number;
   /** Upscale: RIFE frames in between, at twice the clip's frame rate (the HD pass's smooth option). */
   smooth?: boolean;
-  /** The reference clip of the motion transfer, prepared by prepareMotionClip, with its length and aspect. */
+  /** The reference clip of the motion transfer, or the clip of a restyle, prepared by prepareMotionClip, with its length and aspect. */
   motion?: string;
   motion_s?: number;
   motionAspect?: Aspect;
+  /** The restyled clip's first frame, which restyle-edit changes. */
+  restyleFrame?: string;
+  /** The restyle's reference image and what it is to the job; none: the text alone. */
+  restyleReference?: { path: string; mode: RestyleReference };
   /** The speech of avatar, and its length in seconds (the caller reads it). */
   audio?: string;
   /** The voice job's sample (mono FLAC, as the app prepares it): the cloned voice. */
@@ -259,6 +285,26 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
           ...(motion ? { motion } : {}),
         });
         return [{ name, tag: name, model, ...job, files: [file('image', photo), file('video', clip)] }];
+      }
+      case 'restyle-edit': {
+        // The clip's first frame restyled by the edit: the reference a restyle keeps as its first frame.
+        const frame = need(opts.restyleFrame, '--motion', name);
+        const job = compileEdit(model, template, { imageRef: basename(frame), instruction: restyleInstruction(text('restyle')), seed: opts.seed, fast }, library.lock);
+        return [{ name, tag: name, model, ...job, files: [file('image', frame)] }];
+      }
+      case 'restyle': {
+        const clip = need(opts.motion, '--motion', name);
+        if (opts.motion_s === undefined || opts.motionAspect === undefined) throw new Error('the restyle job needs the length and the aspect of its prepared clip');
+        const reference = opts.restyleReference;
+        const job = compileRestyle(model, template, {
+          videoRef: basename(clip),
+          video_s: opts.motion_s,
+          aspect: opts.motionAspect,
+          seed: opts.seed,
+          prompt: text('restyle'),
+          ...(reference ? { reference: { imageRef: basename(reference.path), mode: reference.mode } } : {}),
+        });
+        return [{ name, tag: reference ? `${name}:${reference.mode}` : name, model, ...job, files: [file('video', clip), ...(reference ? [file('image', reference.path)] : [])] }];
       }
       case 'upscale': {
         const clip = need(opts.clip, '--clip', name);

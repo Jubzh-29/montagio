@@ -35,7 +35,7 @@ import {
   type Library,
   type Resolution,
 } from '@montagio/presets';
-import { prepareMotionClip, probe, probeAudio } from '@montagio/sequence';
+import { extractFirstFrame, prepareMotionClip, probe, probeAudio } from '@montagio/sequence';
 import { imageSize } from 'image-size';
 import { EXTENSION_JOBS, extensionJobs, jobTexts, photoFile, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
 import { imageFingerprint, imagePrompts } from './lib/image';
@@ -114,8 +114,10 @@ if (args.help) {
   --dry-run          compile and write the workflows, contact nothing
 
 Extensions (instead of presets):
-  --extension LIST   edit, compose, effect, hook (= hook-edit then transition), voice, avatar, music, upscale, motion (comma list) or "all"
-  --input PATH       the photo of edit, effect, hook and avatar (default demo-assets/images/sample-16x9.png)
+  --extension LIST   edit, compose, effect, hook (= hook-edit then transition), voice, avatar, music, upscale, motion,
+                     restyle (comma list) or "all"; restyle-edit,restyle restyles the clip's first frame, then keeps it
+  --input PATH       the photo of edit, effect, hook and avatar (default demo-assets/images/sample-16x9.png); restyle
+                     run alone: a look to follow (without --input, the text alone)
   --effect LIST      the effects to run, e.g. squish,explode, or "all" (default all)
   --hook ID          the hook of hook-edit and transition (default iris-dive)
   --input2 PATH      the second image of a two-reference hook (the outfit of wardrobe-swap), or compose's character
@@ -126,12 +128,14 @@ Extensions (instead of presets):
   --look LOOK        a look of the edit job: infl8, action or angles
   --clip PATH        the clip to upscale (required by upscale)
   --smooth           upscale: RIFE frames in between, twice the clip's frame rate (16 to 32 fps for Wan)
-  --motion PATH      the reference video of the motion transfer (required by motion): its first 5 s are kept, at 16 fps, silent
+  --motion PATH      the reference video of the motion transfer, or the clip to restyle (required by motion and restyle):
+                     its first 5 s are kept, at 16 fps, silent
   --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
   --voice PATH       voice: speak with this sample (a consented recording, mono FLAC) instead of the built-in voice
-  --text [JOB=]TEXT  the edit instruction, the effects' subject, the words to say or the music description (each has
-                     a default), for the one job of the run that reads a text; when several do, name it:
-                     --text edit=… --text effect=… --text voice=… --text music=… (repeatable)
+  --text [JOB=]TEXT  the edit instruction, the effects' subject, the words to say, the music description or the
+                     restyle's new look (each has a default), for the one job of the run that reads a text; when
+                     several do, name it: --text edit=… --text effect=… --text voice=… --text music=… --text restyle=…
+                     (repeatable)
   --language en|fr   the language of the voice (default en)
   --duration S       music: the length of the film it goes under (default 10)
 
@@ -504,6 +508,8 @@ async function runExtensions(
   if (chainedHook && !names.includes('hook-edit')) names.splice(names.indexOf('transition'), 0, 'hook-edit');
   // With a composition, the effects animate the composed photo: the composition runs first.
   const chainedCompose = names.includes('compose') && names.includes('effect');
+  // With restyle-edit, the restyle keeps the clip's first frame as the edit restyled it.
+  const chainedRestyle = names.includes('restyle-edit') && names.includes('restyle');
   // Each text feeds one job (the voice, for an avatar that speaks its output).
   const text = jobTexts(args.text, names);
 
@@ -527,23 +533,37 @@ async function runExtensions(
     clipAspect = pickAspect(width, height);
     clipFrames = Math.round(duration_s * fps);
   }
-  // The motion transfer's clip is prepared first (5 s at 16 fps, silent), and sizes its own job.
+  // The clip of the motion transfer or of the restyle is prepared first (5 s at 16 fps, silent), and sizes its own job.
   let motion: string | undefined;
   let motion_s: number | undefined;
   let motionAspect: Aspect | undefined;
-  if (names.includes('motion')) {
+  let restyleFrame: string | undefined;
+  if (names.some((name) => name === 'motion' || name === 'restyle' || name === 'restyle-edit')) {
     if (args['dry-run']) {
       motion = args.motion ? fromCaller(args.motion) : 'motion.mp4';
       motion_s = 5;
       motionAspect = '9:16';
+      restyleFrame = input;
     } else if (args.motion) {
       await mkdir(join(outDir, 'inputs'), { recursive: true });
       motion = join(outDir, 'inputs', 'motion.mp4');
       const prepared = await prepareMotionClip(fromCaller(args.motion), motion);
       motion_s = prepared.duration_s;
       motionAspect = pickAspect(prepared.width, prepared.height);
+      if (names.includes('restyle-edit')) {
+        restyleFrame = join(outDir, 'inputs', 'first-frame.png');
+        await extractFirstFrame(motion, restyleFrame);
+      }
     }
   }
+  // The restyle's reference: the restyled first frame (set once restyle-edit has run), the photo given, or none.
+  let restyleReference: { path: string; mode: 'first-frame' | 'look' } | undefined = chainedRestyle
+    ? args['dry-run']
+      ? { path: input, mode: 'first-frame' }
+      : undefined
+    : args.input
+      ? { path: input, mode: 'look' }
+      : undefined;
   let audio = args.audio ? fromCaller(args.audio) : undefined;
   let audio_s = audio ? (await probeAudio(audio))?.duration_s : undefined;
   if (audio && !audio_s) throw new Error(`no audio stream in ${audio}`);
@@ -566,6 +586,8 @@ async function runExtensions(
     motion,
     motion_s,
     motionAspect,
+    restyleFrame,
+    restyleReference,
     audio: audio ?? (args['dry-run'] ? 'speech.flac' : undefined),
     audio_s: audio_s ?? (args['dry-run'] ? 5 : undefined),
     text,
@@ -576,7 +598,9 @@ async function runExtensions(
   });
   // Compile what can be compiled now: a missing file fails before any GPU second is spent.
   const first = names.filter(
-    (name) => args['dry-run'] || !((chained && name === 'avatar') || (chainedHook && name === 'transition') || (chainedCompose && name === 'effect')),
+    (name) =>
+      args['dry-run'] ||
+      !((chained && name === 'avatar') || (chainedHook && name === 'transition') || (chainedCompose && name === 'effect') || (chainedRestyle && name === 'restyle')),
   );
   const jobs = extensionJobs(library, options(first));
   await mkdir(join(outDir, 'workflows'), { recursive: true });
@@ -661,6 +685,16 @@ async function runExtensions(
       const { width, height } = imageSize(await readFile(input));
       aspect = pickAspect(width, height);
       for (const effect of extensionJobs(library, options(['effect']))) await run(effect);
+    }
+    if (chainedRestyle && job.name === 'restyle-edit' && !args['dry-run']) {
+      const frame = record.outputs[0];
+      if (record.status !== 'succeeded' || !frame) {
+        console.error('  ✗ no restyled first frame: the restyle job is skipped');
+        continue;
+      }
+      restyleReference = { path: join(outDir, frame), mode: 'first-frame' };
+      const [restyle] = extensionJobs(library, options(['restyle']));
+      await run(restyle!);
     }
   }
 

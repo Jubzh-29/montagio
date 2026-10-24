@@ -14,7 +14,7 @@ beforeAll(async () => {
 
 const base = { language: 'en' as const, duration_s: 10, seed: 7, aspect: '16:9' as const };
 
-const files = { input: '/data/photo.png', input2: '/data/outfit.png', input3: '/data/product.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, voice: '/data/voice.flac', motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const };
+const files = { input: '/data/photo.png', input2: '/data/outfit.png', input3: '/data/product.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, voice: '/data/voice.flac', motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const, restyleFrame: '/data/first.png', restyleReference: { path: '/data/restyled.png', mode: 'first-frame' as const } };
 
 test('one job per extension, in the order of the session, each accepted by ComfyUI v0.41.0 once its files are uploaded', () => {
   const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
@@ -31,6 +31,8 @@ test('one job per extension, in the order of the session, each accepted by Comfy
     ['upscale-image', 'seedvr2-image-upscale'],
     ['voice-change', 'chatterbox-vc'],
     ['motion', 'wan-animate2-motion'],
+    ['restyle-edit', 'qwen-image-edit-2511'],
+    ['restyle:first-frame', 'wan21-vace-restyle'],
   ]);
   for (const job of jobs) {
     const skip = job.files.map((file) => `${file.node}.${file.field}`);
@@ -53,6 +55,11 @@ test('each job uploads the files it reads and nothing else', () => {
   expect(uploads.motion).toEqual([
     { node: '189', field: 'image', path: '/data/photo.png' },
     { node: '240', field: 'file', path: '/data/motion.mp4' },
+  ]);
+  expect(uploads['restyle-edit']).toEqual([{ node: '41', field: 'image', path: '/data/first.png' }]);
+  expect(uploads.restyle).toEqual([
+    { node: '1', field: 'file', path: '/data/motion.mp4' },
+    { node: '20', field: 'image', path: '/data/restyled.png' },
   ]);
   expect(uploads.edit).toEqual([{ node: '41', field: 'image', path: '/data/photo.png' }]);
   expect(uploads.compose).toEqual([
@@ -91,7 +98,22 @@ test('an extension record carries the sha256 of its photo', () => {
     'upscale-image': '/data/photo.png',
     'voice-change': null,
     motion: '/data/photo.png',
+    'restyle-edit': '/data/first.png',
+    restyle: '/data/restyled.png',
   });
+});
+
+test("a restyle follows its text alone, a look to follow, or the clip's first frame restyled by its edit", () => {
+  const restyle = (extra: object) => extensionJobs(library, { ...base, motion: '/data/clip.mp4', motion_s: 5, motionAspect: '16:9', jobs: ['restyle'], ...extra })[0]!;
+  const alone = restyle({});
+  expect([alone.tag, alone.params.reference, alone.params.prompt]).toEqual(['restyle', null, 'a snowy winter evening']);
+  expect(alone.files).toEqual([{ node: '1', field: 'file', path: '/data/clip.mp4' }]);
+  const look = restyle({ restyleReference: { path: '/data/look.png', mode: 'look' }, text: { restyle: 'a watercolor painting' } });
+  expect([look.tag, look.params.reference, look.params.prompt]).toEqual(['restyle:look', 'look', 'a watercolor painting']);
+  expect(look.workflow['20']!.inputs.image).toBe('look.png');
+  const [edit] = extensionJobs(library, { ...base, restyleFrame: '/data/first.png', jobs: ['restyle-edit'], text: { restyle: 'a watercolor painting' } });
+  expect(edit!.params.instruction).toMatch(/^Change the look of this image: a watercolor painting\. Keep the framing/);
+  expect(() => extensionJobs(library, { ...base, jobs: ['restyle'] })).toThrow(/--motion/);
 });
 
 test('without a list, every effect of the pack runs, each with its own tag', () => {
@@ -170,7 +192,7 @@ describe('jobTexts (smoke --text)', () => {
   });
 
   test('when several jobs read a text, a bare one is refused and each text names its job', () => {
-    expect(() => jobTexts(['night rain'], [...EXTENSION_JOBS])).toThrow(/edit, effect, voice, music, motion read a text: name the job, as in --text edit=/);
+    expect(() => jobTexts(['night rain'], [...EXTENSION_JOBS])).toThrow(/edit, effect, voice, music, motion, restyle read a text: name the job, as in --text edit=/);
     expect(jobTexts(['music=calm piano', 'edit=make it snow'], [...EXTENSION_JOBS])).toEqual({ music: 'calm piano', edit: 'make it snow' });
   });
 

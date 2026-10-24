@@ -20,10 +20,14 @@
  * FrameInterpolationModelLoader, FrameInterpolate and ComfyMathExpression (the smooth motion of the HD
  * pass) come from the CPU ComfyUI v0.41.0 on 2026-10-24, its frame_interpolation folder holding the
  * lock's rife_v4.26.safetensors (tooltips removed).
+ * WanVaceToVideo, LoadDA3Model, DA3Inference, DA3Render, ImageScale, ImageBatch and EmptyImage (the
+ * restyle) come from the same CPU ComfyUI on 2026-10-24, its geometry_estimation folder holding the
+ * lock's depth_anything_3_small.safetensors; UNETLoader and LoraLoaderModelOnly list the lock's VACE
+ * 14B and its T2V LoRA (tooltips removed). The same graphs ran on an L4 in the restyle spike.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { compileAvatar, compileEdit, compileEffect, compileImageUpscale, compileHookEdit, compileHookTransition, compileJob, compileMusic, compileSpeech, compileTransition, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
+import { compileAvatar, compileEdit, compileEffect, compileImageUpscale, compileHookEdit, compileHookTransition, compileJob, compileMusic, compileRestyle, compileSpeech, compileTransition, compileUpscale, loadLibrary, type Aspect, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -218,6 +222,17 @@ test('the avatar job compiled for 1, 2 and 3 chunks is accepted', () => {
       seed: 3,
     });
     expect({ audio_s, problems: checkWorkflow(workflow, info) }).toEqual({ audio_s, problems: [] });
+  }
+});
+
+test.each(['16:9', '9:16', '1:1'] as Aspect[])('the restyle job is accepted with no reference, a look or a first frame (%s)', (aspect) => {
+  const model = library.extensionModels.get('wan21-vace-restyle')!;
+  const template = library.extensionTemplates.get(model.workflow)!;
+  for (const reference of [undefined, { imageRef: 'start.png', mode: 'look' as const }, { imageRef: 'start.png', mode: 'first-frame' as const }]) {
+    for (const video_s of [5, 2.4]) {
+      const { workflow } = compileRestyle(model, template, { videoRef: 'clip.mp4', video_s, aspect, seed: 3, prompt: 'a snowy winter evening', ...(reference ? { reference } : {}) });
+      expect({ mode: reference?.mode ?? null, video_s, problems: checkWorkflow(workflow, info) }).toEqual({ mode: reference?.mode ?? null, video_s, problems: [] });
+    }
   }
 });
 
