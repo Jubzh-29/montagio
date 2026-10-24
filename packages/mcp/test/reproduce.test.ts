@@ -169,12 +169,63 @@ describe('a recipe is a file from anywhere: it never speaks for the user', () =>
     expect(calls.filter((call) => call.method === 'POST')).toEqual([]);
   });
 
+  test('a recipe asks for one follow-up at most: a chain of renders is refused', async () => {
+    const upscale = { route: '/api/generations/:parent/upscale', body: { smooth: true }, files: [] };
+    const recipe = tampered((request) => (request.then = [upscale, { ...upscale, route: '/api/jobs/:parent/upscale' }]));
+    const { fetch, calls } = app(() => recipe);
+    await expect(reproduce(clientOf(fetch), { recipe, inputs: { imageRef: photo } })).rejects.toMatchObject({ code: 'invalid-recipe' });
+    expect(calls.filter((call) => call.method === 'POST')).toEqual([]);
+  });
+
   test('a file field that would reach an object prototype is refused', async () => {
     const recipe = tampered((request) => (request.files = [{ field: '__proto__.polluted', sha256: null }]));
     const { fetch } = app(() => recipe);
     await expect(reproduce(clientOf(fetch), { recipe, inputs: { '__proto__.polluted': photo } })).rejects.toMatchObject({ code: 'invalid-recipe' });
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
+});
+
+test('an avatar in the user\'s own voice: the sample goes to the voice route, and only the call says the speaker agreed', async () => {
+  const voice = join(dir, 'voice.wav');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=220:duration=1', voice]);
+  const recipe = buildRecipe(
+    {
+      kind: 'clip',
+      task: 'avatar',
+      name: 'Avatar',
+      createdAt: '2026-10-24T18:00:00.000Z',
+      backend: 'local',
+      seed: 3,
+      request: {
+        route: '/api/avatars',
+        body: { text: 'Hello there', language: 'en', seed: 3, voiceConsent: true },
+        files: [{ field: 'imageRef', sha256: photoSha }, { field: 'voiceRef', sha256: 'e'.repeat(64) }],
+      },
+      steps: [{ name: 'speech', workflow: WORKFLOW, inputs: [{ node: '1', field: 'image', from: 'imageRef', sha256: photoSha }] }],
+      post: ['tag'],
+    },
+    { lock: [], models: [], stack: STACK },
+  );
+  const avatarApp = () =>
+    fakeFetch((call: Call) => {
+      if (call.path === '/api/uploads') return reply({ imageRef: 'uploads/new.png', width: 16, height: 9, aspect: '16:9', origin: 'upload', personal: true }, 201);
+      if (call.path === '/api/uploads/voice') return reply({ voiceRef: 'voices/v.flac', duration_s: 1 }, 201);
+      if (call.method === 'POST' && call.path === '/api/avatars') return reply({ id: 'j1', task: 'avatar', state: 'queued', progress: 0, label: {}, modelId: 'm' }, 201);
+      if (call.path === '/api/jobs/j1') return reply({ id: 'j1', task: 'avatar', state: 'succeeded', progress: 1, label: {}, modelId: 'm', outputUrl: '/media/data/jobs/j1/output.mp4' });
+      if (call.path === '/api/recipes/job/j1') return reply(recipe);
+      return reply({ error: 'not-found' }, 404);
+    });
+  const first = avatarApp();
+  const result = await reproduce(clientOf(first.fetch), { recipe, inputs: { imageRef: photo, voiceRef: voice } });
+  expect(first.calls.find((call) => call.path === '/api/uploads/voice')?.form?.get('audio')).toBeInstanceOf(Blob);
+  const sent = first.calls.find((call) => call.path === '/api/avatars')!.json!;
+  expect(sent).toMatchObject({ imageRef: 'uploads/new.png', voiceRef: 'voices/v.flac', text: 'Hello there' });
+  expect(sent).not.toHaveProperty('voiceConsent');
+  // The app prepares the sample (mono FLAC, 20 s): its sha256 cannot be the file's own.
+  expect(result.sameInputs).toEqual({ imageRef: true, voiceRef: null });
+  const second = avatarApp();
+  await reproduce(clientOf(second.fetch), { recipe, inputs: { imageRef: photo, voiceRef: voice }, voiceConsent: true });
+  expect(second.calls.find((call) => call.path === '/api/avatars')!.json).toMatchObject({ voiceConsent: true });
 });
 
 test('the MCP server lists get_recipe and reproduce', () => {

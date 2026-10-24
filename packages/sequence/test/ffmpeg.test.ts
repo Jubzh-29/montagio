@@ -23,6 +23,7 @@ import {
   previewClip,
   probe,
   probeAudio,
+  readSentTags,
   readTags,
   RECIPE_TAG,
   replaceAudio,
@@ -120,6 +121,16 @@ test('the film and its 9:16 cut can carry the recipe too', async () => {
   await concatClips([clipA, clipB], film, { width: 832, height: 480 }, 16, { tags });
   await exportVertical(film, vertical, { tags });
   for (const file of [film, vertical]) expect((await readTags(file)).synopsis, file).toBe('{"seed":8}');
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('the tags of a file from anywhere are read from that file alone: a list named .mp4 is refused', async () => {
+  const tagged = join(dir, 'sent-recipe.mp4');
+  await tagClip(clipA, tagged, { [RECIPE_TAG.video]: '{"seed":9}' });
+  expect((await readSentTags(tagged)).synopsis).toBe('{"seed":9}');
+  // An ffconcat list would make FFmpeg open the files it names: the tags of another clip.
+  const list = join(dir, 'sent-list.mp4');
+  writeFileSync(list, ['ffconcat version 1.0', 'file sent-recipe.mp4', ''].join('\n'));
+  await expect(readSentTags(list)).rejects.toThrow(SequenceToolError);
 }, FFMPEG_TEST_TIMEOUT_MS);
 
 test('a WebM clip is remuxed to an MP4 carrying the mention', async () => {

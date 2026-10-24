@@ -111,6 +111,12 @@ export async function readTags(media: string): Promise<Record<string, string>> {
   return (JSON.parse(out) as { format?: { tags?: Record<string, string> } }).format?.tags ?? {};
 }
 
+/** The tags of a video someone sent (a recipe's clip): the local file alone, read as a real container. */
+export async function readSentTags(media: string): Promise<Record<string, string>> {
+  const out = await run(ffprobe(), ['-v', 'error', '-show_entries', 'format_tags', '-of', 'json', ...LOCAL_FILE_ONLY, ...SENT_VIDEO, media]);
+  return (JSON.parse(out) as { format?: { tags?: Record<string, string> } }).format?.tags ?? {};
+}
+
 /**
  * Copy a clip into an MP4 that carries the AI mention (and `extra` tags: its recipe), without re-encoding.
  * Whatever the source container (ComfyUI's SaveWEBM writes WebM), the result is

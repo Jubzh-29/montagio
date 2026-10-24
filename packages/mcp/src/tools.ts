@@ -734,6 +734,10 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
           .boolean()
           .default(false)
           .describe('For a motion transfer: the user holds the rights on the photo and the video. Set it only when the user has said so.'),
+        voiceConsent: z
+          .boolean()
+          .default(false)
+          .describe('For an avatar in someone\'s own voice (inputs.voiceRef): that person agreed. Set it only when the user has said so.'),
         timeoutMinutes,
       },
       annotations: renders,
@@ -744,7 +748,7 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
         const inputs = args.photo ? withPhoto(recipe, args.inputs ?? {}, args.photo) : (args.inputs ?? {});
         const result = await reproduce(
           client,
-          { recipe, inputs, consent: args.consent, rights: args.rights },
+          { recipe, inputs, consent: args.consent, rights: args.rights, voiceConsent: args.voiceConsent },
           { ...(args.timeoutMinutes ? { timeoutMs: args.timeoutMinutes * 60_000 } : {}), signal: extra.signal, onProgress: progressOf(extra) },
         );
         return finished(client, result.render, { sameInputs: result.sameInputs, sameWorkflow: result.sameWorkflow, stack: result.stack, note: result.note });

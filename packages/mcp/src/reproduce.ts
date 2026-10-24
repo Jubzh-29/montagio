@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve } from 'node:path';
 import { parseRecipe, sameWorkflows, type CompactRecipe, type Recipe } from '@montagio/recipe';
-import { readImageTags, readTags, RECIPE_TAG } from '@montagio/sequence';
+import { readImageTags, readSentTags, RECIPE_TAG } from '@montagio/sequence';
 import type { RecipeRequest } from '@montagio/recipe';
 import type { RenderStatus, MontagioClient, WaitOptions } from './client';
 import { ToolFailure } from './errors';
@@ -18,6 +18,8 @@ export type ReproduceArgs = {
   inputs: Record<string, string>;
   consent?: boolean;
   rights?: boolean;
+  /** The speaker of the voice sample agreed (an avatar in someone's own voice). */
+  voiceConsent?: boolean;
 };
 
 export type ReproduceResult = {
@@ -40,7 +42,7 @@ export async function loadRecipe(source: unknown): Promise<Recipe | CompactRecip
     const path = resolve(source);
     try {
       const ext = extname(path).toLowerCase();
-      if (VIDEO.has(ext)) raw = JSON.parse((await readTags(path))[RECIPE_TAG.video] ?? 'null');
+      if (VIDEO.has(ext)) raw = JSON.parse((await readSentTags(path))[RECIPE_TAG.video] ?? 'null');
       else if (ext === '.png') raw = JSON.parse((await readImageTags(path))[RECIPE_TAG.image] ?? 'null');
       else raw = JSON.parse(await readFile(path, 'utf8'));
     } catch {
@@ -89,6 +91,8 @@ function checkRequest(request: RecipeRequest): void {
   for (const file of request.files) {
     if (!FILE_FIELD.test(file.field) || file.field.split('.').some((part) => PROTOTYPE_KEYS.has(part))) refuse(`"${file.field}" is not a file field`);
   }
+  // One follow-up at most (the HD pass, a film's music): a recipe never chains renders on the user's GPU.
+  if ((request.then?.length ?? 0) > 1) refuse('it asks for more than one render after the first');
   for (const next of request.then ?? []) {
     if (!FOLLOW_UPS.has(next.route) || next.files.length > 0 || (next.then?.length ?? 0) > 0) refuse(`${next.route} cannot follow it`);
   }
@@ -151,15 +155,20 @@ export async function reproduce(client: MontagioClient, args: ReproduceArgs, opt
     const given = args.inputs[file.field]!;
     let ref = given;
     let sha: string | null = null;
+    // The app keeps a reference clip's first 5 s and a voice sample as a mono FLAC: their sha256 is not the file's own.
+    const prepared = file.field === 'videoRef' || file.field === 'voiceRef';
     if (!isRef(given)) {
-      sha = await fileSha256(resolve(given));
-      ref = file.field === 'videoRef' ? (await client.uploadVideo(given)).videoRef : (await client.uploadPhoto(given)).imageRef;
+      sha = prepared ? null : await fileSha256(resolve(given));
+      if (file.field === 'videoRef') ref = (await client.uploadVideo(given)).videoRef;
+      else if (file.field === 'voiceRef') ref = (await client.uploadVoice(given)).voiceRef;
+      else ref = (await client.uploadPhoto(given)).imageRef;
     }
     setField(body, file.field, ref);
     sameInputs[file.field] = sha && file.sha256 ? sha === file.sha256 : null;
   }
   if (args.consent) body.consent = true;
   if (args.rights) body.rights = true;
+  if (args.voiceConsent) body.voiceConsent = true;
 
   let done = await settled(client, await client.startRequest(request.route, body), options);
   for (const next of request.then ?? []) {

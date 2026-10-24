@@ -25,6 +25,15 @@ export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 const IMAGE_TYPES: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 const VIDEO_TYPES: Record<string, string> = { '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime' };
+export const MAX_VOICE_BYTES = 10 * 1024 * 1024;
+const VOICE_TYPES: Record<string, string> = {
+  '.wav': 'audio/wav',
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.flac': 'audio/flac',
+  '.ogg': 'audio/ogg',
+  '.webm': 'audio/webm',
+};
 
 /** POST /api/uploads, /api/uploads/sample. */
 export type UploadResult = {
@@ -347,6 +356,14 @@ export class MontagioClient {
     form.append('video', file.blob, file.name);
     const { value } = await this.call<VideoUploadResult>('POST', '/api/uploads/video', { form });
     return { ...value, ...(value.url ? { url: this.absolute(value.url) } : {}) };
+  }
+
+  /** A voice sample for an avatar (field "audio"): the app keeps 20 s of it at most, as a mono FLAC. */
+  async uploadVoice(path: string): Promise<{ voiceRef: string; duration_s: number }> {
+    const file = await readLocalFile(path, VOICE_TYPES, MAX_VOICE_BYTES, 'a WAV, MP3, M4A, FLAC, OGG or WebM sound');
+    const form = new FormData();
+    form.append('audio', file.blob, file.name);
+    return (await this.call<{ voiceRef: string; duration_s: number }>('POST', '/api/uploads/voice', { form })).value;
   }
 
   /** Start a job (/api/images, /api/edits, /api/effects, /api/hooks, /api/avatars, /api/motion). */

@@ -19,6 +19,7 @@ export {
   withJpegComment,
   probe,
   probeAudio,
+  readSentTags,
   readTags,
   replaceAudio,
   SequenceToolError,
