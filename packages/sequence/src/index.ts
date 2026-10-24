@@ -10,6 +10,8 @@ export {
   mixMusic,
   normalizeClip,
   overlayImage,
+  moodboardSheet,
+  MOODBOARD_TILE,
   placeholderClip,
   prepareMotionClip,
   posterFrame,

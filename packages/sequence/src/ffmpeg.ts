@@ -352,6 +352,32 @@ export async function prepareVoiceSample(input: string, out: string, opts: { max
   return { duration_s: (await probeAudio(out))?.duration_s ?? 0 };
 }
 
+/** The side of one picture of a moodboard sheet, in pixels. */
+export const MOODBOARD_TILE = 512;
+
+/**
+ * A moodboard sheet: one to four reference pictures, each cropped to a square, side by side
+ * (two by two for four), as one PNG the edit reads as a style reference. Every input is read as
+ * a local file only.
+ */
+export async function moodboardSheet(inputs: readonly string[], out: string): Promise<{ width: number; height: number }> {
+  if (inputs.length < 1 || inputs.length > 4) throw new SequenceToolError(`a moodboard holds 1 to 4 pictures, not ${inputs.length}`);
+  const side = MOODBOARD_TILE;
+  const tiles = inputs.map((_, index) => `[${index}:v]scale=${side}:${side}:force_original_aspect_ratio=increase,crop=${side}:${side},setsar=1,format=rgb24[t${index}]`);
+  const labels = inputs.map((_, index) => `[t${index}]`).join('');
+  const grid = inputs.length === 4;
+  const layout = grid ? '0_0|w0_0|0_h0|w0_h0' : inputs.map((_, index) => (index === 0 ? '0_0' : `${side * index}_0`)).join('|');
+  const join = inputs.length === 1 ? '[t0]null[out]' : `${labels}xstack=inputs=${inputs.length}:layout=${layout}[out]`;
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    ...inputs.flatMap((input) => [...LOCAL_FILE_ONLY, '-i', input]),
+    '-filter_complex', [...tiles, join].join(';'),
+    '-map', '[out]', '-frames:v', '1', '-map_metadata', '-1',
+    '-f', 'image2', '-c:v', 'png', partial,
+  ]);
+  return grid ? { width: side * 2, height: side * 2 } : { width: side * inputs.length, height: side };
+}
+
 /**
  * Lay a transparent PNG (an ad's tagline, drawn by the browser) over a 9:16 clip: the image is
  * scaled to the clip, the sound is kept, and the result carries the AI mention. Both inputs are

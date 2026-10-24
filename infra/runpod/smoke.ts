@@ -74,6 +74,7 @@ const { values: args } = parseArgs({
     input2: { type: 'string' },
     input3: { type: 'string' },
     mask: { type: 'string' },
+    ref: { type: 'string' },
     end: { type: 'string' },
     effect: { type: 'string', default: 'all' },
     hook: { type: 'string' },
@@ -121,6 +122,7 @@ Extensions (instead of presets):
   --input2 PATH      the second image of a two-reference hook (the outfit of wardrobe-swap), or compose's character
   --input3 PATH      compose: the product (--input is the place); with effect, the effects animate the composed photo
   --mask PATH        edit: inpaint through this mask (white where the photo changes, the photo's size)
+  --ref PATH         edit: a second image it reads (a palette's colors, a moodboard sheet)
   --end PATH         the end frame of a transition run alone; without it, the hook's edit runs first and makes it
   --quality          the edit, the effects and the transition without their 4-step LoRAs (more steps, slower)
   --look LOOK        a look of the edit job: infl8, action or angles
@@ -511,6 +513,7 @@ async function runExtensions(
   const input2 = args.input2 ? fromCaller(args.input2) : undefined;
   const input3 = args.input3 ? fromCaller(args.input3) : undefined;
   const mask = args.mask ? fromCaller(args.mask) : undefined;
+  const ref = args.ref ? fromCaller(args.ref) : undefined;
   let end = args.end ? fromCaller(args.end) : undefined;
   const clip = args.clip ? fromCaller(args.clip) : undefined;
   // The photo sizes the jobs that read it; the clip to upscale is probed on its own, so that
@@ -553,6 +556,7 @@ async function runExtensions(
     input2,
     input3,
     mask,
+    ref,
     ...(args.voice ? { voice: fromCaller(args.voice) } : {}),
     end: end ?? (args['dry-run'] ? 'end.png' : undefined),
     effects: args.effect === 'all' ? undefined : args.effect.split(',').map((id) => id.trim()),

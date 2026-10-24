@@ -24,7 +24,7 @@ import { saveUploadFromFile, type Provenance } from './uploads';
 
 export { JobError } from './errors';
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad' | 'voice-change';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad' | 'voice-change' | 'moodboard';
 
 export type StepRecord = {
   name: string;
@@ -125,7 +125,7 @@ const SAFE_ID = /^[A-Za-z0-9-]{1,64}$/;
 const UNKNOWN_PROVENANCE: Provenance = { origin: 'upload', personal: true };
 
 const jobsDir = () => join(getEnv().data, 'jobs');
-const jobDir = (id: string) => join(jobsDir(), id);
+export const jobDir = (id: string) => join(jobsDir(), id);
 const keyFile = (key: string) => join(jobsDir(), '_keys', `${createHash('sha256').update(key).digest('hex')}.json`);
 const stepWorkflowFile = (id: string, index: number) => join(jobDir(id), `step${index}.workflow.json`);
 

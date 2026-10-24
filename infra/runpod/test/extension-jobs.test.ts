@@ -180,3 +180,14 @@ describe('jobTexts (smoke --text)', () => {
     expect(() => jobTexts(['snow'], ['upscale', 'transition'])).toThrow(/no job of this run reads a text/);
   });
 });
+
+test('the edit reads a second image with --ref (a palette, a moodboard sheet), never with a mask', () => {
+  const [edit] = extensionJobs(library, { ...base, jobs: ['edit'], input: '/p.png', ref: '/data/sheet.png', text: { edit: 'Restyle image 1 with the look of image 2.' } });
+  expect(edit!.tag).toBe('edit:ref');
+  expect(edit!.files).toEqual([
+    { node: '41', field: 'image', path: '/p.png' },
+    { node: '42', field: 'image', path: '/data/sheet.png' },
+  ]);
+  expect(checkWorkflow(edit!.workflow, info, { skip: ['41.image', '42.image'] })).toEqual([]);
+  expect(() => extensionJobs(library, { ...base, jobs: ['edit'], input: '/p.png', ref: '/r.png', mask: '/m.png' })).toThrow(/--mask and --ref/);
+});

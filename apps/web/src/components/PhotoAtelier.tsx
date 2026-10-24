@@ -4,9 +4,15 @@ import { useRef, useState } from 'react';
 import { useI18n, type MessageKey } from '@/i18n';
 import { apiFetch } from '@/lib/api';
 import { formatDuration } from '@/lib/duration';
-import type { ExtensionsInfo } from '@/lib/api-types';
+import type { ExtensionsInfo, UploadResult } from '@/lib/api-types';
 import { needsConsent } from '@/lib/consent';
 import {
+  MOODBOARD_REFS_MAX,
+  PALETTE_COLORS,
+  PALETTE_FROM_PHOTO_INSTRUCTION,
+  paletteInstruction,
+  paletteKey,
+  PALETTES,
   RELIGHTS,
   relightInstruction,
   relightKey,
@@ -34,6 +40,20 @@ const LOOKS = [
   ['angles', 'editLookAngles'],
 ] as const;
 const TEXT_MAX = 500;
+/** With a moodboard the text leaves room for the restyling (MOODBOARD_TEXT_MAX on the server). */
+const MOODBOARD_TEXT_MAX = 300;
+
+/** A picture the visitor added: a moodboard reference, or the photo whose colors a palette takes. */
+type Picked = { imageRef: string; url: string; personal: boolean };
+
+async function uploadPicture(file: File): Promise<Picked | null> {
+  const form = new FormData();
+  form.append('image', file);
+  const res = await apiFetch('/api/uploads', { method: 'POST', body: form }).catch(() => null);
+  if (!res?.ok) return null;
+  const meta = (await res.json()) as UploadResult;
+  return { imageRef: meta.imageRef, url: `/media/data/${meta.imageRef}`, personal: meta.personal };
+}
 
 /** The photo the atelier hands back to the Studio. */
 export type AtelierPhoto = { imageRef: string; url: string; personal: boolean; prompt?: string };
@@ -69,9 +89,16 @@ export function PhotoAtelier({
   const [maskPainted, setMaskPainted] = useState(false);
   const [maskFailed, setMaskFailed] = useState(false);
   const maskExport = useRef<(() => Promise<Blob | null>) | null>(null);
+  // Moodboard (text to image): references whose look the picture takes; the edit is needed for it.
+  const [refs, setRefs] = useState<Picked[]>([]);
+  // Change palette (edit): the photo whose colors the edit takes, as its second image.
+  const [palettePhoto, setPalettePhoto] = useState<Picked | null>(null);
+  const [pickFailed, setPickFailed] = useState(false);
+  const moodboard = kind === 't2i' && refs.length > 0;
+  const textMax = moodboard ? MOODBOARD_TEXT_MAX : TEXT_MAX;
   const [consent, setConsent] = useState(false);
-  // Another photo asks for consent again (state adjusted while rendering, when the photo changes).
-  const photoKey = photo.status === 'ready' ? photo.imageRef : null;
+  // Another photo, reference or palette photo asks for consent again (state adjusted while rendering).
+  const photoKey = [photo.status === 'ready' ? photo.imageRef : '', ...refs.map((ref) => ref.imageRef), palettePhoto?.imageRef ?? ''].join('|');
   const [consentFor, setConsentFor] = useState(photoKey);
   if (consentFor !== photoKey) {
     setConsentFor(photoKey);
@@ -80,10 +107,15 @@ export function PhotoAtelier({
   // An edit shows the photo it started from, even when the visitor loads another one meanwhile.
   const [source, setSource] = useState<UploadState | null>(null);
   const before = job && source ? source : photo;
-  const askConsent = kind === 'edit' && needsConsent(photo, 'edit');
+  const askConsent =
+    kind === 'edit' ? needsConsent(photo, 'edit') || palettePhoto?.personal === true : refs.some((ref) => ref.personal);
   const done = job?.state === 'succeeded' && job.outputImageRef && job.outputUrl ? job : null;
   const canStart =
-    text.trim().length > 0 && !busy && (kind === 't2i' || (photo.status === 'ready' && (!askConsent || consent) && (!inpaint || maskPainted)));
+    text.trim().length > 0 &&
+    text.trim().length <= textMax &&
+    !busy &&
+    (!askConsent || consent) &&
+    (kind === 't2i' || (photo.status === 'ready' && (!inpaint || maskPainted)));
   // What a disabled button waits for, said under it: the photo first, then the text, then the consent.
   const waitingFor: MessageKey | null = busy
     ? null
@@ -93,11 +125,15 @@ export function PhotoAtelier({
         ? kind === 't2i'
           ? 't2iNeedsText'
           : 'editNeedsText'
-        : kind === 'edit' && askConsent && !consent
-          ? 'editNeedsConsent'
-          : kind === 'edit' && inpaint && !maskPainted
-            ? 'inpaintNeedsPaint'
-            : null;
+        : text.trim().length > textMax
+          ? 'moodboardTextTooLong'
+          : askConsent && !consent
+            ? kind === 'edit'
+              ? 'editNeedsConsent'
+              : 'moodboardNeedsConsent'
+            : kind === 'edit' && inpaint && !maskPainted
+              ? 'inpaintNeedsPaint'
+              : null;
   const percent = job ? Math.round(job.progress * 100) : 0;
 
   /** The painted mask, uploaded like a photo; undefined when nothing is painted, null when the upload failed. */
@@ -116,7 +152,9 @@ export function PhotoAtelier({
     if (!canStart) return;
     if (kind === 't2i') {
       const chosen = styleBody(style);
-      void start('/api/images', { prompt: text.trim(), aspect, ...(Object.keys(chosen).length > 0 ? { style: chosen } : {}) });
+      const body = { prompt: text.trim(), aspect, ...(Object.keys(chosen).length > 0 ? { style: chosen } : {}) };
+      if (moodboard) void start('/api/moodboards', { ...body, refs: refs.map((ref) => ref.imageRef), ...(askConsent ? { consent } : {}) });
+      else void start('/api/images', body);
     }
     else if (photo.status === 'ready') {
       setMaskFailed(false);
@@ -129,7 +167,21 @@ export function PhotoAtelier({
         ...(look ? { look } : {}),
         ...(askConsent ? { consent } : {}),
         ...(maskRef ? { maskRef } : {}),
+        ...(palettePhoto ? { image2Ref: palettePhoto.imageRef } : {}),
       });
+    }
+  };
+
+  /** A picture from the visitor's files: a moodboard reference, or the palette's photo. */
+  const pick = async (file: File | undefined, into: 'ref' | 'palette') => {
+    if (!file) return;
+    setPickFailed(false);
+    const picked = await uploadPicture(file);
+    if (!picked) return setPickFailed(true);
+    if (into === 'ref') setRefs((current) => (current.length < MOODBOARD_REFS_MAX ? [...current, picked] : current));
+    else {
+      setPalettePhoto(picked);
+      setText(PALETTE_FROM_PHOTO_INSTRUCTION);
     }
   };
 
@@ -165,7 +217,7 @@ export function PhotoAtelier({
         onChange={(event) => setText(event.target.value)}
       />
       <p id="atelier-count" className={styles.counter}>
-        {t('charCount', { n: text.length, max: TEXT_MAX })}
+        {t('charCount', { n: text.length, max: textMax })}
       </p>
 
       {kind === 't2i' ? (
@@ -203,6 +255,49 @@ export function PhotoAtelier({
               </div>
             ))}
           </fieldset>
+          {estimates.edit !== undefined && (
+            <div className={styles.panelSection}>
+              <p id="atelier-moodboard" className={styles.sectionTitle}>
+                {t('moodboardTitle')}
+              </p>
+              <p className={styles.hint}>{t('moodboardHint', { n: MOODBOARD_REFS_MAX })}</p>
+              <ul className={styles.moodboard} aria-labelledby="atelier-moodboard">
+                {refs.map((ref, index) => (
+                  <li key={ref.imageRef} className={styles.moodboardRef}>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a reference picture */}
+                    <img src={ref.url} alt="" />
+                    <button
+                      type="button"
+                      className={styles.chip}
+                      disabled={busy}
+                      aria-label={t('moodboardRemove', { n: index + 1 })}
+                      onClick={() => setRefs((current) => current.filter((entry) => entry.imageRef !== ref.imageRef))}
+                    >
+                      {t('composeRemove')}
+                    </button>
+                  </li>
+                ))}
+                {refs.length < MOODBOARD_REFS_MAX && (
+                  <li className={styles.moodboardAdd}>
+                    <input
+                      id="moodboard-input"
+                      className="visually-hidden"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      disabled={busy}
+                      onChange={(event) => {
+                        void pick(event.target.files?.[0], 'ref');
+                        event.target.value = '';
+                      }}
+                    />
+                    <label htmlFor="moodboard-input" className={styles.moodboardAddLabel} aria-disabled={busy || undefined}>
+                      {t('moodboardAdd')}
+                    </label>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
         </>
       ) : (
         <>
@@ -226,11 +321,59 @@ export function PhotoAtelier({
               </button>
             ))}
           </div>
+          <div className={styles.styleRow} role="group" aria-label={t('paletteTitle')}>
+            <span className={styles.styleLabel} aria-hidden="true">
+              {t('paletteTitle')}
+            </span>
+            {PALETTES.map((palette) => (
+              <button
+                key={palette}
+                type="button"
+                className={styles.chip}
+                disabled={busy}
+                onClick={() => {
+                  setPalettePhoto(null);
+                  setText(paletteInstruction(palette));
+                }}
+              >
+                <span className={styles.swatches} aria-hidden="true">
+                  {PALETTE_COLORS[palette].swatches.map((colour) => (
+                    <span key={colour} style={{ background: colour }} />
+                  ))}
+                </span>
+                {t(paletteKey(palette))}
+              </button>
+            ))}
+            <input
+              id="palette-input"
+              className="visually-hidden"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={busy || inpaint}
+              onChange={(event) => {
+                void pick(event.target.files?.[0], 'palette');
+                event.target.value = '';
+              }}
+            />
+            <label htmlFor="palette-input" className={styles.chip} aria-disabled={busy || inpaint || undefined}>
+              {t('paletteFromPhoto')}
+            </label>
+          </div>
+          {palettePhoto && (
+            <div className={styles.palettePhoto}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- the photo whose colors the edit takes */}
+              <img src={palettePhoto.url} alt="" />
+              <span className={styles.hint}>{t('paletteFromPhotoHint')}</span>
+              <button type="button" className={styles.chip} disabled={busy} onClick={() => setPalettePhoto(null)}>
+                {t('composeRemove')}
+              </button>
+            </div>
+          )}
           <div className={styles.styleRow}>
             <span className={styles.styleLabel} aria-hidden="true">
               {t('inpaintLabel')}
             </span>
-            <button type="button" className={styles.chip} aria-pressed={inpaint} disabled={busy || photo.status !== 'ready'} onClick={() => setInpaint(!inpaint)}>
+            <button type="button" className={styles.chip} aria-pressed={inpaint} disabled={busy || photo.status !== 'ready' || palettePhoto !== null} onClick={() => setInpaint(!inpaint)}>
               {t('inpaintToggle')}
             </button>
           </div>
@@ -248,6 +391,12 @@ export function PhotoAtelier({
         </>
       )}
 
+      {pickFailed && (
+        <p className={styles.photoError} role="alert">
+          {t('composeUploadFailed')}
+        </p>
+      )}
+
       {askConsent && <ConsentCheck id="atelier-consent" checked={consent} onChange={setConsent} />}
 
       <div className={styles.atelierActions}>
@@ -258,7 +407,11 @@ export function PhotoAtelier({
           aria-describedby={waitingFor ? `atelier-waiting-${kind}` : undefined}
           onClick={() => void run()}
         >
-          {kind === 't2i' ? t('t2iCreate', { d: formatDuration(estimates.t2i) }) : t('editApply', { d: formatDuration(estimates.edit ?? 0) })}
+          {kind === 't2i'
+            ? moodboard
+              ? t('moodboardCreate', { d: formatDuration(estimates.t2i + (estimates.edit ?? 0)) })
+              : t('t2iCreate', { d: formatDuration(estimates.t2i) })
+            : t('editApply', { d: formatDuration(estimates.edit ?? 0) })}
         </button>
         {busy && job && (
           <button type="button" className={styles.buttonGhost} onClick={() => void cancel()}>

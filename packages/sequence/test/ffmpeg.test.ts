@@ -15,6 +15,8 @@ import {
   mixMusic,
   normalizeClip,
   overlayImage,
+  moodboardSheet,
+  MOODBOARD_TILE,
   placeholderClip,
   PLACEHOLDER_METADATA,
   posterFrame,
@@ -426,4 +428,19 @@ test('a sent file that is a list of other files is refused, not read through', a
   execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-protocol_whitelist', 'file', '-i', list, '-f', 'null', '-']);
   await expect(prepareMotionClip(list, join(dir, 'never-motion.mp4'))).rejects.toThrow(SequenceToolError);
   await expect(prepareSpeechVideo(list, join(dir, 'never.mp4'), join(dir, 'never.flac'))).rejects.toThrow(SequenceToolError);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('a moodboard sheet puts one to four pictures side by side, two by two for four', async () => {
+  const pictures = ['red', 'green', 'blue', 'yellow'].map((colour, index) => {
+    const picture = join(dir, `ref-${colour}.png`);
+    const size = index % 2 === 0 ? '640x360' : '360x640';
+    execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `color=c=${colour}:s=${size}`, '-frames:v', '1', picture]);
+    return picture;
+  });
+  for (const [count, width, height] of [[1, 1, 1], [2, 2, 1], [3, 3, 1], [4, 2, 2]] as const) {
+    const out = join(dir, `board-${count}.png`);
+    expect(await moodboardSheet(pictures.slice(0, count), out)).toEqual({ width: width * MOODBOARD_TILE, height: height * MOODBOARD_TILE });
+    expect(await probe(out)).toMatchObject({ width: width * MOODBOARD_TILE, height: height * MOODBOARD_TILE });
+  }
+  await expect(moodboardSheet([], join(dir, 'never.png'))).rejects.toThrow(SequenceToolError);
 }, FFMPEG_TEST_TIMEOUT_MS);
