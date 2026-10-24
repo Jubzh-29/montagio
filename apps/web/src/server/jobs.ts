@@ -9,6 +9,7 @@ import {
   type SubmitJob,
 } from '@montagio/comfy-adapter';
 import { CompileError, type ApiWorkflow, type Aspect, type Library } from '@montagio/presets';
+import type { InputSlot } from '@montagio/recipe';
 import type { ExtensionId } from '@montagio/registry';
 import { ensureTools, probe, tagAudio, tagClip, tagImage } from '@montagio/sequence';
 import type { JobSummary } from '@/lib/api-types';
@@ -159,6 +160,26 @@ export async function readJobWorkflow(id: string): Promise<{ record: JobRecord; 
     }
   }
   return null;
+}
+
+/** Every step submitted so far, with its workflow and its input files (null for a step submitted before they were noted). */
+export async function readJobSteps(id: string): Promise<{ record: JobRecord; steps: { name: string; workflow: ApiWorkflow; inputs: InputSlot[] | null }[] } | null> {
+  const record = await readJob(id);
+  if (!record) return null;
+  const steps: { name: string; workflow: ApiWorkflow; inputs: InputSlot[] | null }[] = [];
+  for (let index = 0; index < record.steps.length; index++) {
+    let workflow: ApiWorkflow;
+    try {
+      workflow = JSON.parse(await readFile(stepWorkflowFile(id, index), 'utf8')) as ApiWorkflow;
+    } catch {
+      break; // not submitted yet
+    }
+    const inputs = await readFile(stepInputsFile(id, index), 'utf8')
+      .then((text) => JSON.parse(text) as InputSlot[])
+      .catch(() => null);
+    steps.push({ name: record.steps[index]!.name, workflow, inputs });
+  }
+  return { record, steps };
 }
 
 /** A compile error is the request's fault: a stable code for the client, the details in the log. */

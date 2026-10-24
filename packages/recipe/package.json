@@ -5,7 +5,8 @@
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./same": "./src/same.ts"
   },
   "scripts": {
     "test": "vitest run --globals",

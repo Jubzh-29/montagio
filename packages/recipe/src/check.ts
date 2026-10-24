@@ -1,6 +1,6 @@
 import { loadedWeights } from './build';
 import { workflowSha256 } from './hash';
-import type { CompactRecipe, LockLike, Recipe } from './types';
+import type { LockLike, Recipe } from './types';
 
 /** The licences of the open stack: a weight under any other fails the check. */
 export const OPEN_LICENSES: ReadonlySet<string> = new Set(['Apache-2.0', 'MIT']);
@@ -43,9 +43,4 @@ export function checkRecipe(recipe: Recipe, lockEntries: Iterable<LockLike>): st
     }
   });
   return problems;
-}
-
-/** Two recipes ran the same workflows: same steps, same hashes, in the same order. */
-export function sameWorkflows(a: Pick<Recipe | CompactRecipe, 'steps'>, b: Pick<Recipe | CompactRecipe, 'steps'>): boolean {
-  return a.steps.length === b.steps.length && a.steps.every((step, index) => step.workflowSha256 === b.steps[index]!.workflowSha256);
 }

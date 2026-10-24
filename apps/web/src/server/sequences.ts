@@ -34,7 +34,7 @@ export type ShotRecord = {
   presetId: string;
   modelId?: string;
   userPrompt?: string;
-  /** The seed asked for (a film reproduced); absent, the shot draws its own. */
+  /** The seed asked for (a film reproduced), then the one the shot's render took; absent before a shot starts. */
   seed?: number;
   startImageRef?: string;
   generationId?: string;
@@ -187,6 +187,7 @@ async function startShot(record: SequenceRecord, index: number, imageRef: string
   });
   shot.startImageRef = imageRef;
   shot.generationId = generation.id;
+  shot.seed = generation.seed;
   shot.state = generation.state;
   record.currentShot = index;
 }

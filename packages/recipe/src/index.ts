@@ -3,4 +3,6 @@ export { canonicalJson, findLocalPath, normalizeWorkflow, sha256Hex, summarizeWo
 export { buildRecipe, loadedWeights } from './build';
 export { COMPACT_MAX_BYTES, compactRecipe } from './compact';
 export { parseRecipe } from './parse';
-export { checkRecipe, OPEN_LICENSES, sameWorkflows } from './check';
+export { checkRecipe, OPEN_LICENSES } from './check';
+export { sameWorkflows } from './same';
+export { readStack } from './stack';

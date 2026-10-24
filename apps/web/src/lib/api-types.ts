@@ -253,7 +253,9 @@ export type Reprise = {
   modelId?: string;
   /** A remixed clip: the remix editor reopens on that generation's preset text. */
   remixGenerationId?: string;
-  shots?: { presetId: string; prompt?: string }[];
+  /** The seed it was rendered with: Reproduce sends it back, Reuse leaves it out. */
+  seed?: number;
+  shots?: { presetId: string; prompt?: string; seed?: number }[];
 };
 
 /** One finished creation, newest first (GET /api/history). */
@@ -269,4 +271,6 @@ export type HistoryItem = {
   previewUrl: string;
   downloadUrl: string;
   reprise: Reprise;
+  /** Its recipe (GET): the workflow, the weights, the seed and the stack that made it. */
+  recipeUrl?: string;
 };
