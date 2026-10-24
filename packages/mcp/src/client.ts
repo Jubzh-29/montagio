@@ -333,10 +333,10 @@ export class MontagioClient {
     return this.fromGeneration((await this.call<GenerationRecord>('POST', '/api/generations', { json: body }, true)).value);
   }
 
-  /** HD 1080p of a finished clip: a job of its own. */
-  async startUpscale(kind: RenderKind, id: string): Promise<RenderStatus> {
+  /** HD 1080p of a finished clip: a job of its own; smooth, at twice its frame rate (RIFE). */
+  async startUpscale(kind: RenderKind, id: string, smooth: boolean): Promise<RenderStatus> {
     const base = kind === 'generation' ? '/api/generations' : '/api/jobs';
-    return this.fromJob((await this.call<JobSummary>('POST', `${base}/${encodeURIComponent(id)}/upscale`, { json: {} }, true)).value);
+    return this.fromJob((await this.call<JobSummary>('POST', `${base}/${encodeURIComponent(id)}/upscale`, { json: { smooth } }, true)).value);
   }
 
   /** One poll: the app moves the render forward when it is asked. */

@@ -544,6 +544,10 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
       inputSchema: {
         id: z.string().min(1).describe('The id of the finished clip (returned by the tool that made it, or from list_history).'),
         kind: z.enum(['generation', 'job']).optional().describe('generation for a camera_move clip, job for the others; found from the id when left out.'),
+        smooth: z
+          .boolean()
+          .optional()
+          .describe('Smooth motion: RIFE puts a frame between each two, twice the frame rate (16 fps clips come out at 32), same length. Default true.'),
         timeoutMinutes,
       },
       annotations: renders,
@@ -554,7 +558,7 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
         const estimate_s = await estimateOf(client, (info) => info.estimates.upscale);
         try {
           return await render(client, extra, { timeoutMinutes: args.timeoutMinutes, more: { sourceId: args.id, estimate_s } }, () =>
-            client.startUpscale(kind, args.id),
+            client.startUpscale(kind, args.id, args.smooth ?? true),
           );
         } catch (error) {
           if (error instanceof ToolFailure && error.code === 'invalid-input') {

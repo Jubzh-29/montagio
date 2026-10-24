@@ -110,6 +110,18 @@ describe('MCP tools', () => {
     expect(post.json).toEqual({ imageRef: 'samples/sample-16x9.png', effectId: 'squish', subject: 'a brown dog', consent: false });
   });
 
+  it('upscale_to_1080p asks for smooth motion unless the caller says otherwise', async () => {
+    for (const [args, smooth] of [[{}, true], [{ smooth: false }, false]] as const) {
+      await client?.close();
+      const app = jobApp('upscale', [{ state: 'succeeded', progress: 1, outputUrl: '/media/data/jobs/j1/output.mp4' }]);
+      client = await connect(testConfig(), { fetch: app.fetch, ...fakeClock() });
+      const { isError } = await callTool(client, 'upscale_to_1080p', { id: 'c1', kind: 'job', ...args });
+
+      expect(isError).toBe(false);
+      expect(app.calls.find((call) => call.path === '/api/jobs/c1/upscale')!.json).toEqual({ smooth });
+    }
+  });
+
   it('passes the app\'s consent refusal through as isError, with the photo already uploaded', async () => {
     const photo = join(dir, 'friend.png');
     await writeFile(photo, new Uint8Array([0x89, 0x50, 0x4e, 0x47]));
