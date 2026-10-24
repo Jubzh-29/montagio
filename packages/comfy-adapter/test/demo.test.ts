@@ -57,6 +57,49 @@ test('a key reused after the idempotency window is a new job, as in the web laye
   expect((await b.get(first.backendJobId)).outputPath).toMatch(/[\\/]crash-push\.mp4$/);
 });
 
+describe('render: the file made from the job\'s photo', () => {
+  const files = [{ node: '1', field: 'image', path: '/data/uploads/photo.png' }];
+
+  test('replaces the pre-rendered clip, and the job waits for it at 99 %', async () => {
+    let finish: (path: string) => void = () => undefined;
+    const render = vi.fn(() => new Promise<string | undefined>((resolve) => (finish = resolve)));
+    const b = new DemoBackend({ clipsDir: fixtureClips, durationMs: 3000, now: clock, render });
+    const { backendJobId } = await b.submit({ workflow: {}, presetId: 'crash-push', idempotencyKey: 'r1', files });
+    expect(render).toHaveBeenCalledWith({ presetId: 'crash-push', output: 'video', files });
+    t = 5000;
+    expect(await b.get(backendJobId)).toMatchObject({ state: 'running', progress: 0.99 });
+    finish('/data/demo-renders/moved.mp4');
+    await Promise.resolve();
+    expect(await b.get(backendJobId)).toMatchObject({ state: 'succeeded', progress: 1, outputPath: '/data/demo-renders/moved.mp4' });
+  });
+
+  test('a render that gives nothing, or fails, leaves the pre-rendered clip', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const empty = new DemoBackend({ clipsDir: fixtureClips, durationMs: 3000, now: clock, render: async () => undefined });
+    const failing = new DemoBackend({ clipsDir: fixtureClips, durationMs: 3000, now: clock, render: () => Promise.reject(new Error('no ffmpeg')) });
+    const a = await empty.submit({ workflow: {}, presetId: 'crash-push', idempotencyKey: 'r2', files });
+    const c = await failing.submit({ workflow: {}, presetId: 'crash-push', idempotencyKey: 'r3', files });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    t = 5000;
+    expect((await empty.get(a.backendJobId)).outputPath).toMatch(/[\\/]crash-push\.mp4$/);
+    expect((await failing.get(c.backendJobId)).outputPath).toMatch(/[\\/]crash-push\.mp4$/);
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  test('is not asked for a job without files, nor for another output of the job', async () => {
+    const render = vi.fn(async () => '/data/demo-renders/moved.mp4');
+    const b = new DemoBackend({ clipsDir: fixtureClips, durationMs: 3000, now: clock, render });
+    const plain = await b.submit({ workflow: {}, presetId: 'crash-push', idempotencyKey: 'r4' });
+    const voiced = await b.submit({ workflow: {}, presetId: 'crash-push', idempotencyKey: 'r5', files });
+    await Promise.resolve();
+    t = 5000;
+    expect(render).toHaveBeenCalledOnce();
+    expect((await b.get(plain.backendJobId)).outputPath).toMatch(/[\\/]crash-push\.mp4$/);
+    expect((await b.get(voiced.backendJobId, { output: 'audio' })).outputPath).toMatch(/[\\/]_default\.flac$/);
+  });
+});
+
 test('different keys, different jobs', async () => {
   const b = make();
   const a = await b.submit({ workflow: {}, presetId: 'p', idempotencyKey: 'one' });

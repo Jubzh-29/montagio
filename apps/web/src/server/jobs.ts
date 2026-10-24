@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   IDEMPOTENCY_WINDOW_MS,
@@ -12,7 +12,8 @@ import { CompileError, type ApiWorkflow, type Aspect, type Library } from '@mont
 import type { InputSlot } from '@montagio/recipe';
 import type { ExtensionId } from '@montagio/registry';
 import { AI_IMAGE_METADATA, ensureTools, probe, tagAudio, tagClip, tagImage } from '@montagio/sequence';
-import type { JobSummary } from '@/lib/api-types';
+import type { DemoKind, JobSummary } from '@/lib/api-types';
+import { demoKindOf } from './demo-render';
 import { getEnv } from './env';
 import { JobError } from './errors';
 import { markRejected } from './extensions';
@@ -68,6 +69,8 @@ export type JobRecord = {
   frames?: number;
   /** A film's 9:16 cut, when the task makes one (music under a film). */
   verticalUrl?: string;
+  /** A demo render: what it is, since no model made it. */
+  demo?: DemoKind;
   error?: string;
   idempotencyKey: string;
   createdAt: string;
@@ -255,7 +258,10 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
     try {
       if (step.output === 'video') {
         const out = join(dir, 'output.mp4');
-        await access(out).catch(async () => tagClip(outputPath, out, await recipeTags('video')));
+        const demo = demoKindOf(outputPath);
+        if (demo) record.demo = demo;
+        // A clip FFmpeg moved (demo) keeps its own mention: no model made it.
+        await access(out).catch(async () => (demo === 'moved' ? copyFile(outputPath, out) : tagClip(outputPath, out, await recipeTags('video'))));
         const info = await probe(out);
         record.frames = Math.round(info.duration_s * info.fps);
         record.outputUrl = mediaUrlFor(out);
@@ -474,6 +480,7 @@ export function jobSummary(record: JobRecord): JobSummary {
     ...(record.error ? { error: record.error } : {}),
     ...(record.frames !== undefined ? { frames: record.frames } : {}),
     ...(record.verticalUrl ? { verticalUrl: record.verticalUrl } : {}),
+    ...(record.demo ? { demo: record.demo } : {}),
     createdAt: record.createdAt,
   };
 }

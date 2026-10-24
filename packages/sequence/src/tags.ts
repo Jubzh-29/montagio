@@ -25,6 +25,12 @@ export const PLACEHOLDER_METADATA = {
   description: 'Placeholder: the camera move is simulated by FFmpeg from the sample photo; it is not a model output.',
 } as const;
 
+/** What a clip of the demo backend says when FFmpeg moved the photo: no model made it. */
+export const DEMO_MOVE_METADATA = {
+  comment: 'Montagio demo render',
+  description: 'Demo render: the photo is moved by FFmpeg along the preset; no model made this clip.',
+} as const;
+
 /**
  * Where a delivered file carries its compact recipe (@montagio/recipe), beside the mention: MP4's standard
  * `synopsis` atom (no `use_metadata_tags`, so `comment` and `description` stay where players read them),

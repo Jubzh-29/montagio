@@ -233,7 +233,7 @@ a.weightId:hover {
   /* Every weight on two lines, the same way: its id, then its size and licence. */
   .weights li {
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-1);
   }
   .weightMeta {
     grid-template-columns: auto auto;

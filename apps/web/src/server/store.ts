@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { JobState } from '@montagio/comfy-adapter';
 import type { ApiWorkflow, Aspect } from '@montagio/presets';
 import type { InputSlot } from '@montagio/recipe';
+import type { DemoKind } from '@/lib/api-types';
 import { getEnv } from './env';
 
 export type GenerationRecord = {
@@ -24,6 +25,8 @@ export type GenerationRecord = {
   remix?: true;
   /** The delivered clip's frame count, read by probe (HD takes 121 at most); absent for a clip delivered before. */
   frames?: number;
+  /** A demo render: what it is, since no model made it. */
+  demo?: DemoKind;
   idempotencyKey: string;
   createdAt: string;
   updatedAt: string;

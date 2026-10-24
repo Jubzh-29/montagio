@@ -150,6 +150,9 @@ const SAMPLE_OF_TAB: Record<Tab, { file: string; scene: MessageKey; forTab?: 'ef
   motion: { file: 'sample-character.png', scene: 'sampleCharacterScene', forTab: 'motion' },
 };
 
+/** What the avatar of the sample portrait says in the GPU session's render (demo-assets/examples/avatar.mp4), in English. */
+const SAMPLE_SPEECH = 'Hello, this is a test of the Montagio avatar.';
+
 /** Under the promise: what each tab makes, in one line. */
 const TAB_LEDES: Record<Tab, MessageKey> = {
   effects: 'ledeEffects',
@@ -382,6 +385,24 @@ export function Studio() {
     if (token === motionToken.current) setMotionVideo(next);
   };
 
+  /** The sample dance, copied by the server as a prepared clip: with the sample character, the Motion tab's whole example. */
+  const loadSampleVideo = async () => {
+    const token = ++motionToken.current;
+    setMotionVideo({ status: 'uploading' });
+    let next: MotionVideo;
+    try {
+      const res = await apiFetch('/api/uploads/video/sample', { method: 'POST' });
+      if (!res.ok) next = { status: 'error', message: t('errorGeneric') };
+      else {
+        const meta = (await res.json()) as { videoRef: string; url: string; duration_s: number; sourceDuration_s: number };
+        next = { status: 'ready', videoRef: meta.videoRef, url: meta.url, duration_s: meta.duration_s, sourceDuration_s: meta.sourceDuration_s, sample: true };
+      }
+    } catch {
+      next = { status: 'error', message: t('errorGeneric') };
+    }
+    if (token === motionToken.current) setMotionVideo(next);
+  };
+
   /** The outfit of a two-reference hook: a second upload, which the start photo does not replace. */
   const outfitToken = useRef(0);
   const onOutfit = async (file: File) => {
@@ -407,6 +428,15 @@ export function Studio() {
     if (sceneOfPhoto.current || !prompt.trim()) {
       setPrompt(t(sample.scene));
       sceneOfPhoto.current = true;
+    }
+    // The whole example, not half of it: the line the sample portrait says, the dance the sample character
+    // performs. A text or a clip of the visitor's own stays.
+    if (tab === 'avatar' && (!speechText.trim() || speechText === SAMPLE_SPEECH)) {
+      setSpeechText(SAMPLE_SPEECH);
+      setSpeechLanguage('en');
+    }
+    if (tab === 'motion' && !(motionVideo.status === 'ready' && !motionVideo.sample) && motionVideo.status !== 'uploading') {
+      void loadSampleVideo();
     }
     setUpload({ status: 'uploading', localUrl });
     const settle = (next: UploadState) => {
@@ -528,8 +558,28 @@ export function Studio() {
   const askScene = needsScene(tab, IS_SHOWCASE);
   const missingScene = sceneMissing(tab, IS_SHOWCASE, prompt);
   const ready = upload.status === 'ready' && modelId !== null && !busy && !missingScene;
+  // The sample dance on a photo nobody imported: Montagio's own files, no rights to confirm (the server agrees).
+  const rightsAsked = !(motionVideo.status === 'ready' && motionVideo.sample && upload.status === 'ready' && !upload.personal);
+  // What a disabled Generate waits for, said under it: the first thing missing, in the order of the composer.
+  const waitingFor: MessageKey | null = upload.status !== 'ready'
+    ? 'generateHint'
+    : busy
+    ? null
+    : missingScene
+    ? 'sceneNeeded'
+    : tab === 'effects' && needsOutfit && outfit.status !== 'ready'
+    ? 'hookNeedsOutfit'
+    : tab === 'motion' && motionVideo.status !== 'ready'
+    ? 'motionNeedsVideo'
+    : tab === 'motion' && rightsAsked && !rights
+    ? 'motionNeedsRights'
+    : tab === 'avatar' && !speechText.trim()
+    ? 'avatarNeedsText'
+    : (tab === 'effects' || tab === 'avatar') && askConsent && !consent
+    ? 'needsConsent'
+    : null;
   const canGenerate = tab === 'motion'
-    ? upload.status === 'ready' && motionVideo.status === 'ready' && rights && !busy
+    ? upload.status === 'ready' && motionVideo.status === 'ready' && (rights || !rightsAsked) && !busy
     : tab === 'avatar'
     ? upload.status === 'ready' && !busy && speechText.trim().length > 0 && (!askConsent || consent) && (!voice.mine || (voice.voiceRef !== null && voice.consent))
     : composing
@@ -762,7 +812,7 @@ export function Studio() {
     if (tab === 'motion') {
       if (motionVideo.status !== 'ready') return;
       const texts = { ...(motionCharacter.trim() ? { character: motionCharacter.trim() } : {}), ...(motionAction.trim() ? { motion: motionAction.trim() } : {}) };
-      void submit('job', { imageRef: upload.imageRef, videoRef: motionVideo.videoRef, ...texts, rights: true, ...seed }, undefined, '/api/motion');
+      void submit('job', { imageRef: upload.imageRef, videoRef: motionVideo.videoRef, ...texts, ...(rightsAsked ? { rights: true } : {}), ...seed }, undefined, '/api/motion');
       return;
     }
     if (tab === 'avatar') {
@@ -971,7 +1021,7 @@ export function Studio() {
       ? motionVideo.status === 'ready' && motionVideo.duration_s !== undefined && t('slateSpec', { s: Math.round(motionVideo.duration_s * 10) / 10 })
       : tab === 'avatar'
       ? speechSeconds > 0 && t('slateSpec', { s: speechSeconds })
-      : t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
+      : t(IS_SHOWCASE && showcase?.hd ? 'slateSpecHd' : 'slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
     ...(busy && take
       ? [
           t('slateRec', { t: formatClock(elapsed_s) }),
@@ -1027,8 +1077,6 @@ export function Studio() {
                     ? t('motionKind', { s: Math.round(motionVideo.duration_s * 10) / 10 })
                     : t('motionKindEmpty')
                 }
-                previewUrl={extensions?.examples?.motion?.previewUrl}
-                posterUrl={extensions?.examples?.motion?.posterUrl}
                 icon="motion"
                 paused={motionPaused}
               />
@@ -1036,8 +1084,6 @@ export function Studio() {
               <ChoiceCard
                 name={t('tabAvatar')}
                 kindLabel={speechSeconds > 0 ? t('avatarKind', { s: speechSeconds }) : t('avatarKindEmpty')}
-                previewUrl={extensions?.examples?.avatar?.previewUrl}
-                posterUrl={extensions?.examples?.avatar?.posterUrl}
                 icon="avatar"
                 paused={motionPaused}
               />
@@ -1183,7 +1229,7 @@ export function Studio() {
           }
           consent={
             tab === 'motion' ? (
-              <ConsentCheck id="motion-rights" label="motionRights" checked={rights} onChange={setRights} />
+              rightsAsked && <ConsentCheck id="motion-rights" label="motionRights" checked={rights} onChange={setRights} />
             ) : askConsent ? (
               <ConsentCheck id="effect-consent" checked={consent} onChange={setConsent} />
             ) : undefined
@@ -1208,6 +1254,7 @@ export function Studio() {
                     type="button"
                     className={resultShown || canvas.view === 'atelier' ? styles.buttonSecondary : styles.buttonPrimary}
                     disabled={!canGenerate}
+                    aria-describedby={waitingFor ? 'generate-reason' : undefined}
                     onClick={generate}
                   >
                     {t(primaryLabel, { d: formatDuration(mode === 'sequence' && !remix ? filmEstimate : estimate) })}
@@ -1222,10 +1269,11 @@ export function Studio() {
                     )}
                   </div>
                 )}
-                {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
-                {upload.status === 'ready' && missingScene && <p className={styles.hint}>{t('sceneNeeded')}</p>}
-                {tab === 'effects' && upload.status === 'ready' && needsOutfit && outfit.status !== 'ready' && <p className={styles.hint}>{t('hookNeedsOutfit')}</p>}
-                {tab === 'motion' && upload.status === 'ready' && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('motionNeedsVideo')}</p>}
+                {waitingFor && primaryLabel && (
+                  <p id="generate-reason" className={styles.hint}>
+                    {t(waitingFor)}
+                  </p>
+                )}
                 {replay && (
                   <p className={styles.hint} data-testid="replay-seed">
                     {t('recipeSeedChip', { seed: replay.seed ?? replay.shotSeeds?.join(' · ') ?? '' })}{' '}
@@ -1364,9 +1412,17 @@ export function Studio() {
                 </p>
               )}
               {IS_SHOWCASE && succeeded && !succeeded.placeholder && (resultModel ?? showcase?.model) && (
-                <AiCaption text="showcaseCaption" testId="result-caption" model={(resultModel ?? showcase?.model)!} />
+                // A clip restored to 1080p also names its HD pass's model.
+                <AiCaption
+                  text={succeeded.hdModel ? 'showcaseHdCaption' : 'showcaseCaption'}
+                  testId="result-caption"
+                  model={(resultModel ?? showcase?.model)!}
+                  hd={succeeded.hdModel}
+                />
               )}
-              {!IS_SHOWCASE && succeeded && resultModel && <AiCaption model={resultModel} />}
+              {!IS_SHOWCASE && succeeded && resultModel && (
+                <AiCaption model={resultModel} demoKind={tracked?.kind === 'sequence' ? undefined : tracked?.record.demo} />
+              )}
               {succeeded && tracked?.kind === 'job' && tracked.record.task === 'motion' && (
                 <p className={styles.caption} data-testid="motion-no-sound">
                   {t('motionNoSound')}

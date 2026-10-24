@@ -1,5 +1,6 @@
 import { createBackend, type GenerationBackend } from '@montagio/comfy-adapter';
 import { loadLibrary, type Library } from '@montagio/presets';
+import { demoRender } from './demo-render';
 import { getEnv } from './env';
 
 type Services = { key: string; library: Promise<Library>; backend: GenerationBackend };
@@ -10,14 +11,18 @@ const holder = globalThis as typeof globalThis & { __montagioServices?: Services
 
 export function getServices(): Services {
   const { root, data } = getEnv();
-  const key = `${root}|${data}|${process.env.MONTAGIO_BACKEND ?? 'demo'}|${process.env.COMFY_BASE_URL ?? ''}`;
+  const key = `${root}|${data}|${process.env.MONTAGIO_BACKEND ?? 'demo'}|${process.env.COMFY_BASE_URL ?? ''}|${process.env.MONTAGIO_DEMO_RENDER ?? ''}`;
   if (!holder.__montagioServices || holder.__montagioServices.key !== key) {
     const library = loadLibrary(root);
     library.catch(() => undefined); // surfaced to callers that await it
     holder.__montagioServices = {
       key,
       library,
-      backend: createBackend({ ...process.env, MONTAGIO_ROOT: root, MONTAGIO_DATA: data }),
+      // MONTAGIO_DEMO_RENDER=off keeps the pre-rendered files of demo-assets/ (the unit tests).
+      backend: createBackend(
+        { ...process.env, MONTAGIO_ROOT: root, MONTAGIO_DATA: data },
+        process.env.MONTAGIO_DEMO_RENDER === 'off' ? {} : { demoRender: demoRender(library) },
+      ),
     };
   }
   return holder.__montagioServices;

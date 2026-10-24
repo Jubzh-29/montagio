@@ -218,10 +218,12 @@ export async function exportVertical(
  * The one encoding of every showcase clip, placeholder and 9:16 cut. Identical
  * settings give identical H.264 headers, so the browser can join clips with
  * `-c copy`; no B-frames and a keyframe every 16 frames keep each clip a clean
- * series of closed GOPs.
+ * series of closed GOPs. CRF 23 with the slow preset keeps a 1080p clip at about
+ * 5 MB, 42 to 43 dB PSNR from its SeedVR2 output (CRF 18 veryfast: 10 MB, 45 dB),
+ * so the showcase stays well under the 1 GB of a Hugging Face Space.
  */
 export const SHOWCASE_X264: readonly string[] = [
-  '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'veryfast', '-crf', '18',
+  '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'slow', '-crf', '23',
   '-bf', '0', '-g', '16', '-keyint_min', '16', '-sc_threshold', '0',
   '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
   '-an', '-movflags', '+faststart',

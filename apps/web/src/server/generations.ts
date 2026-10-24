@@ -1,10 +1,11 @@
 import { randomInt, randomUUID } from 'node:crypto';
-import { access } from 'node:fs/promises';
+import { access, copyFile } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { IDEMPOTENCY_WINDOW_MS, isBackendError, type BackendErrorCode } from '@montagio/comfy-adapter';
 import { compileJob, CompileError, validatePreset, type Preset } from '@montagio/presets';
 import { ensureTools, probe, tagClip } from '@montagio/sequence';
 import { MAX_PRESET_YAML_BYTES, MAX_REQUEST_BYTES } from '@/lib/limits';
+import { demoKindOf } from './demo-render';
 import { getEnv } from './env';
 import { slotsOf } from './inputs';
 import { getServices } from './services';
@@ -239,7 +240,9 @@ export async function getGeneration(id: string): Promise<GenerationRecord | null
     updatedAt: new Date().toISOString(),
   };
   if (job.state === 'succeeded' && job.outputPath) {
-    const url = await deliverClip(record.id, job.outputPath);
+    const demo = demoKindOf(job.outputPath);
+    if (demo) updated.demo = demo;
+    const url = await deliverClip(record.id, job.outputPath, demo === 'moved');
     if (url) {
       updated.outputUrl = url;
       const frames = await frameCount(mediaFileFor(url));
@@ -266,16 +269,18 @@ async function frameCount(file: string | null): Promise<number | undefined> {
  * URL of the clip the user gets: a copy of the backend's output that carries the
  * AI-generated mention, under data/generations/<id>/clip.mp4. If FFmpeg cannot
  * write it, the render is not lost: the raw output is delivered untagged and the
- * error goes to the server log.
+ * error goes to the server log. A clip FFmpeg moved (`moved`, demo) keeps its own mention: no model made it.
  */
-function deliverClip(id: string, outputPath: string): Promise<string | undefined> {
+function deliverClip(id: string, outputPath: string, moved = false): Promise<string | undefined> {
   const clip = join(getEnv().data, 'generations', id, 'clip.mp4');
   let delivery = taggedClips.get(clip);
   if (!delivery) {
     delivery = (async () => {
       try {
         // recipe.ts reads this module: imported when needed, not at load.
-        await access(clip).catch(async () => tagClip(outputPath, clip, await (await import('./recipe')).recipeTags('generation', id, 'video')));
+        await access(clip).catch(async () =>
+          moved ? copyFile(outputPath, clip) : tagClip(outputPath, clip, await (await import('./recipe')).recipeTags('generation', id, 'video')),
+        );
         return mediaUrlFor(clip);
       } catch (error) {
         console.error(`[montagio] generation ${id}: the AI-generated mention could not be written, clip delivered untagged`, error);
