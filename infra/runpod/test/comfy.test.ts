@@ -306,6 +306,43 @@ describe('checkWorkflow: what ComfyUI v0.41.0 validates in the inputs of an opti
   });
 });
 
+describe('checkWorkflow: Autogrow inputs (the values of ComfyMathExpression)', () => {
+  // ComfyMathExpression as the real /object_info gives it: values a to z, the first one required, FLOAT, INT or BOOLEAN
+  const real = JSON.parse(readFileSync(new URL('./fixtures/object_info-v0.41.0.json', import.meta.url), 'utf8')) as ObjectInfo;
+  const info: ObjectInfo = {
+    ComfyMathExpression: real.ComfyMathExpression!,
+    GetVideoComponents: real.GetVideoComponents!,
+    LoadVideo: real.LoadVideo!,
+    // a TemplatePrefix one: image0 to image2, none required
+    Batch: { input: { required: { images: ['COMFY_AUTOGROW_V3', { template: { input: { optional: { image: ['IMAGE', {}] } }, prefix: 'image', min: 1, max: 3 } }] } }, output: ['IMAGE'] },
+  };
+  const math = (inputs: Record<string, unknown>): ApiWorkflow => ({
+    '73': { class_type: 'LoadVideo', inputs: { file: 'clip.mp4' } },
+    '74': { class_type: 'GetVideoComponents', inputs: { video: ['73', 0] } },
+    '103': { class_type: 'ComfyMathExpression', inputs: { expression: 'a * 2', ...inputs } },
+  });
+
+  test('a grown value is an input of the template type, and the Autogrow itself is never required', () => {
+    expect(checkWorkflow(math({ 'values.a': ['74', 2] }), info)).toEqual([]);
+    expect(checkWorkflow(math({ 'values.a': ['74', 2], 'values.b': 3 }), info)).toEqual([]);
+  });
+
+  test('the first min values are required, a name outside the template is unknown, a link is type-checked', () => {
+    expect(checkWorkflow(math({}), info)).toEqual(['node 103 (ComfyMathExpression): missing required input "values.a"']);
+    expect(checkWorkflow(math({ 'values.a': 2, 'values.aa': 1 }), info)).toEqual(['node 103 (ComfyMathExpression): unknown input "values.aa"']);
+    expect(checkWorkflow(math({ 'values.a': ['74', 0] }), info)).toEqual([
+      'node 103 (ComfyMathExpression).values.a expects FLOAT,INT,BOOLEAN, output 0 of node 74 is IMAGE',
+    ]);
+  });
+
+  test('a prefix template grows <prefix>0 to <prefix><max - 1>, optional when its input is', () => {
+    const batch = (inputs: Record<string, unknown>): ApiWorkflow => ({ '1': { class_type: 'Batch', inputs } });
+    expect(checkWorkflow(batch({}), info)).toEqual([]);
+    expect(checkWorkflow(batch({ 'images.image2': 'x' }), info)).toEqual([]);
+    expect(checkWorkflow(batch({ 'images.image3': 'x' }), info)).toEqual(['node 1 (Batch): unknown input "images.image3"']);
+  });
+});
+
 test.each([
   [{ cameraPose: 'Zoom In', cameraPose2: null, cameraCombine: null }, 'Zoom In'],
   [{ cameraPose: 'Pan Up', cameraPose2: 'Zoom In', cameraCombine: 'together' as const }, 'Pan Up + Zoom In'],

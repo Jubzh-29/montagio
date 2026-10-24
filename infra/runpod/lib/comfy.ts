@@ -96,6 +96,8 @@ export function comboOptions(spec: unknown): (string | number)[] | null {
  * its own check reports.
  */
 function specFor(declared: InputSpecs, inputs: Record<string, unknown>, field: string): unknown {
+  // an input an Autogrow grew is declared whole: "values.a"
+  if (Object.hasOwn(declared, field)) return declared[field];
   const parts = field.split('.');
   let specs: InputSpecs = declared;
   for (let i = 0; i < parts.length - 1; i++) {
@@ -128,6 +130,36 @@ function requiredUnderOptions(declared: InputSpecs, inputs: Record<string, unkno
   return required;
 }
 
+/** A V3 io.Autogrow (the values of ComfyMathExpression): inputs written "<input>.<name>", each of its template's type. */
+const AUTOGROW = 'COMFY_AUTOGROW_V3';
+type AutogrowTemplate = { input: { required?: InputSpecs; optional?: InputSpecs }; names?: string[]; prefix?: string; min: number; max?: number };
+
+/**
+ * The inputs of a node with each Autogrow replaced by the inputs it grows, as ComfyUI expands
+ * it (_expand_schema_for_dynamic): "values.a", "values.b"…, the first `min` of them required
+ * when the template's input is, the others optional; the Autogrow itself is never an input.
+ */
+function expandAutogrow(input: { required?: InputSpecs; optional?: InputSpecs } | undefined): { required: InputSpecs; optional: InputSpecs } {
+  const required: InputSpecs = {};
+  const optional: InputSpecs = {};
+  for (const [group, specs] of [[required, input?.required], [optional, input?.optional]] as const) {
+    for (const [name, spec] of Object.entries(specs ?? {})) {
+      const template = Array.isArray(spec) && spec[0] === AUTOGROW ? (spec[1] as { template: AutogrowTemplate }).template : null;
+      if (!template) {
+        group[name] = spec;
+        continue;
+      }
+      const requiredItem = Object.values(template.input.required ?? {})[0];
+      const item = requiredItem ?? Object.values(template.input.optional ?? {})[0];
+      const names = template.names ?? Array.from({ length: template.max ?? 0 }, (_, i) => `${template.prefix}${i}`);
+      names.forEach((grown, i) => {
+        (i < template.min && requiredItem !== undefined ? required : optional)[`${name}.${grown}`] = item;
+      });
+    }
+  }
+  return { required, optional };
+}
+
 /**
  * Compare a workflow with what the running ComfyUI accepts: installed node
  * classes, input names (unknown ones, missing required ones, those of the
@@ -146,8 +178,8 @@ export function checkWorkflow(workflow: ApiWorkflow, info: ObjectInfo, opts: { s
       problems.push(`node ${id}: class ${node.class_type} is not installed`);
       continue;
     }
-    const required = spec.input?.required ?? {};
-    const declared = { ...spec.input?.optional, ...required };
+    const { required, optional } = expandAutogrow(spec.input);
+    const declared = { ...optional, ...required };
     for (const field of [...Object.keys(required), ...requiredUnderOptions(declared, node.inputs)]) {
       if (!(field in node.inputs)) problems.push(`node ${id} (${node.class_type}): missing required input "${field}"`);
     }
