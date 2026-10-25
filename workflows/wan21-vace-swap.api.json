@@ -3,7 +3,7 @@
   "2": {"class_type": "GetVideoComponents", "inputs": {"video": ["1", 0]}},
   "7": {"class_type": "ImageFromBatch", "inputs": {"image": ["2", 0], "batch_index": 0, "length": 81}},
   "3": {"class_type": "ImageScale", "inputs": {"image": ["7", 0], "upscale_method": "area", "width": 832, "height": 480, "crop": "center"}},
-  "40": {"class_type": "DownloadAndLoadSAM2Model", "inputs": {"model": "sam2.1_hiera_base_plus.safetensors", "segmentor": "video", "device": "cuda", "precision": "fp32"}},
+  "40": {"class_type": "DownloadAndLoadSAM2Model", "inputs": {"model": "sam2.1_hiera_base_plus.safetensors", "segmentor": "video", "device": "cuda", "precision": "fp16"}},
   "41": {"class_type": "Sam2VideoSegmentationAddPoints", "inputs": {"sam2_model": ["40", 0], "coordinates_positive": "[{\"x\": 416, \"y\": 240}]", "frame_index": 0, "object_index": 0, "image": ["3", 0]}},
   "42": {"class_type": "Sam2VideoSegmentation", "inputs": {"sam2_model": ["41", 0], "inference_state": ["41", 1], "keep_model_loaded": false}},
   "43": {"class_type": "GrowMask", "inputs": {"mask": ["42", 0], "expand": 12, "tapered_corners": true}},

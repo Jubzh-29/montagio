@@ -121,12 +121,13 @@ describe('compileSwap (SAM 2.1 follows the object, Wan 2.1 VACE 14B redraws it)'
     expect(compile({ video_s: 30 }).params.frames).toBe(81);
   });
 
-  test('the text, the seed and the weights are bound; the tracker loads the locked fp32 file', () => {
+  test('the text, the seed and the weights are bound; the tracker runs in fp16, from the locked "-fp16" file', () => {
     const { workflow } = compile({ prompt: '  a golden retriever ', seed: 42 });
     expect(workflow['14']!.inputs.text).toBe('a golden retriever');
     expect(workflow['31']!.inputs.seed).toBe(42);
-    expect(workflow['40']!.inputs).toMatchObject({ model: 'sam2.1_hiera_base_plus.safetensors', segmentor: 'video', precision: 'fp32' });
-    expect(lib.lock.get('sam21-hiera-base-plus')).toMatchObject({ file: 'sam2.1_hiera_base_plus.safetensors', extension: 'swap', folder: 'sam2' });
+    // SAM 2's attention allows Flash only on an L4 or a 4090, which has no fp32 kernel
+    expect(workflow['40']!.inputs).toMatchObject({ model: 'sam2.1_hiera_base_plus.safetensors', segmentor: 'video', precision: 'fp16' });
+    expect(lib.lock.get('sam21-hiera-base-plus')).toMatchObject({ file: 'sam2.1_hiera_base_plus-fp16.safetensors', extension: 'swap', folder: 'sam2' });
   });
 
   test('an empty or too long text, or a clip out of range, is refused', () => {

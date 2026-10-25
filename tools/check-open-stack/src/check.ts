@@ -55,6 +55,18 @@ export type OpenStackReport = {
   violations: Violation[];
 };
 
+/**
+ * The file a loader really reads for `value`, when the node derives it: in fp16 or bf16,
+ * DownloadAndLoadSAM2Model loads "<name>-fp16.safetensors" for a SAM 2.1 model
+ * (kijai/ComfyUI-segment-anything-2 at 0c35fff5, nodes.py).
+ */
+export function loadedFile(classType: string | undefined, inputs: Record<string, unknown>, value: string): string {
+  if (classType === 'DownloadAndLoadSAM2Model' && inputs.model === value && inputs.precision !== 'fp32' && value.includes('2.1')) {
+    return value.replace(/\.([^.]+)$/, '-fp16.$1');
+  }
+  return value;
+}
+
 /** Input values that name a model weight file. */
 const WEIGHT_FILE = /\.(safetensors|sft|ckpt|pt|pth|bin|gguf|onnx)$/i;
 const SOURCE_EXTENSIONS = /\.(ts|tsx|js|mjs|cjs|py)$/;
@@ -495,11 +507,13 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
         });
       }
       for (const value of Object.values(node.inputs ?? {})) {
-        if (typeof value === 'string' && WEIGHT_FILE.test(value) && !files.has(value)) {
+        if (typeof value !== 'string' || !WEIGHT_FILE.test(value)) continue;
+        const loaded = loadedFile(node.class_type, node.inputs ?? {}, value);
+        if (!files.has(loaded)) {
           violations.push({
             rule: 'weight-file',
             file: relative(root, path),
-            detail: `node ${id} loads "${value}", which is not one of ${owner}`,
+            detail: `node ${id} loads "${loaded}", which is not one of ${owner}`,
           });
         }
       }

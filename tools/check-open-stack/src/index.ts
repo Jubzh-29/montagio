@@ -1,5 +1,6 @@
 export {
   checkOpenStack,
+  loadedFile,
   STACK_FUNCTIONS,
   type OpenStackReport,
   type StackFunction,

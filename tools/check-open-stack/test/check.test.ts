@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
-import { checkOpenStack } from '../src/index';
+import { checkOpenStack, loadedFile } from '../src/index';
 
 const fixture = (name: string) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 
@@ -103,6 +103,15 @@ test('a workflow loading a file that is not a declared weight of its model fails
   expect(r.violations).toContainEqual(
     expect.objectContaining({ rule: 'weight-file', detail: expect.stringContaining('flux1-dev.safetensors') }),
   );
+});
+
+test('the SAM 2 loader reads a "-fp16" file in fp16 or bf16 for a SAM 2.1 model, the name as written otherwise', () => {
+  const sam = (precision: string, model = 'sam2.1_hiera_base_plus.safetensors') => loadedFile('DownloadAndLoadSAM2Model', { model, precision }, model);
+  expect(sam('fp16')).toBe('sam2.1_hiera_base_plus-fp16.safetensors');
+  expect(sam('bf16')).toBe('sam2.1_hiera_base_plus-fp16.safetensors');
+  expect(sam('fp32')).toBe('sam2.1_hiera_base_plus.safetensors');
+  expect(sam('fp16', 'sam2_hiera_base_plus.safetensors')).toBe('sam2_hiera_base_plus.safetensors');
+  expect(loadedFile('UNETLoader', { unet_name: 'x.safetensors' }, 'x.safetensors')).toBe('x.safetensors');
 });
 
 test('a workflow of an extension may load only the weights of its own model', async () => {

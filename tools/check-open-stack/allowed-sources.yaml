@@ -285,7 +285,7 @@ sources:
     role: mirror
     revision: f885607d88bb3f9145efa49c3e3c50a9e5bf13eb
     license_file: false
-    note: the safetensors the pinned node pack loads; sam2.1_hiera_base_plus.safetensors holds the 615 tensors of Meta's sam2.1_hiera_base_plus.pt, bit for bit (checked on 2026-10-24)
+    note: the safetensors the pinned node pack loads; sam2.1_hiera_base_plus-fp16.safetensors holds the 615 tensors of Meta's sam2.1_hiera_base_plus.pt cast to fp16, bit for bit (checked on 2026-10-24, as its fp32 file)
   - repo: facebook/sam2.1-hiera-base-plus
     license: Apache-2.0
     role: source
