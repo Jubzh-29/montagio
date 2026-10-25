@@ -121,9 +121,10 @@ export async function startExport(jobId: string, body: unknown): Promise<Caption
   void enqueue(async () => {
     try {
       const url = mediaUrlFor(await renderExport(read.record, read.transcript, request, dir))!;
-      await writeState(dir, { ...state, state: 'succeeded', url });
-      // The job's result is its last export finished.
+      // The job's result is its last export finished, recorded before the export says so: a client that reads
+      // "succeeded" finds the job pointing to it.
       await updateJob(jobId, (record) => (record.outputUrl = url));
+      await writeState(dir, { ...state, state: 'succeeded', url });
     } catch (error) {
       console.error(`[montagio] captions ${jobId}: the export ${id} failed`, error);
       await writeState(dir, { ...state, state: 'failed', error: 'export-failed' });
