@@ -369,3 +369,14 @@ Avec l'accord de l'utilisateur (« Oui, lance la validation GPU du remix de tend
 - **Coût réel : 0,23 $** (les plans et l'image 0,19 $, Gemma sur le volume 0,01 $, les deux passages du squelette 0,03 $). Relevé du mois : 22,60 $.
 - **Daté** : `gpu_validated: 2026-10-25`. L'aperçu `presets/extensions/previews/remix.mp4` (l'exemple et son remix côte à côte, 153 Ko) vient de ce rendu.
 
+## 19. Sous-titres sur GPU (25/10)
+
+Demandé par l'utilisateur (« go » à « On boucle les deux trous (sous-titres sur GPU et installeur) avant la coupe ? », environ 0,05 à 0,10 $, plafond 0,15 $). Le node Montagio Transcribe Words (Whisper large-v3 turbo) n'avait tourné que sur le ComfyUI CPU.
+
+- Les 11 fichiers de Whisper manquaient sur le volume du compte montagio-2 : téléchargés par `weights --only whisper-turbo-…` (1,6 Go, sha256 vérifiés), 0,003 $.
+- `smoke --extension transcribe --audio demo-assets/examples/avatar.mp4` : la parole du clip préparée comme l'app la prépare (FLAC mono à 16 kHz), langue détectée. **10,5 s** sur la L4, chargement du modèle compris, **4,9 Go** au plus (contre 95,7 s sur le CPU d'un portable). Résultat sur le volume (`runs/20261025-205422-captions`) et hors dépôt dans `s3/validation/20261025-205422-captions/`.
+- **Les mots** : les mêmes neuf mots et les mêmes instants qu'au passage CPU, au centième près (« Hello, this is a test of the Shotrate Avatar. », langue `en` détectée). Contre le son : la parole s'arrête à 2,545 s (silence détecté par FFmpeg), le dernier mot finit à 2,56 s.
+- **L'export 9:16** fait de ces mots, avec le texte corrigé (« Montagio ») et le style « pop » : chaque mot est surligné pendant qu'il est dit (HELLO à 0,25 s, TEST à 1,09 s, MONTAGIO à 1,72 s, AVATAR à 2,19 s).
+- **L'app et la recette** : les tests des sous-titres, rejoués sur ces mots (`MONTAGIO_DEMO_CAPTIONS`), passent (14 sur 14). Ils couvrent le transcript, l'export 1080×1920 avec son et mention « AI-generated », et la recette qui rejoue l'avatar puis ses sous-titres dans le même style.
+- **Coût réel : 0,016 $** (Whisper sur le volume 0,003 $, le passage 0,013 $). Relevé du mois : 22,62 $.
+- **Daté** : la validation est notée dans `registry/extensions/whisper-turbo-words.yaml`, dont l'estimation passe de 8 s à 12 s. Les sous-titres suivent l'extension « avatar », déjà datée.

@@ -43,6 +43,7 @@ import {
   cutShot,
   detectShots,
   extractFirstFrame,
+  extractSpeech,
   framesAt,
   prepareMotionClip,
   prepareRemixSource,
@@ -138,7 +139,7 @@ if (args.help) {
 
 Extensions (instead of presets):
   --extension LIST   edit, compose, effect, hook (= hook-edit then transition), voice, avatar, music, upscale, motion,
-                     restyle, swap, remix-skeleton, remix (comma list) or "all"; restyle-edit,restyle restyles the clip's first frame,
+                     restyle, swap, remix-skeleton, remix, transcribe (comma list) or "all"; restyle-edit,restyle restyles the clip's first frame,
                      then keeps it
   --input PATH       the photo of edit, effect, hook and avatar (default demo-assets/images/sample-16x9.png); restyle
                      run alone: a look to follow; swap: the photo of the new object (without --input, the text alone)
@@ -165,7 +166,9 @@ Extensions (instead of presets):
                      same seed for all, then puts them back on the trend's frames and cuts the 9:16, as the app does;
                      remix-skeleton has Gemma read the sheet of the shots' first frames and write the post (--language)
   --keep-sound       remix: keep the trend's own sound (the app asks the user's word for it)
-  --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
+  --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output;
+                     transcribe: a clip or a sound that speaks, read by Whisper as the captions read it (its sound as
+                     mono FLAC at 16 kHz, 60 s at most, the language detected)
   --voice PATH       voice: speak with this sample (a consented recording, mono FLAC) instead of the built-in voice
   --text [JOB=]TEXT  the edit instruction, the effects' subject, the words to say, the music description or the
                      restyle's new look or the swap's new object (each has a default), for the one job of the run that
@@ -674,6 +677,18 @@ async function runExtensions(
       console.log(`remix: ${ranges.length} shots at ${prepared.fps} fps, cut at frames ${cuts.join(', ') || '(none)'}`);
     }
   }
+  // The transcription reads the speech of --audio as the app sends it: mono FLAC at 16 kHz, 60 s at most.
+  let words: string | undefined;
+  if (names.includes('transcribe')) {
+    if (args['dry-run']) words = 'speech.flac';
+    else {
+      if (!args.audio) throw new Error('the transcribe job needs --audio <a clip or a sound that speaks>');
+      await mkdir(join(outDir, 'inputs'), { recursive: true });
+      words = join(outDir, 'inputs', 'speech-16k.flac');
+      const { duration_s } = await extractSpeech(fromCaller(args.audio), words, { max_s: 60 });
+      console.log(`transcribe: ${duration_s.toFixed(2)} s of speech`);
+    }
+  }
   // The restyle's reference: the restyled first frame (set once restyle-edit has run), the photo given, or none.
   let restyleReference: { path: string; mode: 'first-frame' | 'look' } | undefined = chainedRestyle
     ? args['dry-run']
@@ -710,6 +725,7 @@ async function runExtensions(
     motionSize,
     restyleFrame,
     restyleReference,
+    words,
     remixShots,
     remixAspect,
     remixSheet,

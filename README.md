@@ -113,6 +113,7 @@ Measured on the L4 (an RTX 4090 is about twice as fast, going by the official te
 | Talking avatar, 3–4 s of speech (Wan 2.2 S2V), after the voice | 127–145 s | 21.7 GB |
 | Voice (Chatterbox) | 2.5–5 s, warm | 3.3 GB |
 | Voice change (Chatterbox VC), a 4 s clip | 23.6 s, cold | 4.3 GB |
+| Captions, the words of 2.9 s of speech and their moments (Whisper large-v3 turbo) | 10.5 s, the loading included | 4.9 GB |
 | Music, 60 s (ACE-Step 1.5) | 9.5 s, warm | 10–14.6 GB |
 | HD upscale, 81 frames to 1080p (SeedVR2 3B) | 428 s | 18.4 GB |
 | HD with smooth motion, 81 frames at 16 fps to 161 at 32 fps in 1080p (SeedVR2 3B, then RIFE 4.26) | 410 s, of which RIFE 4.8 s | 8.6 GB |
@@ -192,7 +193,7 @@ What gets downloaded:
 | Option | Weights | Disk |
 |---|---|---|
 | default | the camera presets and the effects pack (84 GiB) | about 110 GB |
-| `--extensions all` | every extension, the avatar aside (see below) | about 200 GB |
+| `--extensions all` | every extension, with the node packs of the avatar and the object swap (see below) | about 200 GB |
 | `--extensions none` | the camera presets alone | about 90 GB |
 | `--app-only` | none: the app alone, in demo mode or rendering on a remote GPU with `--proxy-url` | — |
 

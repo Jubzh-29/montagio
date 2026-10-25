@@ -58,8 +58,8 @@ export function markSkeletonRejected(reason: string): void {
 export const skeletonRejected = () => skeletonRefusal.reason !== null;
 
 /**
- * The captions are offered with the extension "avatar" (validated for real on a CPU ComfyUI and in the
- * browser on 2026-10-25), unless ComfyUI refused their workflow.
+ * The captions are offered with the extension "avatar" (validated on a CPU ComfyUI, in the browser and on an
+ * L4 on 2026-10-25), unless ComfyUI refused their workflow.
  */
 export async function captionsOffered(): Promise<boolean> {
   return !captionsRejected() && (await visibleExtensions()).includes('avatar');

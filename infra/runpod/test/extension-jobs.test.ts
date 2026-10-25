@@ -14,7 +14,7 @@ beforeAll(async () => {
 
 const base = { language: 'en' as const, duration_s: 10, seed: 7, aspect: '16:9' as const };
 
-const files = { input: '/data/photo.png', input2: '/data/outfit.png', input3: '/data/product.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, voice: '/data/voice.flac', motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const, restyleFrame: '/data/first.png', restyleReference: { path: '/data/restyled.png', mode: 'first-frame' as const }, motionSize: { width: 480, height: 832 }, swapPoints: [{ x: 0.5, y: 0.4 }], swapImage: '/data/bike.png', remixShots: [{ path: '/data/shot1.mp4', seconds: 2 }, { path: '/data/shot2.mp4', seconds: 1.5 }], remixAspect: '9:16' as const, remixSheet: '/data/shots.png' };
+const files = { input: '/data/photo.png', input2: '/data/outfit.png', input3: '/data/product.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, voice: '/data/voice.flac', motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const, restyleFrame: '/data/first.png', restyleReference: { path: '/data/restyled.png', mode: 'first-frame' as const }, motionSize: { width: 480, height: 832 }, swapPoints: [{ x: 0.5, y: 0.4 }], swapImage: '/data/bike.png', remixShots: [{ path: '/data/shot1.mp4', seconds: 2 }, { path: '/data/shot2.mp4', seconds: 1.5 }], remixAspect: '9:16' as const, remixSheet: '/data/shots.png', words: '/data/speech-16k.flac' };
 
 test('one job per extension, in the order of the session, each accepted by ComfyUI v0.41.0 once its files are uploaded', () => {
   const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
@@ -31,6 +31,7 @@ test('one job per extension, in the order of the session, each accepted by Comfy
     ['upscale', 'seedvr2-upscale'],
     ['upscale-image', 'seedvr2-image-upscale'],
     ['voice-change', 'chatterbox-vc'],
+    ['transcribe', 'whisper-turbo-words'],
     ['motion', 'wan-animate2-motion'],
     ['restyle-edit', 'qwen-image-edit-2511'],
     ['restyle:first-frame', 'wan21-vace-restyle'],
@@ -87,6 +88,8 @@ test('each job uploads the files it reads and nothing else', () => {
     { node: '58', field: 'audio', path: '/data/speech.flac' },
   ]);
   expect(uploads['remix-skeleton']).toEqual([{ node: '1', field: 'image', path: '/data/shots.png' }]);
+  // The captions' Whisper reads the speech as the app sends it, the language left to Whisper.
+  expect(uploads.transcribe).toEqual([{ node: '1', field: 'audio', path: '/data/speech-16k.flac' }]);
 });
 
 test("a remix makes each shot again with the same photo and the same seed, and Gemma reads the sheet of their first frames", () => {
@@ -119,6 +122,7 @@ test('an extension record carries the sha256 of its photo', () => {
     upscale: null,
     'upscale-image': '/data/photo.png',
     'voice-change': null,
+    transcribe: null,
     motion: '/data/photo.png',
     'restyle-edit': '/data/first.png',
     restyle: '/data/restyled.png',

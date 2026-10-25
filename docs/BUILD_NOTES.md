@@ -172,7 +172,7 @@ How the times were taken: `smoke.ts` ([`infra/runpod`](../infra/runpod)) compile
 
 - Clips are 5 s at 16 fps and 480p before the HD pass; films chain two or three of them.
 - Captions:
-  - Whisper large-v3 turbo ran for real on a CPU ComfyUI only, on 2026-10-25. It transcribed the 2.9 s of the avatar example in 95.7 s, the model loading included, in fp32 on a laptop. No GPU session has run it.
+  - Whisper large-v3 turbo ran on a CPU ComfyUI, then on an L4, on 2026-10-25. It transcribed the 2.9 s of the avatar example in 95.7 s on a laptop's CPU (fp32), and in 10.5 s on the L4, the model loading included each time, with the same words and moments.
   - Captions are made in 22 languages written in the Latin alphabet. Japanese and Chinese would need CJK fonts and line breaks without spaces.
   - Films and ads have no voice to caption: their music is instrumental.
 - Fun Camera renders push-ins, pull-backs and side moves well, vertical moves and rolls poorly.

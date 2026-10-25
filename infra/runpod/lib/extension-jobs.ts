@@ -15,6 +15,7 @@ import {
   compileRestyle,
   compileSpeech,
   compileSwap,
+  compileTranscribe,
   compileTranslate,
   compileTrendSkeleton,
   compileImageUpscale,
@@ -50,6 +51,7 @@ export const EXTENSION_JOBS = [
   'upscale',
   'upscale-image',
   'voice-change',
+  'transcribe',
   'motion',
   'restyle-edit',
   'restyle',
@@ -72,6 +74,8 @@ const TASKS: Record<ExtensionJobName, ExtensionTask> = {
   upscale: 'v2v-upscale',
   'upscale-image': 'i2i-upscale',
   'voice-change': 'a2a-vc',
+  // The captions' Whisper: the words of a talking clip, each with its moment.
+  transcribe: 'a2t-words',
   motion: 'motion-transfer',
   'restyle-edit': 'i2i-edit',
   restyle: 'v2v-restyle',
@@ -142,6 +146,8 @@ export type ExtensionJobOptions = {
   remixShots?: { path: string; seconds: number }[];
   remixAspect?: Aspect;
   remixSheet?: string;
+  /** The transcription's speech, as the app prepares it (mono FLAC at 16 kHz). */
+  words?: string;
   /** The speech of avatar, and its length in seconds (the caller reads it). */
   audio?: string;
   /** The voice job's sample (mono FLAC, as the app prepares it): the cloned voice. */
@@ -429,6 +435,12 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
           });
           return { name, tag: `${name}:shot${index + 1}`, model, ...job, files: [file('image', photo), file('video', shot.path)] };
         });
+      }
+      case 'transcribe': {
+        const speech = need(opts.words, '--audio', name);
+        // "auto": Whisper detects the language, as the captions panel asks by default.
+        const job = compileTranscribe(model, template, { audioRef: basename(speech), language: 'auto' });
+        return [{ name, tag: name, model, ...job, files: [file('audio', speech)] }];
       }
       case 'upscale-image': {
         const photo = need(opts.input, '--input', name);
