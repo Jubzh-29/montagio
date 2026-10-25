@@ -264,4 +264,5 @@ UI/UX audit of 21/10 (score 26/40, no P0, three P1): its action plan, one branch
   - Checked:
     - Whisper ran for real on the CPU ComfyUI (2.9 s of speech in 95.7 s with the model loading, English detected; its words are the demo's transcription);
     - the export was checked in the browser (1080x1920, 32 fps, AAC, `comment = AI-generated`, the recipe in `synopsis`);
-    - one suite at a time: typecheck, lint, the packages' and the web's tests, `test:nodes`, `check:open-stack`, the e2e specs it touches.
+    - one suite at a time: typecheck, lint, `npm test` (two tests that run past their time under load, `motion.test.ts` and the showcase recipe hook, passed when run alone), `test:nodes` 1,264 passed and 3 skipped, `check:open-stack` (16 models, 60 weight files), the e2e specs of the captions, the Studio and the avatar. Not run: the showcase e2e (its build re-encodes every clip), whose Open Stack count moves to 16 like the Studio's.
+  - An independent review found nothing critical; its nine points were fixed before the cut (the export's language, a replay that runs the same workflows, a missing Whisper that hides the captions, the export queue, the blocked names, the stale preview, the export's recipe, the clip's model in the caption, long words shrunk to the frame).
