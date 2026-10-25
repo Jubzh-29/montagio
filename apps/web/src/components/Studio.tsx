@@ -854,6 +854,8 @@ export function Studio() {
         : undefined;
 
   const selectedModel = models.find((model) => model.id === modelId);
+  // On a 12 GB card the 20-step model is not offered: say so where the models are chosen.
+  const profileNote = extensions?.vramProfile === '12gb' ? t('profile12Note') : undefined;
   const estimate =
     tab === 'motion'
       ? (extensions?.estimates.motion ?? 0)
@@ -1151,6 +1153,7 @@ export function Studio() {
                 onSelect={setModelId}
                 onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
                 className={styles.modelsInFields}
+                {...(profileNote ? { note: profileNote } : {})}
               />
             </>
             )
@@ -1175,6 +1178,7 @@ export function Studio() {
                     onSelect={setModelId}
                     onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
                     className={styles.modelsByGenerate}
+                    {...(profileNote ? { note: profileNote } : {})}
                   />
                 )}
                 {primaryLabel ? (

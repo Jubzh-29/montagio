@@ -17,7 +17,7 @@ If you just want to see Montagio, the demo link needs no install at all.
 | | Needed |
 |---|---|
 | System | Windows 10 or 11 (x64), or Linux x64 (Ubuntu 22.04 or newer, other distributions should work) |
-| GPU | NVIDIA with 24 GB of VRAM (RTX 3090, RTX 4090, L4, A10, A5000, …) |
+| GPU | NVIDIA with 24 GB of VRAM (RTX 3090, RTX 4090, L4, A10, A5000, …); 12 to 20 GB for the [12 GB profile](#below-24-gb-of-vram-the-12-gb-profile) |
 | NVIDIA driver | R580 or newer (CUDA 13.0); R570 (CUDA 12.8) works with an older PyTorch |
 | RAM | 32 GB or more recommended |
 | Disk | about 112 GB free by default: 72 GB of weights for the camera presets (their Turbo LoRAs included), 21 GB for the effects pack, ComfyUI and PyTorch, the app; about 92 GB with `--extensions none`, about 200 GB with `--extensions all` |
@@ -62,9 +62,21 @@ The first install takes a while. Most of it is the download of the weights: 67.2
 
 A download that stops (network, Ctrl+C, a closed window) resumes where it was: run the same command again.
 
-### Below 24 GB of VRAM
+### Below 24 GB of VRAM: the 12 GB profile
 
-The video models need a 24 GB card. On a smaller GPU, or without an NVIDIA GPU, the installer says so and offers the app alone (see [App only](#app-only)). `--ignore-vram` installs everything anyway, for people who want to try with `MONTAGIO_COMFYUI_ARGS=--lowvram`; renders may then fail for lack of memory.
+Every model runs on a 24 GB card. On a card of 12 to 20 GB (RTX 3060 12 GB, RTX 4070, RTX 4080…), the installer offers its **12 GB profile** instead of the app alone; `--low-vram` asks for it directly, and the next runs keep it. It installs the same weights: ComfyUI v0.41.0 streams the part of an fp8 model that does not fit (its dynamic VRAM), and the app offers only what a GPU session ran on a GPU held to 12 GB, with the times measured there:
+
+| What | 12 GB profile | 24 GB card |
+|---|---|---|
+| Camera moves and films, Turbo (4 steps) | about 2.5 min | about 1 min |
+| Camera moves and films, Fast (Wan 2.2 5B) | about 3 min | about 1.5 min |
+| Effects | about 3 min | about 1.5 min |
+| Text to image | about 15 s | about 5 s |
+| Camera moves, Quality (20 steps), and the other extensions | not offered yet | yes |
+
+The times of the 12 GB profile were measured on 2026-10-25 on an NVIDIA L4 held to 11.5 GiB of free VRAM (the rest taken before ComfyUI started) and 32 GiB of RAM: a card in the class of an RTX 4070, as fast with 12 GB as with 24 (the weights stream between two steps, the computing is the same). A slower card, such as an RTX 3060, takes longer. Keep 32 GB of RAM: ComfyUI holds there the part of a model the card does not.
+
+Under 12 GB, or without an NVIDIA GPU, the installer offers the app alone (see [App only](#app-only)). `--ignore-vram` installs anyway, for people who want to try; renders may then fail for lack of memory.
 
 ## What gets installed, and where
 
@@ -110,7 +122,7 @@ Running `install` again only does what changed: a new ComfyUI or PyTorch version
 
 ## App only
 
-Without a 24 GB GPU, `install --app-only` installs the app alone: no ComfyUI, no PyTorch, no weights.
+Without a GPU of 12 GB at least, `install --app-only` installs the app alone: no ComfyUI, no PyTorch, no weights.
 
 - By default the app runs in demo mode, with pre-rendered clips.
 - With `--proxy-url <url>`, it renders on a GPU elsewhere, through that machine's comfy-api-proxy. For example, a rented GPU that runs Montagio, reached through an SSH tunnel:
@@ -130,7 +142,8 @@ Without a 24 GB GPU, `install --app-only` installs the app alone: no ComfyUI, no
 | `--app-only` | the app alone (see above) |
 | `--proxy-url URL` | with `--app-only`: a remote comfy-api-proxy, kept for the next runs |
 | `--demo` | with `--app-only`: forget a saved `--proxy-url`, run the demo mode |
-| `--ignore-vram` | install on a GPU under 24 GB anyway |
+| `--low-vram` | the 12 GB profile (see above), kept for the next runs |
+| `--ignore-vram` | install on a GPU under 12 GB, or every model under 24 GB, anyway |
 | `--dir DIR` | install folder |
 | `--comfy-port N`, `--proxy-port N`, `--app-port N` | ports (defaults 8188, 8189, 3000), kept for the next runs |
 | `--no-start` | install without starting |
@@ -141,7 +154,7 @@ Without a 24 GB GPU, `install --app-only` installs the app alone: no ComfyUI, no
 |---|---|
 | `MONTAGIO_HOME` | install folder |
 | `MONTAGIO_EXTENSIONS` | the default of `--extensions`; the app reads it too |
-| `MONTAGIO_COMFYUI_ARGS` | extra ComfyUI arguments, separated by spaces, for example `--lowvram`; `--listen` and `--port` are refused, ComfyUI stays on 127.0.0.1 and the install's port |
+| `MONTAGIO_COMFYUI_ARGS` | extra ComfyUI arguments, separated by spaces, for example `--reserve-vram 1` (ComfyUI v0.41.0's dynamic VRAM makes `--lowvram` a no-op); `--listen` and `--port` are refused, ComfyUI stays on 127.0.0.1 and the install's port |
 | `HF_TOKEN` | a Hugging Face token; not needed for the files of the lock |
 | `MONTAGIO_FFMPEG`, `MONTAGIO_FFPROBE` | FFmpeg and ffprobe outside the `PATH` |
 

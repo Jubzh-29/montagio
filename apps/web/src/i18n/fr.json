@@ -39,6 +39,7 @@
   "tierQualityHint": "Suit le mouvement exactement, pose par pose",
   "tierTurboHint": "Les mêmes mouvements en 4 étapes : un peu moins de détail",
   "tierFastHint": "Suit le mouvement d’après son texte seulement",
+  "profile12Note": "Profil 12 Go : Qualité (20 étapes) demande une carte de 24 Go",
   "slateRec": "REC {t}",
   "slateLeft": "encore ~{d}",
   "slateFinishing": "presque fini",

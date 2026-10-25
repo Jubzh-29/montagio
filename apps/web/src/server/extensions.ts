@@ -200,5 +200,6 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     ...(motion ? { motionModel: summaryOf(motion) } : {}),
     ...(Object.keys(examples).length > 0 ? { examples } : {}),
     ...((process.env.MONTAGIO_BACKEND ?? 'demo') === 'demo' ? { demo: true } : {}),
+    ...(currentProfile() === '12gb' ? { vramProfile: '12gb' as const } : {}),
   };
 }

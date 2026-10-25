@@ -48,7 +48,7 @@ Options:
 
 Environment:
   MONTAGIO_EXTENSIONS     install: the default of --extensions (the app reads it too)
-  MONTAGIO_COMFYUI_ARGS   extra ComfyUI arguments, for example "--lowvram"
+  MONTAGIO_COMFYUI_ARGS   extra ComfyUI arguments, for example "--reserve-vram 1"
   HF_TOKEN               Hugging Face token, only if a download is refused
   MONTAGIO_FFMPEG, MONTAGIO_FFPROBE   FFmpeg binaries outside the PATH
 

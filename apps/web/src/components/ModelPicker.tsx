@@ -18,6 +18,7 @@ export function ModelPicker({
   compact = false,
   name = 'model',
   className,
+  note,
 }: {
   models: ModelSummary[];
   loading?: boolean;
@@ -30,6 +31,8 @@ export function ModelPicker({
   /** The radio group's name: two pickers on a page (one per screen size) must not share it. */
   name?: string;
   className?: string;
+  /** A line under the choice, such as why a model is not offered on this install. */
+  note?: string;
 }) {
   const { t } = useI18n();
   if (compact) {
@@ -57,6 +60,7 @@ export function ModelPicker({
           })}
         </div>
         {chosen && <p className={styles.modelHintLine}>{t(TIER_HINT[chosen.tier])}</p>}
+        {note && <p className={styles.modelHintLine}>{note}</p>}
       </fieldset>
     );
   }
@@ -90,6 +94,7 @@ export function ModelPicker({
           );
         })}
       </div>
+      {note && <p className={styles.modelHint}>{note}</p>}
     </fieldset>
   );
 }

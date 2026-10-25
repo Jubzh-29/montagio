@@ -39,6 +39,7 @@
   "tierQualityHint": "Follows the move exactly, pose by pose",
   "tierTurboHint": "The same moves in 4 steps: a little less detail",
   "tierFastHint": "Follows the move from its text only",
+  "profile12Note": "12 GB profile: Quality (20 steps) needs a 24 GB card",
   "slateRec": "REC {t}",
   "slateLeft": "~{d} left",
   "slateFinishing": "finishing",
