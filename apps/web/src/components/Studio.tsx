@@ -1048,7 +1048,7 @@ export function Studio() {
     : tracked?.kind === 'job' && tracked.record.task === 'motion'
       ? extensions?.motionModel
     : tracked?.kind === 'generation'
-      ? models.find((model) => model.id === tracked.record.modelId)
+      ? catalogModels.find((model) => model.id === (tracked.record.demoModelId ?? tracked.record.modelId))
       : tracked?.kind === 'sequence'
         ? (models.find((model) => model.id === tracked.record.shots[0]?.modelId) ?? selectedModel)
         : undefined;

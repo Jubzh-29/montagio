@@ -63,6 +63,8 @@ export type GenerationRecord = {
   /** Showcase: the model that restored the clip to 1080p (its HD pass), named in its caption. */
   hdModel?: HdModelSummary;
   demo?: DemoKind;
+  /** A demo example rendered by another model than the job's (a 20-step clip for a Turbo job): the one its caption names. */
+  demoModelId?: string;
 };
 
 /** The upscaler of a showcase clip's HD pass (SeedVR2). */

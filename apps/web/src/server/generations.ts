@@ -5,7 +5,7 @@ import { IDEMPOTENCY_WINDOW_MS, isBackendError, type BackendErrorCode } from '@m
 import { compileJob, CompileError, validatePreset, type Preset } from '@montagio/presets';
 import { DEMO_MOVE_METADATA, ensureTools, probe, tagClip } from '@montagio/sequence';
 import { MAX_PRESET_YAML_BYTES, MAX_REQUEST_BYTES } from '@/lib/limits';
-import { demoKindOf } from './demo-render';
+import { demoExampleModel, demoKindOf } from './demo-render';
 import { getEnv } from './env';
 import { slotsOf } from './inputs';
 import { getServices } from './services';
@@ -250,6 +250,9 @@ export async function getGeneration(id: string): Promise<GenerationRecord | null
   if (job.state === 'succeeded' && job.outputPath) {
     const demo = demoKindOf(job.outputPath);
     if (demo) updated.demo = demo;
+    // A camera example was rendered in 20 steps: the caption names that model, not the Turbo the job asked for.
+    const madeBy = demo === 'example' ? demoExampleModel(job.outputPath) : undefined;
+    if (madeBy && madeBy !== record.modelId) updated.demoModelId = madeBy;
     const url = await deliverClip(record.id, job.outputPath, demo === 'moved');
     if (url) {
       updated.outputUrl = url;
