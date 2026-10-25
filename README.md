@@ -75,6 +75,10 @@ The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan
 
 The first seven were validated in GPU session S2 on 2026-10-21; Restyle, motion transfer up to 30 s and the composed character on 2026-10-24; the object swap, and a composed character holding a product, on 2026-10-25. Relight, inpaint, the HD photo, the photodump, the voice sample, the composition, the ad, the drawing and the voice change came after, on these same models, and each was rendered on the L4 on 2026-10-22; smooth motion on 2026-10-24. An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
 
+### Trend remix, not yet validated on a GPU
+
+The Remix page (`/remix`) takes a short video you have the right to use: a file, a TikTok, Instagram reel or YouTube Short link fetched on your machine by yt-dlp, or Montagio's own sample. FFmpeg's scene filter finds its shots; you can move, remove or add a cut, and keep a shot as filmed. Each other shot is made again with your character (the motion transfer) or with one object replaced (the object swap), on the same references and the same seed, so the character stays the same from shot to shot. The shots go back on the trend's own frames at its frame rate, then the clip is cut to 9:16 with the words on screen burned over the first shot. The trend's sound is left out unless you keep it and confirm you may use it; the page links to the sound on its platform instead. Gemma 4 E4B (Apache-2.0), on your machine, reads a sheet of the shots' first frames and drafts the caption, the hashtags and the words on screen, all editable. Nothing is published for you. The page shows with `MONTAGIO_EXTENSIONS=all` until a GPU session validates it; the import by link exists only in the app on your machine, never in the demo nor the showcase.
+
 ## The Montagio node pack for ComfyUI
 
 > [!NOTE]
@@ -245,7 +249,8 @@ Never on the roadmap:
 Do not make videos of real people without their consent, nothing illegal and nothing not safe for work.
 
 - Before an edit, an effect, a hook or an avatar on an uploaded photo, the Studio asks you to confirm that you are the person in it or have their consent. Motion transfer, Restyle and the object swap ask you to confirm that you hold the rights on the video and the images; the object swap also that the people filmed agree, and it warns never to replace a real person without their consent nor to pass the result off as filmed. The Motion library's reference motions show fictional characters made by Montagio: no rights to clear. A voice sample, for the avatar or the voice change, needs its speaker's agreement.
-- A [list of well-known names](registry/blocked-names.txt) is refused in text-to-image prompts, edit instructions, effect subjects, avatar texts, motion-transfer descriptions, restyle texts and object-swap texts. It is a good-faith guardrail, not a complete filter.
+- The trend remix asks you to confirm that you may use the video and the photo and that the people filmed agree, and, for each photo, that its person is you, agreed, or is fictional: that box is ticked every time, never deduced from a file sent. A link is fetched only from TikTok, Instagram or YouTube Shorts, checked by name before anything runs (http(s), no user, no port, no other host), 60 s and 50 MB at most; it is shown to you beside the trend and never written in a recipe. A remix of a trend that is not Montagio's sample cannot be shared in the community gallery.
+- A [list of well-known names](registry/blocked-names.txt) is refused in text-to-image prompts, edit instructions, effect subjects, avatar texts, motion-transfer descriptions, restyle texts, object-swap texts and a remix's texts and post. It is a good-faith guardrail, not a complete filter.
 - Every clip, image and sound is tagged "AI-generated" in its metadata, beside its recipe, and the Studio shows the mention under each result with the model and its license. A recipe never gives the consent or the rights.
 - No content filter is imposed on your own machine: what you render locally is your responsibility.
 
@@ -277,6 +282,7 @@ Every file, with its source, revision and sha256, is in [registry/models.lock.ya
 - the [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) at commit `59a3b48b`, MIT, which every Montagio workflow but the voice's is converted from ([license text](workflows/LICENSE.workflow_templates));
 - [wildminder/ComfyUI-Chatterbox](https://github.com/wildminder/ComfyUI-Chatterbox) at commit `4597af8f` (Apache-2.0), the voice node, pinned and patched to remove its HTTP routes ([patch](infra/runpod/patches/comfyui-chatterbox-no-routes.patch));
 - [kijai/ComfyUI-segment-anything-2](https://github.com/kijai/ComfyUI-segment-anything-2) at commit `0c35fff5` (Apache-2.0), the object swap's tracking nodes, pinned and unchanged: they open no HTTP route and need no Python package ComfyUI lacks;
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) 2026.10.21 (Unlicense), the trend remix's link importer: the release binary, checked by its sha256, downloaded by the local installer and never bundled;
 - [ffmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) in the showcase, whose license texts ship beside it.
 
 ## Contributing

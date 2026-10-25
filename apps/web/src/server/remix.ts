@@ -123,6 +123,8 @@ export const REMIX_SAMPLE_MOTIONS = ['hip-hop', 'wave-clap', 'jumping-jacks'] as
  * Montagio from fictional characters, it needs no rights and is what the showcase and the demo show.
  */
 export async function saveRemixSample(): Promise<RemixSourceMeta> {
+  // A fresh install has no data folder yet.
+  await mkdir(getEnv().data, { recursive: true });
   const work = await mkdtemp(join(getEnv().data, 'remix-sample-'));
   try {
     const shots = [];

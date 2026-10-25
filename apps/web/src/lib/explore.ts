@@ -92,6 +92,7 @@ export function exploreTools(presets: readonly PresetSummary[], info: Extensions
       previewUrl: info?.examples?.swap?.previewUrl,
       icon: '⇋',
     },
+    !showcase && has('remix') && { id: 'remix', href: '/remix', name: 'tabTrendRemix', description: 'exploreTrendText', icon: '✂' },
     { id: 't2i', href: tabHref('camera'), name: 'exploreT2iName', description: 'exploreT2iText', icon: 'Aa' },
     has('edit') && { id: 'edit', href: tabHref('camera'), name: 'exploreEditName', description: 'exploreEditText', icon: '✎' },
     has('upscale') && { id: 'hd', href: '/history', name: 'exploreHdName', description: 'exploreHdText', icon: 'HD' },

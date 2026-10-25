@@ -364,6 +364,14 @@ export class MontagioClient {
     return { ...value, ...(value.url ? { url: this.absolute(value.url) } : {}) };
   }
 
+  /** A trend to remix (field "video"): the app keeps its first 60 s at a constant frame rate and finds its shots. */
+  async uploadTrend(path: string): Promise<{ remixRef: string; frames: number; fps: number; cuts: number[] }> {
+    const file = await readLocalFile(path, VIDEO_TYPES, MAX_VIDEO_BYTES, 'an MP4, WebM or QuickTime video');
+    const form = new FormData();
+    form.append('video', file.blob, file.name);
+    return (await this.call<{ remixRef: string; frames: number; fps: number; cuts: number[] }>('POST', '/api/uploads/remix', { form })).value;
+  }
+
   /** A motion of the library taken as the clip, as if it had been sent. */
   async pickLibraryMotion(id: string): Promise<VideoUploadResult> {
     const { value } = await this.call<VideoUploadResult>('POST', '/api/uploads/video/library', { json: { id } });

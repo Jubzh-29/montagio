@@ -10,7 +10,7 @@ import { loadRecipe, reproduce, withPhoto } from './reproduce';
 const USAGE = [
   'Render a Montagio recipe again on this Montagio and its local ComfyUI, with the same seed.',
   '',
-  '  npm run reproduce -- <recipe.json | clip.mp4 | image.png> --photo <file> [--input field=file]... [--consent] [--rights] [--voice-consent] [--out folder]',
+  '  npm run reproduce -- <recipe.json | clip.mp4 | image.png> --photo <file> [--input field=file]... [--consent] [--rights] [--voice-consent] [--face-consent] [--out folder]',
   '',
   'The recipe never holds the photo: give yours. Montagio must be running (./montagio.sh start, or montagio.ps1 start on Windows)',
   'at MONTAGIO_URL (default http://127.0.0.1:3000); --out (or MONTAGIO_MCP_OUT) saves the file there.',
@@ -40,6 +40,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         consent: { type: 'boolean', default: false },
         rights: { type: 'boolean', default: false },
         'voice-consent': { type: 'boolean', default: false },
+        'face-consent': { type: 'boolean', default: false },
         out: { type: 'string' },
         help: { type: 'boolean', default: false },
       },
@@ -71,6 +72,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         consent: values.consent,
         rights: values.rights,
         voiceConsent: values['voice-consent'],
+        faceConsent: values['face-consent'],
       },
       { onProgress: (status) => err(`${status.task} ${status.id}: ${status.state} ${Math.round(status.progress * 100)}%`) },
     );

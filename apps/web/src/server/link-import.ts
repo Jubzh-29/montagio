@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getEnv } from './env';
 import { REMIX_MAX_S, saveRemixSource, type RemixSound, type RemixSourceMeta } from './remix';
@@ -185,6 +185,8 @@ export async function importLink(raw: unknown, run: YtDlpRun = runYtDlp): Promis
   importing.busy = true;
   let dir: string | undefined;
   try {
+    // A fresh install has no data folder yet.
+    await mkdir(getEnv().data, { recursive: true });
     dir = await mkdtemp(join(getEnv().data, 'remix-link-'));
     const { file, info } = await downloadLink(checked.url, dir, run);
     const sound = soundOf(info, checked.platform);

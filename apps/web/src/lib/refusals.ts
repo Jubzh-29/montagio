@@ -28,6 +28,15 @@ const REFUSALS: Record<string, MessageKey> = {
   // Captions (server/tasks/captions.ts).
   'language-unsupported': 'captionsUnsupported',
   'no-speech': 'captionsNoSpeech',
+  // The trend remix (server/tasks/remix.ts) and its import by link (server/link-import.ts).
+  'shot-too-long': 'trendShotTooLong',
+  'link-invalid': 'trendLinkInvalid',
+  'link-host': 'trendLinkHost',
+  'link-path': 'trendLinkPath',
+  'link-too-long': 'trendLinkTooLong',
+  'link-busy': 'trendLinkBusy',
+  'link-import-failed': 'trendLinkFailed',
+  'link-import-unavailable': 'trendLinkUnavailable',
 };
 
 export function refusalMessageKey(code: string | undefined): MessageKey {

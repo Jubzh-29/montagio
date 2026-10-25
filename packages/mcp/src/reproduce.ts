@@ -20,6 +20,8 @@ export type ReproduceArgs = {
   rights?: boolean;
   /** The speaker of the voice sample agreed (an avatar in someone's own voice). */
   voiceConsent?: boolean;
+  /** A trend remix's photo: its person is the user, agreed, or is fictional. */
+  faceConsent?: boolean;
 };
 
 export type ReproduceResult = {
@@ -56,12 +58,12 @@ export async function loadRecipe(source: unknown): Promise<Recipe | CompactRecip
 
 /** `inputs` with the photo put where the recipe asks for its first photo (imageRef, productRef…), unless given by field already. */
 export function withPhoto(recipe: Recipe | CompactRecipe, inputs: Record<string, string>, photo: string): Record<string, string> {
-  const field = recipe.request?.files.find((file) => !/^(video|voice|speech|audio)Ref$/.test(file.field) && !(file.field in inputs))?.field ?? 'imageRef';
+  const field = recipe.request?.files.find((file) => !/^(video|voice|speech|audio|remix)Ref$/.test(file.field) && !(file.field in inputs))?.field ?? 'imageRef';
   return { ...inputs, [field]: photo };
 }
 
 /** A value of `inputs` that is a ref the app holds already ("uploads/…", "videos/…"), not a local file. */
-const isRef = (value: string) => /^(uploads|videos|voices|speech)\//.test(value);
+const isRef = (value: string) => /^(uploads|videos|voices|speech|remix)\//.test(value);
 
 async function fileSha256(path: string): Promise<string | null> {
   try {
@@ -74,10 +76,11 @@ async function fileSha256(path: string): Promise<string | null> {
 
 // A recipe is a file from anywhere: it may name only the app's creation routes, its own input files, and never the user's word.
 /** The creation routes a recipe's request may name, and what may follow on what it made. */
-const ROUTES = new Set(['/api/generations', '/api/sequences', '/api/images', '/api/images/upscale', '/api/edits', '/api/effects', '/api/hooks', '/api/avatars', '/api/motion', '/api/restyle', '/api/swap', '/api/ads']);
+const ROUTES = new Set(['/api/generations', '/api/sequences', '/api/images', '/api/images/upscale', '/api/edits', '/api/effects', '/api/hooks', '/api/avatars', '/api/motion', '/api/restyle', '/api/swap', '/api/ads', '/api/remix']);
 const FOLLOW_UPS = new Set(['/api/generations/:parent/upscale', '/api/jobs/:parent/upscale', '/api/sequences/:parent/music', '/api/jobs/:parent/captions']);
 /** Only the user says that the person agreed, or that they hold the rights: never a recipe. */
-const USER_ONLY = new Set(['consent', 'rights', 'voiceConsent']);
+// A remix's own sound is the user's word too: a replay leaves it out unless the user keeps it in the app.
+const USER_ONLY = new Set(['consent', 'rights', 'voiceConsent', 'faceConsent', 'soundRights', 'keepSound']);
 /** A file field: a name, or a composed photo's role ("compose.place"). */
 const FILE_FIELD = /^[A-Za-z][A-Za-z0-9]*(\.[A-Za-z][A-Za-z0-9]*)?$/;
 const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -155,12 +158,14 @@ export async function reproduce(client: MontagioClient, args: ReproduceArgs, opt
     const given = args.inputs[file.field]!;
     let ref = given;
     let sha: string | null = null;
-    // The app keeps a reference clip's first 5 s and a voice sample as a mono FLAC: their sha256 is not the file's own.
-    const prepared = file.field === 'videoRef' || file.field === 'voiceRef';
+    // The app keeps a reference clip's first 5 s, a trend's first 60 s at a constant frame rate and a voice sample as a
+    // mono FLAC: their sha256 is not the file's own.
+    const prepared = file.field === 'videoRef' || file.field === 'voiceRef' || file.field === 'remixRef';
     if (!isRef(given)) {
       sha = prepared ? null : await fileSha256(resolve(given));
       if (file.field === 'videoRef') ref = (await client.uploadVideo(given)).videoRef;
       else if (file.field === 'voiceRef') ref = (await client.uploadVoice(given)).voiceRef;
+      else if (file.field === 'remixRef') ref = (await client.uploadTrend(given)).remixRef;
       else ref = (await client.uploadPhoto(given)).imageRef;
     }
     setField(body, file.field, ref);
@@ -169,6 +174,7 @@ export async function reproduce(client: MontagioClient, args: ReproduceArgs, opt
   if (args.consent) body.consent = true;
   if (args.rights) body.rights = true;
   if (args.voiceConsent) body.voiceConsent = true;
+  if (args.faceConsent) body.faceConsent = true;
 
   let done = await settled(client, await client.startRequest(request.route, body), options);
   for (const next of request.then ?? []) {

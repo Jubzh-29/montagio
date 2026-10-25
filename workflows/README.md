@@ -67,6 +67,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 | `chatterbox-vc.api.json` | none (no official template: ComfyUI has no local voice conversion node) | Chatterbox VC (S3Gen) | node 3, FLAC |
 | `translate-speech.api.json` | none (written for Montagio from the core TextGenerate node) | Gemma 4 E4B int8, then Chatterbox Multilingual V3 | node 5, FLAC |
 | `whisper-words.api.json` | none (written for Montagio: the pack's transcription node and the core Save Text) | Whisper large-v3 turbo | node 3, JSON |
+| `gemma-trend-skeleton.api.json` | none (written for Montagio from the core TextGenerate and Save Text nodes) | Gemma 4 E4B int8 | node 7, text |
 | `wan22-s2v-avatar.api.json` | `templates/video_wan2_2_14B_s2v.json` | Wan 2.2 S2V 14B fp8 | node 113, MP4 with the speech |
 | `wan21-i2v-effect.api.json` | `templates/image_to_video_wan.json` | Wan 2.1 I2V 14B 480p fp8, an effect LoRA | node 56, MP4 |
 | `wan22-flf2v-transition.api.json` | `templates/video_wan2_2_14B_flf2v.json` | Wan 2.2 I2V A14B fp8 (high and low noise) | node 61, MP4 |
@@ -117,6 +118,11 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 - Written for Montagio: `LoadAudio` (node 1, the speech), the core `CLIPLoader` reading Gemma 4 E4B (int8, one file with its audio encoder and tokenizer), the core `TextGenerate` (node 3, greedy decoding, no thinking) asked for the translation alone, then `ChatterboxMTLTTS` (node 4) saying that text, its `text` input linked to node 3, with the speech as its voice reference (`audio_prompt`), and `SaveAudioAdvanced` in FLAC, `montagio/translation`.
 - `cfg_weight` is 0, the Chatterbox card's advice when the reference voice speaks another language than the text. The app then animates the face again on that speech (Wan 2.2 S2V): the lips follow the new words.
 - Gemma 4 hears 30 s of audio at most; the app keeps 15 s, what the avatar animates.
+
+### gemma-trend-skeleton
+
+- Written for Montagio, core nodes only: `LoadImage` (node 1, a sheet of the first frame of each shot of a trend, in reading order, four across), the core `CLIPLoader` reading Gemma 4 E4B (int8, the same file as the translation, with its vision encoder), and two passes of the core `TextGenerate` (greedy decoding, no thinking). The first (node 3) looks at the sheet and answers the trend's skeleton as JSON: one line per shot, the words written on screen, the tone. The second (node 5) reads that skeleton after the app's instruction (node 4, a `StringConcatenate`) and writes the post of its remix as JSON: a caption, hashtags, words for the screen, in English or French, never naming a real person or a brand. `SaveText` (node 7) keeps both answers apart by a line of `=====`, `montagio/remix-skeleton`; the app reads them with `parseTrendSkeleton`, which tolerates a code fence or a sentence around the JSON and leaves empty what it cannot read.
+- Optional within the trend remix, like the captions within the avatar: a ComfyUI that refuses the workflow hides it alone, and the user writes the post.
 
 ### whisper-words
 
@@ -183,6 +189,7 @@ Extension models (a binding with several inputs gets the same value in each):
 | `chatterbox-vc` | audio 1.audio; voice 4.audio | 3 (audio) |
 | `gemma4-translate` | audio 1.audio; prompt 3.prompt; language 4.language; cfg 4.cfg_weight; seed 4.seed | 5 (audio) |
 | `whisper-turbo-words` | audio 1.audio; language 2.language | 3 (file) |
+| `gemma4-trend-skeleton` | image 1.image; prompt 4.string_a | 7 (file) |
 | `wan22-s2v-avatar` | image 52.image; audio 58.audio; prompt 6.text; seed 3.seed (+1, +2 on the extension samplers); width / height 93.width / 93.height; frames 96.length | 113 (video) |
 | `wan21-i2v-effects` | image 52.image; prompt 6.text; negative 7.text; seed 3.seed; width / height / frames 50.width / height / length; lora 200.lora_name; lora_strength 200.strength_model | 56 (video) |
 | `wan22-flf2v-transition` | image 68.image; end_image 62.image; prompt 6.text; negative 7.text; seed 57.noise_seed; width / height / frames 67.width / height / length | 61 (video) |
