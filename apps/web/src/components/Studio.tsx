@@ -24,7 +24,7 @@ import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
 import { entryAsHistoryItem, type CommunityEntry } from '@/lib/community';
 import { recipeUrlOf } from '@/lib/recipe-url';
-import { applyReprise, replayOn, reproducedRecipeUrl, reproducibleResult, type Replay } from '@/lib/reprise';
+import { applyReprise, replayOn, repriseHref, reproducedRecipeUrl, reproducibleResult, type Replay } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseArrival, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { motionFrames, motionWindows } from '@montagio/presets/browser';
@@ -766,6 +766,8 @@ export function Studio() {
 
   /** A history item's "Reuse": its tab, photo, choice and texts come back, ready to render again. */
   const restore = (item: HistoryItem, opts: { reproduce?: boolean } = {}) => {
+    // A remix reopens on its own page.
+    if (item.reprise.tab === 'remix') return window.location.assign(repriseHref(item, opts));
     const back = applyReprise(item, opts);
     setReplay(back.seed !== undefined || back.shotSeeds ? { tab: back.tab, seed: back.seed, shotSeeds: back.shotSeeds, recipeUrl: reproducedRecipeUrl(item) } : null);
     touched.current = true;

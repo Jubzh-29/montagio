@@ -201,6 +201,11 @@ export type ExtensionsInfo = {
   swapModel?: { id: string; name: string; license: string };
   /** Captions of a talking clip (Whisper), when the flag, the extension "avatar" and ComfyUI allow them. */
   captions?: { estimate_s: number; model: { id: string; name: string; license: string } };
+  /**
+   * The trend remix, when its extension shows: whether a shot can be made again in its own scene (the
+   * object swap), and Gemma 4 E4B reading the shots and writing the post (extension "avatar").
+   */
+  remix?: { scene: boolean; skeleton?: { estimate_s: number; model: { id: string; name: string; license: string } } };
   /** The demo backend answers (no GPU): a result is a stand-in clip, and its caption says no model ran. */
   demo?: boolean;
   /** The install runs the 12 GB profile: the Studio says why Quality is not offered. */
@@ -221,7 +226,7 @@ export type LibraryMotionSummary = {
   posterUrl?: string;
 };
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'restyle' | 'swap' | 'ad' | 'voice-change' | 'moodboard' | 'translate' | 'captions';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'restyle' | 'swap' | 'ad' | 'voice-change' | 'moodboard' | 'translate' | 'captions' | 'remix' | 'remix-skeleton';
 
 import type { CaptionStyleId, CaptionWord } from '@montagio/captions';
 import type { CharacterKind, CharacterType } from './characters';
@@ -311,7 +316,7 @@ export type JobSummary = {
 
 /** What it takes to make a history item again: the Studio reopens its tab with these (GET /api/history). */
 export type Reprise = {
-  tab: 'effects' | 'camera' | 'film' | 'avatar' | 'motion';
+  tab: 'effects' | 'camera' | 'film' | 'avatar' | 'motion' | 'remix';
   imageRef?: string;
   /** The photo is, or derives from, an imported one: an effect on it asks for consent. */
   personal?: boolean;
@@ -340,6 +345,25 @@ export type Reprise = {
   /** The seed it was rendered with: Reproduce sends it back, Reuse leaves it out. */
   seed?: number;
   shots?: { presetId: string; prompt?: string; seed?: number }[];
+  /** A remix's trend on this machine (absent once it is gone): never in a recipe nor a share. */
+  remixRef?: string;
+  /** A remix's choices: where its trend came from, its mode and cuts, each shot kept or made again, its texts. */
+  remix?: RemixChoices;
+};
+
+export type RemixMode = 'motion' | 'scene';
+export type RemixShotChoice = { keep: boolean; points?: { x: number; y: number }[]; exclude?: { x: number; y: number }[] };
+export type RemixChoices = {
+  origin: 'upload' | 'link' | 'sample';
+  mode: RemixMode;
+  cuts: number[];
+  shots: RemixShotChoice[];
+  character?: string;
+  motion?: string;
+  prompt?: string;
+  onscreen?: string;
+  language: 'en' | 'fr';
+  post?: { caption: string; hashtags: string[] };
 };
 
 /** One finished creation, newest first (GET /api/history). */

@@ -54,6 +54,16 @@ describe('parseTrendSkeleton (the two answers, as Gemma gives them)', () => {
     });
   });
 
+  test('one JSON document with both (the demo file) reads the same', () => {
+    const doc = JSON.stringify({ skeleton: { shots: ['a wave'], hook: 'POV', style: 'calm' }, post: { caption: 'Hi.', hashtags: ['#remix'], onscreen: 'POV' } });
+    expect(parseTrendSkeleton(doc)).toEqual({
+      skeleton: { shots: ['a wave'], hook: 'POV', style: 'calm' },
+      post: { caption: 'Hi.', hashtags: ['remix'], onscreen: 'POV' },
+    });
+    // A skeleton alone, without the separator, is still the first answer.
+    expect(parseTrendSkeleton('{"shots": ["a"], "hook": "", "style": ""}').skeleton.shots).toEqual(['a']);
+  });
+
   test('what cannot be read comes back empty, never thrown', () => {
     expect(parseTrendSkeleton('no json here')).toEqual({
       skeleton: { shots: [], hook: '', style: '' },

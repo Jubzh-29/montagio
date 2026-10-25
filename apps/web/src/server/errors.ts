@@ -7,7 +7,9 @@ export type JobErrorCode = 'extension-disabled' | 'invalid-input' | 'consent-req
   | 'rights-required'
   // Captions: a language they are not made in (server/tasks/captions.ts), a clip without a voice.
   | 'language-unsupported'
-  | 'no-speech';
+  | 'no-speech'
+  // A remix's shot longer than its mode makes again (30 s for the motion, 5 s in its own scene).
+  | 'shot-too-long';
 
 export class JobError extends Error {
   constructor(readonly code: JobErrorCode) {

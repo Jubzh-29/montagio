@@ -29,3 +29,10 @@ export function voicePath(voiceRef: string): string {
 export function videoPath(videoRef: string): string {
   return join(getEnv().data, 'uploads', ...videoRef.split('/'));
 }
+
+const REMIX_REF = /^remix\/[0-9a-f-]{36}\.mp4$/;
+
+/** The file behind a remix's trend ("remix/<id>.mp4"), under MONTAGIO_DATA/uploads; null for any other ref. */
+export function remixFile(remixRef: string): string | null {
+  return REMIX_REF.test(remixRef) ? join(getEnv().data, 'uploads', ...remixRef.split('/')) : null;
+}

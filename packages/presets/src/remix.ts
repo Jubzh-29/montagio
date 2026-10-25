@@ -55,6 +55,8 @@ export function compileTrendSkeleton(
   return { workflow, output: { ...model.output }, params: { language: inputs.language, character } };
 }
 
+const isObject = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
 /** The first JSON object of a model's answer: it may come in a code fence or after a sentence. */
 function jsonIn(text: string): Record<string, unknown> | null {
   const start = text.indexOf('{');
@@ -88,13 +90,15 @@ export function cleanHashtags(values: unknown): string[] {
 
 /**
  * The skeleton and the post out of the workflow's text file: the two answers apart by a line of
- * "=", each a JSON object perhaps wrapped in words. What cannot be read comes back empty, never thrown:
- * the user writes the post then.
+ * "=", each a JSON object perhaps wrapped in words; or one JSON document { skeleton, post } (the demo's
+ * file). What cannot be read comes back empty, never thrown: the user writes the post then.
  */
 export function parseTrendSkeleton(file: string): { skeleton: TrendSkeleton; post: TrendPost } {
   const [first = '', second = ''] = file.split(/\n=+\n/);
-  const skeleton = jsonIn(first) ?? {};
-  const post = jsonIn(second) ?? {};
+  const whole = second ? null : jsonIn(first);
+  const doc = whole && (isObject(whole.skeleton) || isObject(whole.post)) ? whole : null;
+  const skeleton = (doc ? (isObject(doc.skeleton) ? doc.skeleton : {}) : jsonIn(first)) ?? {};
+  const post = (doc ? (isObject(doc.post) ? doc.post : {}) : jsonIn(second)) ?? {};
   return {
     skeleton: {
       shots: Array.isArray(skeleton.shots) ? skeleton.shots.filter((line): line is string => typeof line === 'string').map((line) => line.trim().slice(0, 200)).filter(Boolean).slice(0, 16) : [],

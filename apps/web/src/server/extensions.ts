@@ -30,6 +30,7 @@ export function markRejected(extension: ExtensionId, reason: string): void {
 export function resetRejectedForTests(): void {
   rejected.clear();
   captionsRefusal.reason = null;
+  skeletonRefusal.reason = null;
 }
 
 // The captions run in the extension "avatar" but are optional in it: a ComfyUI without the transcription
@@ -43,6 +44,18 @@ export function markCaptionsRejected(reason: string): void {
 }
 
 export const captionsRejected = () => captionsRefusal.reason !== null;
+
+// The trend's skeleton (Gemma reading the shots) is optional within the remix in the same way: a ComfyUI
+// that refuses its workflow hides it alone, and the post is written by hand.
+const skeletonHolder = globalThis as typeof globalThis & { __montagioSkeletonRefusal?: { reason: string | null } };
+const skeletonRefusal = (skeletonHolder.__montagioSkeletonRefusal ??= { reason: null });
+
+export function markSkeletonRejected(reason: string): void {
+  if (skeletonRefusal.reason === null) console.warn(`[montagio] the trend skeleton is hidden until the app restarts: ${reason}`);
+  skeletonRefusal.reason = reason;
+}
+
+export const skeletonRejected = () => skeletonRefusal.reason !== null;
 
 /**
  * The captions are offered with the extension "avatar" (validated for real on a CPU ComfyUI and in the
@@ -156,6 +169,11 @@ export function transcribeModel(lib: Library): ExtensionModel | undefined {
   return [...lib.extensionModels.values()].find((entry) => entry.task === 'a2t-words');
 }
 
+/** Gemma 4 E4B reading a trend's shots and writing its remix's post (extension "avatar", optional within the remix). */
+export function skeletonModel(lib: Library): ExtensionModel | undefined {
+  return [...lib.extensionModels.values()].find((entry) => entry.task === 'i2t-trend');
+}
+
 /** The 1080p model of the extension "upscale". */
 export function upscaleModel(lib: Library): ExtensionModel {
   const model = [...lib.extensionModels.values()].find((entry) => entry.task === 'v2v-upscale');
@@ -229,6 +247,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const restyle = extensions.includes('restyle') ? restyleModel(lib) : null;
   const swap = extensions.includes('swap') ? swapModel(lib) : null;
   const words = extensions.includes('avatar') && !captionsRejected() ? transcribeModel(lib) : undefined;
+  const skeleton = extensions.includes('remix') && extensions.includes('avatar') && !skeletonRejected() ? skeletonModel(lib) : undefined;
   // A tab without a wall shows what it makes: a render of the GPU session, looping (presets/extensions/previews).
   const examples: NonNullable<ExtensionsInfo['examples']> = {};
   for (const id of ['avatar', 'motion', 'restyle', 'swap'] as const) {
@@ -263,6 +282,14 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     ...(restyle ? { restyleModel: summaryOf(restyle) } : {}),
     ...(swap ? { swapModel: summaryOf(swap) } : {}),
     ...(words ? { captions: { estimate_s: estimateFor(words, true), model: summaryOf(words) } } : {}),
+    ...(extensions.includes('remix')
+      ? {
+          remix: {
+            scene: extensions.includes('swap'),
+            ...(skeleton ? { skeleton: { estimate_s: estimateFor(skeleton, true), model: summaryOf(skeleton) } } : {}),
+          },
+        }
+      : {}),
     ...(Object.keys(examples).length > 0 ? { examples } : {}),
     ...((process.env.MONTAGIO_BACKEND ?? 'demo') === 'demo' ? { demo: true } : {}),
     ...(currentProfile() === '12gb' ? { vramProfile: '12gb' as const } : {}),

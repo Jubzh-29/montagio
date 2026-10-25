@@ -56,7 +56,7 @@ function draftFromRecipe(recipe: Recipe): RecipeDraft {
 }
 
 /** What the recipe never carries of the Studio's choices: this machine's photo and clip, its own remix id. */
-const PRIVATE_REPRISE: (keyof Reprise)[] = ['imageRef', 'personal', 'photoMissing', 'videoRef', 'remixGenerationId'];
+const PRIVATE_REPRISE: (keyof Reprise)[] = ['imageRef', 'personal', 'photoMissing', 'videoRef', 'remixGenerationId', 'remixRef'];
 
 function shareable(reprise: Reprise): Record<string, unknown> {
   const copy: Record<string, unknown> = { ...reprise };
@@ -222,6 +222,25 @@ function jobRequest(record: JobRecord, slots: readonly InputSlot[]): RecipeReque
         body: { ...text('prompt'), points: inputs.points, ...(inputs.exclude ? { exclude: inputs.exclude } : {}), seed },
         files: files('videoRef', 'imageRef'),
       };
+    case 'remix':
+      // The trend is the user's file, by its sha256: never the link it came from. Its sound is never
+      // kept on a replay (the user's word that they may use it goes with each render).
+      return {
+        route: '/api/remix',
+        body: {
+          mode: inputs.mode,
+          cuts: inputs.cuts,
+          shots: inputs.shots,
+          ...text('character'),
+          ...text('motion'),
+          ...text('prompt'),
+          ...text('onscreen'),
+          language: inputs.language,
+          ...(inputs.post ? { post: inputs.post } : {}),
+          seed,
+        },
+        files: files('remixRef', 'imageRef'),
+      };
     case 'ad':
       return { route: '/api/ads', body: { ...text('style'), ...text('effectId'), ...text('tagline'), seed }, files: files('productRef', 'characterRef', 'overlayRef') };
     case 'image-upscale':
@@ -279,7 +298,11 @@ async function jobDraft(id: string, inputs?: Record<string, unknown>): Promise<R
       ? presetOf(hookId, await libraryText(lib.hookFiles.get(hookId)))
       : {};
   let request = jobRequest(record, steps.flatMap((step) => step.inputs));
-  let post = ['tag'];
+  // A remix: its shots put back on the trend's frames (the kept ones cut from it), then its 9:16 export.
+  let post =
+    record.task === 'remix'
+      ? ['assemble-shots', ...(record.inputs.keepSound === true ? ['source-sound'] : []), ...(record.inputs.onscreen ? ['onscreen-text'] : []), 'vertical', 'tag']
+      : ['tag'];
   // The backend that rendered it; a job made before it was noted: its demo mark, else the app's now.
   let backend: string = record.backendKind ?? (record.demo ? 'demo' : getServices().backend.kind);
 
