@@ -55,5 +55,6 @@ test('the Linux layout uses bin/', () => {
     runDir: '/s/run',
     cacheDir: '/s/cache',
     statePath: '/s/install-state.json',
+    ytDlpExe: '/s/tools/yt-dlp',
   });
 });

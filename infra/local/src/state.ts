@@ -9,7 +9,7 @@ import { DEFAULT_PORTS, type Mode, type Ports, type VramProfile } from './checks
 import type { LockWeight } from './pins.ts';
 
 export type WeightRecord = { sha256: string; size: number; mtimeMs: number };
-export type StampId = 'comfyui' | 'comfyEnv' | 'proxy' | 'npm' | 'build';
+export type StampId = 'comfyui' | 'comfyEnv' | 'proxy' | 'npm' | 'build' | 'ytDlp';
 
 export type InstallState = {
   schema: 'montagio/install@0.1';

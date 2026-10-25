@@ -51,6 +51,7 @@ Environment:
   MONTAGIO_COMFYUI_ARGS   extra ComfyUI arguments, for example "--reserve-vram 1"
   HF_TOKEN               Hugging Face token, only if a download is refused
   MONTAGIO_FFMPEG, MONTAGIO_FFPROBE   FFmpeg binaries outside the PATH
+  MONTAGIO_YTDLP          another yt-dlp for the remix's import by link than the one the installer pins
 
 Guide: docs/INSTALL.md`;
 
@@ -222,6 +223,7 @@ export async function main(argv: string[]): Promise<number> {
       log,
       ask: process.stdin.isTTY && process.stdout.isTTY ? askYesNo : null,
       probe,
+      download: downloadBytes,
       runningPorts: () => runningPorts(services()),
       stopAll: () => stopAll(services()),
       startAll: (opts) => startAll(services(), opts),
@@ -256,4 +258,11 @@ if (entry === import.meta.url) {
       process.exitCode = 1;
     },
   );
+}
+
+/** A release file, followed through its redirects; refused unless the server answers 200. */
+async function downloadBytes(url: string): Promise<Uint8Array> {
+  const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(300_000) });
+  if (!res.ok) throw new Error(`${url} answered ${res.status}`);
+  return new Uint8Array(await res.arrayBuffer());
 }

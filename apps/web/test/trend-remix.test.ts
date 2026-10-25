@@ -96,6 +96,15 @@ describe('the trend: sent, cut into shots, the cuts moved', () => {
     expect((await postShots(json('/api/remix/shots', { remixRef: 'remix/../../x.mp4', cuts: [] }))).status).toBe(404);
   }, 120_000);
 
+  test('another site can neither send a trend nor ask for the sample', async () => {
+    const form = new FormData();
+    form.set('video', new File([readFileSync(trendFile)], 'trend.mp4', { type: 'video/mp4' }));
+    const sent = await postTrend(new Request('http://localhost/api/uploads/remix', { method: 'POST', body: form, headers: { 'sec-fetch-site': 'cross-site' } }));
+    expect(sent.status).toBe(403);
+    const sample = await postTrendSample(new Request('http://localhost/api/uploads/remix/sample', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: '{}' }));
+    expect(sample.status).toBe(403);
+  });
+
   test('the sample: three moves of the Motion library, 2 s each, cut where they were joined', async () => {
     const res = await postTrendSample(json('/api/uploads/remix/sample', {}));
     expect(res.status).toBe(201);

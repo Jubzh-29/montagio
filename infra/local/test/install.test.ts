@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +14,9 @@ const realRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const os = osOf(process.platform)!;
 const COMMIT = parseVersionsEnv(readFileSync(join(realRoot, 'infra', 'runpod', 'versions.env'), 'utf8')).COMFYUI_COMMIT!;
 const GiB = 1024 ** 3;
+/** What the simulated download of yt-dlp gives: the test repository pins its sha256 (never the network). */
+const YTDLP_BYTES = new TextEncoder().encode('a yt-dlp binary');
+const YTDLP_SHA256 = createHash('sha256').update(YTDLP_BYTES).digest('hex');
 
 const WEIGHTS = [
   { id: 'tiny-vae', file: 'tiny_vae.safetensors', folder: 'vae', content: 'vae bytes' },
@@ -31,6 +34,8 @@ beforeEach(() => {
   // A small repository: the real pins, a two-file lock, the files the plan looks at.
   mkdirSync(join(repo, 'infra', 'runpod'), { recursive: true });
   cpSync(join(realRoot, 'infra', 'runpod', 'versions.env'), join(repo, 'infra', 'runpod', 'versions.env'));
+  // The yt-dlp the simulated download gives: never the real release, never the network.
+  appendFileSync(join(repo, 'infra', 'runpod', 'versions.env'), `\nYTDLP_SHA256_WINDOWS=${YTDLP_SHA256}\nYTDLP_SHA256_LINUX=${YTDLP_SHA256}\n`);
   mkdirSync(join(repo, 'registry'));
   writeLock(WEIGHTS);
   writeFileSync(join(repo, 'package-lock.json'), '{"lockfileVersion": 3}\n');
@@ -75,7 +80,7 @@ function facts(over: Partial<MachineFacts> = {}): MachineFacts {
 type Call = { cmd: string; args: string[]; cwd?: string; shell?: boolean; env?: NodeJS.ProcessEnv };
 
 function harness(
-  opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean; ask?: InstallDeps['ask']; comfyHead?: string; gitStatus?: Captured } = {},
+  opts: { facts?: MachineFacts; failOn?: (call: Call) => boolean; ask?: InstallDeps['ask']; comfyHead?: string; gitStatus?: Captured; download?: (url: string) => Uint8Array } = {},
 ) {
   const calls: Call[] = [];
   const lines: string[] = [];
@@ -84,6 +89,8 @@ function harness(
   const timeline: string[] = [];
   /** For each weight fetch-weights is asked for: did its file exist when it was asked? */
   const existedBefore: Record<string, boolean> = {};
+  /** The URLs downloaded (yt-dlp's release file), simulated. */
+  const downloads: string[] = [];
   const L = layout(dir, os);
   const stream: Stream = async (cmd, args, o = {}) => {
     const call = { cmd, args, cwd: o.cwd, shell: o.shell, env: o.env };
@@ -148,10 +155,14 @@ function harness(
     },
     runningPorts: async () => [],
     probe: async () => opts.facts ?? facts(),
+    download: async (url) => {
+      downloads.push(url);
+      return opts.download?.(url) ?? YTDLP_BYTES;
+    },
     // the developer's own choice of extensions (MONTAGIO_EXTENSIONS=all, say) stays out of the tests
     env: Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== 'MONTAGIO_EXTENSIONS')),
   };
-  return { calls, lines, events, timeline, existedBefore, deps, L, output: () => lines.join('\n') };
+  return { calls, lines, events, timeline, existedBefore, downloads, deps, L, output: () => lines.join('\n') };
 }
 
 const options = (over: Partial<InstallOptions> = {}): InstallOptions => ({
@@ -176,7 +187,7 @@ test('dry run executes nothing and writes nothing', async () => {
   expect(h.events).toEqual([]);
   expect(existsSync(dir)).toBe(false);
   const out = h.output();
-  for (const id of ['npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights', 'open-stack', 'app-build', 'save-state', 'start']) {
+  for (const id of ['npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights', 'yt-dlp', 'open-stack', 'app-build', 'save-state', 'start']) {
     expect(out).toMatch(new RegExp(`\\[(run|skip)\\]\\s+${id}\\b`));
   }
   expect(out).toContain(`git clone --depth 1 --branch v0.41.0 https://github.com/Comfy-Org/ComfyUI.git ${h.L.comfyTmp}`);
@@ -270,7 +281,7 @@ test('a full install runs every step and records it', async () => {
   const state = readState(h.L.statePath);
   expect(state.mode).toBe('full');
   expect(state.gpuIndex).toBe(0);
-  expect(Object.keys(state.stamps).sort()).toEqual(['build', 'comfyEnv', 'comfyui', 'npm', 'proxy']);
+  expect(Object.keys(state.stamps).sort()).toEqual(['build', 'comfyEnv', 'comfyui', 'npm', 'proxy', 'ytDlp']);
   expect(Object.keys(state.weights).sort()).toEqual(['tiny-te', 'tiny-vae']);
   expect(existsSync(h.L.comfyTmp)).toBe(false);
   expect(existsSync(join(h.L.comfyDir, '.git'))).toBe(true);
@@ -619,4 +630,24 @@ test('the report is plain ASCII', () => {
   expect(report).toMatch(/^[\x09\x0a\x0d\x20-\x7e]*$/);
   expect(report).toContain('FAIL');
   expect(report).toContain('-> run again with --app-only');
+});
+
+test('yt-dlp: the pinned release file, checked by its sha256, written beside the install', async () => {
+  const h = harness();
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+  expect(h.downloads).toEqual([expect.stringMatching(/^https:\/\/github\.com\/yt-dlp\/yt-dlp\/releases\/download\/\d{4}\.\d{2}\.\d{2}\/yt-dlp(\.exe|_linux)$/)]);
+  expect(readFileSync(h.L.ytDlpExe, 'utf8')).toBe('a yt-dlp binary');
+  expect(readState(h.L.statePath).stamps.ytDlp).toContain(YTDLP_SHA256);
+  // Installed: not downloaded again.
+  const again = harness();
+  expect(await install(repo, options({ start: false }), again.deps)).toBe(0);
+  expect(again.downloads).toEqual([]);
+});
+
+test('a yt-dlp download of other bytes is refused, and nothing is written', async () => {
+  const h = harness({ download: () => new TextEncoder().encode('something else') });
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(1);
+  expect(h.output()).toMatch(/yt-dlp: the file downloaded has the sha256 [0-9a-f]{64}, not the pinned/);
+  expect(existsSync(h.L.ytDlpExe)).toBe(false);
+  expect(existsSync(`${h.L.ytDlpExe}.part`)).toBe(false);
 });

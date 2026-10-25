@@ -75,6 +75,15 @@ test('the proxy and the app follow the install ports', () => {
   expect(app.env.COMFY_BASE_URL).toBe('http://127.0.0.1:8289');
 });
 
+test("the app imports links with the installer's yt-dlp once it is there, unless the user names another", () => {
+  const app = (state: InstallState, env: NodeJS.ProcessEnv = {}) => specsOf(state, env).find((s) => s.name === 'app')!;
+  expect(app(full).env.MONTAGIO_YTDLP).toBeUndefined();
+  const pinned = { ...full, stamps: { ytDlp: 'yt-dlp==2026.10.21 sha256:x' } };
+  expect(app(pinned).env.MONTAGIO_YTDLP).toBe(L.ytDlpExe);
+  expect(app({ ...pinned, mode: 'app-only' }).env.MONTAGIO_YTDLP).toBe(L.ytDlpExe);
+  expect(app(pinned, { MONTAGIO_YTDLP: '/opt/yt-dlp' }).env.MONTAGIO_YTDLP).toBe('/opt/yt-dlp');
+});
+
 test('the app runs the local backend, without any Comfy key', () => {
   const app = specsOf(full, { COMFY_API_KEY: 'secret', PATH: '/bin' }).find((s) => s.name === 'app')!;
   expect(app.env).toMatchObject({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: 'http://127.0.0.1:8189', NEXT_TELEMETRY_DISABLED: '1', MONTAGIO_ROOT: '/repo dir', PATH: '/bin' });

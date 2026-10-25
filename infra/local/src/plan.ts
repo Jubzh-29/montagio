@@ -18,6 +18,7 @@ export type StepId =
   | 'proxy'
   | 'node-pack'
   | 'weights'
+  | 'yt-dlp'
   | 'open-stack'
   | 'app-build'
   | 'save-state'
@@ -45,8 +46,8 @@ export type PlanInput = {
   comfy: { head: string | null; exists: boolean; tmpExists: boolean; marked: boolean };
   /** Where custom_nodes/montagio points today: null if it does not exist, its own path if it is a real folder. */
   packTarget: string | null;
-  /** What the stamps stand for is still there: the venv Python, the proxy launcher, the app build (BUILD_ID). */
-  artifacts: { comfyPython: boolean; proxyExe: boolean; appBuild: boolean };
+  /** What the stamps stand for is still there: the venv Python, the proxy launcher, the app build (BUILD_ID), yt-dlp. */
+  artifacts: { comfyPython: boolean; proxyExe: boolean; appBuild: boolean; ytDlp: boolean };
   /** head: the repository's commit (null outside git); lockHash: sha256 of package-lock.json. */
   repo: { head: string | null; lockHash: string; nodeModules: boolean };
   servicesRunning: boolean;
@@ -68,6 +69,15 @@ const gib = (bytes: number) => `${(bytes / GiB).toFixed(2)} GiB`;
 
 export function envStamp(commit: string, torch: TorchPin, python: [number, number, number]): string {
   return `${commit} torch==${torch.torch}+${torch.cuda} torchvision==${torch.torchvision} python==${python[0]}.${python[1]}`;
+}
+
+/** The release file of yt-dlp for a system: the standalone binary, which needs no Python. */
+export function ytDlpUrl(versions: Versions, os: Os): string {
+  return `https://github.com/yt-dlp/yt-dlp/releases/download/${versions.ytDlp.version}/${os === 'windows' ? 'yt-dlp.exe' : 'yt-dlp_linux'}`;
+}
+
+export function ytDlpStamp(versions: Versions, os: Os): string {
+  return `yt-dlp==${versions.ytDlp.version} sha256:${versions.ytDlp.sha256[os]}`;
 }
 
 /** null outside a git checkout: the app is then rebuilt on every install. */
@@ -240,6 +250,17 @@ export function buildPlan(input: PlanInput): Step[] {
       ],
     });
   }
+
+  // The app imports a trend from its link with it, in either mode; the demo shows no link field.
+  const ytDlp = ytDlpStamp(versions, os);
+  const ytDlpStale = state.stamps.ytDlp !== ytDlp || !input.artifacts.ytDlp;
+  add({
+    id: 'yt-dlp',
+    title: `yt-dlp ${versions.ytDlp.version} for the remix's import by link (sha256 checked)`,
+    run: ytDlpStale,
+    why: !state.stamps.ytDlp ? 'not installed' : !input.artifacts.ytDlp ? `missing: ${L.ytDlpExe}` : ytDlpStale ? 'new version' : 'up to date',
+    detail: [`download ${ytDlpUrl(versions, os)}`, `check its sha256 is ${versions.ytDlp.sha256[os]}`, `write ${L.ytDlpExe}`],
+  });
 
   add({
     id: 'open-stack',

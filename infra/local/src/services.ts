@@ -94,6 +94,8 @@ export function serviceSpecs(input: {
   }
   else if (state.proxyUrl) Object.assign(appEnv, { MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: state.proxyUrl });
   else appEnv.MONTAGIO_BACKEND = 'demo';
+  // The yt-dlp the installer pinned, unless the user names another.
+  if (!appEnv.MONTAGIO_YTDLP && state.stamps.ytDlp) appEnv.MONTAGIO_YTDLP = L.ytDlpExe;
 
   const next = nextBin(input.repoRoot);
   const app: ServiceSpec = {

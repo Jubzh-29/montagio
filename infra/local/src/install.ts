@@ -34,6 +34,8 @@ import {
   proxyStamp,
   weightsToClear,
   weightsToFetch,
+  ytDlpStamp,
+  ytDlpUrl,
   type FileStat,
   type Step,
   type StepId,
@@ -70,6 +72,8 @@ export type InstallDeps = {
   /** Ports of the Montagio services running now (their pid is alive and theirs). */
   runningPorts: () => Promise<number[]>;
   probe: typeof probeMachine;
+  /** The bytes behind a URL (yt-dlp's release file): checked by their sha256 before anything is written. */
+  download: (url: string) => Promise<Uint8Array>;
   os?: Os;
   execPath?: string;
   env?: NodeJS.ProcessEnv;
@@ -268,6 +272,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
         comfyPython: existsSync(L.comfyPython),
         proxyExe: existsSync(L.proxyExe),
         appBuild: servedBuild(join(repoRoot, 'apps', 'web', '.next')),
+        ytDlp: existsSync(L.ytDlpExe),
       },
       repo,
       servicesRunning: own.length > 0,
@@ -412,6 +417,17 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
         save(recordWeights(state, parsed, lock, (id) => weightStat(lock.find((w) => w.id === id)!)));
       }
       if (code !== 0) throw new Error('some weights failed (see above): run the same command again, downloads resume where they stopped');
+    },
+    'yt-dlp': async () => {
+      const system = os ?? 'linux';
+      const bytes = await deps.download(ytDlpUrl(versions, system));
+      const got = createHash('sha256').update(bytes).digest('hex');
+      const pinned = versions.ytDlp.sha256[system];
+      if (got !== pinned) throw new Error(`yt-dlp: the file downloaded has the sha256 ${got}, not the pinned ${pinned}: nothing was written`);
+      mkdirSync(dirname(L.ytDlpExe), { recursive: true });
+      writeFileSync(`${L.ytDlpExe}.part`, bytes, { mode: 0o755 });
+      renameSync(`${L.ytDlpExe}.part`, L.ytDlpExe);
+      stamp('ytDlp', ytDlpStamp(versions, system));
     },
     'open-stack': () => run(execPath, [tsxCli(repoRoot), CHECK_OPEN_STACK, '.', '--out', OPEN_STACK_REPORT], { cwd: repoRoot }),
     'app-build': async () => {

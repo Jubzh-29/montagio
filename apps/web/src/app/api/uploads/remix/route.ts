@@ -9,6 +9,10 @@ import { MAX_VIDEO_FORM_BYTES, UploadError } from '@/server/uploads';
  * rate, its shots found by FFmpeg. Answers its numbers and its shots, each with its first frame.
  */
 export async function POST(request: Request) {
+  // Another site sends a file upload without the browser asking first: a browser that names the
+  // requesting site must name this app's own pages (a script or curl names none).
+  const site = request.headers.get('sec-fetch-site');
+  if (site !== null && site !== 'same-origin' && site !== 'none') return Response.json({ error: 'cross-site' }, { status: 403 });
   // Nothing is read, nor FFmpeg started, while the remix is hidden.
   if (!(await visibleExtensions()).includes('remix')) return Response.json({ error: 'extension-disabled' }, { status: 404 });
   // The body is read up to the cap, never whole.
