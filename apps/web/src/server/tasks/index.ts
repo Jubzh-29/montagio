@@ -8,6 +8,7 @@ import { hookTask } from './hook';
 import { imageUpscaleTask } from './image-upscale';
 import { motionTask } from './motion';
 import { musicTask } from './music';
+import { remixSkeletonTask, remixTask } from './remix';
 import { restyleTask } from './restyle';
 import { swapTask } from './swap';
 import { t2iTask } from './t2i';
@@ -34,4 +35,6 @@ export const TASKS: Partial<Record<JobTask, TaskDef>> = {
   moodboard: moodboardTask,
   translate: translateTask,
   captions: captionsTask,
+  remix: remixTask,
+  'remix-skeleton': remixSkeletonTask,
 };

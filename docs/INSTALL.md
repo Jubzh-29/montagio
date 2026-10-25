@@ -96,6 +96,7 @@ Everything except the app goes into one folder:
 | `ComfyUI/custom_nodes/montagio` | a link (a junction on Windows) to the repository's `comfy-nodes` |
 | `venvs/comfyui/` | Python for ComfyUI, with PyTorch 2.14.1 (CUDA 13.0) or 2.11.0 (CUDA 12.8) |
 | `venvs/comfy-api-proxy/` | Python for comfy-api-proxy |
+| `tools/yt-dlp` (`yt-dlp.exe` on Windows) | yt-dlp 2026.10.21 (Unlicense), the release binary checked by its sha256, for the trend remix's import by link; installed in both modes, handed to the app as `MONTAGIO_YTDLP` |
 | `logs/` | `comfyui.log`, `proxy.log`, `app.log`, and the download report |
 | `install-state.json` | what was installed, the ports and the GPU |
 
@@ -183,6 +184,7 @@ Without a GPU of 12 GB at least, `install --app-only` installs the app alone: no
 | `MONTAGIO_COMFYUI_ARGS` | extra ComfyUI arguments, separated by spaces, for example `--reserve-vram 1` (ComfyUI v0.41.0's dynamic VRAM makes `--lowvram` a no-op); `--listen` and `--port` are refused, ComfyUI stays on 127.0.0.1 and the install's port |
 | `HF_TOKEN` | a Hugging Face token; not needed for the files of the lock |
 | `MONTAGIO_FFMPEG`, `MONTAGIO_FFPROBE` | FFmpeg and ffprobe outside the `PATH` |
+| `MONTAGIO_YTDLP` | another yt-dlp for the trend remix's import by link than the one the installer pins; without either, the link field says yt-dlp is missing and a file can still be sent |
 | `MONTAGIO_ALLOWED_HOSTS` | other addresses the app answers at, comma list: `192.168.1.20:8080` (that port only), `studio.example` (any port); see [Open the app at another address](#open-the-app-at-another-address) |
 
 ### Open the app at another address

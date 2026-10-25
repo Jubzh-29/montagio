@@ -78,3 +78,14 @@ export { compileMotion, MOTION_DEFAULTS, type MotionInputs } from './motion';
 export { motionFrames, motionWindows } from './motion-windows';
 export { compileRestyle, restyleInstruction, type RestyleInputs, type RestyleReference } from './restyle';
 export { compileSwap, framePoint, MAX_SWAP_POINTS, type SwapInputs, type SwapPoint } from './swap';
+export {
+  cleanHashtags,
+  compileTrendSkeleton,
+  parseTrendSkeleton,
+  REMIX_CHARACTER_MAX,
+  REMIX_POST_LANGUAGES,
+  trendPostInstruction,
+  type RemixPostLanguage,
+  type TrendPost,
+  type TrendSkeleton,
+} from './remix';

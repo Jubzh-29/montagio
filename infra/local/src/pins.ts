@@ -16,6 +16,8 @@ export type Versions = {
   proxyVersion: string;
   torch: TorchPin;
   torchFallback: TorchPin;
+  /** The remix's link importer: a release binary per system, by its sha256. */
+  ytDlp: { version: string; sha256: { windows: string; linux: string } };
 };
 
 /** `folder` is relative to ComfyUI's models/; `extension` is null for the weights of the camera presets. */
@@ -77,6 +79,7 @@ export function versionsFrom(env: Record<string, string>): Versions {
     proxyVersion: get('COMFY_API_PROXY_VERSION'),
     torch: pin('TORCH_VERSION', 'TORCHVISION_VERSION', 'TORCH_CUDA'),
     torchFallback: pin('TORCH_FALLBACK_VERSION', 'TORCHVISION_FALLBACK_VERSION', 'TORCH_FALLBACK_CUDA'),
+    ytDlp: { version: get('YTDLP_VERSION'), sha256: { windows: get('YTDLP_SHA256_WINDOWS'), linux: get('YTDLP_SHA256_LINUX') } },
   };
 }
 

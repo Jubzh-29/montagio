@@ -119,7 +119,11 @@ describe('Reproduce: the same choices with the same seed', () => {
   });
 
   test('only the tabs the Studio reopens whole can be reproduced', () => {
-    expect([...REPRODUCIBLE_TABS].sort()).toEqual(['avatar', 'camera', 'effects', 'film', 'motion']);
+    expect([...REPRODUCIBLE_TABS].sort()).toEqual(['avatar', 'camera', 'effects', 'film', 'motion', 'remix']);
+    // A trend remix reopens on its own page, with its seed for Reproduce.
+    const remix = seeded({ task: 'remix', reprise: { tab: 'remix', seed: 9 } });
+    expect(canReproduce(remix)).toBe(true);
+    expect(repriseHref(remix, { reproduce: true })).toBe(`/remix?from=${encodeURIComponent(remix.key)}&reproduce=1`);
     expect(canReproduce(seeded())).toBe(true);
     expect(canReproduce(seeded({ kind: 'photo', task: 't2i' }))).toBe(false);
     expect(canReproduce(seeded({ task: 'ad', reprise: { tab: 'effects', effectId: 'squish', seed: 3 } }))).toBe(false);

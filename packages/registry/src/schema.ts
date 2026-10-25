@@ -4,10 +4,11 @@ import { z } from 'zod';
 export const ALLOWED_WEIGHT_LICENSES = ['Apache-2.0', 'MIT'] as const;
 
 /**
- * The nine extensions, in their order of priority (reoriented toward one-photo hooks on
- * 2026-10-19; motion transfer added on 2026-10-20, restyle on 2026-10-24, object swap last the same day).
+ * The ten extensions, in their order of priority (reoriented toward one-photo hooks on
+ * 2026-10-19; motion transfer added on 2026-10-20, restyle and object swap on 2026-10-24, the trend
+ * remix last on 2026-10-25).
  */
-export const EXTENSION_IDS = ['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap'] as const;
+export const EXTENSION_IDS = ['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap', 'remix'] as const;
 export type ExtensionId = (typeof EXTENSION_IDS)[number];
 
 export const CAPABILITIES = ['i2v-camera', 'i2v', 't2i'] as const;

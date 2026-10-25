@@ -146,6 +146,8 @@ export async function publishToCommunity(body: Record<string, unknown>): Promise
   const key = typeof body.historyKey === 'string' ? body.historyKey : '';
   const item = (await listHistory()).find((entry) => entry.key === key);
   if (!item) return null;
+  // A remix of someone else's trend stays with the user: only one of Montagio's own sample is shared.
+  if (item.task === 'remix' && item.reprise.remix?.origin !== 'sample') throw new JobError('rights-required');
   const { title, author } = await credits(body);
   const id = randomUUID();
   await mkdir(dir(), { recursive: true });

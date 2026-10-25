@@ -1,7 +1,7 @@
 import { win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readLock, readVersions, weightsFor } from '../src/pins.ts';
-import { buildPlan, buildStamp, diskNeed, envStamp, proxyStamp, weightsToClear, weightsToFetch, type PlanInput, type Step } from '../src/plan.ts';
+import { buildPlan, buildStamp, diskNeed, envStamp, proxyStamp, weightsToClear, weightsToFetch, ytDlpStamp, ytDlpUrl, type PlanInput, type Step } from '../src/plan.ts';
 import { layout } from '../src/platform.ts';
 import { emptyState, type InstallState } from '../src/state.ts';
 
@@ -28,7 +28,7 @@ function fresh(over: Partial<PlanInput> = {}): PlanInput {
     weightStat: () => null,
     comfy: { head: null, exists: false, tmpExists: false, marked: false },
     packTarget: null,
-    artifacts: { comfyPython: false, proxyExe: false, appBuild: false },
+    artifacts: { comfyPython: false, proxyExe: false, appBuild: false, ytDlp: false },
     repo: { head: 'abc123', lockHash: 'h1', nodeModules: false },
     servicesRunning: false,
     start: true,
@@ -46,6 +46,7 @@ function installedState(): InstallState {
       proxy: proxyStamp(versions, python.version)!,
       npm: 'h1',
       build: buildStamp('abc123', 'h1')!,
+      ytDlp: ytDlpStamp(versions, 'windows'),
     },
     weights: Object.fromEntries(lock.map((w) => [w.id, { sha256: w.sha256, size: w.size, mtimeMs: 1 }])),
   };
@@ -57,7 +58,7 @@ function installed(over: Partial<PlanInput> = {}): PlanInput {
     weightStat: (w) => ({ size: w.size, mtimeMs: 1 }),
     comfy: { head: versions.comfyuiCommit, exists: true, tmpExists: false, marked: false },
     packTarget: win32.join(repoRoot, 'comfy-nodes'),
-    artifacts: { comfyPython: true, proxyExe: true, appBuild: true },
+    artifacts: { comfyPython: true, proxyExe: true, appBuild: true, ytDlp: true },
     repo: { head: 'abc123', lockHash: 'h1', nodeModules: true },
     ...over,
   });
@@ -69,9 +70,9 @@ const step = (steps: Step[], id: Step['id']) => steps.find((s) => s.id === id)!;
 test('a fresh machine runs every install step, in order', () => {
   const steps = buildPlan(fresh());
   expect(steps.map((s) => s.id)).toEqual([
-    'stop-services', 'npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights', 'open-stack', 'app-build', 'save-state', 'start',
+    'stop-services', 'npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights', 'yt-dlp', 'open-stack', 'app-build', 'save-state', 'start',
   ]);
-  expect(running(steps)).toEqual(['npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights', 'open-stack', 'app-build', 'save-state', 'start']);
+  expect(running(steps)).toEqual(['npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights', 'yt-dlp', 'open-stack', 'app-build', 'save-state', 'start']);
 });
 
 test('a first install says so, not that something changed', () => {
@@ -200,11 +201,26 @@ test('a weight file the lock no longer pins is cleared before the download', () 
 
 test('a stamp whose artifact is gone runs its step again', () => {
   const gone = (missing: Partial<PlanInput['artifacts']>) =>
-    running(buildPlan(installed({ artifacts: { comfyPython: true, proxyExe: true, appBuild: true, ...missing } })));
+    running(buildPlan(installed({ artifacts: { comfyPython: true, proxyExe: true, appBuild: true, ytDlp: true, ...missing } })));
   expect(gone({ comfyPython: false })).toContain('comfyui-env');
   expect(gone({ proxyExe: false })).toContain('proxy');
   expect(gone({ appBuild: false })).toContain('app-build');
-  expect(step(buildPlan(installed({ artifacts: { comfyPython: true, proxyExe: false, appBuild: true } })), 'proxy').why).toContain('missing');
+  expect(gone({ ytDlp: false })).toContain('yt-dlp');
+  expect(step(buildPlan(installed({ artifacts: { comfyPython: true, proxyExe: false, appBuild: true, ytDlp: true } })), 'proxy').why).toContain('missing');
+});
+
+test("yt-dlp: the release binary of the system, by the pinned version and sha256, in either mode", () => {
+  const fetch = step(buildPlan(fresh({ mode: 'app-only' })), 'yt-dlp');
+  expect(fetch.run).toBe(true);
+  expect(fetch.detail).toEqual([
+    `download https://github.com/yt-dlp/yt-dlp/releases/download/${versions.ytDlp.version}/yt-dlp.exe`,
+    `check its sha256 is ${versions.ytDlp.sha256.windows}`,
+    `write ${L.ytDlpExe}`,
+  ]);
+  expect(ytDlpUrl(versions, 'linux')).toMatch(/\/yt-dlp_linux$/);
+  expect(versions.ytDlp.sha256.windows).toMatch(/^[0-9a-f]{64}$/);
+  const newer = { ...versions, ytDlp: { ...versions.ytDlp, version: '2099.01.01' } };
+  expect(step(buildPlan(installed({ versions: newer })), 'yt-dlp')).toMatchObject({ run: true, why: 'new version' });
 });
 
 test('another Python rebuilds the proxy environment too', () => {

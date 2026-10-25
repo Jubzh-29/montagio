@@ -16,6 +16,7 @@ import {
   compileSpeech,
   compileSwap,
   compileTranslate,
+  compileTrendSkeleton,
   compileImageUpscale,
   compileUpscale,
   compileVoiceChange,
@@ -32,9 +33,9 @@ import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } f
 
 /**
  * In the order a session runs them, the priority order of 2026-10-19 (the motion transfer,
- * added on 2026-10-20, then the restyle and the object swap on 2026-10-24, last): a hook's edit comes before its
- * transition, the voice before the avatar that speaks it, a composed photo before the effects
- * that animate it, the restyled first frame before the restyle that keeps it.
+ * added on 2026-10-20, then the restyle and the object swap on 2026-10-24, then the trend remix on 2026-10-25, last):
+ * a hook's edit comes before its transition, the voice before the avatar that speaks it, a composed photo before the
+ * effects that animate it, the restyled first frame before the restyle that keeps it.
  */
 export const EXTENSION_JOBS = [
   'edit',
@@ -53,6 +54,8 @@ export const EXTENSION_JOBS = [
   'restyle-edit',
   'restyle',
   'swap',
+  'remix-skeleton',
+  'remix',
 ] as const;
 export type ExtensionJobName = (typeof EXTENSION_JOBS)[number];
 
@@ -73,14 +76,17 @@ const TASKS: Record<ExtensionJobName, ExtensionTask> = {
   'restyle-edit': 'i2i-edit',
   restyle: 'v2v-restyle',
   swap: 'v2v-swap',
+  'remix-skeleton': 'i2t-trend',
+  // A trend remix: one motion transfer per shot, the same photo and the same seed.
+  remix: 'motion-transfer',
 };
 
 /**
  * The jobs that read a text: the edit instruction, the effects' subject, the words to say, the
  * music description, the motion's description, the restyle's new look (its edit reads it too), the
- * swap's new object.
+ * swap's new object, what the remix's character looks like (its skeleton's post names it too).
  */
-export const TEXT_JOBS = ['edit', 'effect', 'voice', 'music', 'motion', 'restyle', 'swap'] as const satisfies readonly ExtensionJobName[];
+export const TEXT_JOBS = ['edit', 'effect', 'voice', 'music', 'motion', 'restyle', 'swap', 'remix'] as const satisfies readonly ExtensionJobName[];
 export type TextJobName = (typeof TEXT_JOBS)[number];
 
 const DEFAULT_TEXT: Record<'music' | 'edit' | 'voice' | 'restyle' | 'swap', string> = {
@@ -132,6 +138,10 @@ export type ExtensionJobOptions = {
   swapPoints?: SwapPoint[];
   swapExclude?: SwapPoint[];
   swapImage?: string;
+  /** A trend remix: its shots, each prepared at 16 fps with its length, their aspect, and the sheet of their first frames. */
+  remixShots?: { path: string; seconds: number }[];
+  remixAspect?: Aspect;
+  remixSheet?: string;
   /** The speech of avatar, and its length in seconds (the caller reads it). */
   audio?: string;
   /** The voice job's sample (mono FLAC, as the app prepares it): the cloned voice. */
@@ -211,7 +221,8 @@ function known<T>(map: Map<string, T>, id: string, what: string): T {
  * several do, since it would feed them all (the edit instruction becoming the effects' subject).
  */
 export function jobTexts(values: readonly string[], jobs: readonly ExtensionJobName[]): Partial<Record<TextJobName, string>> {
-  const readers = TEXT_JOBS.filter((job) => jobs.includes(job));
+  // The remix's skeleton reads the remix's text (who performs the shots), with or without the remix.
+  const readers = TEXT_JOBS.filter((job) => jobs.includes(job) || (job === 'remix' && jobs.includes('remix-skeleton')));
   const texts: Partial<Record<TextJobName, string>> = {};
   for (const value of values) {
     const named = TEXT_JOBS.find((job) => value.startsWith(`${job}=`));
@@ -396,6 +407,28 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
         const sample = need(opts.voice, '--voice', name);
         const job = compileVoiceChange(model, template, { audioRef: basename(speech), voiceRef: basename(sample) });
         return [{ name, tag: name, model, ...job, files: [file('audio', speech), file('voice', sample)] }];
+      }
+      case 'remix-skeleton': {
+        const sheet = need(opts.remixSheet, '--motion', name);
+        const character = opts.text?.remix?.trim();
+        const job = compileTrendSkeleton(model, template, { sheetRef: basename(sheet), language: opts.language, ...(character ? { character } : {}) });
+        return [{ name, tag: name, model, ...job, files: [file('image', sheet)] }];
+      }
+      case 'remix': {
+        const photo = need(opts.input, '--input', name);
+        if (!opts.remixShots?.length || opts.remixAspect === undefined) throw new Error('the remix job needs --motion, the trend cut into its shots');
+        const character = opts.text?.remix?.trim();
+        return opts.remixShots.map((shot, index) => {
+          const job = compileMotion(model, template, {
+            imageRef: basename(photo),
+            videoRef: basename(shot.path),
+            video_s: shot.seconds,
+            aspect: opts.remixAspect!,
+            seed: opts.seed,
+            ...(character ? { character } : {}),
+          });
+          return { name, tag: `${name}:shot${index + 1}`, model, ...job, files: [file('image', photo), file('video', shot.path)] };
+        });
       }
       case 'upscale-image': {
         const photo = need(opts.input, '--input', name);

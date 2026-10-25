@@ -69,7 +69,7 @@ test('parseExtensionsConfig reads registry/extensions.yaml as @montagio/registry
       lowVramValidated: low_vram_validated,
     })),
   );
-  expect(readExtensions(repoRoot).map((e) => e.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
+  expect(readExtensions(repoRoot).map((e) => e.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap', 'remix']);
 });
 
 describe('requires: an inline list, as registry/extensions.yaml keeps it', () => {
@@ -128,6 +128,10 @@ describe('selectExtensions agrees with enabledExtensions', () => {
     '  - id: swap',
     '    priority: 9',
     '    requires: [restyle]',
+    '    gpu_validated: null',
+    '  - id: remix',
+    '    priority: 10',
+    '    requires: [motion]',
     '    gpu_validated: null',
     '',
   ].join('\n');

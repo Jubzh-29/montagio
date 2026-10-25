@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { resolve } from 'node:path';
 import type { InputSlot } from '@montagio/recipe';
-import { speechPath, uploadPath, videoPath, voicePath } from './tasks/files';
+import { remixFile, speechPath, uploadPath, videoPath, voicePath } from './tasks/files';
 
 /** sha256 of a file, read as a stream (a reference clip is up to 50 MB); null when it cannot be read. */
 export function fileSha256(path: string): Promise<string | null> {
@@ -27,6 +27,7 @@ const FILE_FIELDS: Record<string, (ref: string) => string | null> = {
   voiceRef: voicePath,
   speechRef: speechPath,
   audioRef: speechPath,
+  remixRef: remixFile,
 };
 
 /**

@@ -21,7 +21,7 @@ export type Violation = {
 };
 
 /** What a model makes, in the order the Open Stack page lists them. */
-export const STACK_FUNCTIONS = ['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion', 'restyle', 'swap'] as const;
+export const STACK_FUNCTIONS = ['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion', 'restyle', 'swap', 'remix'] as const;
 export type StackFunction = (typeof STACK_FUNCTIONS)[number];
 
 /** Exhaustive on purpose: a new capability or task does not compile until it says what it makes. */
@@ -35,6 +35,7 @@ const FUNCTION_OF_TASK: Record<ExtensionTask, StackFunction> = {
   'a2a-translate': 'avatar',
   // the captions of a talking clip
   'a2t-words': 'avatar',
+  'i2t-trend': 'remix',
   'ia2v-talk': 'avatar',
   t2a: 'music',
   'v2v-upscale': 'hd',

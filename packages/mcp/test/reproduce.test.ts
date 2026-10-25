@@ -7,7 +7,7 @@ import { buildRecipe, compactRecipe, type Recipe, type RecipeRequest } from '@mo
 import { AI_IMAGE_METADATA, RECIPE_TAG, tagImage } from '@montagio/sequence';
 import { MontagioClient } from '../src/client';
 import { ToolFailure } from '../src/errors';
-import { loadRecipe, reproduce } from '../src/reproduce';
+import { loadRecipe, reproduce, withPhoto } from '../src/reproduce';
 import { TOOL_NAMES } from '../src/tools';
 import { fakeClock, fakeFetch, reply, testConfig, type Call } from './fake-app';
 
@@ -237,6 +237,52 @@ test('an avatar in the user\'s own voice: the sample goes to the voice route, an
   const second = avatarApp();
   await reproduce(clientOf(second.fetch), { recipe, inputs: { imageRef: photo, voiceRef: voice }, voiceConsent: true });
   expect(second.calls.find((call) => call.path === '/api/avatars')!.json).toMatchObject({ voiceConsent: true });
+});
+
+test("a trend remix: the user's trend goes to the remix route, its cuts and shots replayed, never its sound nor the face box", async () => {
+  const trend = join(dir, 'trend.mp4');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=64x112:rate=16:duration=1', '-pix_fmt', 'yuv420p', trend]);
+  const recipe = buildRecipe(
+    {
+      kind: 'clip',
+      task: 'remix',
+      name: 'Remix',
+      createdAt: '2026-10-25T18:00:00.000Z',
+      backend: 'local',
+      seed: 5,
+      request: {
+        route: '/api/remix',
+        // A tampered recipe that would keep the trend's sound and tick the boxes: all of it is dropped.
+        body: { mode: 'motion', cuts: [8], shots: [{ keep: false }, { keep: true }], language: 'en', seed: 5, keepSound: true, soundRights: true, faceConsent: true },
+        files: [{ field: 'remixRef', sha256: 'f'.repeat(64) }, { field: 'imageRef', sha256: photoSha }],
+      },
+      steps: [{ name: 'shot 1', workflow: WORKFLOW, inputs: [{ node: '1', field: 'image', from: 'imageRef', sha256: photoSha }] }],
+      post: ['assemble-shots', 'vertical', 'tag'],
+    },
+    { lock: [], models: [], stack: STACK },
+  );
+  const remixApp = () =>
+    fakeFetch((call: Call) => {
+      if (call.path === '/api/uploads') return reply({ imageRef: 'uploads/new.png', width: 16, height: 9, aspect: '16:9', origin: 'upload', personal: true }, 201);
+      if (call.path === '/api/uploads/remix') return reply({ remixRef: 'remix/00000000-0000-0000-0000-000000000000.mp4', frames: 16, fps: 16, cuts: [8] }, 201);
+      if (call.method === 'POST' && call.path === '/api/remix') return reply({ id: 'j2', task: 'remix', state: 'queued', progress: 0, label: {}, modelId: 'm' }, 201);
+      if (call.path === '/api/jobs/j2') return reply({ id: 'j2', task: 'remix', state: 'succeeded', progress: 1, label: {}, modelId: 'm', outputUrl: '/media/data/jobs/j2/remix.mp4' });
+      if (call.path === '/api/recipes/job/j2') return reply(recipe);
+      return reply({ error: 'not-found' }, 404);
+    });
+  // The photo fills the character's place, never the trend's.
+  expect(withPhoto(recipe, { remixRef: trend }, photo)).toEqual({ remixRef: trend, imageRef: photo });
+  const first = remixApp();
+  const result = await reproduce(clientOf(first.fetch), { recipe, inputs: { remixRef: trend, imageRef: photo } });
+  expect(first.calls.find((call) => call.path === '/api/uploads/remix')?.form?.get('video')).toBeInstanceOf(Blob);
+  const sent = first.calls.find((call) => call.path === '/api/remix')!.json!;
+  expect(sent).toMatchObject({ remixRef: 'remix/00000000-0000-0000-0000-000000000000.mp4', imageRef: 'uploads/new.png', cuts: [8], shots: [{ keep: false }, { keep: true }], seed: 5 });
+  for (const key of ['keepSound', 'soundRights', 'faceConsent', 'rights']) expect(sent).not.toHaveProperty(key);
+  // The app keeps the trend's first 60 s at its own frame rate: its sha256 cannot be the file's own.
+  expect(result.sameInputs).toEqual({ remixRef: null, imageRef: true });
+  const second = remixApp();
+  await reproduce(clientOf(second.fetch), { recipe, inputs: { remixRef: trend, imageRef: photo }, rights: true, faceConsent: true });
+  expect(second.calls.find((call) => call.path === '/api/remix')!.json).toMatchObject({ rights: true, faceConsent: true });
 });
 
 test('the MCP server lists get_recipe and reproduce', () => {

@@ -1,11 +1,12 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Library } from '@montagio/presets';
-import { TERMINAL_STATES, type HistoryItem, type JobState, type Reprise } from '@/lib/api-types';
+import { TERMINAL_STATES, type HistoryItem, type JobState, type RemixChoices, type Reprise } from '@/lib/api-types';
 import { recipeUrlOf, type RecipeSource } from '@/lib/recipe-url';
 import { getEnv } from './env';
 import { getGeneration } from './generations';
 import { jobs, type JobRecord } from './jobs';
+import { readRemixMeta } from './remix';
 import { advanceSequence, readSequence, type SequenceRecord } from './sequences';
 import { getServices } from './services';
 import { readRecord, type GenerationRecord } from './store';
@@ -250,6 +251,36 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
           ...(typeof record.inputs.imageRef === 'string' ? await photo(record.inputs.imageRef) : {}),
           ...((await readVideoMeta(videoRef)) ? { videoRef } : {}),
           prompt: String(record.inputs.prompt),
+        },
+      };
+    }
+    case 'remix': {
+      // Reuse reopens the Remix page on the same trend (while it is here), the same cuts and choices.
+      const remixRef = String(record.inputs.remixRef);
+      const text = (key: string) => (typeof record.inputs[key] === 'string' && record.inputs[key] !== '' ? { [key]: String(record.inputs[key]) } : {});
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'remix',
+        // What is downloaded is the 9:16 export, ready to post.
+        ...(record.verticalUrl ? { downloadUrl: record.verticalUrl } : {}),
+        reprise: {
+          tab: 'remix',
+          ...(typeof record.inputs.imageRef === 'string' ? await photo(record.inputs.imageRef) : {}),
+          ...((await readRemixMeta(remixRef)) ? { remixRef } : {}),
+          remix: {
+            origin: record.inputs.origin as RemixChoices['origin'],
+            mode: record.inputs.mode === 'scene' ? 'scene' : 'motion',
+            cuts: record.inputs.cuts as number[],
+            shots: record.inputs.shots as RemixChoices['shots'],
+            ...text('character'),
+            ...text('motion'),
+            ...text('prompt'),
+            ...text('onscreen'),
+            language: record.inputs.language === 'fr' ? 'fr' : 'en',
+            ...(record.inputs.post ? { post: record.inputs.post as NonNullable<RemixChoices['post']> } : {}),
+          },
+          seed: record.seed,
         },
       };
     }

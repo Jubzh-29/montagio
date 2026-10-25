@@ -27,7 +27,7 @@ import { saveUploadFromFile, type Provenance } from './uploads';
 
 export { JobError } from './errors';
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'restyle' | 'swap' | 'ad' | 'voice-change' | 'moodboard' | 'translate' | 'captions';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'restyle' | 'swap' | 'ad' | 'voice-change' | 'moodboard' | 'translate' | 'captions' | 'remix' | 'remix-skeleton';
 
 export type StepRecord = {
   name: string;
@@ -115,7 +115,7 @@ export type TaskDef = {
    * The task's own delivery of its last output (music: mixed under its film, then cut to 9:16),
    * in place of the delivery by output kind. A failure ends the job in deliver-failed.
    */
-  deliver?(record: JobRecord, outputPath: string, dir: string): Promise<{ outputUrl: string; verticalUrl?: string; frames?: number }>;
+  deliver?(record: JobRecord, outputPath: string, dir: string): Promise<{ outputUrl: string; verticalUrl?: string; frames?: number; demo?: DemoKind }>;
 };
 
 export type JobEngine = {
@@ -485,6 +485,7 @@ const STATUS: Record<JobError['code'], number> = {
   'rights-required': 400,
   'language-unsupported': 400,
   'no-speech': 400,
+  'shot-too-long': 400,
 };
 
 /** The HTTP answer for a known failure of a job route, or null for an unexpected error. */

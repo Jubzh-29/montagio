@@ -29,6 +29,7 @@ import {
   compileImage,
   compileJob,
   loadLibrary,
+  parseTrendSkeleton,
   pickAspect,
   type ApiWorkflow,
   type Aspect,
@@ -37,7 +38,20 @@ import {
   TRANSLATE_LANGUAGES,
   type TranslateLanguage,
 } from '@montagio/presets';
-import { extractFirstFrame, prepareMotionClip, probe, probeAudio } from '@montagio/sequence';
+import {
+  assembleShots,
+  cutShot,
+  detectShots,
+  extractFirstFrame,
+  framesAt,
+  prepareMotionClip,
+  prepareRemixSource,
+  probe,
+  probeAudio,
+  renderVertical,
+  shotRanges,
+  shotSheet,
+} from '@montagio/sequence';
 import { imageSize } from 'image-size';
 import { EXTENSION_JOBS, extensionJobs, jobTexts, parseSwapPoints, photoFile, type ExtensionJob, type ExtensionJobName } from './lib/extension-jobs';
 import { imageFingerprint, imagePrompts } from './lib/image';
@@ -86,6 +100,8 @@ const { values: args } = parseArgs({
     clip: { type: 'string' },
     smooth: { type: 'boolean', default: false },
     motion: { type: 'string' },
+    cuts: { type: 'string' },
+    'keep-sound': { type: 'boolean', default: false },
     points: { type: 'string' },
     exclude: { type: 'string' },
     audio: { type: 'string' },
@@ -122,7 +138,7 @@ if (args.help) {
 
 Extensions (instead of presets):
   --extension LIST   edit, compose, effect, hook (= hook-edit then transition), voice, avatar, music, upscale, motion,
-                     restyle, swap (comma list) or "all"; restyle-edit,restyle restyles the clip's first frame,
+                     restyle, swap, remix-skeleton, remix (comma list) or "all"; restyle-edit,restyle restyles the clip's first frame,
                      then keeps it
   --input PATH       the photo of edit, effect, hook and avatar (default demo-assets/images/sample-16x9.png); restyle
                      run alone: a look to follow; swap: the photo of the new object (without --input, the text alone)
@@ -144,6 +160,11 @@ Extensions (instead of presets):
   --points "X,Y X,Y" swap: points on the object to replace, on the clip's first frame, in fractions of its width and
                      height from the top left (0.5,0.5 is the centre); the pairs apart by spaces (or ";")
   --exclude "X,Y …"  swap: points on what is not the object, when the tracker takes too much
+  --cuts F,F         remix: the first frame of each shot after the first, in the trend kept at 30 fps at most (default:
+                     the cuts FFmpeg's scene filter finds); remix makes each shot of --motion again with --input, the
+                     same seed for all, then puts them back on the trend's frames and cuts the 9:16, as the app does;
+                     remix-skeleton has Gemma read the sheet of the shots' first frames and write the post (--language)
+  --keep-sound       remix: keep the trend's own sound (the app asks the user's word for it)
   --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
   --voice PATH       voice: speak with this sample (a consented recording, mono FLAC) instead of the built-in voice
   --text [JOB=]TEXT  the edit instruction, the effects' subject, the words to say, the music description or the
@@ -372,6 +393,45 @@ async function main(): Promise<number> {
 }
 
 /** The sha256 of the photo an extension job reads, for the showcase's ingest. */
+/** A trend cut into shots: its prepared file, its frame rate, the frames of each shot. */
+type Remix = { source: string; fps: number; ranges: { start: number; end: number }[] };
+
+/** "32,64": the first frame of each shot after the first, whole frames in order. */
+function parseCuts(value: string): number[] {
+  const cuts = value.split(',').map((part) => Number(part.trim()));
+  if (!cuts.every((cut, index) => Number.isInteger(cut) && cut > 0 && (index === 0 || cut > cuts[index - 1]!))) {
+    throw new Error(`--cuts takes whole frames in order, such as 32,64 (got "${value}")`);
+  }
+  return cuts;
+}
+
+/**
+ * The shots made again put back on the trend's own frames (its sound with --keep-sound), then the 9:16 export:
+ * what the app delivers, in <out>/remix. A motion job saves the clip its LoadVideo echoes first, then its result.
+ */
+async function assembleRemix(remix: Remix, shots: { status: string; outputs: string[] }[], outDir: string): Promise<void> {
+  if (shots.length !== remix.ranges.length || shots.some((shot) => shot.status !== 'succeeded' || shot.outputs.length === 0)) {
+    console.error('\n✗ a shot of the remix failed: it is not put together');
+    return;
+  }
+  const clips = shots.map((shot) => join(outDir, shot.outputs.at(-1)!));
+  const size = await probe(clips[0]!);
+  const dir = join(outDir, 'remix');
+  await mkdir(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const assembled = join(dir, `${stamp}__remix.mp4`);
+  const { frames } = await assembleShots(clips, assembled, {
+    frames: remix.ranges.map((range) => range.end - range.start),
+    fps: remix.fps,
+    width: size.width,
+    height: size.height,
+    ...(args['keep-sound'] ? { audioFrom: remix.source } : {}),
+  });
+  const vertical = join(dir, `${stamp}__remix-9x16.mp4`);
+  await renderVertical(assembled, vertical);
+  console.log(`\nremix: ${frames} frames at ${remix.fps} fps → ${relative(outDir, assembled)}, ${relative(outDir, vertical)}`);
+}
+
 async function photoSha256(job: ExtensionJob): Promise<string | null> {
   const photo = photoFile(job);
   return photo ? (await imageFingerprint(photo)).image_sha256 : null;
@@ -580,6 +640,40 @@ async function runExtensions(
       }
     }
   }
+  // A trend remix: the trend (--motion) at a constant frame rate, cut into its shots (--cuts, else FFmpeg's), each
+  // prepared at 16 fps, and the sheet of their first frames that Gemma reads.
+  let remix: Remix | undefined;
+  let remixShots: { path: string; seconds: number }[] | undefined;
+  let remixAspect: Aspect | undefined;
+  let remixSheet: string | undefined;
+  if (names.includes('remix') || names.includes('remix-skeleton')) {
+    if (args['dry-run']) {
+      remixShots = [{ path: 'shot1.mp4', seconds: 2 }, { path: 'shot2.mp4', seconds: 2 }];
+      remixAspect = '9:16';
+      remixSheet = 'shots.png';
+    } else {
+      if (!args.motion) throw new Error('the remix jobs need --motion <the trend>');
+      const dir = join(outDir, 'inputs', 'remix');
+      await mkdir(dir, { recursive: true });
+      const source = join(dir, 'trend.mp4');
+      const prepared = await prepareRemixSource(fromCaller(args.motion), source, { max_s: 60 });
+      const cuts = args.cuts ? parseCuts(args.cuts) : (await detectShots(source)).cuts;
+      const ranges = shotRanges(cuts, prepared.frames);
+      remix = { source, fps: prepared.fps, ranges };
+      remixAspect = pickAspect(prepared.width, prepared.height);
+      remixShots = [];
+      for (const [index, range] of ranges.entries()) {
+        const cut = join(dir, `shot${index + 1}-source.mp4`);
+        await cutShot(source, cut, { ...range, fps: prepared.fps });
+        const clip = join(dir, `shot${index + 1}.mp4`);
+        remixShots.push({ path: clip, seconds: (await prepareMotionClip(cut, clip, { max_s: 30 })).duration_s });
+      }
+      const thumbs = await framesAt(source, ranges.map((range) => range.start), (index) => join(dir, `shot${index + 1}.png`));
+      remixSheet = join(dir, 'shots.png');
+      await shotSheet(thumbs, remixSheet, { aspect: prepared.width / prepared.height });
+      console.log(`remix: ${ranges.length} shots at ${prepared.fps} fps, cut at frames ${cuts.join(', ') || '(none)'}`);
+    }
+  }
   // The restyle's reference: the restyled first frame (set once restyle-edit has run), the photo given, or none.
   let restyleReference: { path: string; mode: 'first-frame' | 'look' } | undefined = chainedRestyle
     ? args['dry-run']
@@ -616,6 +710,9 @@ async function runExtensions(
     motionSize,
     restyleFrame,
     restyleReference,
+    remixShots,
+    remixAspect,
+    remixSheet,
     swapPoints: parseSwapPoints(args.points, '--points'),
     swapExclude: parseSwapPoints(args.exclude, '--exclude'),
     ...(args.input ? { swapImage: input } : {}),
@@ -692,6 +789,11 @@ async function runExtensions(
 
   for (const job of jobs) {
     const record = await run(job);
+    if (job.name === 'remix-skeleton' && record.status === 'succeeded' && record.outputs[0]) {
+      const read = parseTrendSkeleton(await readFile(join(outDir, record.outputs[0]), 'utf8'));
+      await writeFile(join(outDir, 'clips', `${basename(record.outputs[0], extname(record.outputs[0]))}.json`), `${JSON.stringify(read, null, 2)}\n`);
+      console.log(`  skeleton: ${JSON.stringify(read)}`);
+    }
     if (chained && job.name === 'voice' && !args['dry-run']) {
       const speech = record.outputs[0];
       if (record.status !== 'succeeded' || !speech) {
@@ -746,6 +848,8 @@ async function runExtensions(
       await run(restyle!);
     }
   }
+
+  if (remix) await assembleRemix(remix, records.filter((record) => record.job.startsWith('remix:shot')), outDir);
 
   // The nodes' definitions on this ComfyUI, merged across the runs of a series: the tests' fixture is checked against them.
   if (objectInfo) {

@@ -8,8 +8,12 @@ import { POST as postCharacter } from '@/app/api/characters/route';
 import { DELETE as deleteCommunityEntry } from '@/app/api/community/[id]/route';
 import { POST as cancelGeneration } from '@/app/api/generations/[id]/cancel/route';
 import { POST as cancelJob } from '@/app/api/jobs/[id]/cancel/route';
+import { POST as postTrendImport } from '@/app/api/remix/import/route';
+import { POST as postTrendShots } from '@/app/api/remix/shots/route';
 import { POST as cancelSequence } from '@/app/api/sequences/[id]/cancel/route';
 import { POST as postFaceUpload } from '@/app/api/uploads/face/route';
+import { POST as postTrend } from '@/app/api/uploads/remix/route';
+import { POST as postTrendSample } from '@/app/api/uploads/remix/sample/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import { POST as postSpeech } from '@/app/api/uploads/speech/route';
@@ -111,4 +115,19 @@ test('the app, and a script that names no site, still reach them', async () => {
     expect((await route(bare('POST'), id)).status).toBe(404);
   }
   expect((await deleteCommunityEntry(bare('DELETE', 'same-origin'), id)).status).toBe(404);
+});
+
+test('another site cannot send a trend, take the sample, recut it nor import a link', async () => {
+  for (const site of ['cross-site', 'same-site']) {
+    await refused(await postTrend(form('video', site)));
+    await refused(await postTrendSample(json({}, site)));
+    await refused(await postTrendShots(json({ remixRef: 'remix/x.mp4', cuts: [] }, site)));
+    await refused(await postTrendImport(json({ url: 'https://www.tiktok.com/@a/video/1', rights: true }, site)));
+  }
+  // Plain text needs no permission from the browser: refused too.
+  await refused(await postTrendSample(text({})));
+  await refused(await postTrendImport(text({ url: 'https://www.tiktok.com/@a/video/1', rights: true })));
+  expect(existsSync(join(dataDir(), 'uploads'))).toBe(false);
+  // The app's own page gets past the guard: an empty form is the route's own refusal.
+  expect((await postTrend(form(null, 'same-origin'))).status).toBe(400);
 });

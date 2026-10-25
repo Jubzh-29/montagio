@@ -4,7 +4,8 @@ import type { HistoryItem, Reprise } from './api-types';
 
 /** What the Studio sets back from a history item. */
 export type StudioRestore = {
-  tab: HistoryItem['reprise']['tab'];
+  /** A remix reopens on its own page: never a tab of the Studio. */
+  tab: Exclude<HistoryItem['reprise']['tab'], 'remix'>;
   photo?: { imageRef: string; personal: boolean };
   /** A photo made from a text: its text, for an effect's subject. */
   photoPrompt?: string;
@@ -37,7 +38,7 @@ export type StudioRestore = {
 };
 
 /** The tabs the Studio reopens whole: a photo, an ad, a voice change or a film's music stay with their recipe only. */
-export const REPRODUCIBLE_TABS: ReadonlySet<Reprise['tab']> = new Set(['camera', 'film', 'effects', 'avatar', 'motion']);
+export const REPRODUCIBLE_TABS: ReadonlySet<Reprise['tab']> = new Set(['camera', 'film', 'effects', 'avatar', 'motion', 'remix']);
 const NOT_REPRODUCIBLE = new Set<HistoryItem['task']>(['ad', 'voice-change', 'music']);
 
 /** The recipe a reproduction of the item is compared with: its own, or its parent's (an HD clip reopens its clip). */
@@ -65,13 +66,15 @@ export function canReproduce(item: HistoryItem): boolean {
 
 /** The Studio, on the item's tab, told which item to bring back; to reproduce it, with its seed. */
 export function repriseHref(item: HistoryItem, opts: { reproduce?: boolean } = {}): string {
-  return `/?tab=${item.reprise.tab}&from=${encodeURIComponent(item.key)}${opts.reproduce ? '&reproduce=1' : ''}`;
+  // A remix reopens on its own page, not in the Studio.
+  const page = item.reprise.tab === 'remix' ? '/remix?' : `/?tab=${item.reprise.tab}&`;
+  return `${page}from=${encodeURIComponent(item.key)}${opts.reproduce ? '&reproduce=1' : ''}`;
 }
 
 /** Reuse reopens the choices (a new seed comes with the next render); Reproduce reopens the seed too. */
 export function applyReprise(item: HistoryItem, opts: { reproduce?: boolean } = {}): StudioRestore {
   const { reprise } = item;
-  const restore: StudioRestore = { tab: reprise.tab };
+  const restore: StudioRestore = { tab: reprise.tab === 'remix' ? 'motion' : reprise.tab };
   if (reprise.restyle) {
     // The Motion tab in its restyle mode: the image is the look to follow, never the start photo.
     restore.restyle = {

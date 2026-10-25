@@ -22,6 +22,8 @@ export type Layout = {
   runDir: string;
   cacheDir: string;
   statePath: string;
+  /** The pinned yt-dlp the app imports links with (MONTAGIO_YTDLP). */
+  ytDlpExe: string;
 };
 
 export function osOf(platform: string): Os | null {
@@ -73,5 +75,6 @@ export function layout(dir: string, os: Os): Layout {
     runDir: join(dir, 'run'),
     cacheDir: join(dir, 'cache'),
     statePath: join(dir, 'install-state.json'),
+    ytDlpExe: join(dir, 'tools', os === 'windows' ? 'yt-dlp.exe' : 'yt-dlp'),
   };
 }

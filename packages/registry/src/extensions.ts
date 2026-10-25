@@ -22,6 +22,7 @@ export const EXTENSION_TASKS = [
   'motion-transfer',
   'v2v-restyle',
   'v2v-swap',
+  'i2t-trend',
 ] as const;
 export type ExtensionTask = (typeof EXTENSION_TASKS)[number];
 
@@ -75,6 +76,8 @@ export const REQUIRED_EXTENSION_BINDINGS: Record<ExtensionTask, ExtensionBinding
   'v2v-restyle': ['video', 'image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames'],
   // `image` (the new object) is optional as well; `exclude_points` is set only when a job has some
   'v2v-swap': ['video', 'image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames', 'points'],
+  // the sheet of a trend's shots, and the instruction of the post's second pass
+  'i2t-trend': ['image', 'prompt'],
 };
 
 export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
@@ -92,6 +95,7 @@ export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
   'motion-transfer': 'video',
   'v2v-restyle': 'video',
   'v2v-swap': 'video',
+  'i2t-trend': 'file',
 };
 
 const binding = z.object({ node: z.string().min(1), field: z.string().min(1) }).strict();
