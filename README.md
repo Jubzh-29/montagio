@@ -49,7 +49,7 @@ The app opens on **Explore**, the clips it makes and a door to every tool. The S
 
 The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan Right and Crane Up, plus five presets with two moves. Rise & Push, Drift Left Push and Pull Back & Tilt Up run both moves at once; Push & Settle and Breathing run one after the other. The core ComfyUI node takes a single move, so the two-move presets go through a node of the Montagio pack, Montagio Camera Embedding.
 
-### Eight extensions, validated on a 24 GB GPU
+### Nine extensions, validated on a 24 GB GPU
 
 | Extension | In the Studio | Model (license) |
 |---|---|---|
@@ -59,12 +59,11 @@ The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan
 | **Talking avatar** | the Avatar tab: a photo and a text (English or French) give a talking clip, in the built-in voice or in a **voice sample** given with its speaker's consent | Wan 2.2 S2V (Apache-2.0), voice by Chatterbox Multilingual (MIT) |
 | **Music** | "Add music" under a finished film, mixed into the film and its 9:16 cut | ACE-Step 1.5 (MIT) |
 | **HD** | "HD 1080p" under a finished clip, with **smooth motion** ticked by default: RIFE puts a frame between each two, so a 16 fps clip comes out at 32 fps; "HD 2560 px" on a photo of the atelier or of a character | SeedVR2 3B (Apache-2.0), RIFE 4.26 (MIT) |
-| **Motion transfer** | the Motion tab: the character of a photo moves like a reference video of up to 30 s, or like a motion of the **Motion library**, seven dances and moves Montagio made from fictional characters. The character can also be **composed** first by the edit, from a photo of it and one of the outfit it wears | Wan2.2-Animate-2, distilled, with the core context windows past 5 s (Apache-2.0) |
+| **Motion transfer** | the Motion tab: the character of a photo moves like a reference video of up to 30 s, or like a motion of the **Motion library**, seven dances and moves Montagio made from fictional characters. The character can also be **composed** first by the edit, from a photo of it, one of the outfit it wears and one of a product in its hand | Wan2.2-Animate-2, distilled, with the core context windows past 5 s (Apache-2.0) |
 | **Restyle** | the Motion tab's second mode: a clip of up to 5 s and a few words rebuild its whole scene, its motion, camera move and timing kept. An optional image gives a look to follow; without one, the edit restyles the clip's first frame first | Wan 2.1 VACE 14B with a 4-step lightx2v LoRA, guided by the depth of each frame from Depth Anything 3 Small (Apache-2.0) |
+| **Object swap** | the Motion tab's third mode: paint an object on a clip's first frame and say what replaces it, with a photo of the new object if you have one; Montagio follows the object through the clip and redraws it, the rest of the clip untouched | SAM 2.1 base+ (Apache-2.0) follows it, Wan 2.1 VACE 14B redraws it |
 
-The first seven were validated on 2026-10-21; Restyle, motion transfer up to 30 s and the composed character on 2026-10-24. Relight, inpaint, the HD photo, the photodump and the voice sample were added on 2026-10-22 on these same models and weights, and rendered on the L4 the same day: inpaint changes only the painted area, the HD photo takes 14 s to 1440×2560, a voice sample moves the voice from 131 Hz (built-in) to the sample's register. An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
-
-**Next step: object swap.** A ninth extension is written and tested, and stays hidden until a GPU session validates it. In the Motion tab's third mode, you paint an object on the clip's first frame and say what replaces it, with a photo of the new object if you have one; SAM 2.1 (Apache-2.0) follows the object through the clip and VACE 14B redraws it, the rest of the clip untouched. Its tracking has already run on a CPU ComfyUI: two boxing gloves, followed through a turn of the body.
+The first seven were validated on 2026-10-21; Restyle, motion transfer up to 30 s and the composed character on 2026-10-24; the object swap, and a composed character holding a product, on 2026-10-25. Relight, inpaint, the HD photo, the photodump and the voice sample were added on 2026-10-22 on these same models and weights, and rendered on the L4 the same day: inpaint changes only the painted area, the HD photo takes 14 s to 1440×2560, a voice sample moves the voice from 131 Hz (built-in) to the sample's register. An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
 
 ## Proof, measured
 
@@ -92,14 +91,15 @@ Measured on the L4 (an RTX 4090 is about twice as fast, going by the official te
 | HD with smooth motion, 81 frames at 16 fps to 161 at 32 fps in 1080p (SeedVR2 3B, then RIFE 4.26) | 410 s, of which RIFE 4.8 s | 8.6 GB |
 | Motion transfer, 5 s (Animate-2 distilled) | 391–415 s | 20.1–22.2 GB |
 | Motion transfer, 30 s (Animate-2 distilled, 9 context windows) | 3,425 s | 22.6 GB |
-| Composed character (edit, two photos), then its motion transfer, 5 s | 84 s + 425 s | 21.9 GB, 22.6 GB |
+| Composed character (edit, two or three photos), then its motion transfer, 5 s | 82–84 s + 425 s | 22.2 GB, 22.6 GB |
+| Object swap, 5 s at 480p (SAM 2.1, then VACE 14B, 4 steps), from a text or a photo | 207–252 s | 21.0–22.5 GB |
 | Restyle, 5 s at 480p (VACE 14B, 4 steps), after the edit of its first frame (73 s) | 186–239 s | 22.2–22.5 GB |
 
 What the session taught, and changed:
 
 - **The photo's description is required.** Without a text saying what the photo shows, Fun Camera invents and the clip turns ghostly: the diagnosis changed one variable per clip, and the description alone fixed it. The Studio now asks for it, and fills it in whenever the photo's text is known.
 - **HD goes through the upscale.** 480p followed by SeedVR2 gives 1080p about three times faster than rendering 720p natively.
-- **Honest limits.** Fun Camera handles push-ins, pull-backs and side moves well, and vertical moves and rotation poorly: Tilt Up became Crane Up, Tilt Down and a Dutch angle were dropped. Two hooks stay hidden: Iris Dive until it gets an intermediate keyframe, Figurine because its change is barely visible. The avatar's built-in voice is male, whatever the face: a consented voice sample replaces it. Motion transfer needs a photo framed like the reference video. Restyle from a text alone rebuilds the scene but keeps a realistic look: an asked style holds once the edit has restyled the first frame, or with an image to follow. A composed character keeps its face and its outfit, but a product put in its hand beside the outfit comes out as another object (a toy car became a bottle, then a phone).
+- **Honest limits.** Fun Camera handles push-ins, pull-backs and side moves well, and vertical moves and rotation poorly: Tilt Up became Crane Up, Tilt Down and a Dutch angle were dropped. Two hooks stay hidden: Iris Dive until it gets an intermediate keyframe, Figurine because its change is barely visible. The avatar's built-in voice is male, whatever the face: a consented voice sample replaces it. Motion transfer needs a photo framed like the reference video. Restyle from a text alone rebuilds the scene but keeps a realistic look: an asked style holds once the edit has restyled the first frame, or with an image to follow. A composed character keeps its face, its outfit and the product in its hand once the product comes before the outfit in the edit's images; after it, a toy car became a bottle, then a phone.
 
 ## How it works
 
@@ -179,8 +179,8 @@ Montagio covers a one-click studio's main ground today. The next steps follow th
 | Talking avatar | Wan 2.2 S2V, up to 15 s | longer takes with LongCat-Video-Avatar (MIT); the avatar in the local installer |
 | Voice | Chatterbox Multilingual, built-in voice or a consented voice sample | Qwen3-TTS (Apache-2.0) |
 | Music and sound | ACE-Step 1.5, instrumental | songs with lyrics on ACE-Step 1.5; foley waits for a permissive model, as none passes the rule yet |
-| Motion transfer | Animate-2 distilled, up to 30 s; a character composed from photos; a library of seven motions | a product in hand that stays itself; dance driven by the film's music (Wan-Dancer, once its license is read) |
-| Restyle | VACE 14B guided by depth, 5 s | **object swap, the next step**: SAM 2.1 (Apache-2.0) follows a painted object, VACE redraws it, written and tested, waiting for its GPU validation; longer clips |
+| Motion transfer | Animate-2 distilled, up to 30 s; a character composed from photos; a library of seven motions | dance driven by the film's music (Wan-Dancer, once its license is read) |
+| Restyle and object swap | VACE 14B guided by depth, 5 s; one object followed by SAM 2.1 and redrawn | longer clips over several VACE windows; several objects swapped at once |
 | Finishing | SeedVR2: HD 1080p clips, smooth at twice the frame rate with RIFE 4.26; HD 2560 px photos | background removal (BiRefNet), pending a license check at the source |
 | Director | — | an open LLM of the Qwen3 family (Apache-2.0) that turns a short script into a shot list of presets; Qwen3-VL to describe an uploaded photo for you |
 | Sharing and provenance | visible "AI-generated" label | C2PA manifests (c2pa-python, Apache-2.0); the node pack on the Comfy Registry; a community preset library |
