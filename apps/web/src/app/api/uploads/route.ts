@@ -1,7 +1,8 @@
-import { readFormBody } from '@/server/body';
+import { namesThisSite, readFormBody } from '@/server/body';
 import { MAX_UPLOAD_FORM_BYTES, saveUpload, UploadError } from '@/server/uploads';
 
 export async function POST(request: Request) {
+  if (!namesThisSite(request)) return Response.json({ error: 'cross-site' }, { status: 403 });
   // The body is read up to the cap, never whole: a 2 GB file is cut off past 10 MB.
   const body = await readFormBody(request, MAX_UPLOAD_FORM_BYTES);
   if (!body.ok && body.reason === 'too-large') return Response.json({ error: 'images are limited to 10 MB' }, { status: 413 });

@@ -1,5 +1,5 @@
 import { ensureTools } from '@montagio/sequence';
-import { readFormBody } from '@/server/body';
+import { namesThisSite, readFormBody } from '@/server/body';
 import { visibleExtensions } from '@/server/extensions';
 import { mediaUrlFor } from '@/server/generations';
 import { videoPath } from '@/server/tasks/files';
@@ -7,6 +7,7 @@ import { MAX_VIDEO_FORM_BYTES, saveVideoUpload, UploadError } from '@/server/upl
 
 /** A reference clip for a motion transfer, or a clip to restyle: prepared once (5 s at most, 16 fps, silent), then its kept length. */
 export async function POST(request: Request) {
+  if (!namesThisSite(request)) return Response.json({ error: 'cross-site' }, { status: 403 });
   // Nothing is read, nor FFmpeg started, when this server shows neither extension that takes a clip.
   const shown = await visibleExtensions();
   if (!shown.includes('motion') && !shown.includes('restyle')) return Response.json({ error: 'extension-disabled' }, { status: 404 });

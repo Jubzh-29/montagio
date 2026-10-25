@@ -1,4 +1,5 @@
 import { ensureTools } from '@montagio/sequence';
+import { fromThisSite } from '@/server/body';
 import { visibleExtensions } from '@/server/extensions';
 import { mediaUrlFor } from '@/server/generations';
 import { libraryMotionPath, libraryMotions } from '@/server/motions';
@@ -7,6 +8,7 @@ import { saveLibraryVideo } from '@/server/uploads';
 
 /** A motion of the library taken as the reference clip ({ id }): the same answer as a clip sent. */
 export async function POST(request: Request) {
+  if (!fromThisSite(request)) return Response.json({ error: 'cross-site' }, { status: 403 });
   const shown = await visibleExtensions();
   if (!shown.includes('motion') && !shown.includes('restyle')) return Response.json({ error: 'extension-disabled' }, { status: 404 });
   const body = (await request.json().catch(() => null)) as { id?: unknown } | null;

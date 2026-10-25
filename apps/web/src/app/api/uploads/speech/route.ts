@@ -1,5 +1,5 @@
 import { ensureTools } from '@montagio/sequence';
-import { readFormBody } from '@/server/body';
+import { namesThisSite, readFormBody } from '@/server/body';
 import { JobError } from '@/server/errors';
 import { requireExtension } from '@/server/extensions';
 import { mediaUrlFor } from '@/server/generations';
@@ -8,6 +8,7 @@ import { MAX_VIDEO_FORM_BYTES, saveSpeechUpload, UploadError } from '@/server/up
 
 /** A video whose voice will change: its first 30 s kept with their sound, then its length. */
 export async function POST(request: Request) {
+  if (!namesThisSite(request)) return Response.json({ error: 'cross-site' }, { status: 403 });
   // Nothing is read, nor FFmpeg started, for an extension this server does not show.
   try {
     await requireExtension('avatar');

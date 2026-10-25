@@ -33,6 +33,15 @@ export async function readBodyBytes(request: Request, maxBytes: number): Promise
  */
 export function fromThisSite(request: Request): boolean {
   if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) return false;
+  return namesThisSite(request);
+}
+
+/**
+ * Whether the browser, when it names the site a request comes from, names this app's own pages (a
+ * script or curl names none). Another site sends a file upload or a body-less POST without the browser
+ * asking first; another port of localhost is the same site, not this app.
+ */
+export function namesThisSite(request: Request): boolean {
   const site = request.headers.get('sec-fetch-site');
   return site === null || site === 'same-origin' || site === 'none';
 }

@@ -185,6 +185,19 @@ Without a GPU of 12 GB at least, `install --app-only` installs the app alone: no
 | `HF_TOKEN` | a Hugging Face token; not needed for the files of the lock |
 | `MONTAGIO_FFMPEG`, `MONTAGIO_FFPROBE` | FFmpeg and ffprobe outside the `PATH` |
 | `MONTAGIO_YTDLP` | another yt-dlp for the trend remix's import by link than the one the installer pins; without either, the link field says yt-dlp is missing and a file can still be sent |
+| `MONTAGIO_ALLOWED_HOSTS` | other addresses the app answers at, comma list: `192.168.1.20:8080` (that port only), `studio.example` (any port); see [Open the app at another address](#open-the-app-at-another-address) |
+
+### Open the app at another address
+
+The app's API and files (`/api`, `/media`) answer only a request for `localhost`, `127.0.0.1` or `[::1]` on the app's port (3000 by default). A page you have open on another site cannot use them. If that site points its domain at 127.0.0.1 (DNS rebinding), the request still names that domain, and the app refuses it with 403 `host-not-allowed`. A request whose `Origin` is another site, or another port, is refused the same way. A file, a form or plain text that another site sends is refused too (403 `cross-site`).
+
+The start script keeps the app on 127.0.0.1. To open it from another device, put a reverse proxy in front of it (Caddy, nginx, `tailscale serve`). Then list the address you type in the browser before `start`:
+
+```bash
+MONTAGIO_ALLOWED_HOSTS=studio.example,192.168.1.20:8080 ./montagio.sh start
+```
+
+On Windows, set `$env:MONTAGIO_ALLOWED_HOSTS = 'studio.example,192.168.1.20:8080'` in PowerShell first. A name with a port allows that port only; a name alone allows every port. A leading `http://` and a trailing `/` are ignored, so a pasted URL works. An SSH tunnel that keeps the port (`ssh -L 3000:127.0.0.1:3000 …`) needs nothing; a tunnel to another local port needs it listed (`localhost:9000`). The app's log names each refused address once.
 
 ### Extensions
 
