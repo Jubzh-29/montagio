@@ -104,3 +104,7 @@ nodes:
   - { class_type: TextGenerate, source: comfyui-core, license: GPL-3.0 }
   # The translation's second pass: the core comfy_extras/nodes_string.py joins the instruction and the transcription.
   - { class_type: StringConcatenate, source: comfyui-core, license: GPL-3.0 }
+  # Captions (2026-10-25): the pack's own transcription node (Whisper large-v3 turbo through transformers,
+  # which the core already needs), and the core comfy_extras/nodes_text.py, which writes its words as JSON.
+  - { class_type: MontagioTranscribeWords, source: montagio-nodes, license: GPL-3.0 }
+  - { class_type: SaveText, source: comfyui-core, license: GPL-3.0 }

@@ -4,11 +4,12 @@
 
 ![The Montagio nodes in a Wan 2.2 Fun Camera graph: Load Montagio Preset feeds Montagio Camera Embedding, the prompts and the video size](docs/graph-pack.jpg)
 
-The core `WanCameraEmbedding` node takes one camera move. This pack adds three nodes:
+The core `WanCameraEmbedding` node takes one camera move. This pack adds three camera nodes, and one for captions:
 
 - **Montagio Camera Embedding** takes two moves, run **at once** (a crane that rises while it pushes in) or **one after the other** (push in, then hold; zoom in, then out). It is a drop-in for `WanCameraEmbedding`: same inputs, same outputs, and the same tensor when the second move is `Static` and `combine` is `together`.
 - **Load Montagio Preset** turns a camera preset, a small YAML file, into everything the graph needs: the moves and their speed, the video size and frame count, the fps, the prompt and the negative prompt. Pick a preset in its menu instead of rewiring the graph.
 - **Montagio Preset from YAML** does the same from a text field: paste a preset remixed in the Montagio app.
+- **Montagio Transcribe Words** gives the words of a speech with the moment each one is said ([below](#montagio-transcribe-words)): the source of the app's word-by-word captions.
 
 The preset files are the ones the [Montagio app](../README.md) renders, under CC-BY-4.0: the same file gives the same clip in the app and in a ComfyUI graph, and in ComfyUI's App Mode a whole graph becomes a preset menu, an image and a prompt. The 11 presets bundled here were rendered on a 24 GB GPU (an NVIDIA L4) on 2026-10-21, five of them with two moves.
 
@@ -121,6 +122,27 @@ The node builds the camera path itself, and the Plücker embedding comes from Co
 The preset nodes of this pack feed it in `camera_mode` `combined` (see [Wiring](#wiring)): `camera_pose_2` and `combine` come from the preset, or are `Static` and `together` for a preset with one move.
 
 The Montagio app sends this node only for presets that combine two moves. A preset with one move uses the core node, so it runs on a ComfyUI that does not have this pack.
+
+## Montagio Transcribe Words
+
+`MontagioTranscribeWords` runs Whisper on an `AUDIO` input and returns a JSON string (`words_json`, schema `montagio/words@1`):
+- the language, detected or imposed;
+- the duration and the text;
+- Whisper's pieces of words, each with its `start` and `end` in seconds.
+
+Wire it to the core **Save Text** node, format `json`, to get a file.
+
+| Input | Type | Default | Meaning |
+|---|---|---|---|
+| `audio` | AUDIO | | the speech; resampled to 16 kHz mono if needed |
+| `model` | COMBO, the folders of `models/whisper/` that hold a `config.json` | `whisper-large-v3-turbo` | a Hugging Face Whisper folder |
+| `language` | COMBO: `auto` and Whisper's 100 language codes | `auto` | `auto` detects the language on the first 30 s |
+
+The model loads for the job and is freed after it:
+- fp16 on CUDA, fp32 elsewhere;
+- read from its folder only, never downloaded.
+
+It runs on `transformers`, which ComfyUI already needs: the pack adds no dependency. The Montagio app uses `openai/whisper-large-v3-turbo` (MIT, 1.6 GB), with the files of its lock, in `models/whisper/whisper-large-v3-turbo/`.
 
 ## App Mode
 

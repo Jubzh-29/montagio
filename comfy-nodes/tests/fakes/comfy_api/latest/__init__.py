@@ -166,6 +166,15 @@ class Image(_ComfyType):
         pass
 
 
+@_comfytype("AUDIO")
+class Audio(_ComfyType):
+    class Input(Input):
+        pass
+
+    class Output(Output):
+        pass
+
+
 @_comfytype("WAN_CAMERA_EMBEDDING")
 class WanCameraEmbedding(_ComfyType):
     class Input(Input):
@@ -285,5 +294,6 @@ io = SimpleNamespace(
     Int=Int,
     Float=Float,
     Image=Image,
+    Audio=Audio,
     WanCameraEmbedding=WanCameraEmbedding,
 )

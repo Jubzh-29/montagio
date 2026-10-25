@@ -156,6 +156,15 @@ sources:
     role: mirror
     revision: 63d0f7c476756b88910170c1df75e2384ea1af31
     license_file: false
+  # Captions (2026-10-25): Whisper large-v3 turbo. Its card metadata (cardData.license) and the README's
+  # front matter read "mit" at this revision; no LICENSE file in the repository. OpenAI's own repository
+  # (github.com/openai/whisper) puts the code and the model weights under the MIT License.
+  - repo: openai/whisper-large-v3-turbo
+    license: MIT
+    role: source
+    revision: 41f01f3fe87f28c78e2fbf8b568835947dd65ed9
+    license_file: false
+    note: also the download repository (no mirror)
 
   # Edit: the Lightning LoRA and the looks (each its own source and download repository).
   - repo: lightx2v/Qwen-Image-Edit-2511-Lightning

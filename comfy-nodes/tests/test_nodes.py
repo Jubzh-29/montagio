@@ -29,6 +29,7 @@ from montagio_nodes.nodes import (
     MontagioExtension,
     MontagioLoadPreset,
     MontagioPresetFromYAML,
+    MontagioTranscribeWords,
     comfy_entrypoint,
     preset_dirs,
 )
@@ -441,7 +442,7 @@ def test_package_entrypoint_is_v3_only(pack):
     # with a NODE_CLASS_MAPPINGS, ComfyUI would stop there and never call comfy_entrypoint
     assert hasattr(pack, "comfy_entrypoint") and not hasattr(pack, "NODE_CLASS_MAPPINGS")
     ext = asyncio.run(pack.comfy_entrypoint())
-    assert {n.__name__ for n in asyncio.run(ext.get_node_list())} == {"MontagioLoadPreset", "MontagioPresetFromYAML", "MontagioCameraEmbedding"}
+    assert {n.__name__ for n in asyncio.run(ext.get_node_list())} == {"MontagioLoadPreset", "MontagioPresetFromYAML", "MontagioCameraEmbedding", "MontagioTranscribeWords"}
 
 
 def test_the_extension_is_what_the_comfyui_loader_accepts():
@@ -449,8 +450,8 @@ def test_the_extension_is_what_the_comfyui_loader_accepts():
     extension = asyncio.run(comfy_entrypoint())
     assert isinstance(extension, MontagioExtension) and isinstance(extension, ComfyExtension)
     node_list = asyncio.run(extension.get_node_list())
-    assert node_list == [MontagioLoadPreset, MontagioPresetFromYAML, MontagioCameraEmbedding]
-    assert sorted(node.GET_SCHEMA().node_id for node in node_list) == ["MontagioCameraEmbedding", "MontagioLoadPreset", "MontagioPresetFromYAML"]
+    assert node_list == [MontagioLoadPreset, MontagioPresetFromYAML, MontagioCameraEmbedding, MontagioTranscribeWords]
+    assert sorted(node.GET_SCHEMA().node_id for node in node_list) == ["MontagioCameraEmbedding", "MontagioLoadPreset", "MontagioPresetFromYAML", "MontagioTranscribeWords"]
     asyncio.run(extension.on_load())
 
 
@@ -490,7 +491,7 @@ def test_the_pack_loads_when_its_folder_is_not_on_sys_path(tmp_path):
     )
     assert done.returncode == 0, done.stderr
     assert json.loads(done.stdout.strip().splitlines()[-1]) == {
-        "ids": ["MontagioCameraEmbedding", "MontagioLoadPreset", "MontagioPresetFromYAML"],
+        "ids": ["MontagioCameraEmbedding", "MontagioLoadPreset", "MontagioPresetFromYAML", "MontagioTranscribeWords"],
         "pack_dir_on_sys_path": False,
     }
 
@@ -511,8 +512,8 @@ def pack_sources():
 @pytest.mark.parametrize("path", pack_sources(), ids=lambda path: path.name)
 def test_pack_modules_import_only_what_they_may(path):
     allowed = set(sys.stdlib_module_names) - FORBIDDEN_MODULES | {"yaml", "numpy"}
-    if path.name == "nodes.py":  # the only module that talks to ComfyUI (and to torch, which comes with it)
-        allowed |= {"comfy_api", "folder_paths", "comfy", "torch"}
+    if path.name == "nodes.py":  # the only module that talks to ComfyUI (and to torch and transformers, which come with it)
+        allowed |= {"comfy_api", "folder_paths", "comfy", "torch", "transformers"}
     tree = ast.parse(path.read_text(encoding="utf-8"))
     imported, called = set(), set()
     for node in ast.walk(tree):
@@ -530,3 +531,90 @@ def test_every_python_file_of_the_pack_has_the_license_header():
     files = [path for path in PACK_DIR.rglob("*.py") if "__pycache__" not in path.parts]
     assert PACK_DIR / "__init__.py" in files and FAKES_DIR / "folder_paths.py" in files
     assert [path for path in files if path.read_text(encoding="utf-8").splitlines()[:1] != [SPDX]] == []
+
+
+# --- Montagio Transcribe Words (Whisper) ---------------------------------------------------
+
+
+def whisper_model(models, name="whisper-large-v3-turbo"):
+    folder = models / "whisper" / name
+    folder.mkdir(parents=True)
+    (folder / "config.json").write_text("{}")
+    return folder
+
+
+def test_transcribe_words_schema():
+    schema = MontagioTranscribeWords.GET_SCHEMA()
+    assert (schema.node_id, schema.display_name, schema.category) == ("MontagioTranscribeWords", "Montagio Transcribe Words", "Montagio")
+    assert [(item.id, item.io_type, item.optional) for item in schema.inputs] == [("audio", "AUDIO", False), ("model", "COMBO", False), ("language", "COMBO", False)]
+    assert [(output.display_name, output.io_type) for output in schema.outputs] == [("words_json", "STRING")]
+    language = schema.inputs[2]
+    assert language.default == "auto" and language.options[0] == "auto" and "fr" in language.options
+
+
+def test_transcribe_words_lists_the_models_of_the_whisper_folder(fake_models_dir):
+    whisper_model(fake_models_dir)
+    (fake_models_dir / "whisper" / "not-a-model").mkdir()
+    model = MontagioTranscribeWords.define_schema().inputs[1]
+    assert model.options == ["whisper-large-v3-turbo"] and model.default == "whisper-large-v3-turbo"
+
+
+def test_transcribe_words_offers_the_default_model_before_it_is_downloaded():
+    model = MontagioTranscribeWords.define_schema().inputs[1]
+    assert model.options == ["whisper-large-v3-turbo"]
+
+
+def test_transcribe_words_runs_whisper_on_16k_mono_and_returns_the_document(fake_models_dir, monkeypatch):
+    import numpy as np
+    from comfy import model_management
+
+    folder = whisper_model(fake_models_dir)
+    seen = {}
+
+    def fake_run(model_dir, samples, *, language, device):
+        seen.update(model_dir=model_dir, samples=samples, language=language, device=device)
+        return {"text": " Hi there", "chunks": [{"text": " Hi", "timestamp": (0.0, 0.4)}, {"text": " there", "timestamp": (0.4, None)}]}, "en", True
+
+    monkeypatch.setattr(nodes, "_run_whisper", fake_run)
+    model_management.calls.clear()
+
+    class Waveform:  # what LoadAudio gives: a [batch, channels, samples] tensor, here stereo at 24 kHz
+        def __init__(self, array):
+            self.array = array
+
+        def __getitem__(self, index):
+            return Waveform(self.array[index])
+
+        def cpu(self):
+            return self
+
+        def float(self):
+            return self
+
+        def numpy(self):
+            return self.array
+
+    waveform = Waveform(np.zeros((1, 2, 24000), dtype=np.float32))
+    out = MontagioTranscribeWords.execute(audio={"waveform": waveform, "sample_rate": 24000}, model="whisper-large-v3-turbo", language="auto")
+    doc = json.loads(out.args[0])
+    assert doc == {
+        "schema": "montagio/words@1",
+        "model": "whisper-large-v3-turbo",
+        "language": "en",
+        "detected": True,
+        "duration_s": 1.0,
+        "text": " Hi there",
+        "chunks": [{"text": " Hi", "start": 0.0, "end": 0.4}, {"text": " there", "start": 0.4, "end": None}],
+    }
+    assert seen["model_dir"] == str(folder) and seen["language"] == "auto" and seen["device"] == "cpu"
+    assert seen["samples"].shape == (16000,)
+    names = [call[0] for call in model_management.calls]
+    assert names.index("free_memory") < names.index("soft_empty_cache")
+
+
+def test_transcribe_words_refuses_a_model_that_is_not_in_the_folder(fake_models_dir):
+    with pytest.raises(ValueError, match="whisper-large-v3-turbo"):
+        MontagioTranscribeWords.execute(audio={"waveform": None, "sample_rate": 16000}, model="whisper-large-v3-turbo", language="auto")
+    whisper_model(fake_models_dir)
+    with pytest.raises(ValueError, match="language"):
+        MontagioTranscribeWords.execute(audio={"waveform": None, "sample_rate": 16000}, model="whisper-large-v3-turbo", language="klingon")
