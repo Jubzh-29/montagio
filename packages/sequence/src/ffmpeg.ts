@@ -674,6 +674,196 @@ export async function decodeCheck(media: string): Promise<void> {
   await run(ffmpeg(), ['-v', 'error', '-xerror', '-i', media, '-f', 'null', '-'], { failOnStderr: true });
 }
 
+// --- Trend remix: a clip of several shots, each shot made again, put back on the same frames ----
+
+/** The frame rate a remix source keeps: its own, halved (or more) above 30 fps, so a 60 fps phone clip runs at 30. */
+export const REMIX_MAX_FPS = 30;
+
+/** The frame rate kept from a source at `fps`: itself up to 30, else divided by the smallest whole number that brings it there. */
+export function remixFps(fps: number): number {
+  if (!(fps > 0)) return REMIX_MAX_FPS;
+  return fps <= REMIX_MAX_FPS ? fps : fps / Math.ceil(fps / REMIX_MAX_FPS);
+}
+
+/** The frames of a video's first stream, counted from its packets (exact, without decoding). */
+export async function countFrames(media: string): Promise<number> {
+  const out = await run(ffprobe(), [
+    '-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0',
+    ...LOCAL_FILE_ONLY, media,
+  ]);
+  return Number(out.trim().split(/\s+/)[0]) || 0;
+}
+
+/**
+ * A trend's clip prepared once for a remix: its first `max_s` seconds (60 by default) at a constant
+ * frame rate (its own, 30 fps at most, `remixFps`), in H.264 with even sizes, its sound kept in AAC
+ * when it has one, without its metadata (a phone writes where it filmed). Read as a local file and a
+ * real container only. Returns what the shot list and the reassembly count on: the exact frame count.
+ */
+export async function prepareRemixSource(
+  input: string,
+  out: string,
+  opts: { max_s?: number } = {},
+): Promise<{ duration_s: number; fps: number; frames: number; width: number; height: number; audio: boolean }> {
+  const { max_s = 60 } = opts;
+  const source = await probe(input);
+  const fps = remixFps(source.fps);
+  const audio = (await probeAudio(input)) !== null;
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    ...LOCAL_FILE_ONLY, ...SENT_VIDEO, '-i', input,
+    '-map', '0:v:0', ...(audio ? ['-map', '0:a:0'] : []), '-map_metadata', '-1',
+    '-t', String(max_s),
+    '-vf', `fps=${fps},scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1`,
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18', '-pix_fmt', 'yuv420p',
+    ...(audio ? ['-c:a', 'aac', '-b:a', '160k'] : []),
+    '-movflags', '+faststart',
+    '-f', 'mp4', partial,
+  ]);
+  const prepared = await probe(out);
+  return { duration_s: prepared.duration_s, fps: prepared.fps, frames: await countFrames(out), width: prepared.width, height: prepared.height, audio };
+}
+
+/**
+ * Where a clip's shots start: the frames FFmpeg's scene filter scores over `threshold` (0.3 by
+ * default), none closer than `minShot_s` (0.25 s) to the cut before it or to either end, so a flash
+ * is not a shot. The first shot starts at frame 0, which is not listed.
+ */
+export async function detectShots(
+  video: string,
+  opts: { threshold?: number; minShot_s?: number } = {},
+): Promise<{ cuts: number[]; fps: number; frames: number }> {
+  const { threshold = 0.3, minShot_s = 0.25 } = opts;
+  const { fps } = await probe(video);
+  const frames = await countFrames(video);
+  const out = await run(ffmpeg(), [
+    '-loglevel', 'error', '-nostats',
+    ...LOCAL_FILE_ONLY, '-i', video,
+    '-an', '-vf', `select='gt(scene,${threshold})',metadata=print:file=-`,
+    '-f', 'null', '-',
+  ]);
+  const minGap = Math.max(1, Math.round(minShot_s * fps));
+  const cuts: number[] = [];
+  for (const match of out.matchAll(/pts_time:([\d.]+)/g)) {
+    const frame = Math.round(Number(match[1]) * fps);
+    const previous = cuts.at(-1) ?? 0;
+    if (frame - previous >= minGap && frames - frame >= minGap) cuts.push(frame);
+  }
+  return { cuts, fps, frames };
+}
+
+/** The [start, end) frame ranges of the shots `cuts` make in a clip of `frames` frames. */
+export function shotRanges(cuts: readonly number[], frames: number): { start: number; end: number }[] {
+  const starts = [0, ...[...new Set(cuts)].filter((cut) => cut > 0 && cut < frames).sort((a, b) => a - b)];
+  return starts.map((start, index) => ({ start, end: starts[index + 1] ?? frames }));
+}
+
+/**
+ * One shot of a remix source, frames [start, end), silent, at the source's frame rate: the clip a
+ * model makes again. A shot shorter than `min_s` (1 s, the shortest clip the video models take)
+ * is padded with its last frame; the reassembly cuts it back to its own length.
+ */
+export async function cutShot(video: string, out: string, opts: { start: number; end: number; fps: number; min_s?: number }): Promise<{ frames: number }> {
+  const { start, end, fps, min_s = 1 } = opts;
+  if (!(end > start)) throw new SequenceToolError(`a shot needs at least one frame, not ${start} to ${end}`);
+  const frames = end - start;
+  const pad = Math.max(0, Math.ceil(min_s * fps) - frames);
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    ...LOCAL_FILE_ONLY, '-i', video,
+    '-map', '0:v:0', '-an', '-map_metadata', '-1',
+    '-vf', `trim=start_frame=${start}:end_frame=${end},setpts=PTS-STARTPTS${pad > 0 ? `,tpad=stop_mode=clone:stop=${pad}` : ''}`,
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-pix_fmt', 'yuv420p',
+    '-f', 'mp4', partial,
+  ]);
+  return { frames: frames + pad };
+}
+
+/** Frames `at` of a clip, as PNGs at `out(index)`, at the clip's size: the first frame of each shot. */
+export async function framesAt(video: string, at: readonly number[], out: (index: number) => string): Promise<string[]> {
+  const paths: string[] = [];
+  for (const [index, frame] of at.entries()) {
+    const path = out(index);
+    await writeAtomically(path, (partial) => [
+      '-loglevel', 'error', '-y',
+      ...LOCAL_FILE_ONLY, '-i', video,
+      '-vf', `select=eq(n\\,${frame})`, '-frames:v', '1', '-map_metadata', '-1',
+      '-f', 'image2', '-c:v', 'png', partial,
+    ]);
+    paths.push(path);
+  }
+  return paths;
+}
+
+/**
+ * A contact sheet of up to 16 pictures, in reading order, `cols` across (4): the shots of a remix as
+ * the captioning model reads them. Each tile keeps the pictures' shape (`aspect`, width over height),
+ * `tile` pixels wide (256); the empty places of the last row stay white.
+ */
+export async function shotSheet(
+  inputs: readonly string[],
+  out: string,
+  opts: { cols?: number; tile?: number; aspect: number },
+): Promise<{ width: number; height: number }> {
+  if (inputs.length < 1 || inputs.length > 16) throw new SequenceToolError(`a shot sheet holds 1 to 16 pictures, not ${inputs.length}`);
+  const cols = Math.min(opts.cols ?? 4, inputs.length);
+  const rows = Math.ceil(inputs.length / cols);
+  const w = opts.tile ?? 256;
+  const h = 2 * Math.round(w / opts.aspect / 2);
+  const tiles = inputs.map(
+    (_, index) => `[${index}:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=white,setsar=1,format=rgb24[t${index}]`,
+  );
+  const blanks = Array.from({ length: rows * cols - inputs.length }, (_, index) => `color=c=white:s=${w}x${h}:d=1,format=rgb24[b${index}]`);
+  const labels = [...inputs.map((_, index) => `[t${index}]`), ...blanks.map((_, index) => `[b${index}]`)].join('');
+  const layout = Array.from({ length: rows * cols }, (_, index) => `${(index % cols) * w}_${Math.floor(index / cols) * h}`).join('|');
+  const join = rows * cols === 1 ? '[t0]null[out]' : `${labels}xstack=inputs=${rows * cols}:layout=${layout}[out]`;
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    ...inputs.flatMap((input) => [...LOCAL_FILE_ONLY, '-i', input]),
+    '-filter_complex', [...tiles, ...blanks, join].join(';'),
+    '-map', '[out]', '-frames:v', '1', '-map_metadata', '-1',
+    '-f', 'image2', '-c:v', 'png', partial,
+  ]);
+  return { width: cols * w, height: rows * h };
+}
+
+/**
+ * A remix put back together: each rendered shot fitted to the source's size, retimed to the
+ * source's frame rate and cut, or padded with its last frame, to the exact frame count of the shot
+ * it replaces, then joined; so every cut falls on the frame it fell on in the source. The sound is
+ * the source's when `audioFrom` is given, else there is none.
+ */
+export async function assembleShots(
+  clips: readonly string[],
+  out: string,
+  opts: { frames: readonly number[]; fps: number; width: number; height: number; audioFrom?: string; tags?: VideoTags },
+): Promise<{ frames: number }> {
+  if (clips.length === 0 || clips.length !== opts.frames.length) throw new SequenceToolError('assembleShots needs one frame count per clip');
+  const { fps, width: w, height: h } = opts;
+  const fitted = clips.map((_, index) => {
+    const n = opts.frames[index]!;
+    return (
+      `[${index}:v]fps=${fps},scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1,` +
+      `tpad=stop_mode=clone:stop=${n},trim=end_frame=${n},setpts=PTS-STARTPTS,format=yuv420p[v${index}]`
+    );
+  });
+  const joined = `${clips.map((_, index) => `[v${index}]`).join('')}concat=n=${clips.length}:v=1:a=0[out]`;
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    ...clips.flatMap((clip) => [...LOCAL_FILE_ONLY, '-i', clip]),
+    ...(opts.audioFrom ? [...LOCAL_FILE_ONLY, '-i', opts.audioFrom] : []),
+    '-filter_complex', `${fitted.join(';')};${joined}`,
+    '-map', '[out]',
+    ...(opts.audioFrom ? ['-map', `${clips.length}:a:0?`, '-c:a', 'aac', '-b:a', '160k', '-shortest'] : []),
+    '-r', String(fps),
+    '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
+    ...metadataArgs(opts.tags ?? AI_METADATA),
+    '-movflags', '+faststart',
+    '-f', 'mp4', partial,
+  ]);
+  return { frames: opts.frames.reduce((sum, n) => sum + n, 0) };
+}
+
 const checkedTools = new Map<string, Promise<void>>();
 
 /** Fail fast (and once per binary pair) when FFmpeg or ffprobe is not installed. */
