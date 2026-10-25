@@ -1,4 +1,4 @@
-import { ASS_GENERATOR, buildAss, CAPTION_STYLE_IDS, CAPTION_STYLES, escapeAssText, isCaptionStyle, type CaptionTrack } from '../src';
+import { ASS_GENERATOR, buildAss, CAPTION_STYLE_IDS, CAPTION_STYLES, escapeAssText, isCaptionStyle, textWidth, type CaptionTrack } from '../src';
 
 const track: CaptionTrack = {
   language: 'en',
@@ -48,9 +48,10 @@ describe('buildAss', () => {
     expect(fields[3]).toBe('&H0015CCFA');
     expect(fields[4]).toBe('&H00E6E6E6');
     const events = dialogues(ass);
-    expect(events).toHaveLength(1); // 22 characters, 5 words: one line, held 0.3 s after its last word
-    expect(events[0]).toContain('0:00:00.00,0:00:01.90');
-    expect(events[0]).toContain('{\\fad(120,120)}{\\kf68}Hello, {\\kf18}this {\\kf16}is {\\kf10}a {\\k18}{\\kf30}test.');
+    expect(events).toHaveLength(2); // 18 characters at most: "Hello, this is a", then "test."
+    expect(events[0]).toContain('0:00:00.00,0:00:01.30');
+    expect(events[0]).toContain('{\\fad(120,120)}{\\kf68}Hello, {\\kf18}this {\\kf16}is {\\kf10}a');
+    expect(events[1]).toContain('0:00:01.30,0:00:01.90');
     // a silence between two words of a line is a \k with no text
     const paused = buildAss({ language: 'en', words: [track.words[0]!, { text: 'there', start: 1, end: 1.4 }] }, 'karaoke');
     expect(dialogues(paused)[0]).toContain('{\\kf68}Hello, {\\k32}{\\kf40}there');
@@ -78,7 +79,7 @@ describe('buildAss', () => {
     expect(fields[6]).toBe('&H99000000');
     const long = 'This sentence is long enough to need a second line'.split(' ').map((text, index) => ({ text, start: index * 0.3, end: index * 0.3 + 0.3 }));
     const events = dialogues(buildAss({ language: 'en', words: long }, 'classic'));
-    expect(events[0]).toContain('{\\fad(150,150)}');
+    expect(events[0]).toContain('{\\fad(150,150)');
     for (const event of events) expect(event.split('\\N').length).toBeLessThanOrEqual(2);
     expect(events.some((event) => event.includes('\\N'))).toBe(true);
   });
@@ -113,5 +114,43 @@ describe('escapeAssText', () => {
     const escaped = escapeAssText('a{b}\\c\nd');
     expect(escaped).not.toMatch(/[{}\\\n]/);
     expect(escaped).toBe('a｛b｝＼c d');
+  });
+
+  it('drops control characters and turns the Unicode line separators into spaces', () => {
+    expect(escapeAssText('a\u0000b\u0007c\u2028d\u0085e')).toBe('abc de');
+  });
+});
+
+describe('the frame', () => {
+  const LONG = { language: 'de', words: [{ text: 'Geschwindigkeitsbegrenzung', start: 0, end: 1.2 }] };
+  /** The scale a dialogue's text is drawn at: its last \fscx, in hundredths. */
+  const lastScale = (event: string) => Number([...event.matchAll(/\\fscx(\d+)/g)].at(-1)![1]) / 100;
+
+  it('keeps the margins clear of the buttons TikTok and Reels stack on the right', () => {
+    const fields = styleLine(buildAss(track, 'pop'));
+    expect([fields[19], fields[20]]).toEqual(['90', '150']);
+  });
+
+  it('shrinks a word too long for the frame, in every style, and leaves a short one as it is', () => {
+    for (const id of CAPTION_STYLE_IDS) {
+      const ass = buildAss(LONG, id);
+      const event = dialogues(ass).at(-1)!;
+      const style = CAPTION_STYLES[id];
+      const text = style.uppercase ? 'GESCHWINDIGKEITSBEGRENZUNG' : 'Geschwindigkeitsbegrenzung';
+      expect(event, id).toMatch(/\\fscx\d+/);
+      expect(textWidth(text, style) * lastScale(event), id).toBeLessThanOrEqual(840 + 2);
+    }
+    expect(dialogues(buildAss(track, 'classic'))[0]).not.toMatch(/\\fscx/);
+  });
+
+  it('shrinks the stamp of one word from its 180 % and every scale of a pop line alike', () => {
+    const word = dialogues(buildAss(LONG, 'word'))[0]!;
+    const [stamp, settle] = [...word.matchAll(/\\fscx(\d+)/g)].map((match) => Number(match[1]));
+    expect(stamp! / settle!).toBeCloseTo(1.8, 1);
+    expect(settle).toBeLessThan(100);
+    const pop = dialogues(buildAss({ language: 'de', words: [{ text: 'die', start: 0, end: 0.3 }, ...LONG.words.map((w) => ({ ...w, start: 0.3, end: 1.5 }))] }, 'pop'));
+    const long = pop.filter((event) => event.includes('GESCHWINDIGKEITSBEGRENZUNG'));
+    expect(long).not.toHaveLength(0);
+    for (const event of long) for (const match of event.matchAll(/\\fscx(\d+)/g)) expect(Number(match[1])).toBeLessThan(121);
   });
 });

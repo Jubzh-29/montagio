@@ -18,6 +18,9 @@ function substitutionCost(a: string, b: string): number {
   return 1 - 0.5 * (prefix / Math.max(a.length, b.length, 1));
 }
 
+/** The longest silence a fixed word may span to take a dropped neighbour's time (the pause that ends a caption line). */
+const ABSORB_GAP_S = 0.5;
+
 type Step = { kind: 'pair'; edited: number; heard: number } | { kind: 'added'; edited: number } | { kind: 'dropped'; heard: number };
 
 /** The cheapest way to turn the heard words into the edited ones (Levenshtein), in order. */
@@ -65,17 +68,24 @@ export function alignText(words: CaptionWord[], text: string, duration_s: number
     }
   });
 
-  // A dropped word next to a fixed one gives it its time; next to an unchanged word, it stays a pause.
-  steps.forEach((step, index) => {
-    if (step.kind !== 'dropped') return;
-    const heard = words[step.heard]!;
-    const before = steps.slice(0, index).reverse().find((other) => other.kind !== 'dropped');
-    const after = steps.slice(index + 1).find((other) => other.kind !== 'dropped');
+  // A run of dropped words next to a fixed one gives it its time, the nearest word first and on while no pause
+  // lies between them (a sweep must not crawl through a silence); next to an unchanged word, it stays a pause.
+  for (let first = 0; first < steps.length; first++) {
+    if (steps[first]!.kind !== 'dropped') continue;
+    let last = first;
+    while (steps[last + 1]?.kind === 'dropped') last++;
+    const before = steps[first - 1];
+    const after = steps[last + 1];
     const previous = before?.kind === 'pair' ? spans[before.edited] : null;
     const next = after?.kind === 'pair' ? spans[after.edited] : null;
-    if (previous?.fixed) previous.end = Math.max(previous.end, heard.end);
-    else if (next?.fixed) next.start = Math.min(next.start, heard.start);
-  });
+    const heardAt = (index: number) => words[(steps[index] as { heard: number }).heard]!;
+    if (previous?.fixed) {
+      for (let index = first; index <= last && heardAt(index).start - previous.end <= ABSORB_GAP_S; index++) previous.end = Math.max(previous.end, heardAt(index).end);
+    } else if (next?.fixed) {
+      for (let index = last; index >= first && next.start - heardAt(index).end <= ABSORB_GAP_S; index--) next.start = Math.min(next.start, heardAt(index).start);
+    }
+    first = last;
+  }
 
   // Added words: a run shares the span of the word before it, or of the word after it at the start.
   let index = 0;

@@ -20,6 +20,8 @@
  * FrameInterpolationModelLoader, FrameInterpolate and ComfyMathExpression (the smooth motion of the HD
  * pass) come from the CPU ComfyUI v0.41.0 on 2026-10-24, its frame_interpolation folder holding the
  * lock's rife_v4.26.safetensors (tooltips removed).
+ * MontagioTranscribeWords (the captions, from the Montagio pack) and SaveText come from the same CPU ComfyUI on
+ * 2026-10-25, its whisper folder holding the lock's whisper-large-v3-turbo (tooltips removed).
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -228,7 +230,7 @@ test('the avatar job compiled for 1, 2 and 3 chunks is accepted', () => {
 test('every class of the fixture comes from the core of ComfyUI or from the Montagio pack', () => {
   for (const [name, spec] of Object.entries(info)) {
     const origin =
-      name === 'MontagioCameraEmbedding'
+      name.startsWith('Montagio')
         ? 'custom_nodes.montagio'
         : name.startsWith('Chatterbox')
           ? 'custom_nodes.ComfyUI-Chatterbox'

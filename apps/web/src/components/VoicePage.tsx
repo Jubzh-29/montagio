@@ -271,7 +271,7 @@ export function VoicePage({ mode = 'change' }: { mode?: 'change' | 'translate' }
                     {t('voiceChangeDownload')}
                   </a>
                   <p className={studio.hint}>{t('adCaption')}</p>
-                  {!IS_SHOWCASE && info?.captions && <CaptionsPanel key={done.id} parentJobId={done.id} estimate_s={info.captions.estimate_s} model={info.captions.model} />}
+                  {!IS_SHOWCASE && info?.captions && <CaptionsPanel key={done.id} parentJobId={done.id} parentTask={translating ? 'translate' : 'voice-change'} estimate_s={info.captions.estimate_s} model={info.captions.model} />}
                 </>
               ) : (
                 !busy && <p className={styles.empty}>{t(translating ? 'translateEmpty' : 'voiceChangeEmpty')}</p>

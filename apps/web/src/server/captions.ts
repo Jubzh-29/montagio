@@ -1,15 +1,15 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { alignText, buildAss, CAPTION_STYLES, isCaptionLanguage, isCaptionStyle, segmentWords, type CaptionStyleId } from '@montagio/captions';
+import { alignText, buildAss, CAPTION_STYLES, CAPTION_TEXT_MAX, isCaptionLanguage, isCaptionStyle, segmentWords, type CaptionStyleId } from '@montagio/captions';
 import { compactRecipe } from '@montagio/recipe';
 import { AI_METADATA, captionFrame, RECIPE_TAG, renderVertical } from '@montagio/sequence';
 import type { CaptionExportSummary, CaptionsInfo, Transcript } from '@/lib/api-types';
 import { copyCaptionFonts } from './caption-fonts';
 import { JobError } from './errors';
+import { assertNoBlockedName } from './guards';
 import { mediaFileFor, mediaUrlFor } from './generations';
 import { jobDir, jobs, updateJob, type JobRecord } from './jobs';
-import { captionsExportRecipe, replaceJobRecipe } from './recipe';
 import { writeAtomic } from './store';
 
 /** What Whisper heard, beside the transcription job's record. */
@@ -20,9 +20,6 @@ const ASS_FILE = 'captions.ass';
 const VIDEO_FILE = 'video.mp4';
 const STATE_FILE = 'state.json';
 const EXPORT_ID = /^[a-z0-9]{1,16}-[0-9a-f]{4}$/;
-
-/** The corrected text of a captions export, in characters. */
-export const CAPTION_TEXT_MAX = 2000;
 
 export type CaptionExportRequest = { text: string; style: CaptionStyleId };
 
@@ -53,11 +50,16 @@ export async function readTranscript(jobId: string): Promise<{ record: JobRecord
   }
 }
 
-/** The text, the style and the language of a request, against the transcript: language-unsupported or invalid-input otherwise. */
-function captionsRequest(body: unknown, transcript: Transcript): CaptionsRequest {
-  const language = (body as { language?: unknown } | null)?.language ?? transcript.language;
-  if (!isCaptionLanguage(language)) throw new JobError('language-unsupported');
-  return { ...readExportRequest(body), language };
+/**
+ * The text and the style of a request, in the transcript's language (a language sent with them is not
+ * taken: the words were heard in that one): language-unsupported, invalid-input or blocked-name otherwise.
+ * Burned into a video, the text is held to the same list of names as everything a user writes.
+ */
+async function captionsRequest(body: unknown, transcript: Transcript): Promise<CaptionsRequest> {
+  if (!isCaptionLanguage(transcript.language)) throw new JobError('language-unsupported');
+  const request = { ...readExportRequest(body), language: transcript.language };
+  await assertNoBlockedName(request.text);
+  return request;
 }
 
 /** The ASS script of a request and the fonts it names, in `dir`, where FFmpeg will run. */
@@ -65,7 +67,7 @@ async function writeLayer(dir: string, transcript: Transcript, request: Captions
   const words = alignText(transcript.words, request.text, transcript.duration_s);
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, ASS_FILE), buildAss({ language: request.language, words }, request.style));
-  await copyCaptionFonts(dir);
+  await copyCaptionFonts(dir, [CAPTION_STYLES[request.style].font.file]);
   return { words, layer: { dir, ass: ASS_FILE, fonts: 'fonts' } };
 }
 
@@ -78,7 +80,9 @@ function clipOf(record: JobRecord): string {
 /** Render one export in `dir`: the 9:16 clip with the captions burned in, the AI mention and the export's recipe, in the file and beside the job. */
 async function renderExport(record: JobRecord, transcript: Transcript, request: CaptionsRequest, dir: string): Promise<string> {
   const { layer } = await writeLayer(dir, transcript, request);
-  const recipe = await captionsExportRecipe(record.id, request);
+  // recipe.ts reads the job engine, which reads the tasks: imported when needed, not at load.
+  const { captionsExportRecipe, replaceJobRecipe } = await import('./recipe');
+  const recipe = await captionsExportRecipe(record.id, { text: request.text, style: request.style });
   const video = join(dir, VIDEO_FILE);
   await renderVertical(clipOf(record), video, { captions: layer, tags: { ...AI_METADATA, ...(recipe ? { [RECIPE_TAG.video]: compactRecipe(recipe) } : {}) } });
   if (recipe) await replaceJobRecipe(record.id, recipe);
@@ -94,11 +98,18 @@ const writeState = (dir: string, state: CaptionExportSummary) => writeAtomic(joi
 const holder = globalThis as typeof globalThis & { __montagioCaptionExports?: { queue: Promise<unknown>; running: Set<string> } };
 const exportsInFlight = (holder.__montagioCaptionExports ??= { queue: Promise.resolve(), running: new Set() });
 
+/** Run `work` once the exports before it are done; a failure of one never stops the next. */
+function enqueue<T>(work: () => Promise<T>): Promise<T> {
+  const turn = exportsInFlight.queue.then(work);
+  exportsInFlight.queue = turn.catch(() => undefined);
+  return turn;
+}
+
 /** POST /api/captions/:id/export: an export starts (or waits its turn); its state is polled. */
 export async function startExport(jobId: string, body: unknown): Promise<CaptionExportSummary> {
   const read = await readTranscript(jobId);
   if (!read) throw new CaptionsNotFound(jobId);
-  const request = captionsRequest(body, read.transcript);
+  const request = await captionsRequest(body, read.transcript);
   const id = newExportId();
   const dir = exportDir(jobId, id);
   const state: CaptionExportSummary = { id, style: request.style, state: 'running', createdAt: new Date().toISOString() };
@@ -107,7 +118,7 @@ export async function startExport(jobId: string, body: unknown): Promise<Caption
   await writeState(dir, state);
   const key = `${jobId}/${id}`;
   exportsInFlight.running.add(key);
-  const work = exportsInFlight.queue.then(async () => {
+  void enqueue(async () => {
     try {
       const url = mediaUrlFor(await renderExport(read.record, read.transcript, request, dir))!;
       await writeState(dir, { ...state, state: 'succeeded', url });
@@ -119,8 +130,7 @@ export async function startExport(jobId: string, body: unknown): Promise<Caption
     } finally {
       exportsInFlight.running.delete(key);
     }
-  });
-  exportsInFlight.queue = work;
+  }).catch((error: unknown) => console.error(`[montagio] captions ${jobId}: the export ${id} could not record its end`, error));
   return state;
 }
 
@@ -160,11 +170,12 @@ export async function captionsInfo(jobId: string): Promise<CaptionsInfo | null> 
 }
 
 /** Burn the captions in at once (a recipe replayed, inside the job's delivery): the 9:16 clip's URL. */
-export async function exportNow(record: JobRecord, transcript: Transcript, body: { text: string; style: CaptionStyleId; language: string }): Promise<{ url: string }> {
-  const request = captionsRequest(body, transcript);
+export async function exportNow(record: JobRecord, transcript: Transcript, body: { text: string; style: CaptionStyleId }): Promise<{ url: string }> {
+  const request = await captionsRequest(body, transcript);
   const id = newExportId();
   const dir = exportDir(record.id, id);
-  const url = mediaUrlFor(await renderExport(record, transcript, request, dir))!;
+  // In its turn, as an export asked from the panel: one encode at a time.
+  const url = mediaUrlFor(await enqueue(() => renderExport(record, transcript, request, dir)))!;
   await writeState(dir, { id, style: request.style, state: 'succeeded', url, createdAt: new Date().toISOString() });
   return { url };
 }
@@ -180,7 +191,7 @@ const previews = (previewHolder.__montagioCaptionPreviews ??= new Map());
 export async function previewFrame(jobId: string, body: unknown): Promise<string> {
   const read = await readTranscript(jobId);
   if (!read) throw new CaptionsNotFound(jobId);
-  const request = captionsRequest(body, read.transcript);
+  const request = await captionsRequest(body, read.transcript);
   const key = createHash('sha256').update(`${request.style}\n${request.language}\n${request.text}`).digest('hex').slice(0, 16);
   const dir = join(jobDir(jobId), PREVIEWS, key);
   const png = join(dir, 'frame.png');

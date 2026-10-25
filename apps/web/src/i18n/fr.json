@@ -618,5 +618,8 @@
   "captionsDownload": "Télécharger le 9:16",
   "captionsDemo": "Démo : Whisper n’a pas tourné ici ; les instants viennent de la démo.",
   "captionsUnsupported": "Les sous-titres ne sont pas encore disponibles pour cette langue.",
-  "captionsNoSpeech": "Ce clip n’a pas de voix à sous-titrer."
+  "captionsNoSpeech": "Ce clip n’a pas de voix à sous-titrer.",
+  "captionsCredit": "Sous-titres entendus par {model} ({license}).",
+  "captionsRecipe": "Recette de cet export 9:16",
+  "captionsNotReplayable": "Cet export ne se rejoue pas depuis sa recette : le changement de voix ou la traduction dont il vient demande votre fichier de parole et votre consentement."
 }

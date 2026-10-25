@@ -56,9 +56,9 @@ const LETTERS = [
   'äöüßÄÖÜ', // de
   'ìòÌÒ', // it
   'ãõÃÕ', // pt
-  'ŀ', // ca
+  'ŀĿ·', // ca (l·l)
   'ąćęłńśźżĄĆĘŁŃŚŹŻ', // pl
-  'ăîșțĂÎȘȚ', // ro
+  'ăîșțĂÎȘȚşţŞŢ', // ro, with the cedilla forms Whisper may write
   'åøÅØ', // sv, da, no, fi
   'čďěňřšťůýžČĎĚŇŘŠŤŮÝŽĺľŕĹĽŔ', // cs, sk
   'đĐ', // hr, sl

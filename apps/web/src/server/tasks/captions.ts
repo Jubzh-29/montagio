@@ -122,7 +122,7 @@ export const captionsTask: TaskDef = {
     });
     await writeTranscript(record.id, transcript);
     const requested = record.inputs.export as CaptionExportRequest | undefined;
-    if (requested) return { outputUrl: (await exportNow(record, transcript, { ...requested, language: transcript.language })).url };
+    if (requested) return { outputUrl: (await exportNow(record, transcript, requested)).url };
     return { outputUrl: mediaUrlFor(join(dir, TRANSCRIPT_FILE))! };
   },
 };

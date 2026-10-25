@@ -44,6 +44,16 @@ describe('alignText', () => {
     expect(words[8]).toEqual({ text: 'avatar.', start: 2.04, end: 2.86 });
   });
 
+  it('does not stretch a fixed word over a silence to reach a dropped one', () => {
+    const apart: CaptionWord[] = [
+      { text: 'Shot', start: 0, end: 0.3 },
+      { text: 'um', start: 2.5, end: 2.7 },
+      { text: 'done.', start: 2.7, end: 3 },
+    ];
+    const words = alignText(apart, 'Shots done.', 3);
+    expect(words[0]).toEqual({ text: 'Shots', start: 0, end: 0.3 });
+  });
+
   it('lets an added word share the time of its neighbour', () => {
     const words = alignText(heard, 'Well, hello, this is a test of the Montagio avatar.', 2.94);
     expect(words[0]!.text).toBe('Well,');

@@ -618,5 +618,8 @@
   "captionsDownload": "Download 9:16",
   "captionsDemo": "Demo: Whisper did not run here; the timings come with the demo.",
   "captionsUnsupported": "Captions are not available for this language yet.",
-  "captionsNoSpeech": "This clip has no voice to caption."
+  "captionsNoSpeech": "This clip has no voice to caption.",
+  "captionsCredit": "Captions heard by {model} ({license}).",
+  "captionsRecipe": "Recipe of this 9:16 export",
+  "captionsNotReplayable": "This export cannot be replayed from its recipe: the voice change or the translation it is made from needs your speech file and your consent."
 }

@@ -7,10 +7,10 @@ import { getEnv } from './env';
 /** The embedded caption fonts (OFL), served to the Studio as /fonts/captions/ and read by FFmpeg from here. */
 export const captionFontsDir = () => join(getEnv().root, 'apps', 'web', 'public', 'fonts', 'captions');
 
-/** Copy the caption fonts into `dir`/fonts, where libass looks for them by name (FFmpeg runs in `dir`). */
-export async function copyCaptionFonts(dir: string): Promise<void> {
+/** Copy caption fonts (all of them by default) into `dir`/fonts, where libass looks for them by name (FFmpeg runs in `dir`). */
+export async function copyCaptionFonts(dir: string, files: readonly string[] = CAPTION_FONTS.map((font) => font.file)): Promise<void> {
   await mkdir(join(dir, 'fonts'), { recursive: true });
-  await Promise.all(CAPTION_FONTS.map((font) => copyFile(join(captionFontsDir(), font.file), join(dir, 'fonts', font.file))));
+  await Promise.all(files.map((file) => copyFile(join(captionFontsDir(), file), join(dir, 'fonts', file))));
 }
 
 const holder = globalThis as typeof globalThis & { __montagioCaptionFonts?: Map<string, Promise<string>> };

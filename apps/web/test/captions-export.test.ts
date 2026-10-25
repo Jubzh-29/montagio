@@ -1,6 +1,8 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseRecipe, type Recipe } from '@montagio/recipe';
+import { sameWorkflows } from '@montagio/recipe/same';
 import { probe, probeAudio, readTags } from '@montagio/sequence';
 import { POST as postAvatars } from '@/app/api/avatars/route';
 import { GET as getCaptions } from '@/app/api/captions/[id]/route';
@@ -15,12 +17,13 @@ import type { CaptionExportSummary, CaptionsInfo, JobSummary } from '@/lib/api-t
 import { mediaFileFor } from '@/server/generations';
 import { listHistory } from '@/server/history';
 import { jobDir, jobs } from '@/server/jobs';
+import { resetServicesForTests } from '@/server/services';
 import { params, setupTempData } from './helpers';
 
 setupTempData();
 const saved: Record<string, string | undefined> = {};
 beforeEach(() => {
-  for (const name of ['MONTAGIO_EXTENSIONS', 'MONTAGIO_EXPERIMENTAL']) saved[name] = process.env[name];
+  for (const name of ['MONTAGIO_EXTENSIONS', 'MONTAGIO_EXPERIMENTAL', 'MONTAGIO_DEMO_CAPTIONS']) saved[name] = process.env[name];
   process.env.MONTAGIO_EXTENSIONS = 'all';
   process.env.MONTAGIO_EXPERIMENTAL = 'captions';
   process.env.MONTAGIO_DEMO_DURATION_MS = '0';
@@ -90,7 +93,8 @@ test('an export burns the corrected words in a 9:16 clip with its sound, the AI 
   expect(compact.task).toBe('captions');
   expect(compact.post.at(-1)).toMatch(/^captions-9x16:pop:montagio\/captions-ass@1:fonts-[0-9a-f]{12}$/);
   expect(compact.request?.route).toBe('/api/avatars');
-  expect(compact.request?.then).toEqual([{ route: '/api/jobs/:parent/captions', body: { language: 'en', export: { text: FIXED, style: 'pop' } }, files: [] }]);
+  // The language the transcription was asked for ("auto"), so a replay runs the same Whisper workflow.
+  expect(compact.request?.then).toEqual([{ route: '/api/jobs/:parent/captions', body: { language: 'auto', export: { text: FIXED, style: 'pop' } }, files: [] }]);
 
   const ass = readFileSync(join(jobDir(id), 'exports', started.id, 'captions.ass'), 'utf8');
   expect(ass).toContain('MONTAGIO');
@@ -120,11 +124,8 @@ test('two exports one after the other: two folders, the job points to the last o
   expect(files.filter((name) => name.endsWith('.part'))).toEqual([]);
 }, 180_000);
 
-test('an export is refused in a language without captions, without a text, and for an unknown job', async () => {
+test('an export is refused without a text, and for an unknown job', async () => {
   const { id } = await transcribed();
-  const foreign = await startExport(id, { text: FIXED, style: 'pop', language: 'ja' });
-  expect(foreign.status).toBe(400);
-  expect(await foreign.json()).toEqual({ error: 'language-unsupported' });
   const empty = await startExport(id, { text: '  ', style: 'pop', language: 'en' });
   expect(empty.status).toBe(400);
   expect(await empty.json()).toEqual({ error: 'invalid-input' });
@@ -145,11 +146,53 @@ test('the preview is one frame of the export, 540x960, made once for the same te
   expect(readdirSync(join(jobDir(id), 'previews'))).toHaveLength(1);
 }, 60_000);
 
-test('a captions job asked with a text and a style (a recipe replayed) delivers the 9:16 clip at once', async () => {
-  const parent = await talkingAvatar();
-  const created = (await (await postCaptions(post(`/api/jobs/${parent}/captions`, { language: 'en', export: { text: FIXED, style: 'word' } }), params({ id: parent }))).json()) as JobSummary;
+test('a captions job asked with a text and a style (a recipe replayed) delivers the 9:16 clip at once, by the same workflows', async () => {
+  const { parent, id } = await transcribed();
+  const exported = (await (await startExport(id, { text: FIXED, style: 'word' })).json()) as CaptionExportSummary;
+  expect((await finished(id, exported.id)).state).toBe('succeeded');
+  const original = (await (await getRecipe(new Request('http://localhost/x'), params({ source: 'job', id }))).json()) as Recipe;
+
+  // What `npm run reproduce` sends once the clip is made again: here on the same clip.
+  const replay = original.request!.then![0]!;
+  const created = (await (await postCaptions(post(`/api/jobs/${parent}/captions`, replay.body), params({ id: parent }))).json()) as JobSummary;
   const done = await settle(created.id);
   expect(done.state).toBe('succeeded');
   expect(done.outputUrl).toMatch(/\/exports\/[^/]+\/video\.mp4$/);
   expect(await probe(mediaFileFor(done.outputUrl)!)).toMatchObject({ width: 1080, height: 1920 });
+  const again = (await (await getRecipe(new Request('http://localhost/x'), params({ source: 'job', id: created.id }))).json()) as Recipe;
+  expect(sameWorkflows(original, again)).toBe(true);
+  expect(again.post).toEqual(original.post);
+}, 180_000);
+
+test('the export burns the words in the language they were heard in, and refuses a listed name', async () => {
+  const { id } = await transcribed();
+  // A language sent with the text is not taken: the words were heard in English.
+  const res = await startExport(id, { text: FIXED, style: 'classic', language: 'ja' });
+  expect(res.status).toBe(202);
+  const started = (await res.json()) as CaptionExportSummary;
+  expect((await finished(id, started.id)).state).toBe('succeeded');
+  const blocked = await startExport(id, { text: 'Hello, this is Donald Trump.', style: 'pop' });
+  expect(blocked.status).toBe(400);
+  expect(await blocked.json()).toEqual({ error: 'blocked-name' });
+  const preview = await postPreview(post(`/api/captions/${id}/preview`, { text: 'Hello, this is Donald Trump.', style: 'pop' }), params({ id }));
+  expect(preview.status).toBe(400);
+}, 120_000);
+
+test('a transcript heard in a language without captions cannot be exported, whatever language is sent', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'montagio-words-'));
+  writeFileSync(
+    join(dir, '_default.json'),
+    JSON.stringify({ schema: 'montagio/words@1', model: 'whisper-large-v3-turbo', language: 'ja', detected: true, duration_s: 1, text: ' こんにちは', chunks: [{ text: ' こんにちは', start: 0, end: 0.8 }] }),
+  );
+  process.env.MONTAGIO_DEMO_CAPTIONS = dir;
+  resetServicesForTests();
+  const parent = await talkingAvatar();
+  const record = (await jobs.read(parent))!;
+  record.inputs = { ...record.inputs, text: undefined };
+  writeFileSync(join(jobDir(parent), 'record.json'), JSON.stringify(record));
+  const created = (await (await postCaptions(post(`/api/jobs/${parent}/captions`, {}), params({ id: parent }))).json()) as JobSummary;
+  expect((await settle(created.id)).state).toBe('succeeded');
+  const res = await startExport(created.id, { text: 'Konnichiwa', style: 'pop', language: 'en' });
+  expect(res.status).toBe(400);
+  expect(await res.json()).toEqual({ error: 'language-unsupported' });
 }, 120_000);

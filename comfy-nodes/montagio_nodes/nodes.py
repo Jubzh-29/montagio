@@ -276,12 +276,15 @@ def _run_whisper(model_dir, samples, *, language, device):
     device = torch.device(device)
     dtype = torch.float16 if device.type == "cuda" else torch.float32
     processor = WhisperProcessor.from_pretrained(model_dir, local_files_only=True)
-    model = WhisperForConditionalGeneration.from_pretrained(model_dir, torch_dtype=dtype, local_files_only=True).to(device).eval()
+    # eager attention: the word timestamps are read from the cross-attention weights, which SDPA does not return
+    model = WhisperForConditionalGeneration.from_pretrained(
+        model_dir, torch_dtype=dtype, attn_implementation="eager", local_files_only=True,
+    ).to(device).eval()
     try:
         with torch.inference_mode():
             detected = language == "auto"
             if detected:
-                features = processor(samples[: SAMPLE_RATE * 30], sampling_rate=SAMPLE_RATE, return_tensors="pt").input_features
+                features = processor.feature_extractor(samples[: SAMPLE_RATE * 30], sampling_rate=SAMPLE_RATE, return_tensors="pt").input_features
                 language = language_from_token(processor.tokenizer.decode(model.detect_language(features.to(device, dtype))[0]))
             recognize = pipeline(
                 "automatic-speech-recognition", model=model, tokenizer=processor.tokenizer,
@@ -307,7 +310,9 @@ class MontagioTranscribeWords(io.ComfyNode):
 
     @classmethod
     def define_schema(cls):
-        names = model_names(whisper_dirs()) or [DEFAULT_MODEL]
+        # No folder, no choice: ComfyUI then refuses the workflow ("not in list"), which hides the app's captions
+        # instead of letting every job fail once it runs.
+        names = model_names(whisper_dirs())
         return io.Schema(
             node_id="MontagioTranscribeWords",
             display_name="Montagio Transcribe Words",
@@ -315,7 +320,7 @@ class MontagioTranscribeWords(io.ComfyNode):
             description="Whisper's transcription of a speech, each word with its start and end in seconds (JSON).",
             inputs=[
                 io.Audio.Input("audio"),
-                io.Combo.Input("model", options=names, default=DEFAULT_MODEL if DEFAULT_MODEL in names else names[0]),
+                io.Combo.Input("model", options=names, default=DEFAULT_MODEL if DEFAULT_MODEL in names else (names[0] if names else None)),
                 io.Combo.Input("language", options=list(LANGUAGES), default="auto"),
             ],
             outputs=[io.String.Output(display_name="words_json")],

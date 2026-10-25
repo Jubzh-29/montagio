@@ -27,6 +27,9 @@ export type CaptionWord = { text: string; start: number; end: number };
 /** The words of a clip in their order, in one language. */
 export type CaptionTrack = { language: string; words: CaptionWord[] };
 
+/** The corrected text of a captions export, in characters: the app refuses more. */
+export const CAPTION_TEXT_MAX = 2000;
+
 export class CaptionsError extends Error {
   override name = 'CaptionsError';
 }

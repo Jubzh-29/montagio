@@ -1532,7 +1532,14 @@ export function Studio() {
                   />
                 )}
               {!IS_SHOWCASE && tracked?.kind === 'job' && tracked.record.state === 'succeeded' && tracked.record.task === 'avatar' && extensions?.captions && (
-                <CaptionsPanel key={`captions-${tracked.record.id}`} parentJobId={tracked.record.id} estimate_s={extensions.captions.estimate_s} model={extensions.captions.model} />
+                <CaptionsPanel
+                  key={`captions-${tracked.record.id}`}
+                  parentJobId={tracked.record.id}
+                  parentTask="avatar"
+                  estimate_s={extensions.captions.estimate_s}
+                  model={extensions.captions.model}
+                  {...(extensions.avatarModel ? { clip: { model: extensions.avatarModel, ...(tracked.record.demo ? { demoKind: tracked.record.demo } : {}) } } : {})}
+                />
               )}
               {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>

@@ -4,11 +4,12 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { CAPTION_STYLE_IDS, type CaptionStyleId } from '@montagio/captions';
 import { useI18n } from '@/i18n';
 import { apiFetch } from '@/lib/api';
-import type { CaptionExportSummary, CaptionsInfo } from '@/lib/api-types';
+import type { CaptionExportSummary, CaptionsInfo, DemoKind } from '@/lib/api-types';
 import { canExport, CAPTION_LANGUAGE_CHOICES, CAPTION_TEXT_MAX, languageLabel, STYLE_LABEL } from '@/lib/captions';
 import { refusalMessageKey } from '@/lib/refusals';
 import { useJob } from '@/lib/use-job';
 import { AiCaption } from './AiCaption';
+import { RecipePanel } from './RecipePanel';
 import captions from './captions.module.css';
 import styles from './studio.module.css';
 
@@ -49,7 +50,24 @@ function StyleSample({ style }: { style: CaptionStyleId }) {
  * one frame of the real export (same FFmpeg and libass), then Export 9:16 renders the clip. Its recipe
  * travels in the MP4 and shows in the History, where the export is a clip of its own.
  */
-export function CaptionsPanel({ parentJobId, estimate_s, model }: { parentJobId: string; estimate_s: number; model: { id: string; name: string; license: string } }) {
+type ModelSummary = { id: string; name: string; license: string };
+
+export function CaptionsPanel({
+  parentJobId,
+  parentTask,
+  estimate_s,
+  model,
+  clip,
+}: {
+  parentJobId: string;
+  /** What the clip is: a voice change or a translation cannot be replayed from its recipe (the user's speech file). */
+  parentTask: 'avatar' | 'translate' | 'voice-change';
+  estimate_s: number;
+  /** Whisper, credited for the captions. */
+  model: ModelSummary;
+  /** The model that made the clip, for its AI-generated caption; without it, the generic mention. */
+  clip?: { model: ModelSummary; demoKind?: DemoKind };
+}) {
   const { t, lang } = useI18n();
   const transcription = useJob();
   const job = transcription.job;
@@ -59,6 +77,8 @@ export function CaptionsPanel({ parentJobId, estimate_s, model }: { parentJobId:
   const [style, setStyle] = useState<CaptionStyleId>('karaoke');
   const [preview, setPreview] = useState<{ url: string | null; loading: boolean }>({ url: null, loading: false });
   const [exported, setExported] = useState<CaptionExportSummary | null>(null);
+  /** The text and the style the last export burned in: once either changes, the preview comes back. */
+  const [exportedFor, setExportedFor] = useState<{ text: string; style: CaptionStyleId } | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   const radios = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -118,6 +138,8 @@ export function CaptionsPanel({ parentJobId, estimate_s, model }: { parentJobId:
     const timer = setTimeout(async () => {
       const res = await apiFetch(`/api/captions/${encodeURIComponent(info.jobId)}/export/${encodeURIComponent(exported.id)}`).catch(() => null);
       if (res?.ok) setExported((await res.json()) as CaptionExportSummary);
+      // An export the server no longer knows (data wiped) ends here instead of polling on.
+      else if (res?.status === 404) setExported({ ...exported, state: 'failed', error: 'lost' });
       else setExported({ ...exported });
     }, EXPORT_POLL_MS);
     return () => clearTimeout(timer);
@@ -143,6 +165,7 @@ export function CaptionsPanel({ parentJobId, estimate_s, model }: { parentJobId:
     const body = (await res.json().catch(() => ({}))) as CaptionExportSummary & { error?: string };
     if (!res.ok) return setRefusal(body.error ?? 'errorGeneric');
     setExported(body);
+    setExportedFor({ text, style });
   };
 
   // Arrow keys move the choice along the styles, as in any radio group.
@@ -158,7 +181,8 @@ export function CaptionsPanel({ parentJobId, estimate_s, model }: { parentJobId:
   const percent = job ? Math.round(job.progress * 100) : 0;
   const failed = job?.state === 'failed' || job?.state === 'canceled';
   const transcript = info?.transcript;
-  const done = exported?.state === 'succeeded' && exported.url ? exported : null;
+  const current = exportedFor?.text === text && exportedFor.style === style;
+  const done = exported?.state === 'succeeded' && exported.url && current ? exported : null;
 
   return (
     <section className={`${styles.panelSection} ${captions.panel}`} aria-labelledby={`captions-${parentJobId}`} data-testid="captions-panel">
@@ -317,8 +341,17 @@ export function CaptionsPanel({ parentJobId, estimate_s, model }: { parentJobId:
               <span className={captions.mark} data-corner="br" aria-hidden="true" />
             </figure>
             {/* Under the frame, not over it: the video's own controls stay free. */}
-            {done && <AiCaption model={model} testId="captions-caption" />}
+            {done && (clip ? <AiCaption model={clip.model} testId="captions-caption" {...(clip.demoKind ? { demoKind: clip.demoKind } : {})} /> : <p className={styles.hint}>{t('adCaption')}</p>)}
+            {done && <p className={styles.note}>{t('captionsCredit', { model: model.name, license: model.license })}</p>}
           </div>
+        </div>
+      )}
+
+      {done && info && (
+        <div className={captions.recipe}>
+          <p className={styles.note}>{t('captionsRecipe')}</p>
+          <RecipePanel key={done.url} url={`/api/recipes/job/${encodeURIComponent(info.jobId)}`} />
+          {parentTask !== 'avatar' && <p className={styles.hint}>{t('captionsNotReplayable')}</p>}
         </div>
       )}
     </section>

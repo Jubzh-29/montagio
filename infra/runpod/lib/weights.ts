@@ -47,7 +47,7 @@ const LOADER_FOLDERS: Record<string, Record<string, string>> = {
   FrameInterpolationModelLoader: { model_name: 'frame_interpolation' },
 };
 
-/** ComfyUI models/ folders a weight may go to (the same set as infra/local/src/pins.ts); `tts` holds the voice packs. */
+/** ComfyUI models/ folders a weight may go to (the same set as infra/local/src/pins.ts); `tts` holds the voice packs, `whisper` the captions' Whisper. */
 const COMFY_FOLDERS = new Set([
   'checkpoints',
   'diffusion_models',
@@ -60,6 +60,8 @@ const COMFY_FOLDERS = new Set([
   'audio_encoders',
   'frame_interpolation',
   'tts',
+  // the Hugging Face folders of the captions' Whisper (Montagio Transcribe Words)
+  'whisper',
 ]);
 
 export function weightFolders(workflows: ApiWorkflow[]): Map<string, string> {

@@ -326,8 +326,9 @@ async function liveRecipe(source: RecipeSource, id: string): Promise<Recipe | nu
  * The recipe of a captions export: the clip's recipe, Whisper's step, then the same corrected text in the
  * same style as what follows the clip made again. Null when the job is unknown.
  */
-export async function captionsExportRecipe(jobId: string, exported: { text: string; style: string; language: string }): Promise<Recipe | null> {
-  const draft = await jobDraft(jobId, { language: exported.language, export: { text: exported.text, style: exported.style } });
+export async function captionsExportRecipe(jobId: string, exported: { text: string; style: string }): Promise<Recipe | null> {
+  // The transcription keeps the language it was asked for ("auto" included): replayed, Whisper runs the same workflow.
+  const draft = await jobDraft(jobId, { export: { text: exported.text, style: exported.style } });
   return draft ? recipeOfDraft(draft) : null;
 }
 

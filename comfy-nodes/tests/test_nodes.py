@@ -559,9 +559,10 @@ def test_transcribe_words_lists_the_models_of_the_whisper_folder(fake_models_dir
     assert model.options == ["whisper-large-v3-turbo"] and model.default == "whisper-large-v3-turbo"
 
 
-def test_transcribe_words_offers_the_default_model_before_it_is_downloaded():
+def test_transcribe_words_offers_no_model_before_it_is_downloaded():
+    # an empty menu: ComfyUI refuses the workflow at once, and the app hides its captions
     model = MontagioTranscribeWords.define_schema().inputs[1]
-    assert model.options == ["whisper-large-v3-turbo"]
+    assert model.options == [] and model.default is None
 
 
 def test_transcribe_words_runs_whisper_on_16k_mono_and_returns_the_document(fake_models_dir, monkeypatch):

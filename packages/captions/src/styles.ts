@@ -25,10 +25,10 @@ export type CaptionStyleId = (typeof CAPTION_STYLE_IDS)[number];
 export type CaptionStyle = { id: CaptionStyleId; font: CaptionFont; size: number; uppercase: boolean; rules: LineRules };
 
 export const CAPTION_STYLES: Record<CaptionStyleId, CaptionStyle> = {
-  karaoke: { id: 'karaoke', font: font('Poppins'), size: 92, uppercase: false, rules: { maxWords: 6, maxChars: 26, pause_s: 0.5, hold_s: 0.3 } },
-  pop: { id: 'pop', font: font('Anton'), size: 120, uppercase: true, rules: { maxWords: 3, maxChars: 16, pause_s: 0.5, hold_s: 0.2 } },
+  karaoke: { id: 'karaoke', font: font('Poppins'), size: 92, uppercase: false, rules: { maxWords: 5, maxChars: 18, pause_s: 0.5, hold_s: 0.3 } },
+  pop: { id: 'pop', font: font('Anton'), size: 112, uppercase: true, rules: { maxWords: 3, maxChars: 16, pause_s: 0.5, hold_s: 0.2 } },
   word: { id: 'word', font: font('Bebas Neue'), size: 170, uppercase: true, rules: { maxWords: 1, maxChars: 14, pause_s: 0.5, hold_s: 0.1 } },
-  classic: { id: 'classic', font: font('Montserrat'), size: 76, uppercase: false, rules: { maxWords: 8, maxChars: 40, pause_s: 0.6, hold_s: 0.4 } },
+  classic: { id: 'classic', font: font('Montserrat'), size: 70, uppercase: false, rules: { maxWords: 8, maxChars: 36, pause_s: 0.6, hold_s: 0.4 } },
   neon: { id: 'neon', font: font('Bebas Neue'), size: 130, uppercase: true, rules: { maxWords: 4, maxChars: 18, pause_s: 0.5, hold_s: 0.3 } },
 };
 

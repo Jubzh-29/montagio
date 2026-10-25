@@ -1,8 +1,7 @@
-import { CAPTION_LANGUAGES, type CaptionStyleId } from '@montagio/captions';
+import { CAPTION_LANGUAGES, CAPTION_TEXT_MAX, type CaptionStyleId } from '@montagio/captions';
 import type { MessageKey } from '@/i18n';
 
-/** The corrected text of an export, in characters (the server refuses more). */
-export const CAPTION_TEXT_MAX = 2000;
+export { CAPTION_TEXT_MAX };
 
 /** The language menu: Whisper detects it, or the user imposes one of the languages captions are made in. */
 export const CAPTION_LANGUAGE_CHOICES = ['auto', ...CAPTION_LANGUAGES] as const;

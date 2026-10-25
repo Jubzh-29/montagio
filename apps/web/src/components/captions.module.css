@@ -249,6 +249,12 @@
   animation: pulse 1.4s var(--ease-out) infinite alternate;
 }
 
+.recipe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 .side {
   display: flex;
   flex-direction: column;

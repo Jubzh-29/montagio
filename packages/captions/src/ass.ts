@@ -9,7 +9,11 @@ const WIDTH = 1080;
 const HEIGHT = 1920;
 /** The baseline of the captions at 76 % of the height: under a 16:9 picture centred in the frame (it ends at 66 %), over the bottom bar of TikTok and Reels. */
 const MARGIN_V = Math.round(HEIGHT * 0.24);
-const MARGIN_H = 70;
+/** Wider on the right, where TikTok and Reels stack their buttons (from x 960, y 1000 to 1650): the text is centred between the margins. */
+const MARGIN_L = 90;
+const MARGIN_R = 150;
+/** The width a visual line may take: past it, the line shrinks (`fitScale`). */
+const SAFE_WIDTH = WIDTH - MARGIN_L - MARGIN_R;
 
 // ASS colours are &HAABBGGRR (alpha first, 00 = opaque); inline \c tags take &HBBGGRR&.
 const WHITE = '&H00FFFFFF';
@@ -22,7 +26,15 @@ const INLINE_WHITE = '&HFFFFFF&';
 
 /** A word as plain text: braces and backslashes would open tags, so they become their full-width look-alikes; a line break becomes a space. */
 export function escapeAssText(text: string): string {
-  return text.replace(/\\/g, '＼').replace(/\{/g, '｛').replace(/\}/g, '｝').replace(/[\r\n]+/g, ' ');
+  return (
+    text
+      .replace(/\\/g, '＼')
+      .replace(/\{/g, '｛')
+      .replace(/\}/g, '｝')
+      .replace(/[\r\n\u2028\u2029]+/g, ' ')
+      // control characters draw nothing, and some cut the line
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, '')
+  );
 }
 
 const cs = (seconds: number) => Math.max(0, Math.round(seconds * 100));
@@ -61,7 +73,7 @@ function header(style: CaptionStyle): string {
     '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    `Style: ${style.id},${style.font.family},${style.size},${row.primary},${row.secondary},${row.outlineColour},${row.back},${bold},0,0,0,100,100,${row.spacing},0,${row.borderStyle},${row.outline},${row.shadow},2,${MARGIN_H},${MARGIN_H},${MARGIN_V},1`,
+    `Style: ${style.id},${style.font.family},${style.size},${row.primary},${row.secondary},${row.outlineColour},${row.back},${bold},0,0,0,100,100,${row.spacing},0,${row.borderStyle},${row.outline},${row.shadow},2,${MARGIN_L},${MARGIN_R},${MARGIN_V},1`,
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
@@ -106,43 +118,97 @@ function twoLines(text: string, maxChars: number): string {
   return best < 0 ? text : `${text.slice(0, best)}\\N${text.slice(best + 1)}`;
 }
 
-const POP_IN = '\\t(0,80,\\fscx112\\fscy112)\\t(80,160,\\fscx100\\fscy100)';
+/**
+ * The mean advance of each kind of character, in ems, read from the embedded fonts with fontTools on
+ * 2026-10-25. libass sizes a font by its line height, which is taller than its em: a width reckoned in
+ * ems is a little wider than the one drawn, so a line that fits by this count fits on screen.
+ */
+const ADVANCE: Record<string, { upper: number; lower: number; digit: number; space: number; other: number }> = {
+  Poppins: { upper: 0.681, lower: 0.595, digit: 0.597, space: 0.212, other: 0.35 },
+  Anton: { upper: 0.474, lower: 0.455, digit: 0.478, space: 0.234, other: 0.3 },
+  'Bebas Neue': { upper: 0.389, lower: 0.389, digit: 0.4, space: 0.16, other: 0.25 },
+  Montserrat: { upper: 0.735, lower: 0.604, digit: 0.609, space: 0.283, other: 0.35 },
+};
+
+/** The width a text takes in a style, in pixels of the frame, with its outline on both sides. */
+export function textWidth(text: string, style: CaptionStyle): number {
+  const advance = ADVANCE[style.font.family]!;
+  let ems = 0;
+  for (const char of text) {
+    if (char === ' ') ems += advance.space;
+    else if (/\p{Lu}/u.test(char)) ems += advance.upper;
+    else if (/\p{Ll}/u.test(char)) ems += advance.lower;
+    else if (/\p{N}/u.test(char)) ems += advance.digit;
+    else ems += advance.other;
+  }
+  // ASS Spacing: pixels added after each character
+  return ems * style.size + ROWS[style.id].spacing * [...text].length + 2 * ROWS[style.id].outline;
+}
+
+/**
+ * The scale (1 at most) that keeps the widest of a line's visual lines within the safe width, `growth` being
+ * how much a word of it grows (the word said in pop): a long word shrinks instead of leaving the frame.
+ */
+function fitScale(visualLines: string[], style: CaptionStyle, growth: number): number {
+  const widest = Math.max(...visualLines.map((text) => textWidth(text, style))) * growth;
+  return widest > SAFE_WIDTH ? SAFE_WIDTH / widest : 1;
+}
+
+/** A scale tag of `percent` × `scale`, both axes. */
+const fsc = (percent: number, scale: number) => `\\fscx${Math.round(percent * scale)}\\fscy${Math.round(percent * scale)}`;
+const popIn = (scale: number) => `\\t(0,80,${fsc(112, scale)})\\t(80,160,${fsc(100, scale)})`;
 
 function events(style: CaptionStyle, lines: CaptionLine[], label: (word: CaptionWord) => string): string[] {
   const id = style.id;
+  /** The scale a line needs (`growth`: how much its word said grows), as a tag to put first, or nothing when it fits. */
+  const fit = (text: string, growth = 1) => {
+    const scale = fitScale(text.split('\\N'), style, growth);
+    return { scale, tag: scale < 1 ? fsc(100, scale) : '' };
+  };
   switch (id) {
     case 'karaoke':
-      return lines.map((line) => dialogue(0, line.start, line.end, id, `{\\fad(120,120)}${karaokeText(line, label)}`));
+      return lines.map((line) => dialogue(0, line.start, line.end, id, `{\\fad(120,120)${fit(line.words.map(label).join(' ')).tag}}${karaokeText(line, label)}`));
     case 'pop':
-      return lines.flatMap((line) =>
-        perWord(line).map(({ lit, from, to }) => {
+      return lines.flatMap((line) => {
+        // the word said stays at 108 %: the line fits with it
+        const { scale } = fit(line.words.map(label).join(' '), 1.08);
+        return perWord(line).map(({ lit, from, to }) => {
           const first = lit === 0;
           const text = line.words
             .map((word, index) => {
               if (index !== lit) return label(word);
               // The word said grows and turns lime; past it, white at 100 %, the line's pop-in given again (its times count from the event's start).
-              const on = first ? `{\\c${LIME}\\t(0,80,\\fscx121\\fscy121)\\t(80,160,\\fscx108\\fscy108)}` : `{\\c${LIME}\\fscx108\\fscy108}`;
-              const off = `{\\c${INLINE_WHITE}\\fscx100\\fscy100${first ? POP_IN : ''}}`;
+              const on = first ? `{\\c${LIME}\\t(0,80,${fsc(121, scale)})\\t(80,160,${fsc(108, scale)})}` : `{\\c${LIME}${fsc(108, scale)}}`;
+              const off = `{\\c${INLINE_WHITE}${fsc(100, scale)}${first ? popIn(scale) : ''}}`;
               return `${on}${label(word)}${index < line.words.length - 1 ? off : ''}`;
             })
             .join(' ');
-          return dialogue(0, from, to, id, `${first ? `{${POP_IN}}` : ''}${text}`);
-        }),
-      );
+          const lead = first ? popIn(scale) : scale < 1 ? fsc(100, scale) : '';
+          return dialogue(0, from, to, id, `${lead ? `{${lead}}` : ''}${text}`);
+        });
+      });
     case 'word':
-      return lines.map((line) => dialogue(0, line.start, line.end, id, `{\\fscx180\\fscy180\\t(0,120,\\fscx100\\fscy100)}${line.words.map(label).join(' ')}`));
+      return lines.map((line) => {
+        const text = line.words.map(label).join(' ');
+        const { scale } = fit(text);
+        return dialogue(0, line.start, line.end, id, `{${fsc(180, scale)}\\t(0,120,${fsc(100, scale)})}${text}`);
+      });
     case 'classic':
-      return lines.map((line) => dialogue(0, line.start, line.end, id, `{\\fad(150,150)}${twoLines(line.words.map(label).join(' '), style.rules.maxChars)}`));
+      return lines.map((line) => {
+        const text = twoLines(line.words.map(label).join(' '), style.rules.maxChars);
+        return dialogue(0, line.start, line.end, id, `{\\fad(150,150)${fit(text).tag}}${text}`);
+      });
     case 'neon':
       return lines.flatMap((line) => {
         const steps = perWord(line);
+        const { tag } = fit(line.words.map(label).join(' '));
         return steps.flatMap(({ lit, from, to }, index) => {
           const fade = `\\fad(${index === 0 ? 120 : 0},${index === steps.length - 1 ? 120 : 0})`;
           const glow = line.words.map((word, n) => (n === lit ? `{\\blur14\\bord9}${label(word)}{\\blur8\\bord6}` : label(word))).join(' ');
           const core = line.words.map((word, n) => (n === lit ? `{\\c${INLINE_WHITE}}${label(word)}{\\c${CYAN}}` : label(word))).join(' ');
           return [
-            dialogue(0, from, to, id, `{${fade}\\blur8\\bord6\\1c${CYAN}\\3c${CYAN}}${glow}`),
-            dialogue(1, from, to, id, `{${fade}\\blur1}${core}`),
+            dialogue(0, from, to, id, `{${fade}${tag}\\blur8\\bord6\\1c${CYAN}\\3c${CYAN}}${glow}`),
+            dialogue(1, from, to, id, `{${fade}${tag}\\blur1}${core}`),
           ];
         });
       });

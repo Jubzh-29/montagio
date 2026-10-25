@@ -21,7 +21,7 @@ export type Versions = {
 /** `folder` is relative to ComfyUI's models/; `extension` is null for the weights of the camera presets. */
 export type LockWeight = { id: string; file: string; url: string; sha256: string; size: number; folder: string; extension: string | null };
 
-/** ComfyUI models/ folders a lock file can go to (the same set as infra/runpod/lib/weights.ts); `tts` holds the voice packs. */
+/** ComfyUI models/ folders a lock file can go to (the same set as infra/runpod/lib/weights.ts); `tts` holds the voice packs, `whisper` the captions' Whisper. */
 const COMFY_FOLDERS = new Set([
   'checkpoints',
   'diffusion_models',
@@ -34,6 +34,8 @@ const COMFY_FOLDERS = new Set([
   'audio_encoders',
   'frame_interpolation',
   'tts',
+  // the Hugging Face folders of the captions' Whisper (Montagio Transcribe Words)
+  'whisper',
 ]);
 
 export function parseVersionsEnv(text: string): Record<string, string> {
