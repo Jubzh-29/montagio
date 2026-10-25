@@ -18,8 +18,10 @@ test('studio happy path in demo mode', async ({ page }) => {
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.getByRole('progressbar')).toBeVisible();
   await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /\/media\//, { timeout: 15_000 });
-  // The demo backend: the caption says no model ran, and names the one that would.
-  await expect(page.getByTestId('ai-caption')).toHaveText(/^Demo render: no model ran here\. With a GPU, .+ [(]Apache-2.0[)] makes it\.$/);
+  // The demo backend: the sample photo, imported, gets the GPU render of it; the caption says no model ran here.
+  await expect(page.getByTestId('ai-caption')).toHaveText(
+    /^Demo render: no model ran here\. On a GPU, .+ [(]Apache-2.0[)] made this clip of the same sample photo · AI-generated$/,
+  );
   const download = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Open in ComfyUI' }).click();
   expect((await download).suggestedFilename()).toMatch(/\.json$/);

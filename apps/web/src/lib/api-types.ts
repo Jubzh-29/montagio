@@ -37,6 +37,12 @@ export type UploadResult = {
 
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled';
 
+/**
+ * A demo render (no GPU): the clip a GPU session made of the same sample photo, or the photo
+ * moved by FFmpeg. Absent for a model's render.
+ */
+export type DemoKind = 'example' | 'moved';
+
 export type GenerationRecord = {
   id: string;
   presetId: string;
@@ -52,7 +58,13 @@ export type GenerationRecord = {
   workflowUrl?: string;
   /** A showcase clip whose camera move FFmpeg simulated, waiting for the GPU session. */
   placeholder?: boolean;
+  /** Showcase: the model that restored the clip to 1080p (its HD pass), named in its caption. */
+  hdModel?: HdModelSummary;
+  demo?: DemoKind;
 };
+
+/** The upscaler of a showcase clip's HD pass (SeedVR2). */
+export type HdModelSummary = { id: string; name: string; license: string };
 
 /** What a model makes, in the order of the Open Stack page (as @montagio/check-open-stack lists them). */
 export type StackFunction = 'camera' | 'effects' | 'transitions' | 'photo' | 'avatar' | 'music' | 'hd' | 'motion';
@@ -87,6 +99,8 @@ export type SequenceSummary = {
   music?: { jobId: string };
   /** Showcase: at least one shot is a placeholder clip. */
   placeholder?: boolean;
+  /** Showcase: every shot had the same HD pass, so the film is in 1080p. */
+  hdModel?: HdModelSummary;
   /** Showcase: what the in-browser montage is doing while the film is assembling. */
   stage?: 'loading-ffmpeg' | 'joining';
 };
@@ -111,6 +125,8 @@ export type ShowcaseInfo = {
   capabilities: { uploads: boolean; remixRender: boolean };
   /** Some clips are still placeholders (before the GPU session). */
   placeholders: boolean;
+  /** Every clip had an HD pass: the slate says 1080p instead of the render's 480p. */
+  hd: boolean;
   repoUrl: string | null;
 };
 
@@ -234,6 +250,9 @@ export type JobSummary = {
   verticalUrl?: string;
   /** Showcase: an example still waiting for the GPU session. */
   placeholder?: boolean;
+  /** Showcase: the model that restored the example to 1080p (its HD pass). */
+  hdModel?: HdModelSummary;
+  demo?: DemoKind;
   createdAt: string;
 };
 

@@ -17,8 +17,8 @@ import {
   SHOWCASE_COLOUR,
   SHOWCASE_X264,
 } from '@montagio/sequence';
-import type { ShowcaseData } from './data';
-import { effectFile, exampleWorkflowFile, hookFile, loadManifest, SHOWCASE_DIR } from './manifest';
+import type { ShowcaseData, ShowcaseExampleItem, ShowcaseHdModel } from './data';
+import { effectFile, exampleWorkflowFile, hookFile, loadManifest, SHOWCASE_DIR, type HdPass } from './manifest';
 import { motionKeyframes, toZoompan } from './motion';
 import { planClips, type PlannedClip } from './plan';
 import { sha256File, verifyShowcase } from './verify';
@@ -145,7 +145,8 @@ export async function prepareShowcase(
         posterFrame(join(outDir, item.file), path, { width: PREVIEW_WIDTH, comment: tags.comment }),
       );
     }
-    const workflow = showcaseWorkflow(library, manifest, item.preset, item.sample, item.rendered?.seed ?? DEFAULT_PLACEHOLDER_SEED);
+    // The workflow that rendered the clip, with its own texts (the HD pass is in the manifest).
+    const workflow = showcaseWorkflow(library, manifest, item.preset, item.sample, item.rendered?.seed ?? DEFAULT_PLACEHOLDER_SEED, item.rendered ?? {});
     const workflowPath = join(outDir, item.workflow);
     produced.add(item.workflow);
     await mkdir(dirname(workflowPath), { recursive: true });
@@ -153,7 +154,7 @@ export async function prepareShowcase(
   }
 
   // The effect and hook examples, copied as ingest wrote them, with their workflows.
-  const exampleUrls = new Map<string, { sample: string; url: string; workflowUrl: string; poster: string }[]>();
+  const exampleUrls = new Map<string, ShowcaseExampleItem['examples']>();
   for (const [kind, entries] of [
     ['effect', manifest.effects.map((entry) => ({ id: entry.effect, entry }))],
     ['hook', manifest.hooks.map((entry) => ({ id: entry.hook, entry }))],
@@ -167,7 +168,8 @@ export async function prepareShowcase(
       );
       await ensure(workflowUrl, hash('example-workflow', entry.workflow_sha256), (path) => copyFile(join(showcaseDir, workflowUrl), path));
       const key = `${kind}:${id}`;
-      exampleUrls.set(key, [...(exampleUrls.get(key) ?? []), { sample: entry.sample, url: file, workflowUrl, poster: posterOf(file) }]);
+      const hd = hdModelOf(library, entry.hd);
+      exampleUrls.set(key, [...(exampleUrls.get(key) ?? []), { sample: entry.sample, url: file, workflowUrl, poster: posterOf(file), ...(hd ? { hd } : {}) }]);
     }
   }
   const exampleItem = (kind: 'effect' | 'hook', preset: { id: string; name: string; description: string; models: { preferred: string } }) => {
@@ -232,14 +234,18 @@ export async function prepareShowcase(
       credit: sample.credit,
       ...(sample.prompt ? { prompt: sample.prompt } : {}),
     })),
-    clips: planned.map((item) => ({
-      preset: item.preset.id,
-      sample: item.sample.id,
-      url: item.file,
-      verticalUrl: item.vertical,
-      workflowUrl: item.workflow,
-      placeholder: item.rendered === null,
-    })),
+    clips: planned.map((item) => {
+      const hd = hdModelOf(library, item.rendered?.hd);
+      return {
+        preset: item.preset.id,
+        sample: item.sample.id,
+        url: item.file,
+        verticalUrl: item.vertical,
+        workflowUrl: item.workflow,
+        placeholder: item.rendered === null,
+        ...(hd ? { hd } : {}),
+      };
+    }),
     effects: [...library.effects.values()].map((preset) => exampleItem('effect', preset)).filter((item) => item.examples.length > 0),
     hooks: [...library.hooks.values()]
       .map((preset) => ({ ...exampleItem('hook', preset), references: preset.end_frame.references }))
@@ -296,4 +302,10 @@ async function checkJoin(files: string[], label: string): Promise<void> {
 function modelSummary(library: Library, id: string): ShowcaseData['model'] {
   const model = library.models.get(id)!;
   return { id: model.id, name: model.name, license: model.license };
+}
+
+/** The upscaler of a file's HD pass, as the caption names it (verify has checked it is in the registry). */
+function hdModelOf(library: Library, hd: HdPass | undefined): ShowcaseHdModel | undefined {
+  const model = hd && library.extensionModels.get(hd.model);
+  return model ? { id: model.id, name: model.name, license: model.license } : undefined;
 }

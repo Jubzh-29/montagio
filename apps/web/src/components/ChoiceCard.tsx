@@ -6,8 +6,9 @@ import { MoveGlyph } from './MoveGlyph';
 import styles from './studio.module.css';
 
 /**
- * The composer's card: what the next render will be (an effect, a hook, a camera move),
- * its preview looping, and "Change", which brings the wall back to the canvas.
+ * The composer's choice row: what the next render will be (an effect, a hook, a camera move),
+ * a small loop of its preview beside its name, and "Change", which brings the wall back to the
+ * canvas. One row, as the start photo's: the wall and the monitor show the pictures large.
  */
 export function ChoiceCard({
   name,
@@ -59,33 +60,33 @@ export function ChoiceCard({
             {icon === 'hook' ? '◎' : icon === 'avatar' ? '◉' : icon === 'motion' ? '⇄' : '✦'}
           </span>
         )}
+      </div>
+      <div className={styles.choiceText}>
         <span id="choice-name" className={styles.choiceName}>
           {name}
         </span>
+        <span className={styles.choiceKind}>{kindLabel}</span>
       </div>
-      <div className={styles.choiceMeta}>
-        <span>{kindLabel}</span>
-        <span className={styles.choiceActions}>
-          {remix && (
-            <button
-              ref={remixRef}
-              type="button"
-              className={styles.toolButton}
-              aria-expanded={false}
-              aria-describedby="remix-hint"
-              disabled={remix.disabled}
-              onClick={remix.onOpen}
-            >
-              {t('remix')}
-            </button>
-          )}
-          {onChange && (
-            <button type="button" className={styles.buttonGhost} onClick={onChange}>
-              {t('choiceChange')}
-            </button>
-          )}
-        </span>
-      </div>
+      <span className={styles.choiceActions}>
+        {remix && (
+          <button
+            ref={remixRef}
+            type="button"
+            className={styles.buttonSecondary}
+            aria-expanded={false}
+            aria-describedby="remix-hint"
+            disabled={remix.disabled}
+            onClick={remix.onOpen}
+          >
+            {t('remix')}
+          </button>
+        )}
+        {onChange && (
+          <button type="button" className={styles.buttonSecondary} onClick={onChange}>
+            {t('choiceChange')}
+          </button>
+        )}
+      </span>
       {remix && (
         <p id="remix-hint" className={styles.hint}>
           {t('remixHint')}

@@ -30,7 +30,8 @@
 }
 
 .lede {
-  max-width: 75ch;
+  /* Geist's ch is a wide zero: 60ch holds about 75 characters of text. */
+  max-width: 60ch;
   color: var(--ink-muted);
   font-size: var(--text-s);
 }
@@ -73,6 +74,11 @@
   scroll-padding-bottom: var(--generate-room);
   overscroll-behavior: contain;
   padding-right: var(--space-1);
+}
+
+/* With Quality and Fast and their line, the Generate block of Camera and Film is that much taller. */
+.panel:has(.modelsByGenerate) {
+  --generate-room: 200px;
 }
 
 .panelSection {
@@ -482,7 +488,7 @@
 
 /* What the showcase is: under the monitor, in sight whatever the monitor shows. */
 .stageNote {
-  max-width: 72ch;
+  max-width: 60ch;
   color: var(--ink-muted);
   font-size: var(--text-s);
   text-wrap: pretty;
@@ -908,11 +914,13 @@
   bottom: 0;
   z-index: 1;
   padding-block: var(--space-4);
-  background: linear-gradient(to bottom, transparent, var(--bg) var(--space-4));
+  /* An opaque foot with a rule over it: the fields that scroll under it are hidden, not half seen. */
+  background: var(--bg);
+  border-top: 1px solid var(--line);
 }
 
 .hint {
-  max-width: 70ch;
+  max-width: 60ch;
   color: var(--ink-muted);
   font-size: var(--text-s);
 }
@@ -951,7 +959,9 @@
 }
 
 .buttonPrimary:disabled {
-  background: var(--surface-2);
+  /* An outline on the page's ground, not the filled grey of a selected option above it. */
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
   color: var(--ink-faint);
   cursor: not-allowed;
 }
@@ -997,7 +1007,7 @@
     padding: var(--space-4);
     gap: var(--space-5);
   }
-  /* On a phone the setup comes first (the wall below is long); Generate stays pinned at the bottom
+  /* On a phone the canvas comes first, then the setup; Generate stays pinned at the bottom
      of the screen, and starting a render moves the focus, and the page, to the monitor. */
   .studio {
     padding-bottom: var(--generate-room);
@@ -1095,6 +1105,15 @@
 @media (max-width: 640px) {
   .monitor:has(> .monitorEmpty) {
     aspect-ratio: auto;
+  }
+  /* An example behind the words keeps a 16:9 frame: room for the words, and its caption apart, in the foot. */
+  .monitor:has(> .monitorExample) {
+    aspect-ratio: 16 / 9;
+  }
+  .exampleCaption {
+    left: var(--space-4);
+    right: var(--space-4);
+    bottom: var(--space-3);
   }
   .viewfinder .glyphFrame,
   .viewfinder .glyphTarget {
@@ -1481,21 +1500,34 @@
   gap: var(--space-3);
 }
 
-/* The composer's card: the move, effect or hook the next render will be. */
+/* The composer's choice: the move, effect or hook the next render will be, in one row like the
+   start photo's (the wall and the monitor show the pictures large). */
 .choiceCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.choiceMedia {
-  position: relative;
   display: grid;
-  place-items: center;
-  aspect-ratio: 16 / 9;
+  /* The thumbnail on the left; the name, then its actions, beside it: the row fits a phone as is. */
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-2);
+  padding: var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-m);
   background: var(--surface);
+}
+
+.choiceCard > .hint {
+  grid-column: 1 / -1;
+}
+
+.choiceMedia {
+  grid-row: 1 / span 2;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 64px;
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
   overflow: hidden;
   isolation: isolate;
 }
@@ -1511,38 +1543,55 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* a portrait preview in this wide card: keep the upper part, where the face usually is */
+  /* a portrait preview in this wide frame: keep the upper part, where the face usually is */
   object-position: 50% 30%;
 }
 
 .choiceIcon {
-  font-size: 2.5rem;
+  font-size: var(--text-l);
   color: var(--ink-faint);
 }
 
+.choiceText {
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
 .choiceName {
-  position: absolute;
-  left: var(--space-3);
-  bottom: var(--space-2);
-  font-size: var(--text-l);
+  font-size: var(--text-m);
   font-weight: 650;
-  letter-spacing: 0.02em;
-  text-shadow: 0 1px 8px oklch(0 0 0 / 0.6);
-  z-index: 1;
+  overflow-wrap: anywhere;
+}
+
+.choiceKind {
+  color: var(--ink-muted);
+  font-size: var(--text-s);
 }
 
 .choiceActions {
+  align-self: start;
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 
-.choiceMeta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  color: var(--ink-muted);
+.choiceActions:empty {
+  display: none;
+}
+
+.choiceCard:has(> .choiceActions:empty) > .choiceMedia {
+  grid-row: auto;
+}
+
+.choiceCard:has(> .choiceActions:empty) > .choiceText {
+  align-self: center;
+}
+
+.choiceActions .buttonSecondary {
+  padding: var(--space-1) var(--space-3);
   font-size: var(--text-s);
 }
 
@@ -1877,7 +1926,8 @@
 
 .atelierImages img {
   width: 100%;
-  max-height: 60vh;
+  /* A 9:16 image leaves Use this photo in sight on a laptop. */
+  max-height: 45vh;
   object-fit: contain;
   border-radius: var(--radius-m);
   background: var(--bg);
@@ -1899,7 +1949,8 @@
 }
 
 .consent input {
-  margin-top: 3px;
+  /* Optical: the box sits on the first line of its label, whatever the label's length. */
+  margin-top: 0.2em;
   accent-color: var(--rec);
 }
 
@@ -1930,15 +1981,6 @@
 .wallIcon {
   font-size: 2.75rem;
   color: var(--ink-faint);
-}
-
-/* Over a preview, a dark fade under the name keeps it legible on a bright frame. */
-.choiceMedia:has(> video)::after {
-  content: '';
-  position: absolute;
-  inset: 55% 0 0;
-  background: linear-gradient(to bottom, transparent, oklch(0 0 0 / 0.7));
-  pointer-events: none;
 }
 
 @media (max-width: 480px) {

@@ -13,7 +13,8 @@ const TEXT_MAX = 500;
 /**
  * A motion transfer (Wan2.2-Animate-2 distilled): the character of the photo performs the
  * motion of the reference clip, prepared at upload. The user's word that they hold the rights
- * on the video and the photo is required (it stands for the consent box on this tab).
+ * on the video and the photo is required (it stands for the consent box on this tab), except
+ * on the sample dance with a photo nobody imported.
  */
 export const motionTask: TaskDef = {
   async prepare(body, lib) {
@@ -24,7 +25,9 @@ export const motionTask: TaskDef = {
     const videoRef = typeof body.videoRef === 'string' ? body.videoRef : '';
     const video = await readVideoMeta(videoRef);
     if (!video) throw new JobError('invalid-input');
-    if (body.rights !== true) throw new JobError('rights-required');
+    // The sample dance on a photo nobody imported: Montagio's own files, no rights to confirm.
+    const ownFiles = video.origin === 'sample' && !photo.personal;
+    if (body.rights !== true && !ownFiles) throw new JobError('rights-required');
     const model = motionModel(lib);
     const max = model.limits.max_chars ?? TEXT_MAX;
     const character = typeof body.character === 'string' ? body.character.trim() : '';

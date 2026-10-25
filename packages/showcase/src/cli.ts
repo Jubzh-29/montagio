@@ -5,13 +5,14 @@
  *   npm run showcase -- verify [--strict]
  *   npm run showcase -- ingest <smoke results folder> --sample <id> [--pick <preset>=<run> ...]
  *   npm run showcase -- ingest --examples <smoke results folder> --sample <id>
+ *   npm run showcase -- ingest --hd <smoke results folder> --inputs <dir> [--renders <smoke results folder> ...]
  *   npm run showcase -- prepare [--strict] [--out <dir>] [--repo-url <url>]
  *
  * Exit code: 0 when everything is fine, 1 on an error, 2 on a usage error.
  */
 import { isAbsolute, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { IngestError, ingestExamples, ingestSmoke } from './ingest';
+import { IngestError, ingestExamples, ingestHd, ingestSmoke } from './ingest';
 import { PrepareError, prepareShowcase } from './prepare';
 import { verifyShowcase } from './verify';
 
@@ -22,6 +23,7 @@ const USAGE = [
   '  showcase verify [--strict]',
   '  showcase ingest <smoke results folder> --sample <id> [--pick <preset>=<run> ...]',
   '  showcase ingest --examples <smoke results folder> --sample <id>   (one smoke folder per call)',
+  '  showcase ingest --hd <smoke results folder> --inputs <folder of the clips it upscaled> [--renders <smoke results folder> ...]',
   '  showcase prepare [--strict] [--out <dir>] [--repo-url <url>]',
 ].join('\n');
 
@@ -64,9 +66,30 @@ async function ingest(args: string[], io: CliIo): Promise<number> {
   const { values, positionals } = parseArgs({
     args,
     allowPositionals: true,
-    options: { sample: { type: 'string' }, pick: { type: 'string', multiple: true }, examples: { type: 'boolean', default: false } },
+    options: {
+      sample: { type: 'string' },
+      pick: { type: 'string', multiple: true },
+      examples: { type: 'boolean', default: false },
+      hd: { type: 'boolean', default: false },
+      inputs: { type: 'string' },
+      renders: { type: 'string', multiple: true },
+    },
   });
-  if (positionals.length !== 1 || !values.sample) {
+  const fromCwd = (path: string) => (isAbsolute(path) ? path : resolve(io.cwd ?? process.cwd(), path));
+  if (values.hd) {
+    // The upscaled clip says which photo it comes from: no --sample, and nothing to --pick.
+    if (positionals.length !== 1 || !values.inputs || values.sample || values.examples || (values.pick ?? []).length > 0) {
+      io.err(`--hd takes one smoke results folder and --inputs, without --sample, --examples or --pick\n${USAGE}`);
+      return 2;
+    }
+    const result = await ingestHd(io.root, fromCwd(positionals[0]!), { inputs: fromCwd(values.inputs), renders: (values.renders ?? []).map(fromCwd) });
+    for (const line of result.skipped) io.out(`skipped: ${line}`);
+    for (const file of result.added) io.out(`added: ${file}`);
+    for (const file of result.replaced) io.out(`replaced: ${file}`);
+    io.out(`showcase: ${count(result.added.length + result.replaced.length, 'HD file')} ingested; run "showcase verify" next`);
+    return 0;
+  }
+  if (positionals.length !== 1 || !values.sample || values.inputs || values.renders) {
     io.err(USAGE);
     return 2;
   }
@@ -85,8 +108,7 @@ async function ingest(args: string[], io: CliIo): Promise<number> {
     }
     picks[match[1]!] = Number(match[2]);
   }
-  const folder = isAbsolute(positionals[0]!) ? positionals[0]! : resolve(io.cwd ?? process.cwd(), positionals[0]!);
-  const result = await (values.examples ? ingestExamples : ingestSmoke)(io.root, folder, values.sample, picks);
+  const result = await (values.examples ? ingestExamples : ingestSmoke)(io.root, fromCwd(positionals[0]!), values.sample, picks);
   for (const line of result.skipped) io.out(`skipped: ${line}`);
   for (const file of result.added) io.out(`added: ${file}`);
   for (const file of result.replaced) io.out(`replaced: ${file}`);

@@ -409,7 +409,8 @@ export function PhotoAtelier({
       <div className={styles.atelierActions}>
         <button
           type="button"
-          className={styles.buttonPrimary}
+          // One accent button: once an image is made, using it is the next step, not making another.
+          className={done ? styles.buttonSecondary : styles.buttonPrimary}
           disabled={!canStart}
           aria-describedby={waitingFor ? `atelier-waiting-${kind}` : undefined}
           onClick={() => void run()}
@@ -472,7 +473,7 @@ export function PhotoAtelier({
 
       {done && (
         <div className={styles.atelierActions}>
-          <button type="button" className={styles.buttonSecondary} onClick={use}>
+          <button type="button" className={styles.buttonPrimary} onClick={use}>
             {t('photoUse')}
           </button>
           {estimates.imageUpscale !== undefined && <PhotoHd key={done.id} imageRef={done.outputImageRef!} estimate={estimates.imageUpscale} name={kind} />}

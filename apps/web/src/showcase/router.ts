@@ -165,6 +165,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       label: { itemId: item.id, name: item.name },
       modelId: item.modelId,
       placeholder: false,
+      ...(example.hd ? { hdModel: example.hd } : {}),
       createdAt: new Date().toISOString(),
     };
     jobs.set(record.id, record);
@@ -216,6 +217,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       model: data.model,
       capabilities: { uploads: false, remixRender: false },
       placeholders: data.clips.some((clip) => clip.placeholder),
+      hd: data.clips.length > 0 && data.clips.every((clip) => clip.hd !== undefined),
       repoUrl: data.repoUrl,
     };
   }
@@ -244,6 +246,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       outputUrl: showcaseUrl(shot.clip.url),
       workflowUrl: showcaseUrl(shot.clip.workflowUrl),
       placeholder: shot.clip.placeholder,
+      ...(shot.clip.hd ? { hdModel: shot.clip.hd } : {}),
     };
     generations.set(record.id, record);
     visit = [
@@ -280,6 +283,8 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     if (assembling !== null) return refuse('montage-busy', 409);
 
     const placeholder = resolved.some((clip) => clip.placeholder);
+    // A film is in 1080p when every shot had the same HD pass: the browser joins them as they are.
+    const hd = resolved[0]?.hd;
     const record: SequenceSummary = {
       id: newId(),
       state: 'running',
@@ -287,6 +292,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       currentShot: resolved.length - 1,
       progress: PROGRESS.running,
       placeholder,
+      ...(hd && resolved.every((clip) => clip.hd?.id === hd.id) ? { hdModel: hd } : {}),
     };
     const controller = new AbortController();
     sequences.set(record.id, { record, controller });

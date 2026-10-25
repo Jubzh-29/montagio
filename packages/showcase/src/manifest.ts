@@ -28,30 +28,63 @@ const SampleSchema = z
   })
   .strict();
 
+const seed = z.number().int().min(0).max(2 ** 32 - 1);
+const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be a date, YYYY-MM-DD');
+
+/**
+ * The 1080p pass of a clip: SeedVR2 restored the 480p render, and the file of the showcase is
+ * its output. `input` is the name the run loaded the 480p clip under (it is in the workflow),
+ * `source_sha256` the sha256 of that clip.
+ */
+const HdSchema = z
+  .object({
+    model: kebabId,
+    seed,
+    input: z.string().max(128).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*\.mp4$/, 'must be the file name of an .mp4 clip'),
+    source_sha256: sha256,
+    workflow_sha256: sha256,
+    rendered_at: date,
+  })
+  .strict();
+
 const ClipSchema = z
   .object({
     preset: kebabId,
     sample: kebabId,
-    seed: z.number().int().min(0).max(2 ** 32 - 1),
+    seed,
+    /** The description of the photo the model got before the preset's text, when it is not the sample's prompt. */
+    description: z.string().min(1).max(500).optional(),
+    /** The negative prompt the model got instead of the preset's (smoke --negative). */
+    negative: z.string().min(1).max(500).optional(),
     sha256,
     /** The sample photo the clip was rendered from: a photo replaced afterwards is caught. */
     image_sha256: sha256,
     workflow_sha256: sha256,
-    rendered_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be a date, YYYY-MM-DD'),
+    rendered_at: date,
+    hd: HdSchema.optional(),
   })
   .strict();
 
 /** An effect or a hook rendered on a sample photo in a GPU session, tied like a clip to its seed and workflow. */
 const exampleFields = {
   sample: kebabId,
-  seed: z.number().int().min(0).max(2 ** 32 - 1),
+  seed,
   sha256,
   image_sha256: sha256,
   workflow_sha256: sha256,
-  rendered_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be a date, YYYY-MM-DD'),
+  rendered_at: date,
+  hd: HdSchema.optional(),
 };
 const EffectExampleSchema = z.object({ effect: kebabId, ...exampleFields }).strict();
 const HookExampleSchema = z.object({ hook: kebabId, ...exampleFields }).strict();
+
+/** A render kept out of the showcase for what it shows: ingest skips it, and it cannot be listed. */
+const withheldFields = { sample: kebabId, reason: z.string().min(1).max(200) };
+const WithheldSchema = z.union([
+  z.object({ preset: kebabId, ...withheldFields }).strict(),
+  z.object({ effect: kebabId, ...withheldFields }).strict(),
+  z.object({ hook: kebabId, ...withheldFields }).strict(),
+]);
 
 const ManifestSchema = z
   .object({
@@ -61,6 +94,7 @@ const ManifestSchema = z
     clips: z.array(ClipSchema).default([]),
     effects: z.array(EffectExampleSchema).default([]),
     hooks: z.array(HookExampleSchema).default([]),
+    withheld: z.array(WithheldSchema).default([]),
   })
   .strict();
 
@@ -69,6 +103,21 @@ export type SampleEntry = Manifest['samples'][number];
 export type ClipEntry = Manifest['clips'][number];
 export type EffectExample = Manifest['effects'][number];
 export type HookExample = Manifest['hooks'][number];
+export type HdPass = NonNullable<ClipEntry['hd']>;
+export type WithheldEntry = Manifest['withheld'][number];
+
+/** The section a render belongs to, and its preset, effect or hook. */
+export type RenderKind = 'clip' | 'effect' | 'hook';
+export const withheldKind = (entry: WithheldEntry): { kind: RenderKind; id: string } =>
+  'preset' in entry ? { kind: 'clip', id: entry.preset } : 'effect' in entry ? { kind: 'effect', id: entry.effect } : { kind: 'hook', id: entry.hook };
+
+/** The reason a render is withheld from the showcase, or undefined when it is not. */
+export function withheldReason(manifest: Pick<Manifest, 'withheld'>, kind: RenderKind, id: string, sample: string): string | undefined {
+  return manifest.withheld.find((entry) => {
+    const what = withheldKind(entry);
+    return what.kind === kind && what.id === id && entry.sample === sample;
+  })?.reason;
+}
 
 export class ManifestError extends Error {
   override name = 'ManifestError';
@@ -117,6 +166,17 @@ export function parseManifest(text: string, source: string): Manifest {
       if (!sampleIds.has(entry.sample)) problems.push(`${section}.${index}.sample: unknown sample "${entry.sample}"`);
     });
   }
+  const listed = {
+    clip: manifest.clips.map((entry) => `${entry.preset} × ${entry.sample}`),
+    effect: manifest.effects.map((entry) => `${entry.effect} × ${entry.sample}`),
+    hook: manifest.hooks.map((entry) => `${entry.hook} × ${entry.sample}`),
+  };
+  const section = { clip: 'clips', effect: 'effects', hook: 'hooks' } as const;
+  manifest.withheld.forEach((entry, index) => {
+    const { kind, id } = withheldKind(entry);
+    if (!sampleIds.has(entry.sample)) problems.push(`withheld.${index}.sample: unknown sample "${entry.sample}"`);
+    if (listed[kind].includes(`${id} × ${entry.sample}`)) problems.push(`withheld.${index}: ${id} × ${entry.sample} is withheld but listed in ${section[kind]}`);
+  });
   if (problems.length > 0) throw new ManifestError(problems);
   return manifest;
 }

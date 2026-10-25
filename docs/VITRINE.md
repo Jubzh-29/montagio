@@ -43,7 +43,7 @@ La commande enchaîne cinq étapes :
    - les photos ;
    - `data.json`.
 
-   Un fichier dont les entrées n'ont pas changé n'est pas refait. Le premier passage prend environ 80 s, les suivants environ 3 s.
+   Un fichier dont les entrées n'ont pas changé n'est pas refait. Le premier passage prend environ 4 min depuis la passe HD (223 s le 24/10), les suivants quelques secondes.
 3. **La copie de ffmpeg.wasm** dans `apps/web/public/ffmpeg/`, avec ses licences (`LICENSES.txt`). La page charge ces fichiers depuis sa propre origine, jamais depuis un CDN.
 4. **`next build`** en mode export (`MONTAGIO_SHOWCASE_EXPORT=1`, `NEXT_PUBLIC_MONTAGIO_MODE=showcase`), suivi de deux petits correctifs de l'export de Next 16.4.2 (`scripts/export-fixes.mjs`).
 
@@ -52,7 +52,7 @@ La commande enchaîne cinq étapes :
    - le script refuse de démarrer si `.next` contient un build de production (`next build` normal, servi par `next start`, comme celui de l'installeur local). Il faut alors construire la vitrine depuis un autre checkout, ou supprimer `apps/web/.next` puis refaire `next build` avant `next start`.
 5. **La fiche du Space** (`apps/web/showcase-space/README.md`) est copiée dans `out/README.md`.
 
-Résultat : `apps/web/out/`, environ 160 Mo. Les clips pèsent environ 1,7 Mo chacun, leurs variantes 9:16 environ 1,9 Mo, et ffmpeg.wasm 31 Mo.
+Résultat : `apps/web/out/`, environ 290 Mo, dont 254 Mo pour `showcase/`. Les clips 1080p pèsent environ 5 Mo chacun, leurs variantes 9:16 (720×1280) environ 1,5 Mo, et ffmpeg.wasm 31 Mo. C'est sous la limite d'environ 1 Go d'un Space (partie 7, « Le poids »).
 
 **Build de publication**, avant le dépôt final :
 
@@ -115,7 +115,7 @@ Pour mettre à jour la vitrine, reconstruire, puis relancer la même commande `h
 
 - [ ] L'accueil s'affiche, avec le badge « 100% open weights — verified » et les trois photos d'exemple.
 - [ ] `/open-stack/`, ouvert directement (rechargement compris), liste chaque modèle par fonction (caméra, effets, transitions et hooks, photo, avatar, musique, HD, mouvement), tous en Apache-2.0 ou MIT, et la légende d’un clip mène à la ligne de son modèle.
-- [ ] Une photo, un preset, puis « Show clip » : le clip joue, et sa légende dit s'il est provisoire ou pré-généré.
+- [ ] Une photo, un preset, puis « Show clip » : le clip joue, et sa légende dit s'il est provisoire ou pré-généré. Depuis la passe HD (partie 7), elle nomme aussi SeedVR2, et l'ardoise sous le moniteur dit « 1080p ».
 - [ ] « Open in ComfyUI » télécharge `montagio-<preset>.json`.
 - [ ] En Séquence, une photo et trois presets, puis « Assemble film » : le film joue en quelques secondes après le chargement de FFmpeg. « Download film » et « Download 9:16 » fonctionnent.
 - [ ] Les étiquettes du film téléchargé sont les bonnes : `ffprobe -v error -show_entries format_tags -of json montagio-film.mp4` doit afficher `"comment": "AI-generated"` après la S3, ou `"Montagio showcase placeholder"` avant.
@@ -160,7 +160,7 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
    npm run smoke -w @montagio/infra-runpod -- --preset all --image demo-assets/showcase/samples/landscape-a.jpg --prompt "<le prompt de landscape-a, mot pour mot>" --out s3-results/landscape-a
    ```
 
-   **`--prompt` est indispensable** : sans la description de la photo avant le texte du preset, Fun Camera invente ce qu'il ne voit pas et le clip devient fantôme ([S2_RESULTATS.md](S2_RESULTATS.md), partie 3). Copier le `prompt` du manifeste mot pour mot : `ingest` écarte un rendu fait avec un autre texte, car son workflow ne serait pas celui de la vitrine.
+   **`--prompt` est indispensable** : sans la description de la photo avant le texte du preset, Fun Camera invente ce qu'il ne voit pas et le clip devient fantôme ([S2_RESULTATS.md](S2_RESULTATS.md), partie 3). `ingest` écarte un rendu fait sans description. Le `prompt` du manifeste convient ; une description propre au clip aussi (« la voiture reste garée »), avec un `--negative` ciblé : `ingest` la note alors dans l'entrée du clip (partie 7).
 
    Pour goûter plusieurs seeds, ajouter `--runs 2` : la seed augmente de 1 à chaque run. `smoke.jsonl` note désormais la photo de départ (`image`, `image_sha256`).
 3. **Rapatrier avant d'éteindre le pod** : les rendus sont payés, il ne faut pas les perdre. Sur le pod, archiver les résultats **et** les photos :
@@ -177,9 +177,10 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
    ```
 
    `ingest` :
-   - garde les rendus réussis, faits sur le bon modèle, à partir de la bonne photo, avec la caméra du preset, avec le texte de la photo avant celui du preset, et à sa taille et sa durée pour ce format. Un rendu `--resolution 720p` est donc écarté (ligne `skipped:`), au lieu d'être réduit en silence ;
+   - garde les rendus réussis, faits sur le bon modèle, à partir de la bonne photo, avec la caméra du preset, avec une description de la photo avant le texte du preset, et à sa taille et sa durée pour ce format. Un rendu `--resolution 720p` est donc écarté (ligne `skipped:`), au lieu d'être réduit en silence ;
+   - écarte aussi les rendus de la liste `withheld` du manifeste (partie 7) ;
    - les réencode dans l'encodage commun de la vitrine, avec la mention « AI-generated » ;
-   - écrit leurs entrées dans le manifeste : seed, sha256, empreintes de la photo et du workflow, date.
+   - écrit leurs entrées dans le manifeste : seed, sha256, empreintes de la photo et du workflow, date, et la description (`description`) ou le négatif (`negative`) du rendu quand ils ne sont pas ceux de la photo et du preset.
 
    S'il y a plusieurs runs pour un preset, choisir avec `--pick crash-push=2` (une option `--pick` par preset).
 
@@ -204,12 +205,12 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
 
    La commande doit finir sur « 0 errors ». Elle vérifie :
    - les sha256 ;
-   - les dimensions, la durée et le codec ;
+   - les dimensions (1920×1080 ou 1080×1920 après la passe HD), la durée et le codec ;
    - la mention « AI-generated » ;
-   - que chaque workflow n'a pas changé depuis son rendu ;
+   - que chaque workflow n'a pas changé depuis son rendu, celui de la passe HD compris ;
    - que chaque clip vient de la photo actuelle (`image_sha256`) ;
    - qu'on peut concaténer sans réencoder les clips d'une même photo, et qu'ils partagent les mêmes en-têtes H.264.
-6. **Versionner** `demo-assets/showcase/` (manifeste, photos, clips : environ 40 à 70 Mo), jamais `s3-results/`. Puis reconstruire en `--release` (partie 2) et déposer de nouveau (partie 3).
+6. **Versionner** `demo-assets/showcase/` (manifeste, photos, clips : environ 75 Mo en 480p, 205 Mo depuis la passe HD de la partie 7), jamais `s3-results/`. Puis reconstruire en `--release` (partie 2) et déposer de nouveau (partie 3).
 
 À savoir :
 - **Aperçus de la galerie** : chaque tuile joue son preset sur la première photo. La S3 peut donc se passer des aperçus séparés de `presets/previews/`.
@@ -217,7 +218,49 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
 - **Photo refaite après un rendu** : `verify` le voit (`image_sha256`) et refuse les clips faits à partir de l'ancienne photo.
 - **S3 incomplète** : les couples manquants restent provisoires et signalés comme tels (légende sous le clip, badge sur la tuile, phrase dans la note). `verify --strict` refuse alors la publication. C'est à vous de décider de publier quand même (sans `--release`) ou non.
 
-## 7. Ce que la vitrine collecte : rien
+## 7. La passe HD 1080p (24/10)
+
+Le 24/10, l'utilisateur a trouvé laids une partie des clips de la S3. Le tri (hors dépôt, `tri-qualite-2026-10-24.md` de la vidéo de démo) a donné 18 clips caméra bons, 9 moyens et 6 ratés. La résolution n'en était pas la cause principale : chaque clip était une prise unique, et le sujet partait du cadre (la voiture « garée » qui démarre, la passante qui sort) ou devenait fantôme quand la caméra traversait le bateau du port. Tout a été refait sur Modal (compte `montagio-2`) :
+- **15 clips caméra rendus de nouveau en 480p**, à partir de la photo d'exemple exacte, avec une description de la photo propre au clip (`--prompt`, par exemple « The car stays parked and does not move ») et un négatif ciblé (`--negative`), en seed 7, ou 8 pour les reprises ;
+- **les 43 clips de la vitrine passés en 1080p** par SeedVR2 (`smoke.ts --extension upscale --clip <clip 480p>`) : les 33 clips caméra (ces 15, et les 18 autres de la S3 tels quels), 9 effets et le hook Ignite.
+
+Bilan caméra après la refonte : 30 bons, 3 moyens, 0 raté.
+
+**Ce que garde le manifeste.** La vitrine ne garde un clip que s'il vient de la photo d'exemple exacte. Un clip 1080p vient d'un second run, dont l'entrée est un clip et non la photo. L'entrée du manifeste note donc toute la chaîne photo → rendu 480p → passe HD :
+- `seed`, `image_sha256`, `workflow_sha256` et `rendered_at` restent ceux du rendu 480p ;
+- `description` et `negative` notent les textes propres au rendu, quand ce ne sont ni le `prompt` de la photo ni le négatif du preset. **Une description change `workflow_sha256`** : elle entre dans le prompt compilé, donc dans le workflow. Le manifeste la garde pour que `verify` recompile le même workflow, et « Open in ComfyUI » donne le workflow qui a vraiment rendu le clip ;
+- `hd` décrit la passe HD : le modèle (`seedvr2-upscale`), sa seed, le nom sous lequel le run a chargé le clip 480p (`input`, il est dans le workflow), le sha256 de ce clip (`source_sha256`), l'empreinte du workflow de la passe et sa date ;
+- `sha256` est celui du fichier 1080p de la vitrine.
+
+**L'intégration.** `smoke.jsonl` nomme le clip agrandi sans son sha256. `ingest --hd` relit donc ses octets dans la copie envoyée sur le volume Modal, puis remonte la chaîne :
+
+```bash
+MODAL_PROFILE=montagio-2 PYTHONUTF8=1 MSYS_NO_PATHCONV=1 modal volume get montagio-results /inputs C:/chemin/vers/volume
+```
+
+```bash
+npm run showcase -- ingest --hd <dossier du run upscale> --inputs C:/chemin/vers/volume/inputs --renders <dossier d'un run caméra> --renders <autre dossier>
+```
+
+Sous Git Bash, avec `MSYS_NO_PATHCONV=1`, une destination écrite `/c/…` atterrit dans `C:\c\…` : écrire `C:/…`. Un dossier par appel, comme pour les autres `ingest`.
+
+Pour chaque passe HD réussie, `ingest --hd` :
+- retrouve le clip 480p qu'elle a pris, à son sha256 : soit un clip ou un exemple de la vitrine tel que `ingest` l'avait écrit (les 18 clips de la S3 et les 10 effets ou hooks), soit la sortie d'un run caméra d'un dossier `--renders`, qui passe alors les mêmes contrôles qu'avec `ingest` (les 15 nouveaux clips) ;
+- écarte une passe qu'il ne peut pas rattacher à un rendu (les 8 clips propres à la vidéo de démo), une passe d'un rendu écarté (`withheld`), ou une passe à une autre taille que 1920×1080 ou 1080×1920 pour la photo ;
+- prend la sortie à la taille HD (`smoke.ts` liste aussi le clip 480p envoyé parmi les sorties, en `…__r1.mp4`) et la réencode dans l'encodage de la vitrine ;
+- refuse un dossier où le même clip a été agrandi deux fois.
+
+Un exemple d'effet ou de hook passe en HD de la même façon, mais il doit d'abord être dans la vitrine en 480p (`ingest --examples`), avec son workflow.
+
+**Ce que montre la page.** `prepare` écrit le modèle de la passe HD de chaque clip et de chaque exemple dans `data.json`. La légende d'un résultat le nomme après le modèle du rendu, chacun lié à sa ligne de la page Open Stack : « Pre-generated with Montagio · Wan 2.2 Fun Camera (Apache-2.0) · in HD by SeedVR2 3B (1080p upscale) (Apache-2.0) · AI-generated ». Un film le nomme quand tous ses plans ont eu la même passe. Quand tous les clips sont en HD, l'ardoise sous le moniteur dit « 1080p » au lieu de « 480p ». Les 9 dossiers du 24/10 ont été intégrés ainsi, avec `--renders` sur les 6 dossiers `refonte-*` et sur celui du pilote.
+
+**Trois effets écartés.** Cake-ify, Explode et Squish sur la passante (`portrait-a`) sont techniquement réussis, mais montrent un couteau qui tranche une personne, une personne dans une explosion et des mains qui écrasent une personne. Ils ont quitté la vitrine (fichiers et workflows supprimés) et sont listés sous `withheld`, avec leur raison : `ingest`, `ingest --examples` et `ingest --hd` les écartent, et le manifeste refuse qu'un rendu écarté soit aussi listé. Les mêmes effets sur la voiture restent.
+
+**Le poids.** En sortie de SeedVR2, les 43 clips pèsent 346 Mo. L'encodage de la vitrine (`SHOWCASE_X264`) est passé de CRF 18 `veryfast` à **CRF 23 `slow`**, au choix de l'utilisateur : environ 5 Mo par clip 1080p au lieu de 10, avec un PSNR de 42 à 43 dB par rapport à la sortie de SeedVR2 (45 à 46 dB pour l'ancien réglage), sans différence visible. Les 43 fichiers font 214 Mo dans le dépôt, et la vitrine construite environ 290 Mo. Le dépôt d'un Space Hugging Face est limité à environ 1 Go, historique compris : chaque envoi de clips modifiés s'y ajoute. Avant un nouvel envoi complet (après une passe de fluidification, par exemple), vérifier la place prise dans les réglages du Space, et au besoin écraser son historique (`HfApi().super_squash_history("<compte>/montagio", repo_type="space")`).
+
+**Fluidification.** Une passe HD avec RIFE (`--smooth`, 32 i/s) n'est pas encore prise en charge par la vitrine : `ingest --hd` et `verify` attendent la cadence du preset (16 i/s). Il faudra l'ajouter avec la branche de fluidification, puis refaire la passe HD des clips depuis leur 480p.
+
+## 8. Ce que la vitrine collecte : rien
 
 - Pas de compte, pas de cookie, pas de statistiques, pas de traceur.
 - Les polices sont servies par la vitrine elle-même (`next/font`). ffmpeg.wasm aussi.
@@ -228,7 +271,7 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
 
 Ce que la vitrine ne contrôle pas : **l'hébergeur** (Hugging Face, ou GitHub en secours) voit, comme tout serveur web, les requêtes HTTP (adresse IP, fichiers demandés). Le pied de page dit donc « Montagio ne collecte rien », et non « rien ne quitte votre navigateur ».
 
-## 8. Plus tard : une vraie génération sur GPU loué (non construite)
+## 9. Plus tard : une vraie génération sur GPU loué (non construite)
 
 La décision viendra après la S2 (21–22/10). Le point d'extension est prévu :
 - **Côté page** : pour ce qu'un serveur GPU ajouterait, l'interface lit les capacités du routeur (`/api/showcase`) plutôt que le nom du mode (`studioCapabilities`, dans `apps/web/src/lib/showcase-ui.ts`) :
