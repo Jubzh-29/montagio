@@ -598,6 +598,7 @@
   "recipeSameWorkflow": "Même workflow que l’original ; ses fichiers d’entrée n’ont pas pu être comparés.",
   "recipeOtherInput": "Même workflow, sur d’autres fichiers d’entrée : le résultat diffère.",
   "captionsAction": "Sous-titres 9:16",
+  "captionsMake": "Créer les sous-titres",
   "captionsIntro": "Incrustés mot à mot, prêts pour TikTok, Reels et Shorts.",
   "captionsListening": "Écoute…",
   "captionsLanguage": "Langue",
@@ -615,7 +616,7 @@
   "captionsExport": "Exporter en 9:16",
   "captionsExporting": "Incrustation des sous-titres…",
   "captionsDownload": "Télécharger le 9:16",
-  "captionsDemo": "Démo : ces instants sont répartis sur la voix, pas entendus par Whisper.",
+  "captionsDemo": "Démo : Whisper n’a pas tourné ici ; les instants viennent de la démo.",
   "captionsUnsupported": "Les sous-titres ne sont pas encore disponibles pour cette langue.",
   "captionsNoSpeech": "Ce clip n’a pas de voix à sous-titrer."
 }

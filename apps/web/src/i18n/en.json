@@ -598,6 +598,7 @@
   "recipeSameWorkflow": "Same workflow as the original; its input files could not be compared.",
   "recipeOtherInput": "Same workflow, on other input files: the result differs.",
   "captionsAction": "Captions 9:16",
+  "captionsMake": "Make captions",
   "captionsIntro": "Burned in word by word, ready for TikTok, Reels and Shorts.",
   "captionsListening": "Listening…",
   "captionsLanguage": "Language",
@@ -615,7 +616,7 @@
   "captionsExport": "Export 9:16",
   "captionsExporting": "Burning the captions in…",
   "captionsDownload": "Download 9:16",
-  "captionsDemo": "Demo: these timings are spread over the voice, not heard by Whisper.",
+  "captionsDemo": "Demo: Whisper did not run here; the timings come with the demo.",
   "captionsUnsupported": "Captions are not available for this language yet.",
   "captionsNoSpeech": "This clip has no voice to caption."
 }

@@ -44,6 +44,7 @@ import { Composer } from './Composer';
 import { ConsentCheck } from './ConsentCheck';
 import { AvatarFields, BUILT_IN_VOICE, type VoiceChoice } from './AvatarFields';
 import { COMPOSE_OFF, composeBody, composePersonal, composeReady, ComposeSlots, type ComposeState } from './ComposeSlots';
+import { CaptionsPanel } from './CaptionsPanel';
 import { HdPanel } from './HdPanel';
 import { MotionFields, type MotionVideo } from './MotionFields';
 import { MusicPanel } from './MusicPanel';
@@ -1530,6 +1531,9 @@ export function Studio() {
                     model={extensions.upscaleModel}
                   />
                 )}
+              {!IS_SHOWCASE && tracked?.kind === 'job' && tracked.record.state === 'succeeded' && tracked.record.task === 'avatar' && extensions?.captions && (
+                <CaptionsPanel key={`captions-${tracked.record.id}`} parentJobId={tracked.record.id} estimate_s={extensions.captions.estimate_s} model={extensions.captions.model} />
+              )}
               {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (

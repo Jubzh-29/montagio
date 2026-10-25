@@ -7,8 +7,8 @@ export const ASS_GENERATOR = 'montagio/captions-ass@1';
 
 const WIDTH = 1080;
 const HEIGHT = 1920;
-/** The baseline of the captions at 72 % of the height: under a 16:9 picture centred in the frame, over the bottom bar of TikTok and Reels. */
-const MARGIN_V = Math.round(HEIGHT * 0.28);
+/** The baseline of the captions at 76 % of the height: under a 16:9 picture centred in the frame (it ends at 66 %), over the bottom bar of TikTok and Reels. */
+const MARGIN_V = Math.round(HEIGHT * 0.24);
 const MARGIN_H = 70;
 
 // ASS colours are &HAABBGGRR (alpha first, 00 = opaque); inline \c tags take &HBBGGRR&.
