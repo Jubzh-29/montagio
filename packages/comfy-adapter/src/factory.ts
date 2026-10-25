@@ -18,6 +18,7 @@ export function createBackend(env: Record<string, string | undefined>, opts: { d
         clipsDir: env.MONTAGIO_DEMO_CLIPS ?? join(root, 'demo-assets', 'clips'),
         imagesDir: env.MONTAGIO_DEMO_IMAGES ?? join(root, 'demo-assets', 'images'),
         audioDir: env.MONTAGIO_DEMO_AUDIO ?? join(root, 'demo-assets', 'audio'),
+        captionsDir: env.MONTAGIO_DEMO_CAPTIONS ?? join(root, 'demo-assets', 'captions'),
         durationMs: Number(env.MONTAGIO_DEMO_DURATION_MS ?? 6000),
         ...(opts.demoRender ? { render: opts.demoRender } : {}),
       });

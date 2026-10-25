@@ -25,6 +25,9 @@ const REFUSALS: Record<string, MessageKey> = {
   'speech-too-short': 'avatarTooShort',
   // A motion transfer without the rights box (server/tasks/motion.ts).
   'rights-required': 'errorRightsRequired',
+  // Captions (server/tasks/captions.ts).
+  'language-unsupported': 'captionsUnsupported',
+  'no-speech': 'captionsNoSpeech',
 };
 
 export function refusalMessageKey(code: string | undefined): MessageKey {

@@ -181,7 +181,7 @@ export type HookSummary = {
 export type ExtensionsInfo = {
   extensions: ExtensionId[];
   /** Features shown only with MONTAGIO_EXPERIMENTAL (not validated on a GPU yet). */
-  experimental?: ('moodboard' | 'palette-photo')[];
+  experimental?: ('moodboard' | 'palette-photo' | 'captions')[];
   effects: EffectSummary[];
   hooks: HookSummary[];
   estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; imageUpscale?: number; motion?: number; voiceChange?: number; translate?: number };
@@ -195,6 +195,8 @@ export type ExtensionsInfo = {
   upscaleModel?: { id: string; name: string; license: string; maxFrames: number };
   /** The motion transfer model, for the caption under its clip. */
   motionModel?: { id: string; name: string; license: string };
+  /** Captions of a talking clip (Whisper), when the flag, the extension "avatar" and ComfyUI allow them. */
+  captions?: { estimate_s: number; model: { id: string; name: string; license: string } };
   /** The demo backend answers (no GPU): a result is a stand-in clip, and its caption says no model ran. */
   demo?: boolean;
   /** The install runs the 12 GB profile: the Studio says why Quality is not offered. */
@@ -203,8 +205,9 @@ export type ExtensionsInfo = {
   examples?: Partial<Record<'avatar' | 'motion', { previewUrl: string; posterUrl?: string }>>;
 };
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad' | 'voice-change' | 'moodboard' | 'translate';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad' | 'voice-change' | 'moodboard' | 'translate' | 'captions';
 
+import type { CaptionStyleId, CaptionWord } from '@montagio/captions';
 import type { CharacterKind, CharacterType } from './characters';
 
 export type { CharacterKind, CharacterType };
@@ -235,6 +238,30 @@ export type CharacterSummary = {
   createdAt: string;
   photos: CharacterPhotoSummary[];
 };
+
+/** What Whisper heard in a talking clip, as the captions editor starts from it (GET /api/captions/:id). */
+export type Transcript = {
+  /** A Whisper language code, detected or imposed. */
+  language: string;
+  detected: boolean;
+  /** Captions are made in this language (the Latin-alphabet languages of the embedded fonts). */
+  supported: boolean;
+  model: string;
+  duration_s: number;
+  words: CaptionWord[];
+  /** What Whisper wrote. */
+  heard: string;
+  /** The text the editor starts from: an avatar's typed text, else what was heard. */
+  suggested: string;
+  /** The demo's timings: spread over the voice, or the recorded transcription of its example clip; no Whisper ran. */
+  demo?: true;
+};
+
+/** A 9:16 export with burned-in captions, running or done. */
+export type CaptionExportSummary = { id: string; style: CaptionStyleId; state: 'running' | 'succeeded' | 'failed'; url?: string; error?: string; createdAt: string };
+
+/** A transcription job, its transcript and its exports. */
+export type CaptionsInfo = { jobId: string; parentId: string; transcript: Transcript; exports: CaptionExportSummary[] };
 
 /** A photo, effect or chained render (GET /api/jobs/:id). */
 export type JobSummary = {

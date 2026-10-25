@@ -1,6 +1,7 @@
 import type { JobTask, TaskDef } from '../jobs';
 import { adTask } from './ad';
 import { avatarTask } from './avatar';
+import { captionsTask } from './captions';
 import { editTask } from './edit';
 import { effectTask } from './effect';
 import { hookTask } from './hook';
@@ -28,4 +29,5 @@ export const TASKS: Partial<Record<JobTask, TaskDef>> = {
   'voice-change': voiceChangeTask,
   moodboard: moodboardTask,
   translate: translateTask,
+  captions: captionsTask,
 };
