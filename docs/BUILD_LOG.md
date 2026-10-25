@@ -243,3 +243,25 @@ UI/UX audit of 21/10 (score 26/40, no P0, three P1): its action plan, one branch
   - The registry dates what ran within 12 GB: `low_vram` on a model (its date and its times there), `low_vram_validated` on an extension, `low_vram.estimate_s` on an extension model. `MONTAGIO_VRAM_PROFILE=12gb` makes the app offer only those (the Turbo, the 5B, text to image and the effects), with those times; a preset whose default model is not offered starts on the Turbo, a request for another model is refused (`model-incompatible`), and the Camera tab says that Quality needs a 24 GB card. An unknown value reads as the 12 GB profile, which offers less.
   - The installer offers the 12 GB profile on a card of 12 to 20 GB instead of the app alone (`--low-vram` asks for it), fetches only the extensions validated within 12 GB by default, keeps the profile for the next runs and passes it to the app. Under 12 GB it still offers the app alone. `INSTALL.md` gains the profile's table.
   - Checked on the laptop, one suite at a time, on this branch (the Turbo included): typecheck, `npm test` 1,377 in all workspaces (three web expectations moved to the Turbo default on the way), `npm run test:nodes` 1,251 passed and 3 skipped, `check:open-stack` (14 models, 48 weight files), the e2e specs the two branches touch (delight, finish, studio 30/30). Not checked: a real 12 GB card (the L4 was held to 12 GB), a full install with `--low-vram`, the other extensions within 12 GB.
+- Word-by-word captions and a 9:16 export for talking clips (`feat/captions`), behind `MONTAGIO_EXPERIMENTAL=captions` until the cut.
+  - The clips that speak (an avatar, a voice change, a translation) get a "Captions 9:16" panel:
+    - Whisper hears the clip;
+    - the language shows (detected, or imposed from a menu);
+    - the words can be corrected;
+    - five styles are offered (Karaoke, Pop, One word, Classic, Neon);
+    - the preview is one frame of the real export;
+    - Export 9:16 makes a 1080x1920 clip with the captions burned in, its sound, the AI-generated mention and its recipe.
+  - Films and ads have no voice to caption (their music is instrumental). The export function (`renderVertical`, the frame of the existing 9:16 cuts with an optional caption layer) is the one the Share button will reuse.
+  - Whisper is `openai/whisper-large-v3-turbo` (MIT), in a new node of the pack, Montagio Transcribe Words, which runs on `transformers` (already a ComfyUI dependency). The workflow is `whisper-words.api.json`: `LoadAudio`, the node, then the core `SaveText`, whose JSON comes back as a file output (new output kind `file`, task `a2t-words`). The lock gains 11 MIT entries; the Open Stack lists 16 models.
+  - Whisper is optional within the extension `avatar`: a ComfyUI that refuses its workflow hides the captions only.
+  - The captions are an ASS script rendered by libass inside FFmpeg (`@montagio/captions`). The styles, line breaks, alignment and transitions are ported from RushGlide's subtitle engine; the drawing is libass instead of a canvas, so the export runs on the server and a recipe can replay it.
+  - The four fonts (Poppins, Anton, Bebas Neue, Montserrat, OFL) are embedded with their licences and checked glyph by glyph for the 22 caption languages.
+  - The corrected text keeps Whisper's moments: Levenshtein alignment, a merged word takes the time of the words it replaces.
+  - Recipe and History:
+    - a captions export is a clip of its own in the History;
+    - its recipe is the talking clip's, then Whisper's step, then `/api/jobs/:parent/captions` with the corrected text and the style, which `npm run reproduce` accepts as its one follow-up;
+    - a voice change or a translation stays unreplayable (the speech file and the consent come from the user).
+  - Checked:
+    - Whisper ran for real on the CPU ComfyUI (2.9 s of speech in 95.7 s with the model loading, English detected; its words are the demo's transcription);
+    - the export was checked in the browser (1080x1920, 32 fps, AAC, `comment = AI-generated`, the recipe in `synopsis`);
+    - one suite at a time: typecheck, lint, the packages' and the web's tests, `test:nodes`, `check:open-stack`, the e2e specs it touches.

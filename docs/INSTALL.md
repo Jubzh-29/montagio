@@ -179,7 +179,7 @@ Without a GPU of 12 GB at least, `install --app-only` installs the app alone: no
 |---|---|
 | `MONTAGIO_HOME` | install folder |
 | `MONTAGIO_EXTENSIONS` | the default of `--extensions`; the app reads it too |
-| `MONTAGIO_EXPERIMENTAL` | features not validated on a GPU yet, shown anyway: `moodboard`, `palette-photo` (comma list) |
+| `MONTAGIO_EXPERIMENTAL` | features not validated on a GPU yet, shown anyway: `moodboard`, `palette-photo`, `captions` (comma list). `captions` adds the 9:16 export with word-by-word captions under a talking clip (avatar, voice change, translation): Whisper large-v3 turbo, MIT, 1.6 GB, fetched with the extension `avatar` in `models/whisper/whisper-large-v3-turbo/` |
 | `MONTAGIO_COMFYUI_ARGS` | extra ComfyUI arguments, separated by spaces, for example `--reserve-vram 1` (ComfyUI v0.41.0's dynamic VRAM makes `--lowvram` a no-op); `--listen` and `--port` are refused, ComfyUI stays on 127.0.0.1 and the install's port |
 | `HF_TOKEN` | a Hugging Face token; not needed for the files of the lock |
 | `MONTAGIO_FFMPEG`, `MONTAGIO_FFPROBE` | FFmpeg and ffprobe outside the `PATH` |
