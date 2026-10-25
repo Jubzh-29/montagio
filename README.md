@@ -32,7 +32,7 @@ The showcase is a static copy of the real Studio. Pick a sample photo and a came
 
 ### From an MCP client
 
-Once Montagio runs on your machine, any MCP client (a desktop assistant, an IDE, an agent framework) can drive it through a local MCP server: "animate this photo with Crash Push", "make the dog squish", "generate an image, then apply Explode". The server calls the app's own HTTP API, renders nothing itself and keeps the Studio's consent rule. Setup, the client configuration and the 15 tools: [packages/mcp](packages/mcp/README.md).
+Once Montagio runs on your machine, any MCP client (a desktop assistant, an IDE, an agent framework) can drive it through a local MCP server: "animate this photo with Crash Push", "make the dog squish", "generate an image, then apply Explode". The server calls the app's own HTTP API, renders nothing itself and keeps the Studio's consent rule. Setup, the client configuration and the 17 tools, `reproduce` included: [packages/mcp](packages/mcp/README.md).
 
 ## Why Montagio
 
@@ -54,7 +54,8 @@ The app opens on **Explore**, the clips it makes and a door to every tool. The S
 | **Characters** | Make a fictional character once from a type and a few words, save it, then its **photodump**: the same character in the scenes you pick. Any picture opens Camera, Effects, Avatar or Motion with it as the start photo, its description filled in. A character is never a photo of someone: only pictures made from a text here, and edits of them, qualify. | Z-Image-Turbo and Qwen-Image-Edit-2511 (Apache-2.0) |
 | **Ad studio** | A product photo, a character if you like (or one of yours), a style (Studio, Lifestyle, Bold), an effect and a tagline give a 9:16 ad with music: the edit stages the scene with room for the tagline, the effect animates it, ACE-Step writes the music. | Qwen-Image-Edit-2511, Wan 2.1 I2V and an effect LoRA (Apache-2.0), ACE-Step 1.5 (MIT) |
 | **Voice change** | The speech of a clip, sent here or made by the avatar, said again in the voice of a sample its speaker agreed to lend; the words, the rhythm and the picture stay. | Chatterbox VC (MIT) |
-| **History** | Every photo, clip and film, with download and reuse. | — |
+| **Recipe and Reproduce** | Every result carries its recipe: the preset, the exact ComfyUI workflow of each step and its sha256, the weight files with their licences, the seed, the settings and the sha256 of each input, never the photo. A Recipe panel shows it under each result and in History; a compact copy rides in each exported MP4 and PNG. Reproduce renders a clip or a film again with the same seed and says whether the workflow matches, in the Studio, from a terminal (`npm run reproduce`) or from an MCP client. | — |
+| **History** | Every photo, clip and film, with download, reuse and its recipe. | — |
 
 The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan Right and Crane Up, plus five presets with two moves. Rise & Push, Drift Left Push and Pull Back & Tilt Up run both moves at once; Push & Settle and Breathing run one after the other. The core ComfyUI node takes a single move, so the two-move presets go through a node of the Montagio pack, Montagio Camera Embedding.
 
@@ -239,7 +240,7 @@ Do not make videos of real people without their consent, nothing illegal and not
 
 - Before an edit, an effect, a hook or an avatar on an uploaded photo, the Studio asks you to confirm that you are the person in it or have their consent. Motion transfer asks you to confirm that you hold the rights on the photo and the video. A voice sample, for the avatar or the voice change, needs its speaker's agreement.
 - A [list of well-known names](registry/blocked-names.txt) is refused in text-to-image prompts, edit instructions, effect subjects, avatar texts and motion-transfer descriptions. It is a good-faith guardrail, not a complete filter.
-- Every clip, image and sound is tagged "AI-generated" in its metadata, and the Studio shows the mention under each result with the model and its license.
+- Every clip, image and sound is tagged "AI-generated" in its metadata, beside its recipe, and the Studio shows the mention under each result with the model and its license. A recipe never gives the consent or the rights.
 - No content filter is imposed on your own machine: what you render locally is your responsibility.
 
 Security issues: [SECURITY.md](SECURITY.md).

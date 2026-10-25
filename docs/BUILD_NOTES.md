@@ -45,7 +45,8 @@ A camera clip, from the Generate button to the file:
 4. The adapter builds the job with the SDK: `client.workflows.fromJson(workflow)`, `workflow.setInput(node, field, client.assets.fromFile(path))` for the photo, then `client.submit(workflow)`. The SDK client is created with an explicit local base URL and a `fetch` that refuses any other origin; a Comfy-hosted host is refused outright.
 5. The Studio polls `/api/generations/{id}`; the server reads `client.jobs.get(id)` and passes on its status and progress.
 6. When the job succeeds, the adapter picks the output by kind and node, downloads it from the proxy and keeps it under `data/`. FFmpeg writes the "AI-generated" mention into the file's metadata before the Studio shows it.
-7. "Open in ComfyUI" downloads the exact API workflow that ran.
+7. When the result is delivered, its recipe is written beside it: the workflow and its sha256, the weight files with their lock sha256, the seed, the settings and the sha256 of each input. A compact copy goes into the MP4 (its `synopsis` tag) or the PNG, and Reproduce sends the same request again ([INSTALL.md](INSTALL.md#reproduce-a-recipe)).
+8. "Open in ComfyUI" downloads the exact API workflow that ran.
 
 Every other feature follows the same path through its own route and compiler; the ones that chain models (a hook, an avatar, an ad) run their jobs one after the other, each on the output of the one before.
 
@@ -137,6 +138,7 @@ How the times were taken: `smoke.ts` ([`infra/runpod`](../infra/runpod)) compile
 - **HD through the upscale.** 480p followed by SeedVR2 gives 1080p about three times faster than a native 720p render, so the Studio renders 480p and offers "HD 1080p". Smooth motion is an option of that pass, not a model of its own: RIFE adds 4.8 s to 410.
 - **4 steps by default.** The edit, the effects, the hooks and the avatar run their distillation LoRAs (4 steps); each keeps its full-step path (`fast: false`), and the measures above give both where they were taken.
 - **The description of the photo is required.** S2 changed one variable per clip on the same photo and seed: the text of what the photo shows alone removed the ghosting. The Studio fills it in whenever the photo's text is known.
+- **Every result is reproducible.** A result carries its recipe, written when it is delivered, so a later preset, lock or Montagio version never changes what made it. Same recipe and same stack give the same result on the same setup, and a very close one elsewhere: diffusion is not always bit-exact from one graphics card to another.
 - **Shown only when validated.** An extension, an effect or a hook appears in the Studio only once a GPU session has dated it (`gpu_validated`). Iris Dive and Figurine stay hidden.
 - **Guardrails without a filter.** A consent box before a person's photo is edited, animated or made to speak, a consented sample for any voice but the built-in one, a list of well-known names refused in texts, a character made only from pictures created in the app, and the "AI-generated" mention in every file. No content filter is imposed on the user's own machine.
 - **A pinned install.** One ComfyUI commit, one PyTorch build per CUDA version, every weight by sha256, every service on `127.0.0.1`. The installer does not use comfy-cli, which brings telemetry SDKs and ComfyUI-Manager.
