@@ -224,3 +224,10 @@ describe('outputs by kind', () => {
     }
   });
 });
+
+test('a job that makes a file gets the demo words, beside the clips', async () => {
+  const b = make();
+  const { backendJobId } = await b.submit({ workflow: {}, presetId: 'captions', idempotencyKey: 'words', output: 'file' });
+  t = 3000;
+  expect((await b.get(backendJobId)).outputPath).toMatch(/[\\/]captions[\\/]_default\.json$/);
+});

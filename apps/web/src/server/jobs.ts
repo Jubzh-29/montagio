@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   IDEMPOTENCY_WINDOW_MS,
@@ -277,9 +277,14 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
         record.outputImageRef = upload.imageRef;
         record.personal = provenance.personal;
         record.outputUrl = mediaUrlFor(join(getEnv().data, ...upload.imageRef.split('/')));
-      } else {
+      } else if (step.output === 'audio') {
         const out = join(dir, 'output.flac');
         await access(out).catch(() => tagAudio(outputPath, out));
+        record.outputUrl = mediaUrlFor(out);
+      } else {
+        // A JSON document (a transcription): data, not media, so no mention to write in it.
+        const out = join(dir, 'output.json');
+        await access(out).catch(() => copyFile(outputPath, out));
         record.outputUrl = mediaUrlFor(out);
       }
     } catch (error) {

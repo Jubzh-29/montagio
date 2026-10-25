@@ -33,6 +33,8 @@ const FUNCTION_OF_TASK: Record<ExtensionTask, StackFunction> = {
   tts: 'avatar',
   'a2a-vc': 'avatar',
   'a2a-translate': 'avatar',
+  // the captions of a talking clip
+  'a2t-words': 'avatar',
   'ia2v-talk': 'avatar',
   t2a: 'music',
   'v2v-upscale': 'hd',
