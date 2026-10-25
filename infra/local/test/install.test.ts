@@ -391,11 +391,12 @@ function withMusicWeight(size: number): void {
   );
   writeFileSync(
     join(repo, 'registry', 'extensions.yaml'),
-    ['schema: montagio/extensions@0.1', 'extensions:', ...['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap'].flatMap((id, i) => [
+    ['schema: montagio/extensions@0.1', 'extensions:', ...['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap', 'remix'].flatMap((id, i) => [
         `  - id: ${id}`,
         `    priority: ${i + 1}`,
         ...(id === 'transitions' ? ['    requires: [edit]'] : []),
         ...(id === 'swap' ? ['    requires: [restyle]'] : []),
+        ...(id === 'remix' ? ['    requires: [motion]'] : []),
         '    gpu_validated: null',
       ]),
       '',

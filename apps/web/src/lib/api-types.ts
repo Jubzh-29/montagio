@@ -71,7 +71,7 @@ export type GenerationRecord = {
 export type HdModelSummary = { id: string; name: string; license: string };
 
 /** What a model makes, in the order of the Open Stack page (as @montagio/check-open-stack lists them). */
-export type StackFunction = 'camera' | 'effects' | 'transitions' | 'photo' | 'avatar' | 'music' | 'hd' | 'motion' | 'restyle' | 'swap';
+export type StackFunction = 'camera' | 'effects' | 'transitions' | 'photo' | 'avatar' | 'music' | 'hd' | 'motion' | 'restyle' | 'swap' | 'remix';
 
 export type OpenStackReport = {
   ok: boolean;
@@ -137,7 +137,7 @@ export type ShowcaseInfo = {
 };
 
 /** The seven extensions, as registry/extensions.yaml names them. */
-export type ExtensionId = 'edit' | 'effects' | 'transitions' | 'avatar' | 'music' | 'upscale' | 'motion' | 'restyle' | 'swap';
+export type ExtensionId = 'edit' | 'effects' | 'transitions' | 'avatar' | 'music' | 'upscale' | 'motion' | 'restyle' | 'swap' | 'remix';
 
 /** A one-photo effect of the wall (GET /api/extensions). */
 export type EffectSummary = {

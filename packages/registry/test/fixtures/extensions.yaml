@@ -29,3 +29,7 @@ extensions:
     priority: 9
     requires: [restyle]
     gpu_validated: null
+  - id: remix
+    priority: 10
+    requires: [motion]
+    gpu_validated: null

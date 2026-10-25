@@ -78,9 +78,9 @@ test('unset flag: the dates of the GPU sessions show the nine extensions, the si
   expect((await visibleHooks()).map((hook) => hook.id)).toEqual(['wardrobe-swap', 'ignite']);
 });
 
-test('all shows the nine extensions, every effect and every hook', async () => {
+test('all shows the ten extensions, every effect and every hook', async () => {
   process.env.MONTAGIO_EXTENSIONS = 'all';
-  expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
+  expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap', 'remix']);
   expect(await visibleEffects()).toHaveLength(6);
   expect(await visibleHooks()).toHaveLength(4);
 });
@@ -118,11 +118,11 @@ test('a rejected extension disappears until the process restarts, and so does on
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   process.env.MONTAGIO_EXTENSIONS = 'all';
   markRejected('edit', 'ComfyUI rejected the workflow');
-  expect(await visibleExtensions()).toEqual(['effects', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
+  expect(await visibleExtensions()).toEqual(['effects', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap', 'remix']);
   expect(await visibleHooks()).toEqual([]);
   // the object swap runs on the restyle's VACE: a rejected restyle takes it along
   markRejected('restyle', 'ComfyUI rejected the workflow');
-  expect(await visibleExtensions()).toEqual(['effects', 'avatar', 'music', 'upscale', 'motion']);
+  expect(await visibleExtensions()).toEqual(['effects', 'avatar', 'music', 'upscale', 'motion', 'remix']);
   resetRejectedForTests();
   expect(await visibleExtensions()).toContain('transitions');
   warn.mockRestore();

@@ -106,6 +106,7 @@
   "stackMotion": "Transfert de mouvement",
   "stackRestyle": "Restyle (remix vidéo)",
   "stackSwap": "Remplacement d’objet",
+  "stackRemix": "Remix de tendance",
   "weightSource": "Dépôt d’origine, où la licence a été lue : {url}",
   "sizeGb": "{size} Go",
   "sizeMb": "{size} Mo",

@@ -1,0 +1,24 @@
+# Trend remix, its skeleton and its post (extension "avatar", 2026-10-25): Gemma 4 E4B (Apache-2.0),
+# the translation's model, reads a sheet of the first frame of each shot of a trend (the vision part of
+# its single file) and writes the trend's skeleton as JSON: a line per shot, the hook written on screen,
+# the tone (node 3). A second pass (node 5), its instruction joined by the core StringConcatenate (node
+# 4), writes the remix's post from that skeleton: a caption, hashtags, a hook to write on screen. Node 6
+# keeps both answers, apart by a line of "=", and the core Save Text node writes them (comfy-api-proxy
+# types it "file"). Core nodes only. Optional within the remix: without the avatar, the post is typed.
+schema: montagio/extension-model@0.1
+id: gemma4-trend-skeleton
+name: Gemma 4 E4B (trend skeleton)
+extension: avatar
+task: i2t-trend
+license: Apache-2.0
+weights: [gemma4-e4b-it]
+workflow: workflows/gemma-trend-skeleton.api.json
+bindings:
+  # the sheet of the shots' first frames, in reading order
+  image: { node: "1", field: image }
+  # the instruction of the post (who the remix shows, in which language), put before the skeleton
+  prompt: { node: "4", field: string_a }
+output: { node: "7", kind: file }
+# GPU seconds on an RTX 4090, the model loading included: an estimate until a GPU session measures it
+# (8 GB of Gemma to load, then two short answers)
+estimate_s: 30

@@ -22,6 +22,7 @@ const FUNCTION_TITLES: Record<StackFunction, MessageKey> = {
   motion: 'stackMotion',
   restyle: 'stackRestyle',
   swap: 'stackSwap',
+  remix: 'stackRemix',
 };
 
 function subscribeToHash(onChange: () => void): () => void {
