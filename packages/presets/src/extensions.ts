@@ -295,6 +295,12 @@ export function compileEdit(
  */
 export const COMPOSE_ROLES = ['location', 'character', 'outfit', 'product'] as const;
 export type ComposeRole = (typeof COMPOSE_ROLES)[number];
+/**
+ * The order of the edit's images: the product before the outfit, as image 2 rather than 3, where the
+ * edit keeps an object closer to itself (as image 3 beside an outfit, a toy car became a bottle, then
+ * a phone, on 2026-10-24).
+ */
+const COMPOSE_IMAGE_ORDER: readonly ComposeRole[] = ['location', 'character', 'product', 'outfit'];
 export type ComposeRefs = Partial<Record<ComposeRole, string>>;
 
 /** The edit takes three images at most: a composition is two or three of the four roles. */
@@ -343,7 +349,7 @@ export function compileCompose(
   inputs: { refs: ComposeRefs; seed: number; fast?: boolean; fullBody?: boolean },
   lock: ReadonlyMap<string, LockEntry>,
 ): ExtensionCompiled<{ instruction: string; seed: number; fast: boolean; look: EditLook | null }> & { order: ComposeRole[] } {
-  const order = COMPOSE_ROLES.filter((role) => Boolean(inputs.refs[role]));
+  const order = COMPOSE_IMAGE_ORDER.filter((role) => Boolean(inputs.refs[role]));
   if (order.length < 2) throw new CompileError('a composed start photo needs two of a place, a character and a product');
   if (order.length > COMPOSE_MAX) throw new CompileError(`a composition takes three references at most, not ${order.length}`);
   if (order.includes('outfit') && !order.includes('character')) throw new CompileError('an outfit needs a character to wear it');
