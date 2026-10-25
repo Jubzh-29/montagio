@@ -88,6 +88,8 @@ export type InstallDeps = {
 const LABEL = { ok: 'ok  ', warn: 'warn', fail: 'FAIL' } as const;
 /** What a node pack's folder holds once installed, as infra/runpod/bootstrap.sh writes it. */
 const NODE_STAMP = '.montagio-stamp';
+/** Where a node pack is made before it goes into custom_nodes: beside ComfyUI's folders, where ComfyUI loads nothing. */
+const buildDirOf = (dir: string) => join(dirname(dirname(dir)), '.montagio-build', basename(dir));
 const CUDA_CHECK =
   'import torch; assert torch.cuda.is_available(), "torch sees no CUDA device"; ' +
   'print(f"[montagio] torch {torch.__version__} (CUDA {torch.version.cuda}) on {torch.cuda.get_device_name(0)}")';
@@ -348,19 +350,25 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     if (existsSync(dir) && !existsSync(join(dir, '.git'))) {
       throw new Error(`${dir} is a folder Montagio did not clone: move it away, then run the same command again`);
     }
-    if (!existsSync(dir)) await run('git', ['-c', 'core.autocrlf=false', 'clone', '--quiet', pin.repo, dir]);
-    // --force drops an earlier copy of the patch, so that it is applied once, to the pinned files.
-    await run('git', ['-C', dir, '-c', 'core.autocrlf=false', 'checkout', '--quiet', '--force', pin.commit]);
-    const head = await gitHead(dir);
-    if (head !== pin.commit) throw new Error(`${dir} is at ${head ?? 'an unreadable commit'}, expected ${pin.commit}`);
+    // Made outside custom_nodes, then moved in whole: ComfyUI never loads a pack half made, even after a Ctrl+C
+    // (an unpatched voice pack would open its /chatterbox/* routes).
+    const build = buildDirOf(dir);
+    rmSync(build, { recursive: true, force: true });
+    mkdirSync(dirname(build), { recursive: true });
+    await run('git', ['-c', 'core.autocrlf=false', 'clone', '--quiet', pin.repo, build]);
+    await run('git', ['-C', build, '-c', 'core.autocrlf=false', 'checkout', '--quiet', '--force', pin.commit]);
+    const head = await gitHead(build);
+    if (head !== pin.commit) throw new Error(`${pin.repo} is at ${head ?? 'an unreadable commit'}, expected ${pin.commit}`);
     if (id === 'voice') {
       const patch = join(repoRoot, VOICE_NODE_PATCH);
-      await run('git', ['-C', dir, 'apply', '--check', patch]);
-      await run('git', ['-C', dir, 'apply', patch]);
+      await run('git', ['-C', build, 'apply', '--check', patch]);
+      await run('git', ['-C', build, 'apply', patch]);
       await run(L.comfyPython, ['-m', 'pip', 'install', '--no-deps', '--require-hashes', '-r', join(repoRoot, VOICE_NODE_REQUIREMENTS)]);
       await run(L.comfyPython, ['-I', '-c', VOICE_NODE_IMPORTS]);
     }
-    writeFileSync(join(dir, NODE_STAMP), `${want}\n`);
+    writeFileSync(join(build, NODE_STAMP), `${want}\n`);
+    rmSync(dir, { recursive: true, force: true });
+    renameSync(build, dir);
   };
 
   const actions: Record<StepId, () => Promise<number | void>> = {
@@ -478,8 +486,8 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
           await installNodePack(pack.id, dir, pack.want);
           stamp(pack.id === 'voice' ? 'voiceNode' : 'segmentNode', pack.want);
         } catch (error) {
-          // A pack half installed never stays: an unpatched voice pack would open its /chatterbox/* routes.
-          if (existsSync(join(dir, '.git'))) rmSync(dir, { recursive: true, force: true });
+          // What was made of it goes; a pack Montagio installed before, patched, stays as it was.
+          rmSync(buildDirOf(dir), { recursive: true, force: true });
           deps.log(`warning: ${(error as Error).message}; the ${pack.extension === 'avatar' ? 'avatar' : 'object swap'} extension is left out, the rest of the install goes on`);
           enabled = enabled.filter((id) => id !== pack.extension);
           lock = weightsFor(fullLock, enabled);

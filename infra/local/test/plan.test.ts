@@ -258,14 +258,19 @@ test('the avatar and the object swap get their node packs, at the commits of ver
   const nodes = step(buildPlan(installed({ extensions: ['avatar', 'swap'] })), 'extension-nodes');
   expect(nodes.run).toBe(true);
   expect(nodes.why).toBe('the voice pack: not installed; the SAM 2 pack: not installed');
+  // Each pack is made outside custom_nodes, where ComfyUI loads nothing, then moved in whole.
+  const voiceBuild = win32.join(L.comfyDir, '.montagio-build', 'ComfyUI-Chatterbox');
+  const sam2Build = win32.join(L.comfyDir, '.montagio-build', 'ComfyUI-segment-anything-2');
   expect(nodes.detail).toEqual([
-    `git -c core.autocrlf=false clone https://github.com/wildminder/ComfyUI-Chatterbox.git ${L.voiceNodeDir}`,
-    `git -C ${L.voiceNodeDir} checkout --force ${versions.voiceNode.commit}, then check that HEAD is ${versions.voiceNode.commit}`,
-    `git -C ${L.voiceNodeDir} apply ${win32.join(repoRoot, 'infra/runpod/patches/comfyui-chatterbox-no-routes.patch')} (its /chatterbox/* HTTP routes removed)`,
+    `git -c core.autocrlf=false clone https://github.com/wildminder/ComfyUI-Chatterbox.git ${voiceBuild}`,
+    `git -C ${voiceBuild} checkout --force ${versions.voiceNode.commit}, then check that HEAD is ${versions.voiceNode.commit}`,
+    `git -C ${voiceBuild} apply ${win32.join(repoRoot, 'infra/runpod/patches/comfyui-chatterbox-no-routes.patch')} (its /chatterbox/* HTTP routes removed)`,
     `${L.comfyPython} -m pip install --no-deps --require-hashes -r ${win32.join(repoRoot, 'infra/runpod/requirements-chatterbox.txt')}`,
     `${L.comfyPython} -I -c "import torchaudio, s3tokenizer, onnx"`,
-    `git -c core.autocrlf=false clone https://github.com/kijai/ComfyUI-segment-anything-2.git ${L.segmentNodeDir}`,
-    `git -C ${L.segmentNodeDir} checkout --force ${versions.segmentNode.commit}, then check that HEAD is ${versions.segmentNode.commit}`,
+    `move it to ${L.voiceNodeDir}`,
+    `git -c core.autocrlf=false clone https://github.com/kijai/ComfyUI-segment-anything-2.git ${sam2Build}`,
+    `git -C ${sam2Build} checkout --force ${versions.segmentNode.commit}, then check that HEAD is ${versions.segmentNode.commit}`,
+    `move it to ${L.segmentNodeDir}`,
   ]);
   // Installed: nothing to do; a new patch or requirements file (another hash) installs the voice pack again.
   const done = { voice: voiceNodeStamp(versions, extras), segment: versions.segmentNode.commit };

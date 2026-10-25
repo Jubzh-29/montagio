@@ -270,9 +270,11 @@ export function buildPlan(input: PlanInput): Step[] {
     // in tools/check-open-stack/allowed-nodes.yaml). A pack that fails leaves its extension out, not the install.
     const packs = nodePacksFor(input);
     const stale = packs.filter((pack) => input.nodeStamps[pack.id] !== pack.want);
+    // Each pack is made in ComfyUI/.montagio-build, where ComfyUI loads nothing, then moved into custom_nodes whole.
+    const build = (dir: string) => path.join(L.comfyDir, '.montagio-build', path.basename(dir));
     const clone = (repo: string, dir: string, commit: string) => [
-      `git -c core.autocrlf=false clone ${repo} ${dir}`,
-      `git -C ${dir} checkout --force ${commit}, then check that HEAD is ${commit}`,
+      `git -c core.autocrlf=false clone ${repo} ${build(dir)}`,
+      `git -C ${build(dir)} checkout --force ${commit}, then check that HEAD is ${commit}`,
     ];
     add({
       id: 'extension-nodes',
@@ -288,11 +290,12 @@ export function buildPlan(input: PlanInput): Step[] {
         pack.id === 'voice'
           ? [
               ...clone(versions.voiceNode.repo, L.voiceNodeDir, versions.voiceNode.commit),
-              `git -C ${L.voiceNodeDir} apply ${path.join(input.repoRoot, VOICE_NODE_PATCH)} (its /chatterbox/* HTTP routes removed)`,
+              `git -C ${build(L.voiceNodeDir)} apply ${path.join(input.repoRoot, VOICE_NODE_PATCH)} (its /chatterbox/* HTTP routes removed)`,
               `${L.comfyPython} -m pip install --no-deps --require-hashes -r ${path.join(input.repoRoot, VOICE_NODE_REQUIREMENTS)}`,
               `${L.comfyPython} -I -c "${VOICE_NODE_IMPORTS}"`,
+              `move it to ${L.voiceNodeDir}`,
             ]
-          : clone(versions.segmentNode.repo, L.segmentNodeDir, versions.segmentNode.commit),
+          : [...clone(versions.segmentNode.repo, L.segmentNodeDir, versions.segmentNode.commit), `move it to ${L.segmentNodeDir}`],
       ),
     });
 

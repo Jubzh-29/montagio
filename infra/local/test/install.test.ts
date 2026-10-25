@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { capture as realCapture, type Capture, type Captured, type Stream } from '../src/exec.ts';
 import { install, markOwned, renderReport, type InstallDeps, type InstallOptions } from '../src/install.ts';
@@ -143,8 +143,8 @@ function harness(
       if (where === repo) return { code: 0, stdout: 'abc123\n', stderr: '' };
       if (!existsSync(join(where, '.git'))) return { code: 128, stdout: '', stderr: 'not a git repository' };
       // A node pack is at the commit versions.env pins.
-      if (where === L.voiceNodeDir) return { code: 0, stdout: `${PINS.CHATTERBOX_NODE_COMMIT}\n`, stderr: '' };
-      if (where === L.segmentNodeDir) return { code: 0, stdout: `${PINS.SAM2_NODE_COMMIT}\n`, stderr: '' };
+      if (basename(where) === 'ComfyUI-Chatterbox') return { code: 0, stdout: `${PINS.CHATTERBOX_NODE_COMMIT}\n`, stderr: '' };
+      if (basename(where) === 'ComfyUI-segment-anything-2') return { code: 0, stdout: `${PINS.SAM2_NODE_COMMIT}\n`, stderr: '' };
       return { code: 0, stdout: `${where === L.comfyDir && opts.comfyHead ? opts.comfyHead : COMMIT}\n`, stderr: '' };
     }
     if (cmd === 'git' && args[2] === 'status') return opts.gitStatus ?? { code: 0, stdout: '', stderr: '' };
@@ -482,8 +482,9 @@ test('the avatar and the object swap get their node packs at the pinned commits,
   withNodeExtensionWeights();
   const h = harness();
   expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
-  const voice = h.L.voiceNodeDir;
-  const sam2 = h.L.segmentNodeDir;
+  // Each pack is made outside custom_nodes, then moved in whole.
+  const voice = join(h.L.comfyDir, '.montagio-build', 'ComfyUI-Chatterbox');
+  const sam2 = join(h.L.comfyDir, '.montagio-build', 'ComfyUI-segment-anything-2');
   const patch = join(repo, 'infra', 'runpod', 'patches', 'comfyui-chatterbox-no-routes.patch');
   const steps = described(h.calls).filter((line) => line.includes(voice) || line.includes(sam2) || line.includes('--require-hashes') || line.includes('import torchaudio'));
   expect(steps).toEqual([
@@ -504,11 +505,13 @@ test('the avatar and the object swap get their node packs at the pinned commits,
   expect(state.extensions).toEqual(expect.arrayContaining(['avatar', 'swap', 'music']));
   expect(state.stamps.voiceNode).toMatch(new RegExp(`^${PINS.CHATTERBOX_NODE_COMMIT} [0-9a-f]{16}$`));
   expect(state.stamps.segmentNode).toBe(PINS.SAM2_NODE_COMMIT);
-  expect(readFileSync(join(sam2, '.montagio-stamp'), 'utf8').trim()).toBe(PINS.SAM2_NODE_COMMIT);
+  expect(readFileSync(join(h.L.segmentNodeDir, '.montagio-stamp'), 'utf8').trim()).toBe(PINS.SAM2_NODE_COMMIT);
+  expect(existsSync(join(h.L.voiceNodeDir, '.git'))).toBe(true);
+  expect(existsSync(voice)).toBe(false);
   // Installed: the next run clones nothing.
   const again = harness();
   expect(await install(repo, options({ start: false, extensions: 'all' }), again.deps)).toBe(0);
-  expect(described(again.calls).filter((line) => line.includes(voice) || line.includes(sam2))).toEqual([]);
+  expect(described(again.calls).filter((line) => line.includes('.montagio-build'))).toEqual([]);
 });
 
 test('a node pack that fails leaves its extension out, never half installed, and the install goes on', async () => {
@@ -516,8 +519,9 @@ test('a node pack that fails leaves its extension out, never half installed, and
   const h = harness({ failOn: (call) => call.args.includes('--require-hashes') });
   expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
   expect(h.output()).toMatch(/warning: python(\.exe)? -m pip install \.\.\. exited with code 1; the avatar extension is left out/);
-  // An unpatched or half-installed voice pack would open its /chatterbox/* routes: its folder is gone.
+  // An unpatched or half-installed voice pack would open its /chatterbox/* routes: it never reached custom_nodes.
   expect(existsSync(h.L.voiceNodeDir)).toBe(false);
+  expect(existsSync(join(h.L.comfyDir, '.montagio-build', 'ComfyUI-Chatterbox'))).toBe(false);
   expect(fetchedIds(h.calls)).not.toContain('tiny-avatar');
   expect(fetchedIds(h.calls)).toContain('tiny-sam2');
   const state = readState(h.L.statePath);
