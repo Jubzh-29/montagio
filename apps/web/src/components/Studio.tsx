@@ -22,7 +22,8 @@ import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
 import { entryAsHistoryItem, type CommunityEntry } from '@/lib/community';
-import { applyReprise } from '@/lib/reprise';
+import { recipeUrlOf } from '@/lib/recipe-url';
+import { applyReprise, replayOn, reproducedRecipeUrl, reproducibleResult, type Replay } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { useMotionPaused } from '@/lib/use-motion';
@@ -46,6 +47,7 @@ import { COMPOSE_OFF, composeBody, composePersonal, composeReady, ComposeSlots, 
 import { HdPanel } from './HdPanel';
 import { MotionFields, type MotionVideo } from './MotionFields';
 import { MusicPanel } from './MusicPanel';
+import { RecipePanel } from './RecipePanel';
 import { ShowcaseTextAtelier } from './ShowcaseTextAtelier';
 import { EffectFields } from './EffectFields';
 import { OutfitSource } from './OutfitSource';
@@ -199,7 +201,13 @@ export function Studio() {
   // History: the latest creations under the result, and the item a "Reuse" link brings back (?from=).
   const [recent, setRecent] = useState<HistoryItem[]>([]);
   const [from, setFrom] = useState<string | null>(null);
+  const [reproduce, setReproduce] = useState(false);
   const appliedFrom = useRef<string | null>(null);
+  /** Reproduce: the seed sent with the next renders, and the recipe of the result it reproduces. */
+  const [replayed, setReplay] = useState<Replay | null>(null);
+  const replay = replayOn(replayed, tab);
+  /** The recipe the result on screen is compared with: set by the render Reproduce started. */
+  const [compareWith, setCompareWith] = useState<string | undefined>(undefined);
   const [repriseNotice, setRepriseNotice] = useState(false);
   const moveCanvas = (event: CanvasEvent) => setCanvas((current) => nextView(event, current));
   const [presets, setPresets] = useState<PresetSummary[]>([]);
@@ -626,8 +634,9 @@ export function Studio() {
   };
 
   /** A history item's "Reuse": its tab, photo, choice and texts come back, ready to render again. */
-  const restore = (item: HistoryItem) => {
-    const back = applyReprise(item);
+  const restore = (item: HistoryItem, opts: { reproduce?: boolean } = {}) => {
+    const back = applyReprise(item, opts);
+    setReplay(back.seed !== undefined || back.shotSeeds ? { tab: back.tab, seed: back.seed, shotSeeds: back.shotSeeds, recipeUrl: reproducedRecipeUrl(item) } : null);
     touched.current = true;
     ++uploadToken.current;
     setJob({ status: 'idle' });
@@ -674,8 +683,9 @@ export function Studio() {
 
   useEffect(() => {
     // A Reuse that comes during a render waits for its end: replacing the Studio now would orphan that render.
-    if (!from || catalog !== 'ready' || busy || appliedFrom.current === from) return;
-    appliedFrom.current = from;
+    const applied = `${from}|${reproduce}`;
+    if (!from || catalog !== 'ready' || busy || appliedFrom.current === applied) return;
+    appliedFrom.current = applied;
     // An entry of the community gallery comes from there, a creation of this machine from the history.
     const lookup = from.startsWith('community:')
       ? apiFetch(`/api/community/${encodeURIComponent(from.slice('community:'.length))}`)
@@ -686,12 +696,12 @@ export function Studio() {
           .then((items) => items.find((entry) => entry.key === from));
     lookup
       .then((item) => {
-        if (item) restore(item);
+        if (item) restore(item, { reproduce });
       })
       .catch(() => undefined);
     // restore reads the catalogue, which is ready here; the item to bring back is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, catalog, busy]);
+  }, [from, reproduce, catalog, busy]);
 
   const checkRemix = async () => {
     if (!remix) return;
@@ -811,16 +821,25 @@ export function Studio() {
     setTake({ expected_s: mode === 'sequence' && !remix ? filmEstimate : estimate });
     moveCanvas('generate');
     if (composed) {
-      const body = { compose: composeBody(compose), effectId: composed.id, subject: subject.trim(), ...(askConsent ? { consent } : {}) };
+      const body = {
+        compose: composeBody(compose),
+        effectId: composed.id,
+        subject: subject.trim(),
+        ...(askConsent ? { consent } : {}),
+        ...(replay?.seed !== undefined ? { seed: replay.seed } : {}),
+      };
       void submit('job', body, undefined, '/api/effects');
       return;
     }
     if (upload.status !== 'ready') return;
     const userPrompt = prompt.trim() || undefined;
+    // Reproduce sends the result's seed back: the same choices give the same workflow.
+    const seed = replay?.seed !== undefined ? { seed: replay.seed } : {};
+    setCompareWith(replay?.recipeUrl);
     if (tab === 'motion') {
       if (motionVideo.status !== 'ready') return;
       const texts = { ...(motionCharacter.trim() ? { character: motionCharacter.trim() } : {}), ...(motionAction.trim() ? { motion: motionAction.trim() } : {}) };
-      void submit('job', { imageRef: upload.imageRef, videoRef: motionVideo.videoRef, ...texts, ...(rightsAsked ? { rights: true } : {}) }, undefined, '/api/motion');
+      void submit('job', { imageRef: upload.imageRef, videoRef: motionVideo.videoRef, ...texts, ...(rightsAsked ? { rights: true } : {}), ...seed }, undefined, '/api/motion');
       return;
     }
     if (tab === 'avatar') {
@@ -830,6 +849,7 @@ export function Studio() {
         language: speechLanguage,
         ...(askConsent ? { consent } : {}),
         ...(voice.mine && voice.voiceRef ? { voiceRef: voice.voiceRef, voiceConsent: voice.consent } : {}),
+        ...seed,
       };
       void submit('job', body, undefined, '/api/avatars');
       return;
@@ -837,18 +857,18 @@ export function Studio() {
     if (tab === 'effects') {
       if (selectedHook) {
         const image2 = needsOutfit && outfit.status === 'ready' ? { image2Ref: outfit.imageRef } : {};
-        void submit('job', { imageRef: upload.imageRef, hookId: selectedHook.id, ...image2, ...(askConsent ? { consent } : {}) }, undefined, '/api/hooks');
+        void submit('job', { imageRef: upload.imageRef, hookId: selectedHook.id, ...image2, ...(askConsent ? { consent } : {}), ...seed }, undefined, '/api/hooks');
         return;
       }
       if (!selectedEffect) return;
-      const body = { imageRef: upload.imageRef, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}) };
+      const body = { imageRef: upload.imageRef, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}), ...seed };
       void submit('job', body, undefined, '/api/effects');
       return;
     }
     if (remix) {
       const { text, baseId } = remix;
       const model = modelId;
-      void submit('generation', { presetYaml: text, modelId: model, imageRef: upload.imageRef, userPrompt }, (status, refusal) => {
+      void submit('generation', { presetYaml: text, modelId: model, imageRef: upload.imageRef, userPrompt, ...seed }, (status, refusal) => {
         if (status === 413) {
           setRemixCheck(text, model, { kind: 'too-large' });
         } else if (status === 400 && refusal?.error === 'invalid-preset') {
@@ -865,14 +885,15 @@ export function Studio() {
         if (record) setRemix((current) => (current?.baseId === baseId ? { ...current, generationId: record.id } : current));
       });
     } else if (mode === 'single') {
-      void submit('generation', { presetId, modelId, imageRef: upload.imageRef, userPrompt });
+      void submit('generation', { presetId, modelId, imageRef: upload.imageRef, userPrompt, ...seed });
     } else {
       void submit('sequence', {
         imageRef: upload.imageRef,
-        shots: shots.map((shot) => ({
+        shots: shots.map((shot, index) => ({
           presetId: shot.presetId,
           modelId,
           userPrompt: [userPrompt, shot.prompt.trim()].filter(Boolean).join(', ') || undefined,
+          ...(replay?.shotSeeds?.[index] !== undefined ? { seed: replay.shotSeeds[index] } : {}),
         })),
       });
     }
@@ -935,6 +956,14 @@ export function Studio() {
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
   const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
+  // The recipe of the result: the showcase names its file; a placeholder has none.
+  const resultRecipeUrl =
+    tracked && succeeded && !succeeded.placeholder ? (succeeded.recipeUrl ?? (IS_SHOWCASE ? undefined : recipeUrlOf(tracked.kind, succeeded.id))) : undefined;
+  // Reproduce the result on screen: History brings it back with its seed (not in the showcase, whose clips are made).
+  const resultReproduceHref =
+    tracked && succeeded && resultRecipeUrl && !IS_SHOWCASE && reproducibleResult(tab, tracked.kind === 'job' ? tracked.record.task : undefined)
+      ? `/?tab=${tab}&from=${encodeURIComponent(`${tracked.kind}:${succeeded.id}`)}&reproduce=1`
+      : undefined;
   // A result on the monitor is the screen's subject: its Download is the lime button, Generate steps back.
   const resultShown = succeeded !== undefined && canvas.view === 'result';
   const elapsed_s = clock && clock.take === take ? clock.ms / 1000 : 0;
@@ -1048,7 +1077,10 @@ export function Studio() {
             if (value !== null) touched.current = true;
             setRequestedTab(value);
           }}
-          onFrom={setFrom}
+          onFrom={(key, again) => {
+            setFrom(key);
+            setReproduce(again);
+          }}
         />
       </Suspense>
       <Header recording={busy} current={tab} />
@@ -1266,6 +1298,14 @@ export function Studio() {
                 {waitingFor && primaryLabel && (
                   <p id="generate-reason" className={styles.hint}>
                     {t(waitingFor)}
+                  </p>
+                )}
+                {replay && (
+                  <p className={styles.hint} data-testid="replay-seed">
+                    {t('recipeSeedChip', { seed: replay.seed ?? replay.shotSeeds?.join(' · ') ?? '' })}{' '}
+                    <button type="button" className={styles.buttonLink} onClick={() => setReplay(null)}>
+                      {t('recipeNewSeed')}
+                    </button>
                   </p>
                 )}
               </div>
@@ -1499,6 +1539,15 @@ export function Studio() {
                   {...(extensions.musicModel ? { model: extensions.musicModel } : {})}
                 />
               )}
+              {resultRecipeUrl && (
+                <RecipePanel
+                  key={resultRecipeUrl}
+                  url={resultRecipeUrl}
+                  {...(resultReproduceHref ? { reproduceHref: resultReproduceHref } : {})}
+                  {...(IS_SHOWCASE && repoUrl ? { homeHref: `${repoUrl}/blob/main/docs/INSTALL.md#reproduce-a-recipe` } : {})}
+                  {...(compareWith && compareWith !== resultRecipeUrl ? { compareUrl: compareWith } : {})}
+                />
+              )}
               {/* What the showcase is, in sight whatever the monitor shows. */}
               {showcaseNote && <p className={styles.stageNote}>{showcaseNote}</p>}
             </>
@@ -1511,18 +1560,19 @@ export function Studio() {
 }
 
 /** Reads ?tab= in its own Suspense boundary: the rest of the Studio prerenders without the URL. */
-function TabParam({ onTab, onFrom }: { onTab: (tab: string | null) => void; onFrom: (key: string | null) => void }) {
+function TabParam({ onTab, onFrom }: { onTab: (tab: string | null) => void; onFrom: (key: string | null, reproduce: boolean) => void }) {
   const params = useSearchParams();
   const tab = params.get('tab');
   const from = params.get('from');
+  const reproduce = params.get('reproduce') === '1';
   useEffect(() => {
     onTab(tab);
     // onTab is a new function on every render of the Studio; the URL's tab is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
   useEffect(() => {
-    onFrom(from);
+    onFrom(from, reproduce);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from]);
+  }, [from, reproduce]);
   return null;
 }

@@ -56,6 +56,8 @@ export type GenerationRecord = {
   frames?: number;
   /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
   workflowUrl?: string;
+  /** The showcase's recipe; elsewhere the Studio asks /api/recipes/generation/:id. */
+  recipeUrl?: string;
   /** A showcase clip whose camera move FFmpeg simulated, waiting for the GPU session. */
   placeholder?: boolean;
   /** Showcase: the model that restored the clip to 1080p (its HD pass), named in its caption. */
@@ -99,6 +101,8 @@ export type SequenceSummary = {
   music?: { jobId: string };
   /** Showcase: at least one shot is a placeholder clip. */
   placeholder?: boolean;
+  /** Showcase: the film's recipe; elsewhere /api/recipes/sequence/:id. */
+  recipeUrl?: string;
   /** Showcase: every shot had the same HD pass, so the film is in 1080p. */
   hdModel?: HdModelSummary;
   /** Showcase: what the in-browser montage is doing while the film is assembling. */
@@ -245,6 +249,8 @@ export type JobSummary = {
   error?: string;
   /** The showcase's pre-built workflow; elsewhere the Studio asks /api/workflows/:id. */
   workflowUrl?: string;
+  /** The showcase's recipe; elsewhere the Studio asks /api/recipes/job/:id. */
+  recipeUrl?: string;
   frames?: number;
   /** A film's 9:16 cut with music. */
   verticalUrl?: string;
@@ -280,7 +286,9 @@ export type Reprise = {
   presetUrl?: string;
   /** No photo of its own: the Studio starts from the tab's sample photo (a community recipe or example). */
   sample?: true;
-  shots?: { presetId: string; prompt?: string }[];
+  /** The seed it was rendered with: Reproduce sends it back, Reuse leaves it out. */
+  seed?: number;
+  shots?: { presetId: string; prompt?: string; seed?: number }[];
 };
 
 /** One finished creation, newest first (GET /api/history). */
@@ -297,4 +305,8 @@ export type HistoryItem = {
   previewUrl: string;
   downloadUrl: string;
   reprise: Reprise;
+  /** Its recipe (GET): the workflow, the weights, the seed and the stack that made it. */
+  recipeUrl?: string;
+  /** The recipe a Reproduce of this item makes again, when it is not its own: an HD clip reopens the clip it was made from. */
+  reproduces?: string;
 };

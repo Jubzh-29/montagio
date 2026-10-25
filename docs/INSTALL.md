@@ -108,6 +108,31 @@ git pull
 
 Running `install` again only does what changed: a new ComfyUI or PyTorch version, a new weight in the lock, new npm dependencies, new app code. Running services are stopped first and started again at the end. A weight that leaves the lock stays on the disk; delete it from `ComfyUI/models/` if you need the space.
 
+## Reproduce a recipe
+
+Every result carries its recipe. It sits in the Recipe panel under the result, in the Studio and in History. The panel downloads it as JSON. A clip, a photo or a film Montagio exports holds a compact copy beside the `AI-generated` mention: the `synopsis` tag of an MP4, the `Montagio-Recipe` text chunk of a PNG. An ad, a film's music and a voice change keep theirs in the panel only. A recipe holds:
+
+- the preset, or the remix YAML;
+- the exact ComfyUI workflow of each step, and its sha256;
+- the weight files it loads, with the lock's sha256, source and licence;
+- the seed, the texts, the resolution, the steps, the frame rate, the HD and RIFE passes;
+- the sha256 of each input file;
+- the versions of Montagio, ComfyUI and the node packs.
+
+It never holds the photo, nor a path of your machine.
+
+To render a recipe again on this install, with Montagio started:
+
+```bash
+npm run reproduce -- montagio-recipe-camera-<id>.json --photo photo.jpg
+```
+
+The recipe can also be the exported clip (`.mp4`) or image (`.png`). The command sends the same request, with the same seed, to your local ComfyUI. It then says whether your photo has the sha256 the recipe noted, and whether the workflow made here has the recipe's sha256, step by step. Other input files go with `--input field=file` (`--input videoRef=dance.mp4`); `--out folder` saves the result. An agent does the same through the MCP server, with `get_recipe` and `reproduce` (see `packages/mcp/README.md`). In the Studio, Reproduce reopens the tab with the same choices and the same seed.
+
+Same recipe, same stack: identical result on the same setup, very close elsewhere (diffusion is not always bit-exact from one graphics card to another). A recipe made by another version of Montagio may compile to another workflow; the command says so.
+
+Without Montagio, `ffprobe -v error -show_entries format_tags=synopsis -of default=nw=1:nk=1 clip.mp4` prints a clip's recipe. The workflow of a full recipe loads in ComfyUI as it is: each input file reads `<imageRef>` (or the field it came from), so pick your own file in that node.
+
 ## App only
 
 Without a 24 GB GPU, `install --app-only` installs the app alone: no ComfyUI, no PyTorch, no weights.

@@ -1,5 +1,5 @@
 import type { HistoryItem } from '@/lib/api-types';
-import { applyReprise, historyFilter, repriseHref } from '@/lib/reprise';
+import { applyReprise, canReproduce, historyFilter, replayOn, REPRODUCIBLE_TABS, repriseHref, reproducedRecipeUrl, reproducibleResult } from '@/lib/reprise';
 
 const item = (over: Partial<HistoryItem> = {}): HistoryItem => ({
   key: 'generation:g-1',
@@ -71,4 +71,59 @@ test('the filter keeps one kind', () => {
   expect(historyFilter(items, 'all')).toHaveLength(3);
   expect(historyFilter(items, 'photo').map((i) => i.key)).toEqual(['job:j']);
   expect(historyFilter(items, 'film').map((i) => i.key)).toEqual(['sequence:s']);
+});
+
+describe('Reproduce: the same choices with the same seed', () => {
+  const seeded = (over: Partial<HistoryItem> = {}) => item({ reprise: { ...item().reprise, seed: 1234 }, recipeUrl: '/api/recipes/generation/g-1', ...over });
+
+  test('its link asks the Studio to reproduce', () => {
+    expect(repriseHref(seeded(), { reproduce: true })).toBe('/?tab=camera&from=generation%3Ag-1&reproduce=1');
+  });
+
+  test('Reuse leaves the seed out: the next render draws its own', () => {
+    expect(applyReprise(seeded()).seed).toBeUndefined();
+  });
+
+  test('Reproduce keeps it', () => {
+    expect(applyReprise(seeded(), { reproduce: true }).seed).toBe(1234);
+  });
+
+  test('a film keeps the seed of each shot', () => {
+    const film = item({
+      kind: 'film',
+      task: 'film',
+      reprise: { tab: 'film', imageRef: 'uploads/p.png', shots: [{ presetId: 'crash-push', seed: 7 }, { presetId: 'pan-left', seed: 8 }] },
+    });
+    expect(applyReprise(film, { reproduce: true }).shotSeeds).toEqual([7, 8]);
+    expect(applyReprise(film).shotSeeds).toBeUndefined();
+  });
+
+  test('only the tabs the Studio reopens whole can be reproduced', () => {
+    expect([...REPRODUCIBLE_TABS].sort()).toEqual(['avatar', 'camera', 'effects', 'film', 'motion']);
+    expect(canReproduce(seeded())).toBe(true);
+    expect(canReproduce(seeded({ kind: 'photo', task: 't2i' }))).toBe(false);
+    expect(canReproduce(seeded({ task: 'ad', reprise: { tab: 'effects', effectId: 'squish', seed: 3 } }))).toBe(false);
+    expect(canReproduce(seeded({ task: 'voice-change', reprise: { tab: 'avatar' } }))).toBe(false);
+    expect(canReproduce(item())).toBe(false);
+  });
+
+  test('a result on screen can be reproduced on the same tabs, an ad cannot', () => {
+    expect(reproducibleResult('camera')).toBe(true);
+    expect(reproducibleResult('effects', 'effect')).toBe(true);
+    expect(reproducibleResult('effects', 'ad')).toBe(false);
+    expect(reproducibleResult('avatar', 'voice-change')).toBe(false);
+  });
+
+  test('the seed brought back holds on its own tab only: another tab draws its own', () => {
+    const replay = { tab: 'camera' as const, seed: 1234 };
+    expect(replayOn(replay, 'camera')).toBe(replay);
+    expect(replayOn(replay, 'effects')).toBeNull();
+    expect(replayOn(null, 'camera')).toBeNull();
+  });
+
+  test('an HD clip reproduces the clip it was made from: its recipe is the one compared', () => {
+    const hd = seeded({ task: 'upscale', recipeUrl: '/api/recipes/job/j-hd', reproduces: '/api/recipes/generation/g-1' });
+    expect(reproducedRecipeUrl(hd)).toBe('/api/recipes/generation/g-1');
+    expect(reproducedRecipeUrl(seeded())).toBe('/api/recipes/generation/g-1');
+  });
 });

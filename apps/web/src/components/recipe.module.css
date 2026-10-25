@@ -1,0 +1,150 @@
+/* The Recipe disclosure under a result and on a History card: facts in rows, sha256s in the monitor's mono. */
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+}
+
+.panel[open] {
+  border-color: var(--line-strong);
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.summary:focus-visible,
+.action:focus-visible,
+.weightId:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.title {
+  font-size: var(--text-s);
+  font-weight: 600;
+}
+
+.hint {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.rows {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, max-content) 1fr;
+  gap: var(--space-3);
+  font-size: var(--text-s);
+}
+
+.row dt {
+  color: var(--ink-muted);
+}
+
+.row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.subtitle {
+  font-size: var(--text-s);
+  font-weight: 600;
+}
+
+.weights {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-s);
+}
+
+.weights li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  color: var(--ink-muted);
+}
+
+.weightId {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.note {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.verdict {
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--warn);
+}
+
+.verdict[data-same='true'] {
+  color: var(--ok);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  color: var(--ink);
+  font-size: var(--text-s);
+  text-decoration: none;
+}
+
+.action:hover {
+  background: var(--surface-2);
+}
+
+.fileTag {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* On a phone the label goes above its value. */
+@media (max-width: 480px) {
+  .row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}

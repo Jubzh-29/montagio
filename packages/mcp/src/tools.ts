@@ -6,6 +6,7 @@ import type { CallToolResult, ServerNotification, ServerRequest } from '@modelco
 import { z } from 'zod';
 import { TERMINAL_STATES, type ExtensionsInfo, type RenderStatus, type MontagioClient, type UploadResult } from './client';
 import { messageFor, toFailure, ToolFailure } from './errors';
+import { HONESTY, loadRecipe, reproduce, withPhoto } from './reproduce';
 
 type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
@@ -26,6 +27,8 @@ export const TOOL_NAMES = [
   'get_job',
   'list_history',
   'get_workflow',
+  'get_recipe',
+  'reproduce',
 ] as const;
 
 const CODE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -677,6 +680,78 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
           }
         }
         throw new ToolFailure('save-failed', `The output folder already holds 100 files named ${stem}*.json.`);
+      }),
+  );
+
+  server.registerTool(
+    'get_recipe',
+    {
+      title: 'Get the recipe',
+      description:
+        'Get the recipe of a render: the preset (or the remix YAML), the exact ComfyUI workflow and its sha256, the weight files with their lock sha256, ' +
+        'source and licence, the seed, texts and settings, the sha256 of each input (never the photo itself) and the versions of Montagio, ComfyUI and ' +
+        'the node packs. reproduce renders it again.',
+      inputSchema: {
+        id: z.string().min(1).describe('The id of the render (returned by the tool that made it, or from list_history).'),
+        kind: z.enum(['generation', 'job', 'sequence']).optional().describe('A camera clip, a job (photo, effect, hook, avatar, HD…) or a film. Found by its id when left out.'),
+      },
+      annotations: readOnly,
+    },
+    async (args) =>
+      guard(async () => {
+        const kinds = args.kind ? [args.kind] : (['generation', 'job', 'sequence'] as const);
+        for (const [index, kind] of kinds.entries()) {
+          try {
+            return await client.recipe(kind, args.id);
+          } catch (error) {
+            if (!(error instanceof ToolFailure) || error.code !== 'not-found' || index === kinds.length - 1) throw error;
+          }
+        }
+        throw new ToolFailure('not-found');
+      }),
+  );
+
+  server.registerTool(
+    'reproduce',
+    {
+      title: 'Reproduce a recipe',
+      description:
+        'Render a Montagio recipe again on this Montagio and its local ComfyUI: the same preset, texts, model and seed, on the photo the user gives (a recipe ' +
+        'never carries the photo, only its sha256). The recipe is a .json file, an MP4 or PNG Montagio exported (it carries a compact one), or the JSON ' +
+        'itself. Returns the render, sameInputs (each file given has the sha256 the recipe noted) and sameWorkflow (the workflow made here has the ' +
+        `recipe's sha256, step for step). ${HONESTY}`,
+      inputSchema: {
+        recipe: z
+          .union([z.string().min(1), z.record(z.string(), z.unknown())])
+          .describe('The recipe: a local .json, .mp4 or .png path (prefer an absolute path), or the recipe JSON from get_recipe.'),
+        photo: z.string().min(1).optional().describe('The photo to render on: a local image file (uploaded first) or an imageRef. It fills the photo the recipe asks for.'),
+        inputs: z
+          .record(z.string(), z.string().min(1))
+          .optional()
+          .describe('Other files the recipe names, by field ("image2Ref", "videoRef", "compose.place"…): a local path or a ref the app holds.'),
+        consent,
+        rights: z
+          .boolean()
+          .default(false)
+          .describe('For a motion transfer: the user holds the rights on the photo and the video. Set it only when the user has said so.'),
+        voiceConsent: z
+          .boolean()
+          .default(false)
+          .describe('For an avatar in someone\'s own voice (inputs.voiceRef): that person agreed. Set it only when the user has said so.'),
+        timeoutMinutes,
+      },
+      annotations: renders,
+    },
+    async (args, extra) =>
+      guard(async () => {
+        const recipe = await loadRecipe(args.recipe);
+        const inputs = args.photo ? withPhoto(recipe, args.inputs ?? {}, args.photo) : (args.inputs ?? {});
+        const result = await reproduce(
+          client,
+          { recipe, inputs, consent: args.consent, rights: args.rights, voiceConsent: args.voiceConsent },
+          { ...(args.timeoutMinutes ? { timeoutMs: args.timeoutMinutes * 60_000 } : {}), signal: extra.signal, onProgress: progressOf(extra) },
+        );
+        return finished(client, result.render, { sameInputs: result.sameInputs, sameWorkflow: result.sameWorkflow, stack: result.stack, note: result.note });
       }),
   );
 }

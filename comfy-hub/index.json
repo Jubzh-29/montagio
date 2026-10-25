@@ -1,0 +1,324 @@
+[
+  {
+    "moduleName": "montagio",
+    "category": "Montagio",
+    "title": "Montagio",
+    "type": "video",
+    "templates": [
+      {
+        "name": "montagio-camera-presets",
+        "title": "Montagio · Camera presets: two moves in one clip",
+        "description": "A photo and a Montagio camera preset give a 5 s clip with a controlled camera move. The preset is a small YAML file: Load Montagio Preset reads it and feeds Montagio Camera Embedding, which runs two moves at once or one after the other, something the core WanCameraEmbedding node cannot do. The example is Rise & Push, Pan Up and Zoom In together, on the fishing-harbour photo of the showcase.",
+        "mediaType": "image",
+        "mediaSubtype": "jpg",
+        "tags": [
+          "Image to Video",
+          "Camera Control",
+          "Video"
+        ],
+        "models": [
+          "Wan2.2",
+          "Wan"
+        ],
+        "date": "2026-10-25",
+        "size": 37592538311,
+        "openSource": true,
+        "username": "Montagio",
+        "minComfyUIVersion": "0.41.0",
+        "requiresCustomNodes": [
+          "montagio"
+        ],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 97,
+              "nodeType": "LoadImage",
+              "file": "landscape-a.jpg",
+              "mediaType": "image"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 106,
+              "nodeType": "SaveVideo",
+              "mediaType": "video"
+            }
+          ]
+        },
+        "thumbnail": [
+          "thumbnails/montagio-camera-presets-1.jpg"
+        ],
+        "buildNotes": "montagio-camera-presets.md"
+      },
+      {
+        "name": "montagio-one-photo-effect",
+        "title": "Montagio · One-photo effect",
+        "description": "One photo becomes a 5 s effect clip, the format of the viral one-photo effects. Here Squish on the red convertible of the showcase: hands press the subject flat like soft clay. The effect is a Remade-AI LoRA on Wan 2.1 I2V 480p, run in 4 steps with the lightx2v distillation LoRA.",
+        "mediaType": "image",
+        "mediaSubtype": "jpg",
+        "tags": [
+          "Image to Video",
+          "LoRA",
+          "Video"
+        ],
+        "models": [
+          "Wan2.1",
+          "Wan"
+        ],
+        "date": "2026-10-25",
+        "size": 25754028333,
+        "openSource": true,
+        "username": "Montagio",
+        "minComfyUIVersion": "0.41.0",
+        "requiresCustomNodes": [],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 52,
+              "nodeType": "LoadImage",
+              "file": "landscape-b.jpg",
+              "mediaType": "image"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 56,
+              "nodeType": "SaveVideo",
+              "mediaType": "video"
+            }
+          ]
+        },
+        "thumbnail": [
+          "thumbnails/montagio-one-photo-effect-1.jpg"
+        ],
+        "buildNotes": "montagio-one-photo-effect.md"
+      },
+      {
+        "name": "montagio-keyframe-hook",
+        "title": "Montagio · Keyframe hook",
+        "description": "A hook in one graph: the photo edit makes the frame the clip ends on, then a first-last-frame video model animates the way there. The example is Ignite: Qwen-Image-Edit-2511 (4 steps) sets the subject on fire, then Wan 2.2 FLF2V (4 steps) turns the photo into that burning end frame.",
+        "mediaType": "image",
+        "mediaSubtype": "jpg",
+        "tags": [
+          "Image Edit",
+          "First Last Frame",
+          "Video"
+        ],
+        "models": [
+          "Qwen-Image-Edit",
+          "Wan2.2",
+          "Wan"
+        ],
+        "date": "2026-10-25",
+        "size": 69055010766,
+        "openSource": true,
+        "username": "Montagio",
+        "minComfyUIVersion": "0.41.0",
+        "requiresCustomNodes": [],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 41,
+              "nodeType": "LoadImage",
+              "file": "landscape-b.jpg",
+              "mediaType": "image"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 9,
+              "nodeType": "SaveImage",
+              "mediaType": "image"
+            },
+            {
+              "nodeId": 1061,
+              "nodeType": "SaveVideo",
+              "mediaType": "video"
+            }
+          ]
+        },
+        "thumbnail": [
+          "thumbnails/montagio-keyframe-hook-1.jpg"
+        ],
+        "buildNotes": "montagio-keyframe-hook.md"
+      },
+      {
+        "name": "montagio-talking-avatar",
+        "title": "Montagio · Talking avatar",
+        "description": "A portrait and a speech file give a talking clip: Wan 2.2 S2V in 4 steps with the lightx2v LoRA. The video follows the photo's identity, and the mouth follows the speech.",
+        "mediaType": "image",
+        "mediaSubtype": "jpg",
+        "tags": [
+          "Image to Video",
+          "Lip Sync",
+          "Audio",
+          "Video"
+        ],
+        "models": [
+          "Wan2.2",
+          "Wan"
+        ],
+        "date": "2026-10-25",
+        "size": 25242529435,
+        "openSource": true,
+        "username": "Montagio",
+        "minComfyUIVersion": "0.41.0",
+        "requiresCustomNodes": [],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 52,
+              "nodeType": "LoadImage",
+              "file": "avatar.jpg",
+              "mediaType": "image"
+            },
+            {
+              "nodeId": 58,
+              "nodeType": "LoadAudio",
+              "file": "speech.flac",
+              "mediaType": "audio"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 113,
+              "nodeType": "SaveVideo",
+              "mediaType": "video"
+            }
+          ]
+        },
+        "thumbnail": [
+          "thumbnails/montagio-talking-avatar-1.jpg"
+        ],
+        "buildNotes": "montagio-talking-avatar.md"
+      },
+      {
+        "name": "montagio-motion-transfer",
+        "title": "Montagio · Motion transfer",
+        "description": "The character of a photo moves like a reference video of up to 5 s: Wan2.2-Animate-2, distilled, in 10 steps. The reference video is taken as it is, with no pose extractor and no mask, and its sound is left out.",
+        "mediaType": "image",
+        "mediaSubtype": "jpg",
+        "tags": [
+          "Video to Video",
+          "Motion Transfer",
+          "Video"
+        ],
+        "models": [
+          "Wan2.2",
+          "Wan"
+        ],
+        "date": "2026-10-25",
+        "size": 24907117139,
+        "openSource": true,
+        "username": "Montagio",
+        "minComfyUIVersion": "0.41.0",
+        "requiresCustomNodes": [],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 189,
+              "nodeType": "LoadImage",
+              "file": "portrait-a.jpg",
+              "mediaType": "image"
+            },
+            {
+              "nodeId": 240,
+              "nodeType": "LoadVideo",
+              "file": "reference-dance.mp4",
+              "mediaType": "video"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 246,
+              "nodeType": "SaveVideo",
+              "mediaType": "video"
+            }
+          ]
+        },
+        "thumbnail": [
+          "thumbnails/montagio-motion-transfer-1.jpg"
+        ],
+        "buildNotes": "montagio-motion-transfer.md"
+      },
+      {
+        "name": "montagio-hd-smooth",
+        "title": "Montagio · HD 1080p with smooth motion",
+        "description": "A 480p clip at 16 fps becomes 1080p at 32 fps: SeedVR2 3B restores every frame, in temporal chunks of 33 frames with an overlap of 3, then RIFE 4.26 puts a frame between each two. All of it is core ComfyUI.",
+        "mediaType": "image",
+        "mediaSubtype": "jpg",
+        "tags": [
+          "Video Upscale",
+          "Frame Interpolation",
+          "Video"
+        ],
+        "models": [
+          "SeedVR2",
+          "RIFE"
+        ],
+        "date": "2026-10-25",
+        "size": 3982259206,
+        "openSource": true,
+        "username": "Montagio",
+        "minComfyUIVersion": "0.41.0",
+        "requiresCustomNodes": [],
+        "io": {
+          "inputs": [
+            {
+              "nodeId": 73,
+              "nodeType": "LoadVideo",
+              "file": "crash-push.mp4",
+              "mediaType": "video"
+            }
+          ],
+          "outputs": [
+            {
+              "nodeId": 76,
+              "nodeType": "SaveVideo",
+              "mediaType": "video"
+            }
+          ]
+        },
+        "thumbnail": [
+          "thumbnails/montagio-hd-smooth-1.jpg"
+        ],
+        "buildNotes": "montagio-hd-smooth.md"
+      },
+      {
+        "name": "montagio-film-music",
+        "title": "Montagio · Film music",
+        "description": "An instrumental track for a film: ACE-Step 1.5 turbo in 8 steps. The length and the seed are each written twice, for the latent and for the language model that writes the audio codes.",
+        "mediaType": "image",
+        "mediaSubtype": "jpg",
+        "tags": [
+          "Text to Audio",
+          "Music",
+          "Audio"
+        ],
+        "models": [
+          "ACE-Step"
+        ],
+        "date": "2026-10-25",
+        "size": 10025368944,
+        "openSource": true,
+        "username": "Montagio",
+        "minComfyUIVersion": "0.41.0",
+        "requiresCustomNodes": [],
+        "io": {
+          "inputs": [],
+          "outputs": [
+            {
+              "nodeId": 107,
+              "nodeType": "SaveAudioAdvanced",
+              "mediaType": "audio"
+            }
+          ]
+        },
+        "thumbnail": [
+          "thumbnails/montagio-film-music-1.jpg"
+        ],
+        "buildNotes": "montagio-film-music.md"
+      }
+    ]
+  }
+]
