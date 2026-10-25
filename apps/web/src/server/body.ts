@@ -26,6 +26,17 @@ export async function readBodyBytes(request: Request, maxBytes: number): Promise
   return Buffer.concat(chunks);
 }
 
+/**
+ * Whether a state change comes from this app's own pages. Another site the visitor has open can send
+ * a form or plain text to localhost without asking; JSON makes the browser ask first (and nothing
+ * answers yes), and a browser that names the requesting site must name this one.
+ */
+export function fromThisSite(request: Request): boolean {
+  if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) return false;
+  const site = request.headers.get('sec-fetch-site');
+  return site === null || site === 'same-origin' || site === 'none';
+}
+
 /** Read a JSON request body of `maxBytes` at most (see readBodyBytes). */
 export async function readJsonBody(request: Request, maxBytes: number, opts: { allowEmpty?: boolean } = {}): Promise<JsonBody> {
   const bytes = await readBodyBytes(request, maxBytes);

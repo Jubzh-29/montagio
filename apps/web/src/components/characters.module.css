@@ -278,3 +278,60 @@
     min-height: 44px;
   }
 }
+
+/* Who the character is: twelve kinds, a sample portrait above each name when the samples ship. */
+.kinds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: var(--space-2);
+}
+
+.kind {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  min-height: 36px;
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--bg);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: var(--text-s);
+  text-align: center;
+  cursor: pointer;
+}
+
+.kind img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: calc(var(--radius-s) - 2px);
+  background: var(--surface);
+}
+
+.kind span {
+  margin: auto 0;
+}
+
+.kind:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.kind[aria-checked='true'] {
+  border-color: var(--rec);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--rec);
+}
+
+.kind:focus-visible {
+  outline: 2px solid var(--rec);
+  outline-offset: 2px;
+}
+
+.kind:disabled {
+  cursor: default;
+  opacity: 0.6;
+}

@@ -79,6 +79,12 @@ def test_split_jobs() -> None:
         s2lib.split_jobs(" ; ")
     with pytest.raises(ValueError):
         s2lib.split_jobs('--text "unbalanced')
+    # A ';' inside quotes stays in its text: an edit instruction may hold one.
+    assert s2lib.split_jobs('--text "edit=keep the framing; change only the colors" ; --preset crane-up') == [
+        '--text "edit=keep the framing; change only the colors"',
+        "--preset crane-up",
+    ]
+    assert s2lib.split_jobs("--text \"edit=image 1's people; nothing else\";--runs 2") == ["--text \"edit=image 1's people; nothing else\"", "--runs 2"]
 
 
 def test_run_dir_is_dated_in_utc_and_slugged() -> None:

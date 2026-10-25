@@ -1,0 +1,9 @@
+{
+  "1": {"class_type": "LoadAudio", "inputs": {"audio": "speech.flac"}},
+  "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": "gemma4_e4b_it_int8_convrot.safetensors", "type": "stable_diffusion", "device": "default"}},
+  "3": {"class_type": "TextGenerate", "inputs": {"clip": ["2", 0], "prompt": "Transcribe this speech exactly, in the language it is spoken in. Output only the spoken words, without labels or notes.", "audio": ["1", 0], "max_length": 256, "sampling_mode": "off", "thinking": false, "use_default_template": true, "mtp": "auto"}},
+  "6": {"class_type": "StringConcatenate", "inputs": {"string_a": "", "string_b": ["3", 0], "delimiter": "\n\n"}},
+  "7": {"class_type": "TextGenerate", "inputs": {"clip": ["2", 0], "prompt": ["6", 0], "max_length": 256, "sampling_mode": "off", "thinking": false, "use_default_template": true, "mtp": "auto"}},
+  "4": {"class_type": "ChatterboxMTLTTS", "inputs": {"model_pack_name": "resembleai-mtl-v3", "model_version": "t3_mtl23ls_v3.safetensors", "language": "fr", "text": ["7", 0], "exaggeration": 0.5, "temperature": 0.8, "cfg_weight": 0, "repetition_penalty": 1.2, "min_p": 0.05, "top_p": 1, "seed": 1, "use_watermark": false, "device": "default", "dtype": "auto", "attention_mode": "sdpa", "crash_protection_template": "", "audio_prompt": ["1", 0]}},
+  "5": {"class_type": "SaveAudioAdvanced", "inputs": {"filename_prefix": "montagio/translation", "format": "flac", "audio": ["4", 0]}}
+}

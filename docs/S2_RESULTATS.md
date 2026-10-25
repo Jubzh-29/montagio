@@ -210,6 +210,24 @@ Un job sur une L4 du nouveau compte Modal, le 24/10 à 17:01 : la passe HD avec 
 - **Définitions des nodes** : celles du GPU (`object_info-extensions.json`) sont identiques, infobulles mises à part, à la fixture capturée sur le ComfyUI CPU.
 - La durée passe de 5,06 s à 5,03 s : 161 images à 32 i/s, contre 81 à 16. La dernière image source dure 1/32 s au lieu de 1/16.
 
+## 13. Fonctions finales : espèces, moodboard, palettes, traduction (24/10)
+
+Une série de 5 jobs dans un seul conteneur L4, le 24/10 à 21:40 : 692 s, plus 347 s sans GPU pour télécharger Gemma 4 E4B (8,1 Go, sha256 conforme), soit environ 0,25 $ en tout. La liste des jobs est dans `s3/validation/s6-jobs.txt`, les résultats dans `s3/validation/20261024-194016-s6-validation/`, hors dépôt.
+
+| Job | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|
+| 12 portraits d'espèces (Z-Image, 9:16) | 49 s pour le 1er (chargement compris), puis 9 s chacun | 21,1 à 22,3 Go | ✅ 11 sur 12 : chaque espèce reconnaissable, habillée, en pied. La personne montrait de la peau sous une veste ouverte : la vignette reprend le portrait du 22/10, et le prompt demande désormais une tenue sage |
+| Moodboard (restyle d'après une planche de 2 images) | 85 s, à froid | 22,4 Go | ❌ composition gardée, mais l'image devient une illustration à rayures sans les tons de la planche |
+| Palette prête « bleu-vert et orange » (le port) | 21 s | 22,6 Go | ✅ cadre et bateau intacts, couleurs cinéma |
+| Palette d'après une photo (le port, avec une photo néon) | 33 s | 22,6 Go | ❌ l'édition recopie le contenu de la 2e image au lieu de ses seules couleurs |
+| Traduction en espagnol (Gemma 4, puis Chatterbox) | 49 s, à froid | 20,2 Go | ❌ le texte dit est la transcription française, pas sa traduction |
+| Avatar sur la parole produite (S2V) | 284 s, à froid | 22,2 Go | ✅ l'avatar parle et les lèvres suivent la parole donnée |
+| Traduction en espagnol, deux passes (rattrapage du 25/10, 00:22) | 43 s, à froid | 11,0 Go | ✅ Whisper relit de l'espagnol (« Hola, aquí hay una prueba de… »), 4,7 s, F0 de 174 Hz contre 199 Hz pour la source |
+
+- **Traduction** : un Whisper local (faster-whisper, modèle tiny) relit la parole produite comme les mots français de la source prononcés à l'espagnole. Gemma, à qui l'on demandait de transcrire puis de traduire d'un coup, n'a rendu que la transcription. Le workflow procède maintenant en deux passes : transcription seule (node 3), puis traduction de ce texte (node 7), avec la consigne placée devant par le `StringConcatenate` du cœur (node 6). Validé sur ComfyUI CPU (`node_errors` vide), puis sur le GPU le 25/10 (168 s de conteneur, environ 0,06 $ ; il resterait environ 0,46 $).
+- **Moodboard et palette d'après une photo** : Qwen-Image-Edit-2511 ne fait pas un transfert de style fiable depuis une image de référence. Les deux fonctions restent derrière `MONTAGIO_EXPERIMENTAL` (absentes de l'atelier et refusées par l'API sans lui). Une piste pour plus tard : faire décrire le style de la planche en mots par Gemma 4 (qui voit les images), puis donner ces mots à Z-Image ou à l'édition. Cela demande de partager les poids de Gemma entre deux extensions, ce que le registre refuse aujourd'hui.
+- Toutes les entrées sont fictives : portraits Z-Image, port et voiture de la S3, voix intégrée de Chatterbox.
+
 ## 14. Mode Turbo (25/10)
 
 Un conteneur L4 du compte Modal « montagio-2 » (`series`, 13 jobs), le 25/10 entre 2 h 53 et 3 h 24 (heure de Paris), avec l'accord de l'utilisateur. Le workflow `wan22-fun-camera-turbo.api.json` est le second groupe du template officiel : les deux LoRA 4 étapes de lightx2v (déjà au lock pour les transitions), 4 étapes à cfg 1, coupure à l'étape 2, shift 8. Pour comparer à l'identique, chaque job reprend la photo, la description, le négatif et la seed de la prise 20 étapes gardée pour la démo (S3, ou la refonte du 24/10). Résultats, planches et mesures : `s3/validation/perf/`, hors dépôt.

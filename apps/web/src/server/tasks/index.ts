@@ -8,6 +8,8 @@ import { imageUpscaleTask } from './image-upscale';
 import { motionTask } from './motion';
 import { musicTask } from './music';
 import { t2iTask } from './t2i';
+import { moodboardTask } from './moodboard';
+import { translateTask } from './translate';
 import { upscaleTask } from './upscale';
 import { voiceChangeTask } from './voice-change';
 
@@ -24,4 +26,6 @@ export const TASKS: Partial<Record<JobTask, TaskDef>> = {
   motion: motionTask,
   ad: adTask,
   'voice-change': voiceChangeTask,
+  moodboard: moodboardTask,
+  translate: translateTask,
 };

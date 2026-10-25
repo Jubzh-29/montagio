@@ -51,7 +51,9 @@ test('a card falls back to another preview, and to none when the list has no pre
 
 test("an extension's tool shows only when the extension is shown", () => {
   const ids = (extensions: ExtensionsInfo['extensions']) => exploreTools([], info({ extensions })).map((tool) => tool.id);
-  expect(ids([])).toEqual(['camera', 'film', 'characters', 't2i', 'comfy']);
-  expect(ids(['edit', 'avatar', 'motion', 'upscale', 'music'])).toEqual(['camera', 'film', 'characters', 'ads', 'avatar', 'motion', 't2i', 'edit', 'hd', 'music', 'comfy']);
+  expect(ids([])).toEqual(['camera', 'film', 'characters', 'community', 't2i', 'comfy']);
+  expect(ids(['edit', 'avatar', 'motion', 'upscale', 'music'])).toEqual(['camera', 'film', 'characters', 'community', 'ads', 'avatar', 'motion', 't2i', 'edit', 'hd', 'music', 'comfy']);
   expect(exploreTools([], info(), true).map((tool) => tool.id)).not.toContain('characters');
+  // The community gallery is in the showcase too: its rendered clips, remixed on their sample photo.
+  expect(exploreTools([], info(), true).map((tool) => tool.id)).toContain('community');
 });

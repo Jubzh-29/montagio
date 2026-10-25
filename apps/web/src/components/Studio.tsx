@@ -21,6 +21,7 @@ import {
 import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
+import { entryAsHistoryItem, type CommunityEntry } from '@/lib/community';
 import { recipeUrlOf } from '@/lib/recipe-url';
 import { applyReprise, replayOn, reproducedRecipeUrl, reproducibleResult, type Replay } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
@@ -421,7 +422,7 @@ export function Studio() {
   };
 
   /** The sample photo, copied by the server: its origin is known, so no effect on it asks for consent, and what it shows too. */
-  const loadSample = async () => {
+  const loadSample = async (keepScene = false) => {
     if (busyRef.current) return;
     touched.current = true;
     const token = ++uploadToken.current;
@@ -430,8 +431,8 @@ export function Studio() {
     const localUrl = `/media/demo-assets/images/${sample.file}`;
     setJob({ status: 'idle' });
     setPhotoPrompt(undefined);
-    // The sample comes described, unless the visitor typed a description before it: theirs stays.
-    if (sceneOfPhoto.current || !prompt.trim()) {
+    // The sample comes described, unless the visitor typed a description before it (or a recipe brought one): theirs stays.
+    if (!keepScene && (sceneOfPhoto.current || !prompt.trim())) {
       setPrompt(t(sample.scene));
       sceneOfPhoto.current = true;
     }
@@ -571,7 +572,8 @@ export function Studio() {
   // The sample dance on a photo nobody imported: Montagio's own files, no rights to confirm (the server agrees).
   const rightsAsked = !(motionVideo.status === 'ready' && motionVideo.sample && upload.status === 'ready' && !upload.personal);
   // What a disabled Generate waits for, said under it: the first thing missing, in the order of the composer.
-  const waitingFor: MessageKey | null = upload.status !== 'ready'
+  // A composed start photo needs no photo of its own: no hint asks for one then.
+  const waitingFor: MessageKey | null = upload.status !== 'ready' && !composing
     ? 'generateHint'
     : busy
     ? null
@@ -680,7 +682,11 @@ export function Studio() {
     setCanvas({ view: 'gallery', before: 'gallery' });
     if (back.remixGenerationId && back.presetId) {
       void openRemix(back.presetId, `/api/generations/${encodeURIComponent(back.remixGenerationId)}/preset`, back.remixGenerationId);
+    } else if (back.remixPresetUrl && back.presetId) {
+      void openRemix(back.presetId, back.remixPresetUrl);
     }
+    // A community share file or example brings no photo of its own: the tab's sample photo stands in.
+    if (back.sample && !IS_SHOWCASE) void loadSample(Boolean(back.prompt));
     // The link did its work: the address keeps the tab only. A photo goes to the tab the link asked for.
     window.history.replaceState(null, '', tabHref(item.kind === 'photo' ? tab : back.tab));
   };
@@ -690,10 +696,16 @@ export function Studio() {
     const applied = `${from}|${reproduce}`;
     if (!from || catalog !== 'ready' || busy || appliedFrom.current === applied) return;
     appliedFrom.current = applied;
-    apiFetch('/api/history')
-      .then((res) => jsonOrThrow<HistoryItem[]>(res))
-      .then((items) => {
-        const item = items.find((entry) => entry.key === from);
+    // An entry of the community gallery comes from there, a creation of this machine from the history.
+    const lookup = from.startsWith('community:')
+      ? apiFetch(`/api/community/${encodeURIComponent(from.slice('community:'.length))}`)
+          .then((res) => jsonOrThrow<CommunityEntry>(res))
+          .then(entryAsHistoryItem)
+      : apiFetch('/api/history')
+          .then((res) => jsonOrThrow<HistoryItem[]>(res))
+          .then((items) => items.find((entry) => entry.key === from));
+    lookup
+      .then((item) => {
         if (item) restore(item, { reproduce });
       })
       .catch(() => undefined);
@@ -811,10 +823,25 @@ export function Studio() {
   }, []);
 
   const generate = () => {
-    if (submitting.current || !canGenerate || upload.status !== 'ready') return;
+    if (submitting.current || !canGenerate) return;
+    // A composed start photo needs no photo of its own: the composition is the start.
+    const composed = composing && selectedEffect !== undefined && !selectedHook ? selectedEffect : null;
+    if (!composed && upload.status !== 'ready') return;
     followJob.current = true;
     setTake({ expected_s: mode === 'sequence' && !remix ? filmEstimate : estimate });
     moveCanvas('generate');
+    if (composed) {
+      const body = {
+        compose: composeBody(compose),
+        effectId: composed.id,
+        subject: subject.trim(),
+        ...(askConsent ? { consent } : {}),
+        ...(replay?.seed !== undefined ? { seed: replay.seed } : {}),
+      };
+      void submit('job', body, undefined, '/api/effects');
+      return;
+    }
+    if (upload.status !== 'ready') return;
     const userPrompt = prompt.trim() || undefined;
     // Reproduce sends the result's seed back: the same choices give the same workflow.
     const seed = replay?.seed !== undefined ? { seed: replay.seed } : {};
@@ -844,8 +871,7 @@ export function Studio() {
         return;
       }
       if (!selectedEffect) return;
-      const start = composing ? { compose: composeBody(compose) } : { imageRef: upload.imageRef };
-      const body = { ...start, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}), ...seed };
+      const body = { imageRef: upload.imageRef, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}), ...seed };
       void submit('job', body, undefined, '/api/effects');
       return;
     }
@@ -1323,6 +1349,7 @@ export function Studio() {
                   kind={kind}
                   photo={upload}
                   estimates={extensions?.estimates ?? { t2i: 12 }}
+                  experimental={extensions?.experimental ?? []}
                   onUse={(photo) => takePhoto(photo, kind)}
                   onClose={() => closeAtelier(kind)}
                   licenseOf={(id) =>
@@ -1483,6 +1510,11 @@ export function Studio() {
                   {!IS_SHOWCASE && tracked.record.task === 'avatar' && extensions?.estimates.voiceChange !== undefined && (
                     <a className={styles.buttonSecondary} href={`/voice?from=${encodeURIComponent(tracked.record.id)}`}>
                       {t('avatarChangeVoice')}
+                    </a>
+                  )}
+                  {!IS_SHOWCASE && tracked.record.task === 'avatar' && extensions?.estimates.translate !== undefined && (
+                    <a className={styles.buttonSecondary} href={`/translate?from=${encodeURIComponent(tracked.record.id)}`}>
+                      {t('avatarTranslate')}
                     </a>
                   )}
                 </div>

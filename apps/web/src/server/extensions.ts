@@ -33,6 +33,20 @@ export function resetRejectedForTests(): void {
 
 const showsEverything = () => process.env.MONTAGIO_EXTENSIONS?.trim() === 'all';
 
+/** Features kept behind a flag until a GPU session validates them (MONTAGIO_EXPERIMENTAL, a comma list). */
+export const EXPERIMENTAL_FEATURES = ['moodboard', 'palette-photo'] as const;
+export type ExperimentalFeature = (typeof EXPERIMENTAL_FEATURES)[number];
+
+export function experimentalFeatures(): ExperimentalFeature[] {
+  const asked = (process.env.MONTAGIO_EXPERIMENTAL ?? '').split(',').map((entry) => entry.trim());
+  return EXPERIMENTAL_FEATURES.filter((feature) => asked.includes(feature));
+}
+
+/** A feature behind the flag answers as a hidden extension does while the flag leaves it out. */
+export function requireExperimental(feature: ExperimentalFeature): void {
+  if (!experimentalFeatures().includes(feature)) throw new JobError('extension-disabled');
+}
+
 /**
  * The extensions the Studio shows: what MONTAGIO_EXTENSIONS allows (the dated ones when
  * unset), minus those ComfyUI refused and those that require a hidden one. An invalid
@@ -170,6 +184,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const upscale = extensions.includes('upscale') ? upscaleModel(lib) : null;
   const imageUpscale = extensions.includes('upscale') ? imageUpscaleModel(lib) : null;
   const voiceChange = extensions.includes('avatar') ? [...lib.extensionModels.values()].find((entry) => entry.task === 'a2a-vc') : undefined;
+  const translate = extensions.includes('avatar') ? [...lib.extensionModels.values()].find((entry) => entry.task === 'a2a-translate') : undefined;
   const motion = extensions.includes('motion') ? motionModel(lib) : null;
   // A tab without a wall shows what it makes: a render of the GPU session, looping (presets/extensions/previews).
   const examples: NonNullable<ExtensionsInfo['examples']> = {};
@@ -183,6 +198,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     extensions,
     effects,
     hooks,
+    experimental: experimentalFeatures(),
     estimates: {
       t2i,
       ...(extensions.includes('edit') && editModel ? { edit: estimateFor(editModel, true) } : {}),
@@ -191,6 +207,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
       ...(upscale ? { upscale: estimateFor(upscale, true) } : {}),
       ...(imageUpscale ? { imageUpscale: estimateFor(imageUpscale, true) } : {}),
       ...(voiceChange ? { voiceChange: estimateFor(voiceChange, true) } : {}),
+      ...(translate && avatar ? { translate: estimateFor(translate, true) + estimateFor(avatar.avatar, true) } : {}),
       ...(motion ? { motion: estimateFor(motion, true) } : {}),
     },
     ...(extensions.includes('edit') && editModel ? { editModel: summaryOf(editModel) } : {}),
