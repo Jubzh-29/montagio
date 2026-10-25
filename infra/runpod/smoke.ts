@@ -34,6 +34,8 @@ import {
   type Aspect,
   type Library,
   type Resolution,
+  TRANSLATE_LANGUAGES,
+  type TranslateLanguage,
 } from '@montagio/presets';
 import { prepareMotionClip, probe, probeAudio } from '@montagio/sequence';
 import { imageSize } from 'image-size';
@@ -74,6 +76,7 @@ const { values: args } = parseArgs({
     input2: { type: 'string' },
     input3: { type: 'string' },
     mask: { type: 'string' },
+    ref: { type: 'string' },
     end: { type: 'string' },
     effect: { type: 'string', default: 'all' },
     hook: { type: 'string' },
@@ -86,6 +89,7 @@ const { values: args } = parseArgs({
     voice: { type: 'string' },
     text: { type: 'string', multiple: true, default: [] },
     language: { type: 'string', default: 'en' },
+    to: { type: 'string', default: 'fr' },
     duration: { type: 'string', default: '10' },
     t2i: { type: 'string', multiple: true, default: [] },
     help: { type: 'boolean', default: false },
@@ -121,6 +125,7 @@ Extensions (instead of presets):
   --input2 PATH      the second image of a two-reference hook (the outfit of wardrobe-swap), or compose's character
   --input3 PATH      compose: the product (--input is the place); with effect, the effects animate the composed photo
   --mask PATH        edit: inpaint through this mask (white where the photo changes, the photo's size)
+  --ref PATH         edit: a second image it reads (a palette's colors, a moodboard sheet)
   --end PATH         the end frame of a transition run alone; without it, the hook's edit runs first and makes it
   --quality          the edit, the effects and the transition without their 4-step LoRAs (more steps, slower)
   --look LOOK        a look of the edit job: infl8, action or angles
@@ -133,6 +138,7 @@ Extensions (instead of presets):
                      a default), for the one job of the run that reads a text; when several do, name it:
                      --text edit=… --text effect=… --text voice=… --text music=… (repeatable)
   --language en|fr   the language of the voice (default en)
+  --to LANG          translate: the language --audio is said again in (default fr); with avatar, the avatar speaks it
   --duration S       music: the length of the film it goes under (default 10)
 
 Text to image (instead of presets), the app's t2i model (Z-Image-Turbo):
@@ -493,6 +499,7 @@ async function runExtensions(
     if (!(EXTENSION_JOBS as readonly string[]).includes(name)) throw new Error(`unknown extension job "${name}" (known: ${EXTENSION_JOBS.join(', ')})`);
   }
   if (args.language !== 'en' && args.language !== 'fr') throw new Error('--language must be en or fr');
+  if (!(TRANSLATE_LANGUAGES as readonly string[]).includes(args.to)) throw new Error(`--to must be one of ${TRANSLATE_LANGUAGES.join(', ')}`);
   const duration_s = Number(args.duration);
   if (!(duration_s > 0)) throw new Error('--duration takes a number of seconds');
   const names = EXTENSION_JOBS.filter((name) => asked.includes(name));
@@ -504,6 +511,8 @@ async function runExtensions(
   if (chainedHook && !names.includes('hook-edit')) names.splice(names.indexOf('transition'), 0, 'hook-edit');
   // With a composition, the effects animate the composed photo: the composition runs first.
   const chainedCompose = names.includes('compose') && names.includes('effect');
+  // With a translation, the avatar speaks it (lip-sync on the new words): the translation runs first.
+  const chainedTranslate = names.includes('translate') && names.includes('avatar');
   // Each text feeds one job (the voice, for an avatar that speaks its output).
   const text = jobTexts(args.text, names);
 
@@ -511,6 +520,7 @@ async function runExtensions(
   const input2 = args.input2 ? fromCaller(args.input2) : undefined;
   const input3 = args.input3 ? fromCaller(args.input3) : undefined;
   const mask = args.mask ? fromCaller(args.mask) : undefined;
+  const ref = args.ref ? fromCaller(args.ref) : undefined;
   let end = args.end ? fromCaller(args.end) : undefined;
   const clip = args.clip ? fromCaller(args.clip) : undefined;
   // The photo sizes the jobs that read it; the clip to upscale is probed on its own, so that
@@ -553,6 +563,7 @@ async function runExtensions(
     input2,
     input3,
     mask,
+    ref,
     ...(args.voice ? { voice: fromCaller(args.voice) } : {}),
     end: end ?? (args['dry-run'] ? 'end.png' : undefined),
     effects: args.effect === 'all' ? undefined : args.effect.split(',').map((id) => id.trim()),
@@ -570,13 +581,16 @@ async function runExtensions(
     audio_s: audio_s ?? (args['dry-run'] ? 5 : undefined),
     text,
     language: args.language as 'en' | 'fr',
+    to: args.to as TranslateLanguage,
     duration_s,
     seed: Number.parseInt(args.seed, 10) || 0,
     aspect,
   });
   // Compile what can be compiled now: a missing file fails before any GPU second is spent.
   const first = names.filter(
-    (name) => args['dry-run'] || !((chained && name === 'avatar') || (chainedHook && name === 'transition') || (chainedCompose && name === 'effect')),
+    (name) =>
+      args['dry-run'] ||
+      !((chained && name === 'avatar') || (chainedHook && name === 'transition') || (chainedCompose && name === 'effect') || (chainedTranslate && name === 'avatar')),
   );
   const jobs = extensionJobs(library, options(first));
   await mkdir(join(outDir, 'workflows'), { recursive: true });
@@ -634,6 +648,17 @@ async function runExtensions(
       const speech = record.outputs[0];
       if (record.status !== 'succeeded' || !speech) {
         console.error('  ✗ no speech for the avatar: the avatar job is skipped');
+        continue;
+      }
+      audio = join(outDir, speech);
+      audio_s = (await probeAudio(audio))?.duration_s;
+      const [avatar] = extensionJobs(library, options(['avatar']));
+      await run(avatar!);
+    }
+    if (chainedTranslate && job.name === 'translate' && !args['dry-run']) {
+      const speech = record.outputs[0];
+      if (record.status !== 'succeeded' || !speech) {
+        console.error('  ✗ no translated speech for the avatar: the avatar job is skipped');
         continue;
       }
       audio = join(outDir, speech);

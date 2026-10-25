@@ -6,18 +6,25 @@ import { useI18n, type MessageKey } from '@/i18n';
 import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import type { CharacterSummary, JobSummary } from '@/lib/api-types';
 import {
-  CHARACTER_TYPES,
+  CHARACTER_KINDS,
+  CHARACTER_STYLES,
+  characterKindKey,
   characterPrompt,
   characterTypeKey,
+  kindPicture,
+  KINDS_WITH_PICTURE,
   DEFAULT_SCENES,
   photodumpInstruction,
   photodumpScene,
+  placeOf,
   SCENES,
   sceneKey,
   scenePhrase,
+  type CharacterKind,
   type CharacterType,
   type Scene,
 } from '@/lib/characters';
+import { formatDuration } from '@/lib/duration';
 import { refusalMessageKey } from '@/lib/refusals';
 import { visibleTabs, type Tab } from '@/lib/tabs';
 import { useExtensions } from '@/lib/use-extensions';
@@ -42,10 +49,27 @@ async function postJson(path: string, body: unknown): Promise<{ ok: true; value:
   }
 }
 
-/** Create a character: a type, a few words, a portrait from Z-Image-Turbo, then a name. */
+/** Who the character is: a picture per kind when the samples ship, a plain chip otherwise. */
+function KindPicker({ kind, disabled, onKind }: { kind: CharacterKind; disabled: boolean; onKind: (kind: CharacterKind) => void }) {
+  const { t } = useI18n();
+  return (
+    <div className={styles.kinds} role="radiogroup" aria-label={t('characterKindLabel')}>
+      {CHARACTER_KINDS.map((value) => (
+        <button key={value} type="button" role="radio" className={styles.kind} aria-checked={kind === value} disabled={disabled} onClick={() => onKind(value)}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a sample portrait of this kind */}
+          {KINDS_WITH_PICTURE.includes(value) && <img src={kindPicture(value)} alt="" loading="lazy" />}
+          <span>{t(characterKindKey(value))}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Create a character: who, a style, a few words, a portrait from Z-Image-Turbo, then a name. */
 function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (character: CharacterSummary) => void }) {
   const { t } = useI18n();
   const { job, refusal, busy, start, reset } = useJob();
+  const [kind, setKind] = useState<CharacterKind>('human');
   const [type, setType] = useState<CharacterType>('everyday');
   const [details, setDetails] = useState('');
   const [name, setName] = useState('');
@@ -58,13 +82,13 @@ function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (charac
   const create = () => {
     if (!details.trim() || busy) return;
     setSaveError(null);
-    void start('/api/images', { prompt: characterPrompt(type, details), aspect: '9:16' });
+    void start('/api/images', { prompt: characterPrompt(type, details, kind), aspect: '9:16' });
   };
 
   const save = async () => {
     if (!done || !name.trim() || saving) return;
     setSaving(true);
-    const answer = await postJson('/api/characters', { name: name.trim(), type, description: details.trim(), imageRef: done.outputImageRef, jobId: done.id });
+    const answer = await postJson('/api/characters', { name: name.trim(), type, kind, description: details.trim(), imageRef: done.outputImageRef, jobId: done.id });
     setSaving(false);
     if (!answer.ok) return setSaveError(answer.code);
     onSaved(answer.value);
@@ -80,11 +104,16 @@ function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (charac
       </h2>
       <p className={studio.hint}>{t('characterFictional')}</p>
 
+      <span className={studio.sectionTitle} aria-hidden="true">
+        {t('characterKindLabel')}
+      </span>
+      <KindPicker kind={kind} disabled={busy} onKind={setKind} />
+
       <div className={studio.styleRow} role="radiogroup" aria-label={t('characterTypeLabel')}>
         <span className={studio.styleLabel} aria-hidden="true">
           {t('characterTypeLabel')}
         </span>
-        {CHARACTER_TYPES.map((value) => (
+        {CHARACTER_STYLES.map((value) => (
           <button key={value} type="button" role="radio" className={studio.chip} aria-checked={type === value} disabled={busy} onClick={() => setType(value)}>
             {t(characterTypeKey(value))}
           </button>
@@ -99,7 +128,7 @@ function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (charac
         className={studio.prompt}
         rows={3}
         maxLength={DETAILS_MAX}
-        placeholder={t('characterDetailsPlaceholder')}
+        placeholder={t(kind === 'human' ? 'characterDetailsPlaceholder' : 'characterDetailsPlaceholderKind')}
         value={details}
         disabled={busy}
         onChange={(event) => setDetails(event.target.value)}
@@ -107,7 +136,7 @@ function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (charac
       <p className={studio.counter}>{t('charCount', { n: details.length, max: DETAILS_MAX })}</p>
 
       <button type="button" className={studio.buttonPrimary} disabled={!details.trim() || busy} onClick={create}>
-        {done ? t('characterAgain', { s: estimate }) : t('characterCreate', { s: estimate })}
+        {done ? t('characterAgain', { d: formatDuration(estimate) }) : t('characterCreate', { d: formatDuration(estimate) })}
       </button>
 
       {busy && job && (
@@ -273,6 +302,7 @@ function CharacterDetail({
             {character.name}
           </h2>
           <p className={styles.detailMeta}>
+            {character.kind && character.kind !== 'human' ? `${t(characterKindKey(character.kind))} · ` : ''}
             {t(characterTypeKey(character.type))} · {character.description}
           </p>
           <button
@@ -300,7 +330,7 @@ function CharacterDetail({
               ))}
             </div>
             <button type="button" className={studio.buttonPrimary} disabled={scenes.length === 0} onClick={make}>
-              {t('photodumpMake', { n: scenes.length, s: scenes.length * editEstimate })}
+              {t(scenes.length === 1 ? 'photodumpMakeOne' : 'photodumpMake', { n: scenes.length, d: formatDuration(scenes.length * editEstimate) })}
             </button>
           </>
         ) : (
@@ -329,14 +359,18 @@ function CharacterDetail({
           <p className={styles.photoScene}>{t('characterPortrait')}</p>
           <AnimateLinks historyKey={character.portraitHistoryKey} tabs={tabs} imageRef={character.imageRef} hdEstimate={hdEstimate} />
         </li>
-        {[...character.photos].reverse().map((photo) => (
-          <li key={photo.imageRef} className={styles.photo}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- a photodump picture */}
-            <img src={photo.url} alt="" />
-            <p className={styles.photoScene}>{photo.scene}</p>
-            <AnimateLinks historyKey={photo.historyKey} tabs={tabs} imageRef={photo.imageRef} hdEstimate={hdEstimate} />
-          </li>
-        ))}
+        {[...character.photos].reverse().map((photo) => {
+          // The caption names the place; the full text stays the photo's description for the camera moves.
+          const place = placeOf(photo.scene);
+          return (
+            <li key={photo.imageRef} className={styles.photo}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- a photodump picture */}
+              <img src={photo.url} alt="" />
+              <p className={styles.photoScene}>{place ? t(sceneKey(place)) : photo.scene}</p>
+              <AnimateLinks historyKey={photo.historyKey} tabs={tabs} imageRef={photo.imageRef} hdEstimate={hdEstimate} />
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

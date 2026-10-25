@@ -47,3 +47,42 @@ export function relightInstruction(relight: Relight): string {
 }
 
 export const relightKey = (relight: Relight) => `relight${camel(relight)}` as MessageKey;
+
+/**
+ * Change color palette: the photo recolored with a ready-made palette, or with the colors of another
+ * photo (the edit's second image). Like Relight, a ready-made instruction the visitor can still change.
+ */
+export const PALETTES = ['sunset', 'tealOrange', 'pastel', 'noir', 'forest', 'neon', 'earth', 'ocean'] as const;
+export type Palette = (typeof PALETTES)[number];
+
+/** Each palette's colors: the swatches on its chip, and the words the edit reads. */
+export const PALETTE_COLORS: Record<Palette, { swatches: readonly string[]; words: string }> = {
+  sunset: { swatches: ['#ff7f6b', '#ffc49b', '#f2b134', '#6b3a5b'], words: 'warm sunset palette of coral, peach, gold and plum' },
+  tealOrange: { swatches: ['#127c7c', '#3fb8af', '#ff9f43', '#f26b1d'], words: 'cinematic teal and orange palette' },
+  pastel: { swatches: ['#f7c5d9', '#bfe8d6', '#cdbcf2', '#fff1b3'], words: 'soft pastel palette of pink, mint, lavender and butter yellow' },
+  noir: { swatches: ['#111111', '#7a7a7a', '#f2f2f2', '#c1121f'], words: 'black and white palette with a single touch of deep red' },
+  forest: { swatches: ['#2f5233', '#7a8b3c', '#efe6cf', '#6b4a2b'], words: 'forest palette of moss green, olive, cream and bark brown' },
+  neon: { swatches: ['#ff2fb3', '#24f0ff', '#8a2cff', '#0b0b23'], words: 'neon palette of magenta, cyan and electric purple on deep night blue' },
+  earth: { swatches: ['#c4622d', '#e3c9a0', '#7d7a3c', '#f5ecd9'], words: 'earthy palette of terracotta, sand, olive and cream' },
+  ocean: { swatches: ['#0b2545', '#13a3b2', '#8de4e8', '#f7fbfc'], words: 'ocean palette of navy, turquoise, aqua and white' },
+};
+
+const KEEP = 'Keep the people, the objects, the light direction, the framing and the composition exactly the same; change only the colors.';
+
+export function paletteInstruction(palette: Palette): string {
+  return `Recolor the photo with a ${PALETTE_COLORS[palette].words}. ${KEEP}`;
+}
+
+/** The colors of a second photo, sent as the edit's image 2. */
+export const PALETTE_FROM_PHOTO_INSTRUCTION =
+  "Recolor image 1 with the color palette of image 2. Keep image 1's people, objects, light direction, framing and composition exactly the same; take only the colors from image 2.";
+
+export const paletteKey = (palette: Palette) => `palette${camel(palette)}` as MessageKey;
+
+/**
+ * Moodboard: the picture made from the text, then restyled with the look of a sheet of reference
+ * pictures (the edit's image 2): their palette, light, texture and mood, never their content.
+ */
+export const MOODBOARD_INSTRUCTION =
+  'Restyle image 1 with the look of the moodboard in image 2: its color palette, lighting, texture and mood. Keep the subjects, shapes and composition of image 1; copy nothing else from image 2.';
+export const MOODBOARD_REFS_MAX = 4;

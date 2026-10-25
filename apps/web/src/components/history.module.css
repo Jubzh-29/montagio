@@ -123,6 +123,80 @@
   background: var(--surface-2);
 }
 
+button.action,
+.actionGhost {
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-s);
+  cursor: pointer;
+}
+
+button.action:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.actionGhost {
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  color: var(--ink-muted);
+}
+
+.actionGhost:hover {
+  color: var(--ink);
+}
+
+/* Publish to the community gallery: a title and a name, under the card's actions. */
+.publish {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.publish label {
+  margin-top: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.publish input {
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+}
+
+.publish .cardActions {
+  padding: var(--space-2) 0 var(--space-3);
+}
+
+.publishNote,
+.published {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+.published {
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.publishError {
+  color: var(--error);
+  font-size: var(--text-xs);
+}
+
+.inlineLink {
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .action:focus-visible,
 .filter:focus-visible,
 .recentItem:focus-visible,

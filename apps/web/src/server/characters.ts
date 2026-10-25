@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { CharacterSummary, CharacterType } from '@/lib/api-types';
-import { CHARACTER_TYPES } from '@/lib/characters';
+import type { CharacterKind, CharacterSummary, CharacterType } from '@/lib/api-types';
+import { CHARACTER_KINDS, CHARACTER_TYPES } from '@/lib/characters';
 import { getEnv } from './env';
 import { JobError } from './errors';
 import { assertNoBlockedName } from './guards';
@@ -19,6 +19,8 @@ type CharacterRecord = {
   id: string;
   name: string;
   type: CharacterType;
+  /** Who the character is (absent on the characters made before the kinds). */
+  kind?: CharacterKind;
   description: string;
   imageRef: string;
   /** The text-to-image job that made the portrait: its history item brings the portrait back in the Studio. */
@@ -42,6 +44,7 @@ function summary(record: CharacterRecord): CharacterSummary {
     id: record.id,
     name: record.name,
     type: record.type,
+    ...(record.kind ? { kind: record.kind } : {}),
     description: record.description,
     imageRef: record.imageRef,
     imageUrl: mediaOf(record.imageRef),
@@ -107,7 +110,9 @@ export async function createCharacter(body: Record<string, unknown>): Promise<Ch
   const name = text(body.name, CHARACTER_NAME_MAX);
   const description = text(body.description, CHARACTER_DESCRIPTION_MAX);
   const type = CHARACTER_TYPES.find((value) => value === body.type);
-  if (!name || !description || !type) throw new JobError('invalid-input');
+  // A person when nothing says otherwise; an unknown kind is refused.
+  const kind = body.kind === undefined ? 'human' : CHARACTER_KINDS.find((value) => value === body.kind);
+  if (!name || !description || !type || !kind) throw new JobError('invalid-input');
   const imageRef = await assertFictionalPhoto(body.imageRef);
   await assertNoBlockedName(name, description);
   const jobId = typeof body.jobId === 'string' && SAFE_ID.test(body.jobId) ? body.jobId : undefined;
@@ -115,6 +120,7 @@ export async function createCharacter(body: Record<string, unknown>): Promise<Ch
     id: randomUUID(),
     name,
     type,
+    kind,
     description,
     imageRef,
     ...(jobId ? { jobId } : {}),

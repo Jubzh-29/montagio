@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useI18n, type MessageKey } from '@/i18n';
 import { apiFetch, jsonOrThrow } from '@/lib/api';
 import type { CharacterSummary, UploadResult } from '@/lib/api-types';
@@ -126,7 +126,7 @@ function Slot({
  * An effect's start photo composed from a character, a place and a product: two at least. The edit
  * puts them together first (the place gives the frame), then the effect animates that photo.
  */
-export function ComposeSlots({ value, onChange, disabled }: { value: ComposeState; onChange: (state: ComposeState) => void; disabled: boolean }) {
+export function ComposeSlots({ value, onChange, disabled }: { value: ComposeState; onChange: Dispatch<SetStateAction<ComposeState>>; disabled: boolean }) {
   const { t } = useI18n();
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   useEffect(() => {
@@ -147,7 +147,7 @@ export function ComposeSlots({ value, onChange, disabled }: { value: ComposeStat
         <span className={styles.styleLabel} aria-hidden="true">
           {t('composeLabel')}
         </span>
-        <button type="button" className={styles.chip} aria-pressed={value.on} disabled={disabled} onClick={() => onChange({ ...value, on: !value.on })}>
+        <button type="button" className={styles.chip} aria-pressed={value.on} disabled={disabled} onClick={() => onChange((current) => ({ ...current, on: !current.on }))}>
           {t('composeToggle')}
         </button>
       </div>
@@ -163,7 +163,7 @@ export function ComposeSlots({ value, onChange, disabled }: { value: ComposeStat
               {...(value[role] ? { slot: value[role] } : {})}
               characters={characters}
               disabled={disabled}
-              onSlot={(slot) => onChange({ ...value, [role]: slot })}
+              onSlot={(slot) => onChange((current) => ({ ...current, [role]: slot }))}
             />
           ))}
           <p className={styles.hint} role="status">

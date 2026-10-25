@@ -99,3 +99,8 @@ nodes:
   - { class_type: BasicScheduler, source: comfyui-core, license: GPL-3.0 }
   - { class_type: KSamplerSelect, source: comfyui-core, license: GPL-3.0 }
   - { class_type: GetImageSize, source: comfyui-core, license: GPL-3.0 }
+  # Translate (2026-10-24): the core of ComfyUI v0.41.0, comfy_extras/nodes_textgen.py; Gemma 4 E4B, read
+  # by the core CLIPLoader, hears the speech and writes its translation. No extra node pack.
+  - { class_type: TextGenerate, source: comfyui-core, license: GPL-3.0 }
+  # The translation's second pass: the core comfy_extras/nodes_string.py joins the instruction and the transcription.
+  - { class_type: StringConcatenate, source: comfyui-core, license: GPL-3.0 }

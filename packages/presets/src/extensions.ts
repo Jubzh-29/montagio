@@ -418,6 +418,49 @@ export function compileSpeech(
   return { workflow, output: { ...model.output }, params: { text, language: inputs.language, seed, cfg } };
 }
 
+/** The languages a speech is translated into: each one Chatterbox Multilingual V3 speaks. */
+export const TRANSLATE_LANGUAGES = ['en', 'fr', 'es', 'de', 'it', 'pt', 'ja', 'zh'] as const;
+export type TranslateLanguage = (typeof TRANSLATE_LANGUAGES)[number];
+
+const LANGUAGE_NAME: Record<TranslateLanguage, string> = {
+  en: 'English',
+  fr: 'French',
+  es: 'Spanish',
+  de: 'German',
+  it: 'Italian',
+  pt: 'Portuguese',
+  ja: 'Japanese',
+  zh: 'Mandarin Chinese, in simplified characters',
+};
+
+/** What Gemma 4 is asked once it has transcribed the speech: the translation of that text alone, short enough to say. */
+export function translateInstruction(language: TranslateLanguage): string {
+  const name = LANGUAGE_NAME[language];
+  return `Translate the following text into ${name}. Only output the ${name} translation: one plain paragraph, natural and concise, without quotes, labels or notes. The text:`;
+}
+
+/**
+ * Translate a speech (Gemma 4 E4B with the core TextGenerate node: it transcribes, then translates
+ * the transcription in a second pass), then say the translation in the
+ * same voice (Chatterbox Multilingual V3, the speech as its reference). cfg_weight is 0, the model
+ * card's advice when the reference voice speaks another language than the text.
+ */
+export function compileTranslate(
+  model: ExtensionModel,
+  template: ApiWorkflow,
+  inputs: { audioRef: string; language: TranslateLanguage; seed: number },
+): ExtensionCompiled<{ language: TranslateLanguage; instruction: string; seed: number; cfg: number }> {
+  expectTask(model, 'a2a-translate');
+  if (!inputs.audioRef) throw new CompileError('a translation needs the speech');
+  if (!(TRANSLATE_LANGUAGES as readonly string[]).includes(inputs.language)) {
+    throw new CompileError(`language "${inputs.language}" is not one of ${TRANSLATE_LANGUAGES.join(', ')}`);
+  }
+  const instruction = translateInstruction(inputs.language);
+  const seed = Math.max(1, inputs.seed);
+  const workflow = bindExtension(model, template, { audio: inputs.audioRef, prompt: instruction, language: inputs.language, cfg: 0, seed });
+  return { workflow, output: { ...model.output }, params: { language: inputs.language, instruction, seed, cfg: 0 } };
+}
+
 /** The prompt of an avatar job without one: S2V tends to move the camera and the body unless told not to. */
 export const AVATAR_DEFAULT_PROMPT = 'a person talking to the camera, medium close-up, static camera';
 

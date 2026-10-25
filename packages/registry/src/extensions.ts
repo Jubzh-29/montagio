@@ -7,7 +7,7 @@ import { ALLOWED_WEIGHT_LICENSES, EXTENSION_IDS, kebabId, type ExtensionId } fro
  * not camera presets: their entries live in registry/extensions/, apart from registry/models/,
  * so nothing that lists preset models (the Studio, the showcase, compileJob) sees them.
  */
-export const EXTENSION_TASKS = ['t2a', 'v2v-upscale', 'i2i-upscale', 'i2i-edit', 'tts', 'a2a-vc', 'ia2v-talk', 'i2v-effect', 'flf2v', 'motion-transfer'] as const;
+export const EXTENSION_TASKS = ['t2a', 'v2v-upscale', 'i2i-upscale', 'i2i-edit', 'tts', 'a2a-vc', 'a2a-translate', 'ia2v-talk', 'i2v-effect', 'flf2v', 'motion-transfer'] as const;
 export type ExtensionTask = (typeof EXTENSION_TASKS)[number];
 
 /** What a job delivers (the same three kinds as @montagio/comfy-adapter, which the registry does not depend on). */
@@ -47,6 +47,7 @@ export const REQUIRED_EXTENSION_BINDINGS: Record<ExtensionTask, ExtensionBinding
   'i2i-edit': ['image', 'prompt', 'seed'],
   tts: ['text', 'language', 'seed', 'cfg'],
   'a2a-vc': ['audio', 'voice'],
+  'a2a-translate': ['audio', 'prompt', 'language', 'cfg', 'seed'],
   'ia2v-talk': ['image', 'audio', 'prompt', 'seed', 'width', 'height', 'frames'],
   'i2v-effect': ['image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames', 'lora', 'lora_strength'],
   flf2v: ['image', 'end_image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames'],
@@ -60,6 +61,7 @@ export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
   'i2i-edit': 'image',
   tts: 'audio',
   'a2a-vc': 'audio',
+  'a2a-translate': 'audio',
   'ia2v-talk': 'video',
   'i2v-effect': 'video',
   flf2v: 'video',
