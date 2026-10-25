@@ -1,10 +1,10 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { evenWords, isCaptionLanguage, isCaptionStyle, parseWordsDoc, wordsFromChunks, type CaptionStyleId, type WordsDoc } from '@montagio/captions';
+import { evenWords, isCaptionLanguage, parseWordsDoc, wordsFromChunks, type WordsDoc } from '@montagio/captions';
 import { compileTranscribe } from '@montagio/presets';
 import { extractSpeech, probe, probeAudio } from '@montagio/sequence';
 import type { Transcript } from '@/lib/api-types';
-import { exportNow, TRANSCRIPT_FILE, writeTranscript } from '../captions';
+import { exportNow, readExportRequest, TRANSCRIPT_FILE, writeTranscript, type CaptionExportRequest } from '../captions';
 import { JobError } from '../errors';
 import { captionsRejected, markCaptionsRejected, requireExperimental, requireExtension, transcribeModel } from '../extensions';
 import { mediaFileFor, mediaUrlFor } from '../generations';
@@ -13,20 +13,9 @@ import { extensionFile } from './files';
 
 /** The clips that speak: what captions are made for. */
 export const CAPTIONABLE_TASKS = ['avatar', 'translate', 'voice-change'] as const;
-/** The corrected text of a captions export, in characters. */
-export const CAPTION_TEXT_MAX = 2000;
 /** The longest clip captioned: the talking clips last 30 s at most today. */
 export const CAPTION_CLIP_MAX_S = 60;
 const SPEECH_FILE = 'speech.flac';
-
-export type CaptionExportRequest = { text: string; style: CaptionStyleId };
-
-/** A corrected text and a style, as an export takes them; anything else is invalid-input. */
-export function readExportRequest(value: unknown): CaptionExportRequest {
-  const { text, style } = (value && typeof value === 'object' ? value : {}) as { text?: unknown; style?: unknown };
-  if (typeof text !== 'string' || !text.trim() || text.length > CAPTION_TEXT_MAX || !isCaptionStyle(style)) throw new JobError('invalid-input');
-  return { text: text.trim(), style };
-}
 
 /** The finished talking clip a transcription starts from. */
 async function parentClip(parent: unknown): Promise<{ record: JobRecord; clip: string }> {
