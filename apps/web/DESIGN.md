@@ -34,7 +34,7 @@ A 4 px scale (`--space-1` 4 … `--space-7` 48). Radii: 6 px (glyphs, badges), 1
 
 ## Logo
 
-Two opposite viewfinder corners around the tally dot (the mark), and the name in heavy condensed lettering with the same lime dot over its i (the wordmark). Files in `docs/brand/`: the mark, the wordmark and the lockup, each for a dark ground (ink `#F4F5F7`, lime `#A2F745`) and a light one (ink `#0A0C0F`, lime darkened to `#5D9A07`, 3.45:1 on white), plus the 1280×640 social card. In the app (`Brand.tsx`, inline): the header shows the lockup, the mark at 20 px and the wordmark at 24 px; the mark's dot blinks while a take renders. The favicon and `icon.svg` use a cut of the mark drawn larger in its graphite tile, with thicker corners and a larger dot, so both survive 16 px; `apple-icon.png` keeps the drawn proportions.
+Two opposite viewfinder corners around the tally dot (the mark: thick corners, the outer angle softened, to match the lettering), and the name in heavy rounded lettering with the same lime dot over its i (the wordmark). Files in `docs/brand/`: the mark, the wordmark and the lockup, each for a dark ground (ink `#F4F5F7`, lime `#A2F745`) and a light one (ink `#0A0C0F`, lime darkened to `#5D9A07`, 3.45:1 on white), plus the 1280×640 social card. In the lockup the mark's corners are as tall as the wordmark (its dot to the foot of its g), about a third of that apart. In the app (`Brand.tsx`, inline): the header shows the lockup, the mark and the wordmark both at 22 px; the mark's dot blinks while a take renders. The favicon and `icon.svg` put the same mark, larger, in its graphite tile, so both survive 16 px; `apple-icon.png` is that drawing on a full square, which iOS rounds itself.
 
 ## Components
 

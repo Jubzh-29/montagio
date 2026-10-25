@@ -7,7 +7,7 @@ sdk: static
 app_file: index.html
 pinned: false
 license: agpl-3.0
-short_description: Camera-move presets on open-weights video models
+short_description: Montagio, the open-source Higgsfield alternative
 models:
   - Comfy-Org/Wan_2.2_ComfyUI_Repackaged
   - Comfy-Org/Wan_2.1_ComfyUI_repackaged

@@ -7,13 +7,13 @@ test('montagio.ps1 hands the arguments over as JSON, untouched by PowerShell 5.1
 });
 
 test('install options are read', () => {
-  expect(parseArgs(['install', '--dry-run', '--ignore-vram', '--dir', 'D:\\Shot Rig', '--comfy-port', '8288', '--no-start', '--no-browser'])).toEqual({
+  expect(parseArgs(['install', '--dry-run', '--ignore-vram', '--dir', 'D:\\Montagio Data', '--comfy-port', '8288', '--no-start', '--no-browser'])).toEqual({
     command: 'install',
     options: {
       dryRun: true,
       appOnly: false,
       ignoreVram: true,
-      dir: 'D:\\Shot Rig',
+      dir: 'D:\\Montagio Data',
       start: false,
       browser: false,
       proxyUrl: null,

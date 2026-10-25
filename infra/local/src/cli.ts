@@ -235,7 +235,7 @@ export async function main(argv: string[]): Promise<number> {
 /**
  * The arguments. montagio.ps1 sends them as JSON in MONTAGIO_ARGV: Windows
  * PowerShell 5.1 splits an argument that starts with "-" and holds a space
- * ("--dir=C:\Shot Rig") when it passes it to a program.
+ * ("--dir=C:\Montagio Data") when it passes it to a program.
  */
 export function argvFrom(env: Record<string, string | undefined>, argv: string[]): string[] {
   const raw = env.MONTAGIO_ARGV;

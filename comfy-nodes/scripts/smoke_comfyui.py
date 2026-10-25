@@ -10,8 +10,9 @@ tensor, so no GPU and no model file are needed.
 
     python comfy-nodes/scripts/smoke_comfyui.py [URL]      # URL defaults to http://127.0.0.1:8199
 
-The pack must be installed in ComfyUI's custom_nodes folder (as custom_nodes/montagio) and ComfyUI
-must be running. Exit code 0 when the run succeeds, 1 otherwise, with ComfyUI's own error shown.
+The pack must be installed in ComfyUI's custom_nodes folder (custom_nodes/montagio for a local install,
+custom_nodes/montagio on the GPU pods of infra/) and ComfyUI must be running. Exit code 0 when the
+run succeeds, 1 otherwise, with ComfyUI's own error shown.
 Standard library only, so it runs anywhere Python does, a pod included.
 """
 import json
@@ -166,7 +167,7 @@ def main(url=DEFAULT_URL, *, timeout=TIMEOUT_S, poll_interval=POLL_INTERVAL_S):
         for class_type in dict.fromkeys(node["class_type"] for node in prompt.values()):
             _, info = _request("GET", f"{url}/object_info/{class_type}")
             if class_type not in info:
-                hint = "is the pack installed as custom_nodes/montagio? see ComfyUI's log" if class_type.startswith("Montagio") else "does this ComfyUI have it?"
+                hint = "is the pack in ComfyUI's custom_nodes folder (custom_nodes/montagio)? see ComfyUI's log" if class_type.startswith("Montagio") else "does this ComfyUI have it?"
                 print(f"{class_type} is not in {url}/object_info ({hint})")
                 return 1
             print(f"{class_type}: in /object_info")

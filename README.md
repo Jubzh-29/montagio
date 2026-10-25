@@ -5,6 +5,8 @@
   </picture>
 </h1>
 
+Montagio, the open-source Higgsfield alternative.
+
 [![Built on the Comfy SDK](https://img.shields.io/badge/built%20on-Comfy%20SDK-a2f745?labelColor=1f2328)](docs/BUILD_NOTES.md#on-the-comfy-developer-platform)
 [![Open weights only: Apache-2.0 or MIT](https://img.shields.io/badge/weights-Apache--2.0%20%7C%20MIT%20only-a2f745?labelColor=1f2328)](#proof-measured)
 [![0 partner nodes](https://img.shields.io/badge/partner%20nodes-0-a2f745?labelColor=1f2328)](#proof-measured)
