@@ -33,7 +33,9 @@ Options:
   --app-only         install the app alone: no ComfyUI, no weights (demo mode, or --proxy-url)
   --proxy-url URL    with --app-only: the comfy-api-proxy of a remote GPU (for example an SSH tunnel), kept for the next runs
   --demo             with --app-only: forget a saved --proxy-url, run the demo mode
-  --ignore-vram      install even on a GPU under 24 GB (renders may run out of memory)
+  --low-vram         install the 12 GB profile (12 to 20 GB cards): only what a GPU session ran within 12 GB,
+                     slower renders; offered on such a card, kept for the next runs
+  --ignore-vram      install even on a GPU under 12 GB, or every model under 24 GB (renders may run out of memory)
   --dir DIR          install folder (default: %LOCALAPPDATA%\\Montagio or ~/.local/share/montagio, or MONTAGIO_HOME)
   --comfy-port N     install: ComfyUI port (default 8188), kept for the next runs
   --proxy-port N     install: comfy-api-proxy port (default 8189)
@@ -65,13 +67,15 @@ export type CliOptions = {
   ports: Partial<Ports>;
   /** --extensions; null leaves it to MONTAGIO_EXTENSIONS, then the effects pack if a GPU session validated it. */
   extensions: string | null;
+  /** --low-vram: the 12 GB profile. */
+  lowVram: boolean;
 };
 
 const COMMANDS: Command[] = ['install', 'start', 'stop', 'status', 'help'];
 const PORT_FLAGS = { comfy: 'comfy-port', proxy: 'proxy-port', app: 'app-port' } as const;
 /** The options each command reads: another one is refused, not ignored (start --dry-run would start). */
 const COMMAND_OPTIONS: Record<Exclude<Command, 'help'>, string[]> = {
-  install: ['dry-run', 'app-only', 'ignore-vram', 'no-start', 'no-browser', 'dir', 'proxy-url', 'demo', 'comfy-port', 'proxy-port', 'app-port', 'extensions'],
+  install: ['dry-run', 'app-only', 'low-vram', 'ignore-vram', 'no-start', 'no-browser', 'dir', 'proxy-url', 'demo', 'comfy-port', 'proxy-port', 'app-port', 'extensions'],
   start: ['dir', 'no-browser'],
   stop: ['dir'],
   status: ['dir'],
@@ -88,6 +92,7 @@ export function parseArgs(argv: string[]): { command: Command; options: CliOptio
         'dry-run': { type: 'boolean' },
         'app-only': { type: 'boolean' },
         'ignore-vram': { type: 'boolean' },
+        'low-vram': { type: 'boolean' },
         'no-start': { type: 'boolean' },
         'no-browser': { type: 'boolean' },
         dir: { type: 'string' },
@@ -134,6 +139,7 @@ export function parseArgs(argv: string[]): { command: Command; options: CliOptio
     }
     if (protocol !== 'http:' && protocol !== 'https:') throw new Error(`--proxy-url must be an http(s) URL, got "${proxyUrl}"`);
   }
+  if (values['low-vram'] && values['app-only']) throw new Error('--low-vram is a profile of the full install, not of --app-only');
   if (values.demo) {
     if (!values['app-only']) throw new Error('--demo only goes with --app-only (the full install renders on this machine)');
     if (proxyUrl !== null) throw new Error('--demo and --proxy-url do not go together: --demo forgets the proxy URL');
@@ -151,6 +157,7 @@ export function parseArgs(argv: string[]): { command: Command; options: CliOptio
       demo: Boolean(values.demo),
       ports,
       extensions: typeof values.extensions === 'string' ? values.extensions : null,
+      lowVram: Boolean(values['low-vram']),
     },
   };
 }
@@ -207,6 +214,7 @@ export async function main(argv: string[]): Promise<number> {
       start: options.start,
       browser: options.browser,
       extensions: options.extensions,
+      lowVram: options.lowVram,
     },
     {
       capture,

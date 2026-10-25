@@ -1,5 +1,6 @@
 import { getEnv } from '@/server/env';
 import { galleryOrder, presetPosterUrl, presetPreviewUrl } from '@/server/gallery';
+import { presetModel } from '@/server/profile';
 import { getServices } from '@/server/services';
 
 export async function GET() {
@@ -18,7 +19,7 @@ export async function GET() {
           ...(posterUrl ? { posterUrl } : {}),
           poses: preset.camera.poses,
           speed: preset.camera.speed,
-          defaultModel: preset.models.preferred,
+          defaultModel: presetModel(lib, preset),
         };
       }),
     ),

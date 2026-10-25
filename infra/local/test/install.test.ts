@@ -215,6 +215,49 @@ test('a 4 GB GPU: a yes installs the app alone, no terminal stops', async () => 
   expect(accepted.events).toEqual(['startAll']);
 });
 
+test('a 12 GB GPU: the dry run points to --low-vram; a yes installs the 12 GB profile and keeps it', async () => {
+  const rtx3060 = facts({ gpus: [{ index: 0, name: 'NVIDIA GeForce RTX 3060', vramMiB: 12288, driver: '580.65' }] });
+  const dry = harness({ facts: rtx3060 });
+  expect(await install(repo, options({ dryRun: true }), dry.deps)).toBe(2);
+  expect(dry.output()).toContain('--low-vram');
+  expect(dry.calls).toEqual([]);
+
+  const questions: string[] = [];
+  const accepted = harness({ facts: rtx3060, ask: async (q) => (questions.push(q), true) });
+  expect(await install(repo, options({ start: false }), accepted.deps)).toBe(0);
+  expect(questions).toHaveLength(1);
+  expect(questions[0]).toContain('12 GB profile');
+  expect(accepted.output()).toContain('full install, 12 GB profile');
+  expect(readState(accepted.L.statePath)).toMatchObject({ mode: 'full', vramProfile: '12gb' });
+
+  // The next run (an update) keeps the profile without asking again.
+  const again = harness({ facts: rtx3060, ask: async (q) => (questions.push(q), false) });
+  expect(await install(repo, options({ start: false }), again.deps)).toBe(0);
+  expect(questions).toHaveLength(1);
+});
+
+test('--low-vram installs the 12 GB profile without asking, and only the extensions validated within 12 GB', async () => {
+  withMusicWeight(5);
+  writeFileSync(
+    join(repo, 'registry', 'models.lock.yaml'),
+    readFileSync(join(repo, 'registry', 'models.lock.yaml'), 'utf8') +
+      `  - id: tiny-effect\n    file: tiny_effect.safetensors\n    url: https://huggingface.co/Comfy-Org/x/resolve/main/split_files/vae/tiny_effect.safetensors\n` +
+      `    sha256: ${'b'.repeat(64)}\n    size: 5\n    license: Apache-2.0\n    source: https://huggingface.co/x/y\n    extension: effects\n`,
+  );
+  const config = join(repo, 'registry', 'extensions.yaml');
+  writeFileSync(config, readFileSync(config, 'utf8').replace(/gpu_validated: null/g, 'gpu_validated: 2026-10-21'));
+  const rtx4070 = facts({ gpus: [{ index: 0, name: 'NVIDIA GeForce RTX 4070', vramMiB: 12282, driver: '580.65' }] });
+  const notYet = harness({ facts: rtx4070 });
+  expect(await install(repo, options({ start: false, lowVram: true }), notYet.deps)).toBe(0);
+  expect(fetchedIds(notYet.calls).sort()).toEqual(['tiny-te', 'tiny-vae']);
+  expect(readState(notYet.L.statePath)).toMatchObject({ vramProfile: '12gb', extensions: [] });
+
+  writeFileSync(config, readFileSync(config, 'utf8').replace('priority: 2\n    gpu_validated: 2026-10-21', 'priority: 2\n    gpu_validated: 2026-10-21\n    low_vram_validated: 2026-10-25'));
+  const validated = harness({ facts: rtx4070 });
+  expect(await install(repo, options({ start: false, lowVram: true }), validated.deps)).toBe(0);
+  expect(readState(validated.L.statePath).extensions).toEqual(['effects']);
+});
+
 test('a full install runs every step and records it', async () => {
   const h = harness();
   expect(await install(repo, options(), h.deps)).toBe(0);

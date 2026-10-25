@@ -6,6 +6,7 @@ import { compileJob, CompileError, validatePreset, type Preset } from '@montagio
 import { ensureTools, probe, tagClip } from '@montagio/sequence';
 import { MAX_PRESET_YAML_BYTES, MAX_REQUEST_BYTES } from '@/lib/limits';
 import { getEnv } from './env';
+import { offeredModel, presetModel } from './profile';
 import { getServices } from './services';
 import {
   lookupKey,
@@ -93,7 +94,8 @@ async function resolveJob(input: Omit<CreateGenerationInput, 'idempotencyKey'>, 
   if (!preset) throw new GenerationError('unknown-preset');
   const upload = await readUploadMeta(input.imageRef);
   if (!upload) throw new GenerationError('unknown-image');
-  const model = lib.models.get(input.modelId ?? preset.models.preferred);
+  // Only a model this install's memory profile offers: a 12 GB card would run out of memory on the others.
+  const model = offeredModel(lib, input.modelId ?? presetModel(lib, preset));
   const template = model ? lib.templates.get(model.workflow) : undefined;
   if (!model || !template) throw new GenerationError('model-incompatible');
   try {

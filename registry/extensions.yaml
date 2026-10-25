@@ -17,6 +17,8 @@ extensions:
   - id: effects
     priority: 2
     gpu_validated: 2026-10-21
+    # Run on a GPU held to 12 GB: the 12 GB profile (MONTAGIO_VRAM_PROFILE=12gb) offers the extensions dated here.
+    low_vram_validated: 2026-10-25
   - id: transitions
     priority: 3
     requires: [edit]

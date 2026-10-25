@@ -7,11 +7,13 @@ export {
   LockSchema,
   ModelSchema,
   REQUIRED_BINDINGS,
+  VRAM_PROFILES,
   type BindingKey,
   type Capability,
   type ExtensionId,
   type LockEntry,
   type ModelEntry,
+  type VramProfile,
 } from './schema';
 export { parseExtensionModel, parseExtensionsConfig, parseLock, parseModel, RegistryError } from './parse';
 export {
@@ -30,3 +32,4 @@ export {
   type ExtensionTask,
   type OutputKind,
 } from './extensions';
+export { extensionEstimate, modelInProfile, vramProfile } from './profile';

@@ -20,7 +20,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { decide, evaluate, pickGpu, pickPython, pickTorch, type Check, type Decision, type Mode, type Ports } from './checks.ts';
+import { decide, evaluate, pickGpu, pickPython, pickTorch, type Check, type Decision, type Mode, type Ports, type VramProfile } from './checks.ts';
 import { npmInvocation, nextBin, tsxCli, type Capture, type Stream } from './exec.ts';
 import { installDefaultExtensions, readExtensions, readLock, readVersions, selectExtensions, weightsFor, type LockWeight } from './pins.ts';
 import {
@@ -55,6 +55,8 @@ export type InstallOptions = {
   browser: boolean;
   /** --extensions: whose weights to fetch besides the camera presets'; null or absent reads MONTAGIO_EXTENSIONS, then the effects pack if validated. */
   extensions?: string | null;
+  /** --low-vram: the 12 GB profile, asked for; otherwise the saved profile, or the one the GPU allows once accepted. */
+  lowVram?: boolean;
 };
 
 export type InstallDeps = {
@@ -78,19 +80,29 @@ const CUDA_CHECK =
   'import torch; assert torch.cuda.is_available(), "torch sees no CUDA device"; ' +
   'print(f"[montagio] torch {torch.__version__} (CUDA {torch.version.cuda}) on {torch.cuda.get_device_name(0)}")';
 
-export function renderReport(checks: Check[], decision: Decision, steps: Step[], ctx: { dir: string; dryRun: boolean; mode: Mode }): string {
+export function renderReport(
+  checks: Check[],
+  decision: Decision,
+  steps: Step[],
+  ctx: { dir: string; dryRun: boolean; mode: Mode; profile?: VramProfile },
+): string {
   const lines = [`Montagio installer${ctx.dryRun ? ' (dry run: nothing will be changed)' : ''}`, `Install folder: ${ctx.dir}`, '', 'Machine'];
   for (const check of checks) {
     lines.push(`  ${LABEL[check.severity]}  ${check.id.padEnd(7)} ${check.message}`);
     if (check.fix && check.severity !== 'ok') lines.push(`${' '.repeat(16)}-> ${check.fix}`);
   }
-  lines.push('', `Plan (${ctx.mode === 'full' ? 'full install' : 'app only'})`);
+  lines.push('', `Plan (${ctx.mode === 'full' ? (ctx.profile === '12gb' ? 'full install, 12 GB profile' : 'full install') : 'app only'})`);
   steps.forEach((step, index) => {
     lines.push(`  ${String(index + 1).padStart(2)}. [${step.run ? 'run' : 'skip'}]${step.run ? ' ' : ''} ${step.id.padEnd(13)} ${step.title} (${step.why})`);
     if (step.run) for (const line of step.detail) lines.push(`${' '.repeat(14)}${line}`);
   });
   lines.push('');
-  if (decision.kind === 'offer-app-only') {
+  if (decision.kind === 'offer-low-vram') {
+    lines.push(
+      `This GPU cannot run every model: ${decision.reason}.`,
+      'Montagio can install its 12 GB profile: the models and extensions a GPU session ran within 12 GB, with slower renders. Run the same command with --low-vram.',
+    );
+  } else if (decision.kind === 'offer-app-only') {
     lines.push(
       `This machine cannot run the video models: ${decision.reason}.`,
       'Montagio can install the app alone (demo mode, or a remote GPU with --proxy-url): run the same command with --app-only.',
@@ -168,23 +180,29 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
   };
   const execPath = deps.execPath ?? process.execPath;
   const versions = readVersions(repoRoot);
+  let state: InstallState = readState(L.statePath);
+  // The 12 GB profile once asked for (--low-vram, or accepted on a 12 to 20 GB card) stays for the next runs.
+  let profile: VramProfile = opts.lowVram || state.vramProfile === '12gb' ? '12gb' : 'standard';
+  const flag = opts.extensions ?? env.MONTAGIO_EXTENSIONS;
+  const config = readExtensions(repoRoot);
+  const extensionsFor = (asked: VramProfile) => {
+    const chosen = flag?.trim() ? selectExtensions(config, flag, asked) : installDefaultExtensions(config, asked);
+    if (chosen.includes('avatar')) {
+      // Its voice runs on a pinned, patched custom node that only infra/runpod/bootstrap.sh installs for now.
+      deps.log('note: the avatar extension is left out: its voice node is installed by infra/runpod/bootstrap.sh only, not by this installer yet');
+    }
+    return chosen.filter((id) => id !== 'avatar');
+  };
   let enabled: string[];
   try {
-    const flag = opts.extensions ?? env.MONTAGIO_EXTENSIONS;
-    const config = readExtensions(repoRoot);
-    enabled = flag?.trim() ? selectExtensions(config, flag) : installDefaultExtensions(config);
+    enabled = extensionsFor(profile);
   } catch (error) {
     deps.log(`error: ${(error as Error).message}`);
     return 2;
   }
-  if (enabled.includes('avatar')) {
-    // Its voice runs on a pinned, patched custom node that only infra/runpod/bootstrap.sh installs for now.
-    deps.log('note: the avatar extension is left out: its voice node is installed by infra/runpod/bootstrap.sh only, not by this installer yet');
-    enabled = enabled.filter((id) => id !== 'avatar');
-  }
   // The weights of the extensions nobody asked for stay out of the plan and of the disk check.
-  const lock = weightsFor(readLock(repoRoot), enabled);
-  let state: InstallState = readState(L.statePath);
+  const fullLock = readLock(repoRoot);
+  let lock = weightsFor(fullLock, enabled);
   const ports: Ports = { ...state.ports, ...opts.ports };
   const proxyUrl = opts.demo ? null : (opts.proxyUrl ?? state.proxyUrl);
   const own = await deps.runningPorts();
@@ -240,7 +258,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
       start: opts.start,
     });
     const toFetch = mode === 'full' ? weightsToFetch(lock, state, weightStat) : [];
-    const checks = evaluate(facts, { mode, versions, ports, ownPorts: own, need: diskNeed(steps, toFetch, onDisk), ignoreVram: opts.ignoreVram });
+    const checks = evaluate(facts, { mode, versions, ports, ownPorts: own, need: diskNeed(steps, toFetch, onDisk), ignoreVram: opts.ignoreVram, profile });
     return { mode, steps, checks, decision: decide(checks, mode), toFetch, torch, python };
   };
 
@@ -251,8 +269,17 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     deps.log(`error: ${(error as Error).message}`);
     return 2;
   }
-  deps.log(renderReport(plan.checks, plan.decision, plan.steps, { dir: opts.dir, dryRun: opts.dryRun, mode: plan.mode }));
+  deps.log(renderReport(plan.checks, plan.decision, plan.steps, { dir: opts.dir, dryRun: opts.dryRun, mode: plan.mode, profile }));
 
+  if (plan.decision.kind === 'offer-low-vram') {
+    if (opts.dryRun || !deps.ask) return 2;
+    if (!(await deps.ask('Install the 12 GB profile instead (slower renders, the models validated on a 12 GB card)? [y/N] '))) return 2;
+    profile = '12gb';
+    enabled = extensionsFor(profile);
+    lock = weightsFor(fullLock, enabled);
+    plan = planFor('full');
+    deps.log(renderReport(plan.checks, plan.decision, plan.steps, { dir: opts.dir, dryRun: false, mode: plan.mode, profile }));
+  }
   if (plan.decision.kind === 'offer-app-only') {
     if (opts.dryRun || !deps.ask) return 2;
     if (!(await deps.ask(`Install the app alone instead (demo mode, or a remote GPU with --proxy-url)? [y/N] `))) return 2;
@@ -384,6 +411,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
         gpuIndex: plan.mode === 'full' ? (pickGpu(facts.gpus)?.index ?? null) : null,
         proxyUrl,
         extensions: plan.mode === 'full' ? enabled : null,
+        vramProfile: plan.mode === 'full' ? profile : null,
       }),
     start: () => deps.startAll({ browser: opts.browser }),
   };

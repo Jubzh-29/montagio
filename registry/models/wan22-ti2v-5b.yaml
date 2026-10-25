@@ -25,3 +25,10 @@ limits:
 estimate_s:
   480p: 95
   720p: 250
+# The 12 GB profile: measured on 2026-10-25 on an L4 held to 11.5 GiB of free VRAM and 32 GiB of RAM
+# (infra/modal, function lowvram), a card in the class of an RTX 4070: its seconds are kept as they are.
+# 192.9 s at 480p with the model loading (190 s at 24 GB); 720p was not run there.
+low_vram:
+  gpu_validated: 2026-10-25
+  estimate_s:
+    480p: 193

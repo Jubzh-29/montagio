@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { RegistryError } from './errors';
-import { ALLOWED_WEIGHT_LICENSES, EXTENSION_IDS, kebabId, type ExtensionId } from './schema';
+import { ALLOWED_WEIGHT_LICENSES, EXTENSION_IDS, gpuDate, kebabId, type ExtensionId, type VramProfile } from './schema';
 
 /**
  * The extensions (edit, effects, transitions, avatar, music, upscale) run models that are
@@ -94,6 +94,8 @@ export const ExtensionModelSchema = z
       .default({}),
     /** Seconds of GPU for a typical job, until a GPU session measures it. */
     estimate_s: z.number().positive(),
+    /** The same job in the 12 GB profile, once a GPU held to 12 GB ran it. */
+    low_vram: z.object({ estimate_s: z.number().positive() }).strict().optional(),
   })
   .strict()
   .superRefine((model, ctx) => {
@@ -118,6 +120,8 @@ const ExtensionEntrySchema = z
     requires: z.array(z.enum(EXTENSION_IDS)).default([]),
     /** The day a GPU session validated the extension; null until then. */
     gpu_validated: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'gpu_validated must be a date (YYYY-MM-DD) or null').nullable(),
+    /** The day a GPU held to 12 GB ran it: the 12 GB profile offers only these. */
+    low_vram_validated: gpuDate.default(null),
   })
   .strict();
 
@@ -155,12 +159,15 @@ export const ExtensionsConfigSchema = z
  * an extension not validated on GPU by the evening of 25/10 is hidden from the demo), less
  * those whose requirement is not kept; "all" and "none" say what they say; anything else
  * is a comma-separated list of ids, which must also name the requirements of each.
+ * In the 12 GB profile, "validated" keeps those a GPU held to 12 GB ran (`low_vram_validated`).
  */
-export function enabledExtensions(config: ExtensionsConfig, flag: string | undefined): ExtensionId[] {
+export function enabledExtensions(config: ExtensionsConfig, flag: string | undefined, profile: VramProfile = 'standard'): ExtensionId[] {
   const byPriority = [...config].sort((a, b) => a.priority - b.priority);
   const value = flag?.trim() ?? '';
   if (value === '' || value === 'validated') {
-    const kept = new Set(byPriority.filter((entry) => entry.gpu_validated !== null).map((entry) => entry.id));
+    // In the 12 GB profile, validated means run on a GPU held to 12 GB.
+    const validated = (entry: ExtensionEntry) => (profile === '12gb' ? entry.low_vram_validated : entry.gpu_validated) !== null;
+    const kept = new Set(byPriority.filter(validated).map((entry) => entry.id));
     for (let changed = true; changed; ) {
       changed = false;
       for (const entry of byPriority) {
