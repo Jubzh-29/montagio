@@ -47,3 +47,21 @@ test('a link to a face opens the tab with that face as the start photo', async (
   await expect(page.getByTestId('photo-slot').locator('img')).toHaveAttribute('src', '/media/demo-assets/faces/bolt.jpg');
   await expect(page).toHaveURL(/\?tab=motion$/);
 });
+
+test('in the trend remix, a face is the character: its photo and its words', async ({ page }) => {
+  await page.goto('/remix');
+  await page.getByRole('button', { name: 'The example', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Use the example' }).click();
+  await expect(page.locator('ol li').filter({ hasText: /^Shot \d/ })).toHaveCount(3, { timeout: 60_000 });
+  await page.getByRole('group', { name: 'The character' }).getByRole('button', { name: 'A ready-made face', exact: true }).click();
+  await page.getByRole('list', { name: 'Start from a face' }).getByRole('button', { name: 'Juniper', exact: true }).click();
+  await expect(page.getByRole('list', { name: 'Start from a face' }).getByRole('button', { name: 'Juniper', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('img[src="/media/demo-assets/faces/juniper.jpg"]')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'What the character looks like (optional)' })).toHaveValue(/^a fox character, a cream cable-knit sweater/);
+  await page.getByRole('checkbox', { name: /The person in this photo is me/ }).check();
+  const sent = page.waitForRequest((request) => request.url().endsWith('/api/remix') && request.method() === 'POST');
+  await page.getByRole('button', { name: /^Remix 3 shot/ }).click();
+  const body = (await sent).postDataJSON() as { imageRef?: string; character?: string };
+  expect(body.imageRef).toMatch(/^uploads\//);
+  expect(body.character).toMatch(/^a fox character/);
+});

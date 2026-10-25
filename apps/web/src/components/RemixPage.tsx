@@ -3,13 +3,15 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useI18n } from '@/i18n';
 import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
-import type { CharacterSummary, HistoryItem, RemixMode } from '@/lib/api-types';
+import type { CharacterSummary, HistoryItem, RemixMode, UploadResult } from '@/lib/api-types';
+import { facePhoto, faceSubject, STARTING_FACES, type BankFace } from '@/lib/character-bank';
 import { formatDuration } from '@/lib/duration';
 import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { refusalMessageKey } from '@/lib/refusals';
 import { useExtensions } from '@/lib/use-extensions';
 import { useJob } from '@/lib/use-job';
 import { ConsentCheck } from './ConsentCheck';
+import { FacePicker } from './FacePicker';
 import { Header } from './Header';
 import { ShowcaseFooter } from './ShowcaseFooter';
 import page from './ads.module.css';
@@ -79,7 +81,7 @@ export function RemixPage() {
   const [rights, setRights] = useState(false);
   const [mode, setMode] = useState<RemixMode>('motion');
   const [characters, setCharacters] = useState<CharacterSummary[] | null>(null);
-  const [photoSource, setPhotoSource] = useState<'mine' | 'photo' | 'sample'>('mine');
+  const [photoSource, setPhotoSource] = useState<'mine' | 'photo' | 'sample' | 'face'>('mine');
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [photoFailed, setPhotoFailed] = useState(false);
   const [faceConsent, setFaceConsent] = useState(false);
@@ -209,6 +211,14 @@ export function RemixPage() {
     if (!res?.ok) return setPhotoFailed(true);
     const meta = (await res.json()) as { imageRef: string };
     setPhotoFrom({ imageRef: meta.imageRef, personal: false, url: `/media/data/${meta.imageRef}` });
+  };
+  /** A starting face, copied by the server like the example: the character of the remix, already described. */
+  const pickFace = async (face: BankFace) => {
+    const res = await apiFetch(`/api/uploads/face?id=${encodeURIComponent(face.id)}`, { method: 'POST' }).catch(() => null);
+    if (!res?.ok) return setPhotoFailed(true);
+    const meta = (await res.json()) as UploadResult;
+    setPhotoFrom({ imageRef: meta.imageRef, personal: false, url: facePhoto(face.id) });
+    setCharacter(faceSubject(face).slice(0, CHARACTER_MAX));
   };
   const pickCharacter = (id: string) => {
     const picked = characters?.find((entry) => entry.id === id);
@@ -527,6 +537,11 @@ export function RemixPage() {
                     {t('trendCharacterSample')}
                   </button>
                 )}
+                {!scene && STARTING_FACES.length > 0 && (
+                  <button type="button" className={studio.chip} aria-pressed={photoSource === 'face'} disabled={busy} onClick={() => setPhotoSource('face')}>
+                    {t('trendCharacterFace')}
+                  </button>
+                )}
               </div>
               {photoSource === 'mine' && !scene ? (
                 characters && characters.length === 0 ? (
@@ -541,6 +556,13 @@ export function RemixPage() {
                     ))}
                   </select>
                 )
+              ) : photoSource === 'face' && !scene ? (
+                <FacePicker
+                  faces={STARTING_FACES}
+                  selectedId={STARTING_FACES.find((face) => facePhoto(face.id) === photo?.url)?.id ?? null}
+                  disabled={busy}
+                  onPick={(face) => void pickFace(face)}
+                />
               ) : photoSource === 'sample' && !scene ? (
                 <button type="button" className={studio.buttonSecondary} disabled={busy} onClick={() => void takeSamplePhoto()}>
                   {t('trendSampleUse')}
