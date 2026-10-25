@@ -59,8 +59,8 @@ if (command === 'jobs') {
     if (workflowSha256(ran) !== workflowSha256(faceWorkflow(lib, face))) throw new Error(`${face.id}: the workflow that ran is not the one the Studio compiles`);
     const jpeg = join(faces, `${face.id}.jpg`);
     await posterFrame(join(runDir, 'clips', png), jpeg, { width: 720, comment: AI_METADATA.comment });
-    // The thumbnail: the middle of the full-length portrait, head to knees, in 3:4.
-    await run(ffmpeg, ['-loglevel', 'error', '-y', '-protocol_whitelist', 'file', '-i', jpeg, '-vf', 'scale=240:-2,crop=240:320', '-frames:v', '1', '-c:v', 'libwebp', '-quality', '78', '-map_metadata', '-1', join(thumbs, `${face.id}.webp`)], { windowsHide: true });
+    // The thumbnail: the top of the full-length portrait, head to knees, in 3:4 (a centred crop cut tall heads off).
+    await run(ffmpeg, ['-loglevel', 'error', '-y', '-protocol_whitelist', 'file', '-i', jpeg, '-vf', 'scale=240:-2,crop=240:320:0:0','-frames:v', '1', '-c:v', 'libwebp', '-quality', '78', '-map_metadata', '-1', join(thumbs, `${face.id}.webp`)], { windowsHide: true });
     const recipe = faceRecipe(lib, face, stack, record.at, await readFile(jpeg));
     await writeFile(join(faces, `${face.id}.recipe.json`), `${JSON.stringify(recipe, null, 2)}\n`);
     done.push(face.id);

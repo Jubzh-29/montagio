@@ -723,8 +723,9 @@ export function Studio() {
 
   useEffect(() => {
     // A Reuse that comes during a render waits for its end: replacing the Studio now would orphan that render.
+    // It waits for the tab too: before /api/extensions answers, the Studio's guess is Camera.
     const applied = `${from}|${reproduce}`;
-    if (!from || catalog !== 'ready' || busy || appliedFrom.current === applied) return;
+    if (!from || catalog !== 'ready' || busy || !tabSettled || appliedFrom.current === applied) return;
     appliedFrom.current = applied;
     // A starting face (a character made from one links here) is the start photo of the tab asked for.
     if (from.startsWith(FACE_KEY_PREFIX)) {
@@ -749,7 +750,7 @@ export function Studio() {
       .catch(() => undefined);
     // restore reads the catalogue, which is ready here; the item to bring back is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, reproduce, catalog, busy]);
+  }, [from, reproduce, catalog, busy, tabSettled]);
 
   const checkRemix = async () => {
     if (!remix) return;

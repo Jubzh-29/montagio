@@ -23,8 +23,8 @@ export type BankFace = {
 
 export const CHARACTER_BANK: readonly BankFace[] = [
   { id: 'marlo', name: 'Marlo', kind: 'human', style: 'extreme', traits: { hair: 'sculptural', skin: 'porcelain' }, details: 'a man in his sixties with a silver beard, a long teal velvet coat and a high ruffled collar', seed: 7101 },
-  { id: 'ines', name: 'Inès', kind: 'human', style: 'bold', traits: { build: 'longNeck', eyes: 'violet' }, details: 'a woman in her forties with close-cropped white hair, a structured mustard suit and chunky green earrings', seed: 7102 },
-  { id: 'tavi', name: 'Tavi', kind: 'human', style: 'extreme', traits: { hair: 'geometric', skin: 'stripes' }, details: 'a young man with a blocky neon-pink haircut, a quilted silver jacket and wide orange trousers', seed: 7103 },
+  { id: 'ines', name: 'Inès', kind: 'human', style: 'bold', traits: { build: 'longNeck', eyes: 'violet' }, details: 'a woman in her forties with close-cropped white hair, a structured mustard suit buttoned over a black high-neck top and chunky green earrings', seed: 7102 },
+  { id: 'tavi', name: 'Tavi', kind: 'human', style: 'extreme', traits: { hair: 'geometric', skin: 'stripes' }, details: 'a young man with a blocky neon-pink haircut, a quilted silver jacket zipped up to the chin and wide orange trousers', seed: 7103 },
   { id: 'odile', name: 'Odile', kind: 'human', style: 'everyday', traits: { extra: 'pointedEars', eyes: 'huge' }, details: 'an elderly woman with freckles and round cheeks, a lavender cardigan and a long patterned skirt', seed: 7104 },
   { id: 'kwame', name: 'Kwame', kind: 'human', style: 'bold', traits: { hair: 'sculptural', build: 'elongated' }, details: 'a man in his thirties with a tall sculpted hair crown and a flowing indigo robe embroidered in gold', seed: 7105 },
   { id: 'yuki', name: 'Yuki', kind: 'human', style: 'extreme', traits: { hair: 'geometric', skin: 'chrome' }, details: 'a woman in her twenties with a sharp silver bob, a white futuristic puffer jacket and platform boots', seed: 7106 },
@@ -32,9 +32,9 @@ export const CHARACTER_BANK: readonly BankFace[] = [
   { id: 'saoirse', name: 'Saoirse', kind: 'human', style: 'bold', traits: { skin: 'spots', eyes: 'violet' }, details: 'a red-haired woman in her fifties with a wide-brimmed hat, a green wax jacket and rain boots', seed: 7108 },
   { id: 'pip', name: 'Pip', kind: 'frog', style: 'bold', traits: { eyes: 'violet' }, details: 'a tailored tweed three-piece suit with a pocket watch chain', seed: 7109 },
   { id: 'juniper', name: 'Juniper', kind: 'fox', style: 'everyday', traits: { eyes: 'huge' }, details: 'a cream cable-knit sweater, corduroy trousers and a leather satchel', seed: 7110 },
-  { id: 'duke', name: 'Duke', kind: 'dog', style: 'extreme', traits: { hair: 'sculptural' }, details: 'a basset hound with a towering pompadour, a sequined purple stage suit and gold sneakers', seed: 7111 },
+  { id: 'duke', name: 'Duke', kind: 'dog', style: 'extreme', traits: { hair: 'sculptural' }, details: 'a basset hound standing upright on two legs, with a towering pompadour, a sequined purple stage suit and gold sneakers', seed: 7111 },
   { id: 'atlas', name: 'Atlas', kind: 'owl', style: 'everyday', traits: { build: 'elongated' }, details: 'a grey cardigan, tiny half-moon glasses and a stack of old books under one wing', seed: 7112 },
-  { id: 'mochi', name: 'Mochi', kind: 'cat', style: 'extreme', traits: { extra: 'horns', eyes: 'violet' }, details: 'a fluffy white cat with a dramatic feathered cape and a tall golden crown', seed: 7113 },
+  { id: 'mochi', name: 'Mochi', kind: 'cat', style: 'extreme', traits: { extra: 'horns', eyes: 'violet' }, details: 'a fluffy white cat standing upright on two legs, in a long velvet robe and a dramatic feathered cape', seed: 7113 },
   { id: 'zuzu', name: 'Zuzu', kind: 'bee', style: 'everyday', traits: { eyes: 'huge' }, details: 'a denim barista apron, a tiny notepad and a paper cup of coffee', seed: 7114 },
   { id: 'gustav', name: 'Gustav', kind: 'lizard', style: 'bold', traits: { hair: 'geometric' }, details: 'a bright tropical shirt, cream linen shorts and woven sandals', seed: 7115 },
   { id: 'ink', name: 'Ink', kind: 'octopus', style: 'everyday', traits: { skin: 'spots' }, details: 'a white double-breasted chef jacket and a tall toque, holding a wooden spoon', seed: 7116 },
@@ -48,17 +48,18 @@ export const CHARACTER_BANK: readonly BankFace[] = [
   { id: 'tilly', name: 'Tilly', kind: 'human', style: 'clay', traits: { hair: 'sculptural', eyes: 'huge' }, details: 'a grandmother baker with a flour-dusted apron and a rolling pin', seed: 7124 },
   { id: 'scout', name: 'Scout', kind: 'dog', style: 'clay', traits: { extra: 'pointedEars' }, details: 'a scruffy terrier postman in a blue uniform and cap, with a mail bag', seed: 7125 },
   { id: 'kiln', name: 'Kiln', kind: 'robot', style: 'clay', traits: { skin: 'stone' }, details: 'a little robot with mismatched buttons and a hand-knitted scarf', seed: 7126 },
-  { id: 'ren', name: 'Ren', kind: 'human', style: 'anime', traits: { hair: 'geometric', eyes: 'violet' }, details: 'a courier in her twenties with a yellow messenger bag, a cropped bomber jacket and cargo pants', seed: 7127 },
+  { id: 'ren', name: 'Ren', kind: 'human', style: 'anime', traits: { hair: 'geometric', eyes: 'violet' }, details: 'a courier in her twenties with a yellow messenger bag, a long olive bomber jacket zipped up, a cap and cargo pants', seed: 7127 },
   { id: 'kitsu', name: 'Kitsu', kind: 'fox', style: 'anime', traits: { eyes: 'violet' }, details: 'a long blue hooded traveling coat, holding a glowing paper lantern', seed: 7128 },
 ];
 
 /**
- * The faces whose picture ships (demo-assets/faces/ and public/characters/faces/): the others are
- * only planned, and no tab shows them.
+ * The faces whose picture ships (demo-assets/faces/ and public/characters/faces/): all 28, rendered on an
+ * L4 on 2026-10-25 and reviewed one by one (five taken again with a closed outfit or standing upright:
+ * Ines, Tavi, Duke, Mochi, Ren). A face left out of this list is only planned, and no tab shows it.
  */
-export const FACES_WITH_PICTURE: readonly string[] = [];
-/** The few faces the static showcase shows on its Characters page. */
-export const SHOWCASE_FACES: readonly string[] = [];
+export const FACES_WITH_PICTURE: readonly string[] = CHARACTER_BANK.map((face) => face.id);
+/** The few faces the static showcase shows on its Characters page: a person, an elder, an animal, a robot, an alien, a clay figure. */
+export const SHOWCASE_FACES: readonly string[] = ['marlo', 'odile', 'pip', 'bolt', 'zorbel', 'tilly'];
 
 export const STARTING_FACES: readonly BankFace[] = CHARACTER_BANK.filter((face) => FACES_WITH_PICTURE.includes(face.id));
 export const faceById = (id: string): BankFace | undefined => CHARACTER_BANK.find((face) => face.id === id);

@@ -230,7 +230,7 @@ function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (charac
       <p className={studio.counter}>{t('charCount', { n: details.length, max: DETAILS_MAX })}</p>
 
       <button type="button" className={studio.buttonPrimary} disabled={!details.trim() || busy} onClick={create}>
-        {done ? t('characterAgain', { d: formatDuration(estimate) }) : t('characterCreate', { d: formatDuration(estimate) })}
+        {portrait ? t('characterAgain', { d: formatDuration(estimate) }) : t('characterCreate', { d: formatDuration(estimate) })}
       </button>
 
       {busy && job && (

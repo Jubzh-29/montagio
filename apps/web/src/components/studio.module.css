@@ -2301,21 +2301,22 @@
   border-radius: var(--radius-s);
 }
 
-/* The starting faces: a scrolling row under the start photo, a grid on the Characters page. */
+/* The starting faces: one scrolling row, small under the start photo, larger on the Characters page. */
 .faces {
   display: flex;
   gap: var(--space-2);
   margin: 0;
-  padding: 0 0 var(--space-1);
+  padding: 0 0 var(--space-2);
   list-style: none;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
   scrollbar-width: thin;
 }
 
-.faces[data-size='large'] {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-  overflow: visible;
+.faces li {
+  flex: none;
+  scroll-snap-align: start;
 }
 
 .face {
@@ -2337,7 +2338,7 @@
 }
 
 .faces[data-size='large'] .face {
-  width: auto;
+  width: 96px;
   font-size: var(--text-s);
 }
 
