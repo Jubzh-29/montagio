@@ -245,6 +245,8 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       progress: 1,
       outputUrl: showcaseUrl(shot.clip.url),
       workflowUrl: showcaseUrl(shot.clip.workflowUrl),
+      // A rendered clip's recipe, a file of the showcase: its Recipe panel reads it as it is.
+      ...(shot.clip.recipeUrl ? { recipeUrl: showcaseUrl(shot.clip.recipeUrl) } : {}),
       placeholder: shot.clip.placeholder,
       ...(shot.clip.hd ? { hdModel: shot.clip.hd } : {}),
     };
@@ -261,6 +263,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
         previewUrl: record.outputUrl!,
         downloadUrl: record.outputUrl!,
         reprise: { tab: 'camera', imageRef: input.imageRef, personal: false, presetId: input.presetId, modelId: data.model.id },
+        ...(record.recipeUrl ? { recipeUrl: record.recipeUrl } : {}),
       },
       ...visit,
     ];
@@ -394,7 +397,9 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     if (method === 'POST' && !id && resource === 'effects') return createExample('effect', await body(init));
     if (method === 'POST' && !id && resource === 'hooks') return createExample('hook', await body(init));
     // Edits and avatars have no example in the showcase (spec §3): they answer as the server answers a hidden one.
-    if (method === 'POST' && !id && (resource === 'edits' || resource === 'avatars' || resource === 'motion')) return refuse('extension-disabled', 404);
+    if (method === 'POST' && !id && (resource === 'edits' || resource === 'avatars' || resource === 'motion' || resource === 'restyle' || resource === 'swap')) {
+      return refuse('extension-disabled', 404);
+    }
     if (resource === 'jobs' && id) {
       const record = jobs.get(id);
       if (record && ((method === 'GET' && action === undefined) || (method === 'POST' && action === 'cancel'))) return json(clone(record));

@@ -38,3 +38,8 @@ limits: { max_duration_s: 5, max_chars: 120 }
 # GPU seconds for 5 s at 832x480 on an RTX 4090 with the 4-step LoRA. Session S2, on an L4 (about
 # half as fast): 156 s warm for each of the 6 effects, 175 to 184 s with the models loading
 estimate_s: 80
+# The 12 GB profile: measured on 2026-10-25 on an L4 held to 11.5 GiB of free VRAM and 32 GiB of RAM
+# (infra/modal, function lowvram), a card in the class of an RTX 4070: its seconds are kept as they are.
+# Squish: 174 s with the models loading (175 to 184 s at 24 GB, 156 s warm).
+low_vram:
+  estimate_s: 160

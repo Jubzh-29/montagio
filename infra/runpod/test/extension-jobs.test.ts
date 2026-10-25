@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { loadLibrary, type Library } from '@montagio/presets';
 import { checkWorkflow, type ObjectInfo } from '../lib/comfy';
-import { EXTENSION_JOBS, extensionJobs, jobTexts, photoFile, type ExtensionJobOptions } from '../lib/extension-jobs';
+import { EXTENSION_JOBS, extensionJobs, jobTexts, parseSwapPoints, photoFile, type ExtensionJobOptions } from '../lib/extension-jobs';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const info = JSON.parse(readFileSync(new URL('./fixtures/object_info-v0.41.0.json', import.meta.url), 'utf8')) as ObjectInfo;
@@ -14,7 +14,7 @@ beforeAll(async () => {
 
 const base = { language: 'en' as const, duration_s: 10, seed: 7, aspect: '16:9' as const };
 
-const files = { input: '/data/photo.png', input2: '/data/outfit.png', input3: '/data/product.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, voice: '/data/voice.flac', motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const };
+const files = { input: '/data/photo.png', input2: '/data/outfit.png', input3: '/data/product.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, voice: '/data/voice.flac', motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const, restyleFrame: '/data/first.png', restyleReference: { path: '/data/restyled.png', mode: 'first-frame' as const }, motionSize: { width: 480, height: 832 }, swapPoints: [{ x: 0.5, y: 0.4 }], swapImage: '/data/bike.png' };
 
 test('one job per extension, in the order of the session, each accepted by ComfyUI v0.41.0 once its files are uploaded', () => {
   const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
@@ -32,6 +32,9 @@ test('one job per extension, in the order of the session, each accepted by Comfy
     ['upscale-image', 'seedvr2-image-upscale'],
     ['voice-change', 'chatterbox-vc'],
     ['motion', 'wan-animate2-motion'],
+    ['restyle-edit', 'qwen-image-edit-2511'],
+    ['restyle:first-frame', 'wan21-vace-restyle'],
+    ['swap:photo', 'wan21-vace-swap'],
   ]);
   for (const job of jobs) {
     const skip = job.files.map((file) => `${file.node}.${file.field}`);
@@ -55,6 +58,11 @@ test('each job uploads the files it reads and nothing else', () => {
   expect(uploads.motion).toEqual([
     { node: '189', field: 'image', path: '/data/photo.png' },
     { node: '240', field: 'file', path: '/data/motion.mp4' },
+  ]);
+  expect(uploads['restyle-edit']).toEqual([{ node: '41', field: 'image', path: '/data/first.png' }]);
+  expect(uploads.restyle).toEqual([
+    { node: '1', field: 'file', path: '/data/motion.mp4' },
+    { node: '20', field: 'image', path: '/data/restyled.png' },
   ]);
   expect(uploads.edit).toEqual([{ node: '41', field: 'image', path: '/data/photo.png' }]);
   expect(uploads.compose).toEqual([
@@ -94,7 +102,58 @@ test('an extension record carries the sha256 of its photo', () => {
     'upscale-image': '/data/photo.png',
     'voice-change': null,
     motion: '/data/photo.png',
+    'restyle-edit': '/data/first.png',
+    restyle: '/data/restyled.png',
+    swap: '/data/bike.png',
   });
+});
+
+test('a swap marks its object with points, and replaces it from a photo of the new one or from the text alone', () => {
+  const swap = (extra: object) => extensionJobs(library, { ...base, motion: '/data/clip.mp4', motion_s: 5, motionAspect: '16:9', motionSize: { width: 1664, height: 960 }, swapPoints: [{ x: 0.5, y: 0.5 }], jobs: ['swap'], ...extra })[0]!;
+  const text = swap({});
+  expect([text.tag, text.params.reference, text.params.prompt, text.params.points]).toEqual(['swap:text', false, 'a red vintage motorbike', 1]);
+  expect(text.files).toEqual([{ node: '1', field: 'file', path: '/data/clip.mp4' }]);
+  expect(JSON.parse(String(text.workflow['41']!.inputs.coordinates_positive))).toEqual([{ x: 416, y: 240 }]);
+  const photo = swap({ swapImage: '/data/bike.png', swapExclude: [{ x: 0.1, y: 0.1 }], text: { swap: 'a golden retriever' } });
+  expect([photo.tag, photo.params.reference, photo.params.prompt, photo.params.excluded]).toEqual(['swap:photo', true, 'a golden retriever', 1]);
+  expect(photo.files).toEqual([
+    { node: '1', field: 'file', path: '/data/clip.mp4' },
+    { node: '20', field: 'image', path: '/data/bike.png' },
+  ]);
+  expect(() => swap({ swapPoints: undefined })).toThrow(/--points/);
+  expect(() => extensionJobs(library, { ...base, jobs: ['swap'], swapPoints: [{ x: 0.5, y: 0.5 }] })).toThrow(/--motion/);
+});
+
+test('--points and --exclude read x,y pairs in fractions of the frame', () => {
+  expect(parseSwapPoints(undefined, '--points')).toBeUndefined();
+  expect(parseSwapPoints('0.5,0.4;0.52,0.6', '--points')).toEqual([{ x: 0.5, y: 0.4 }, { x: 0.52, y: 0.6 }]);
+  // spaces too: a Modal series splits its jobs on ";"
+  expect(parseSwapPoints(' 0.5,0.4  0.52,0.6 ', '--points')).toEqual([{ x: 0.5, y: 0.4 }, { x: 0.52, y: 0.6 }]);
+  expect(() => parseSwapPoints('412,300', '--points')).toThrow(/between 0 and 1/);
+  expect(() => parseSwapPoints('0.5', '--exclude')).toThrow(/--exclude takes x,y pairs/);
+  expect(() => parseSwapPoints('0.5, 0.4', '--points')).toThrow(/x,y pairs/);
+  expect(() => parseSwapPoints('0.5,', '--points')).toThrow(/x,y pairs/);
+  expect(() => parseSwapPoints('0.5,0.5,0.5', '--points')).toThrow(/x,y pairs/);
+});
+
+test("a restyle follows its text alone, a look to follow, or the clip's first frame restyled by its edit", () => {
+  const restyle = (extra: object) => extensionJobs(library, { ...base, motion: '/data/clip.mp4', motion_s: 5, motionAspect: '16:9', jobs: ['restyle'], ...extra })[0]!;
+  const alone = restyle({});
+  expect([alone.tag, alone.params.reference, alone.params.prompt]).toEqual(['restyle', null, 'a snowy winter evening']);
+  expect(alone.files).toEqual([{ node: '1', field: 'file', path: '/data/clip.mp4' }]);
+  const look = restyle({ restyleReference: { path: '/data/look.png', mode: 'look' }, text: { restyle: 'a watercolor painting' } });
+  expect([look.tag, look.params.reference, look.params.prompt]).toEqual(['restyle:look', 'look', 'a watercolor painting']);
+  expect(look.workflow['20']!.inputs.image).toBe('look.png');
+  const [edit] = extensionJobs(library, { ...base, restyleFrame: '/data/first.png', jobs: ['restyle-edit'], text: { restyle: 'a watercolor painting' } });
+  expect(edit!.params.instruction).toMatch(/^Change the look of this image: a watercolor painting\. Keep the framing/);
+  expect(() => extensionJobs(library, { ...base, jobs: ['restyle'] })).toThrow(/--motion/);
+});
+
+test("a composed character for a motion: the character, its outfit and a product, seen full body, no place", () => {
+  const [compose] = extensionJobs(library, { ...base, jobs: ['compose'], input: '/data/place.png', input2: '/data/c.png', outfit: '/data/o.png', input3: '/data/p.png', composeFullBody: true });
+  expect(compose!.tag).toBe('compose:3refs');
+  expect(compose!.files.map((file) => file.path)).toEqual(['/data/c.png', '/data/p.png', '/data/o.png']);
+  expect(compose!.params.instruction).toMatch(/^Show the character from image 1 wearing the outfit from image 3, holding in one hand the very object of image 2, seen full body from head to feet/);
 });
 
 test('without a list, every effect of the pack runs, each with its own tag', () => {
@@ -173,7 +232,7 @@ describe('jobTexts (smoke --text)', () => {
   });
 
   test('when several jobs read a text, a bare one is refused and each text names its job', () => {
-    expect(() => jobTexts(['night rain'], [...EXTENSION_JOBS])).toThrow(/edit, effect, voice, music, motion read a text: name the job, as in --text edit=/);
+    expect(() => jobTexts(['night rain'], [...EXTENSION_JOBS])).toThrow(/edit, effect, voice, music, motion, restyle, swap read a text: name the job, as in --text edit=/);
     expect(jobTexts(['music=calm piano', 'edit=make it snow'], [...EXTENSION_JOBS])).toEqual({ music: 'calm piano', edit: 'make it snow' });
   });
 

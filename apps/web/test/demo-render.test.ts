@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { POST as postGenerations } from '@/app/api/generations/route';
 import { GET as getGeneration } from '@/app/api/generations/[id]/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
-import { demoKindOf, demoRender } from '@/server/demo-render';
+import { demoExampleModel, demoKindOf, demoRender } from '@/server/demo-render';
 import { mediaFileFor } from '@/server/generations';
 import { resetServicesForTests } from '@/server/services';
 import { saveUploadFromFile } from '@/server/uploads';
@@ -30,6 +30,8 @@ test('the sample photo of a preset the GPU session rendered gets that render', a
   const out = await render({ presetId: 'crash-push', output: 'video', files: files(photoFile(imageRef)) });
   expect(out).toBe(join(repoRoot, 'presets', 'previews', 'crash-push.mp4'));
   expect(demoKindOf(out)).toBe('example');
+  // a 20-step render, whatever model the preset now starts on
+  expect(demoExampleModel(out)).toBe('wan22-i2v-a14b-fun-camera');
 });
 
 test('any other photo is moved by FFmpeg along the preset, once, and says no model made it', async () => {
@@ -64,6 +66,22 @@ test('the avatar of the sample portrait, and the motion of the sample character 
   expect(demoKindOf(await render({ presetId: 'motion', output: 'video', files: [...files(character), other] }))).toBe('moved');
 }, 60_000);
 
+test("a clip moved from the user's photo keeps its demo mention and carries its recipe", async () => {
+  process.env.MONTAGIO_DEMO_DURATION_MS = '0';
+  resetServicesForTests();
+  const { imageRef } = await ownPhoto();
+  const { id } = (await (await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'moved-recipe'))).json()) as { id: string };
+  let record: { state: string; outputUrl?: string } = { state: 'queued' };
+  for (let i = 0; i < 100 && record.state !== 'succeeded'; i++) {
+    record = await (await getGeneration(new Request('http://localhost/x'), params({ id }))).json();
+    if (record.state !== 'succeeded') await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  expect(record.state).toBe('succeeded');
+  const tags = await readTags(mediaFileFor(record.outputUrl)!);
+  expect(tags.comment).toBe('Montagio demo render');
+  expect(JSON.parse(tags.synopsis!)).toMatchObject({ compact: true, backend: 'demo', task: 'camera' });
+}, 60_000);
+
 test('nothing for a job without a photo or that makes no video', async () => {
   const { imageRef } = await sample();
   expect(await render({ presetId: 'crash-push', output: 'image', files: files(photoFile(imageRef)) })).toBeUndefined();
@@ -83,4 +101,6 @@ test('a camera move on the sample photo ends as the GPU render, tagged, with wha
   }
   expect(rec).toMatchObject({ state: 'succeeded', demo: 'example', outputUrl: `/media/data/generations/${id}/clip.mp4` });
   expect(await readTags(mediaFileFor(rec.outputUrl)!)).toMatchObject({ comment: 'AI-generated' });
+  // Crash Push starts on the Turbo; its example was rendered in 20 steps, the model its caption names.
+  expect(rec).toMatchObject({ modelId: 'wan22-i2v-a14b-fun-camera-turbo', demoModelId: 'wan22-i2v-a14b-fun-camera' });
 }, 30_000);

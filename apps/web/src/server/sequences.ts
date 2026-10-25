@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { isBackendError, type JobState } from '@montagio/comfy-adapter';
 import type { Aspect } from '@montagio/presets';
 import {
+  AI_METADATA,
   concatClips,
   ensureTools,
   exportVertical,
@@ -34,6 +35,8 @@ export type ShotRecord = {
   presetId: string;
   modelId?: string;
   userPrompt?: string;
+  /** The seed asked for (a film reproduced), then the one the shot's render took; absent before a shot starts. */
+  seed?: number;
   startImageRef?: string;
   generationId?: string;
   state: 'pending' | JobState;
@@ -62,7 +65,7 @@ export type SequenceRecord = {
 
 export type CreateSequenceInput = {
   imageRef: string;
-  shots: { presetId: string; modelId?: string; userPrompt?: string }[];
+  shots: { presetId: string; modelId?: string; userPrompt?: string; seed?: number }[];
   idempotencyKey: string;
 };
 
@@ -158,6 +161,7 @@ async function createSequenceOnce(input: CreateSequenceInput): Promise<CreateRes
       presetId: shot.presetId,
       ...(shot.modelId ? { modelId: shot.modelId } : {}),
       ...(shot.userPrompt ? { userPrompt: shot.userPrompt } : {}),
+      ...(shot.seed !== undefined ? { seed: shot.seed } : {}),
       state: 'pending' as const,
     })),
     currentShot: 0,
@@ -178,11 +182,13 @@ async function startShot(record: SequenceRecord, index: number, imageRef: string
     presetId: shot.presetId,
     modelId: shot.modelId,
     userPrompt: shot.userPrompt,
+    seed: shot.seed,
     imageRef,
     idempotencyKey: shotKey(record, index),
   });
   shot.startImageRef = imageRef;
   shot.generationId = generation.id;
+  shot.seed = generation.seed;
   shot.state = generation.state;
   record.currentShot = index;
 }
@@ -296,8 +302,10 @@ async function assemble(id: string): Promise<void> {
   const film = join(sequenceDir(id), 'film.mp4');
   const vertical = join(sequenceDir(id), 'film-9x16.mp4');
   await mkdir(sequenceDir(id), { recursive: true });
-  await concatClips(clips, film, { width: first.width, height: first.height }, Math.round(first.fps) || 16);
-  await exportVertical(film, vertical);
+  // recipe.ts reads this module: imported when needed, not at load.
+  const tags = { ...AI_METADATA, ...(await (await import('./recipe')).recipeTags('sequence', id, 'video')) };
+  await concatClips(clips, film, { width: first.width, height: first.height }, Math.round(first.fps) || 16, { tags });
+  await exportVertical(film, vertical, { tags });
 
   await withLock(id, async () => {
     const latest = await readSequence(id);

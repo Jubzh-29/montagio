@@ -1,9 +1,11 @@
 # Motion transfer (extension "motion"): the photo of a character (fictional preferably) and a
-# short reference video give that character performing the video's motion, at 480p and 16 fps,
-# silent. The clip is prepared first (prepareMotionClip of @montagio/sequence: 5 s at most,
+# reference video of up to 30 s give that character performing the video's motion, at 480p and
+# 16 fps, silent. The clip is prepared first (prepareMotionClip of @montagio/sequence: 30 s at most,
 # 16 fps, no sound). Wan2.2-Animate-2 distilled reads the raw frames: no pose extractor, no
-# mask, no LoRA; 10 steps, one 81-frame window. The output takes the clip's aspect, and the
-# photo is center-cropped to it. Converted from the official template video_wan_animate2_distilled.
+# mask, no LoRA; 10 steps. Up to 81 frames it is one window; past that, the core context windows
+# of the template's switch (node 610: 21 latent frames, overlapping by 8) sample the whole clip in
+# one pass. The output takes the clip's aspect, and the photo is center-cropped to it. Converted
+# from the official template video_wan_animate2_distilled.
 schema: montagio/extension-model@0.1
 id: wan-animate2-motion
 name: Wan2.2-Animate-2 distilled (motion transfer)
@@ -25,7 +27,9 @@ bindings:
   height: { node: "600", field: resize_type.height }
   frames: { node: "587", field: length }
 output: { node: "246", kind: video }
-limits: { min_duration_s: 1, max_duration_s: 5, max_chars: 500 }
-# GPU seconds for 5 s on an RTX 4090 (10 distilled steps, two branches, the pose cache on the CPU).
-# Session S2, on an L4 (about half as fast): 391 to 415 s, the model loading included
+limits: { min_duration_s: 1, max_duration_s: 30, max_chars: 500 }
+# GPU seconds for 5 s, one window, on an RTX 4090 (10 distilled steps, two branches, the pose cache
+# on the CPU); a longer clip takes about this times its number of windows (motionWindows).
+# Session S2, on an L4 (about half as fast): 391 to 415 s, the model loading included. On 2026-10-24,
+# a 30 s clip (481 frames, 9 windows) took 3,425 s on an L4, peak 22.6 GB: 1.86 times 9 times this
 estimate_s: 205

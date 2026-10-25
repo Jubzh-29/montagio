@@ -156,6 +156,15 @@ sources:
     role: mirror
     revision: 63d0f7c476756b88910170c1df75e2384ea1af31
     license_file: false
+  # Captions (2026-10-25): Whisper large-v3 turbo. Its card metadata (cardData.license) and the README's
+  # front matter read "mit" at this revision; no LICENSE file in the repository. OpenAI's own repository
+  # (github.com/openai/whisper) puts the code and the model weights under the MIT License.
+  - repo: openai/whisper-large-v3-turbo
+    license: MIT
+    role: source
+    revision: 41f01f3fe87f28c78e2fbf8b568835947dd65ed9
+    license_file: false
+    note: also the download repository (no mirror)
 
   # Edit: the Lightning LoRA and the looks (each its own source and download repository).
   - repo: lightx2v/Qwen-Image-Edit-2511-Lightning
@@ -265,6 +274,45 @@ sources:
     revision: 01fdc7e97404120c243c3ea7b427046e5dc7643e
     license_file: false
     note: the author's own repository (RIFEv4.26_0921.zip); its card has no license and sends to GitHub hzwer/Practical-RIFE (MIT LICENSE at bbfd2ea9), whose README says the trained models are under the same MIT license
+
+  # Restyle: Wan 2.1 VACE 14B, its 4-step LoRA and the depth model (read on 2026-10-24).
+  - repo: Wan-AI/Wan2.1-VACE-14B
+    license: Apache-2.0
+    role: source
+    revision: 539c162b1387eac9dc4c20bd3f74671309e76a4c
+    license_file: true
+    note: the README adds Wan's user-conduct paragraph (no illegal, harmful or misleading content), as for the other Wan 2.1 sources
+  - repo: lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v
+    license: Apache-2.0
+    role: source
+    revision: f683105866bf9afe574cb2dea6069c7f3d003e54
+    license_file: true
+  - repo: Comfy-Org/Depth-Anything-3
+    license: Apache-2.0
+    role: mirror
+    revision: 1aaeea516f22fb2f4c7fae761c8ed470c6cf9f93
+    license_file: false
+    note: the four DA3 variants converted by its convert_da3.py; only depth_anything_3_small.safetensors is used (DA3-Large and DA3-Giant, not mirrored here, are CC BY-NC 4.0)
+  - repo: depth-anything/DA3-SMALL
+    license: Apache-2.0
+    role: source
+    revision: e08cab65ca0ec38e7826075418411ab90cab4da3
+    license_file: false
+    note: the card metadata and the README's table say Apache 2.0
+
+  # Object swap: SAM 2.1 base+ (read on 2026-10-24).
+  - repo: Kijai/sam2-safetensors
+    license: Apache-2.0
+    role: mirror
+    revision: f885607d88bb3f9145efa49c3e3c50a9e5bf13eb
+    license_file: false
+    note: the safetensors the pinned node pack loads; sam2.1_hiera_base_plus-fp16.safetensors holds the 615 tensors of Meta's sam2.1_hiera_base_plus.pt cast to fp16, bit for bit (checked on 2026-10-24, as its fp32 file)
+  - repo: facebook/sam2.1-hiera-base-plus
+    license: Apache-2.0
+    role: source
+    revision: b7320756a13354e7530a63935656d35b2f91a290
+    license_file: false
+    note: Meta's checkpoint; the card metadata says Apache 2.0, as does the LICENSE of github.com/facebookresearch/sam2
 
 # Never a source or a download repository, whatever a template or a tutorial fetches from it.
 denied:

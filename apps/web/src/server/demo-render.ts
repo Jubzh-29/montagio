@@ -13,18 +13,21 @@ import { getEnv } from './env';
 // made of the very same sample photo ("example"), or the photo itself moved by FFmpeg ("moved").
 // The caption says which; neither is a model run.
 
+/** The camera examples are 20-step renders, whatever model a preset now starts on (the Turbo). */
+const CAMERA_EXAMPLES_MODEL = 'wan22-i2v-a14b-fun-camera';
+
 /**
  * The clips GPU session S2 rendered from a sample photo of the Studio (demo-assets/images), by preset;
  * a motion also needs the sample reference clip (demo-assets/videos). The avatar and the motion are the
  * full renders (demo-assets/examples), with the voice, not the muted previews of their cards.
  */
-const EXAMPLES: Record<string, { clip: string; sample: string; video?: string }> = {
-  breathing: { clip: 'presets/previews/breathing.mp4', sample: 'sample-16x9.png' },
-  'crash-push': { clip: 'presets/previews/crash-push.mp4', sample: 'sample-16x9.png' },
-  'drift-left-push': { clip: 'presets/previews/drift-left-push.mp4', sample: 'sample-16x9.png' },
-  'pull-back-tilt-up': { clip: 'presets/previews/pull-back-tilt-up.mp4', sample: 'sample-16x9.png' },
-  'push-and-settle': { clip: 'presets/previews/push-and-settle.mp4', sample: 'sample-16x9.png' },
-  'rise-and-push': { clip: 'presets/previews/rise-and-push.mp4', sample: 'sample-16x9.png' },
+const EXAMPLES: Record<string, { clip: string; sample: string; video?: string; model?: string }> = {
+  breathing: { clip: 'presets/previews/breathing.mp4', sample: 'sample-16x9.png', model: CAMERA_EXAMPLES_MODEL },
+  'crash-push': { clip: 'presets/previews/crash-push.mp4', sample: 'sample-16x9.png', model: CAMERA_EXAMPLES_MODEL },
+  'drift-left-push': { clip: 'presets/previews/drift-left-push.mp4', sample: 'sample-16x9.png', model: CAMERA_EXAMPLES_MODEL },
+  'pull-back-tilt-up': { clip: 'presets/previews/pull-back-tilt-up.mp4', sample: 'sample-16x9.png', model: CAMERA_EXAMPLES_MODEL },
+  'push-and-settle': { clip: 'presets/previews/push-and-settle.mp4', sample: 'sample-16x9.png', model: CAMERA_EXAMPLES_MODEL },
+  'rise-and-push': { clip: 'presets/previews/rise-and-push.mp4', sample: 'sample-16x9.png', model: CAMERA_EXAMPLES_MODEL },
   squish: { clip: 'presets/effects/previews/squish.mp4', sample: 'sample-subject.png' },
   'frozen-moment': { clip: 'presets/effects/previews/frozen-moment.mp4', sample: 'sample-subject.png' },
   'wardrobe-swap': { clip: 'presets/transitions/previews/wardrobe-swap.mp4', sample: 'sample-portrait.png' },
@@ -114,6 +117,13 @@ async function movePhoto(photo: string, bytes: Uint8Array, hash: string, presetI
     moves.set(out, move);
   }
   return move;
+}
+
+/** The model that rendered a camera example, which the caption names instead of the one the job asked for; undefined otherwise. */
+export function demoExampleModel(outputPath: string | undefined): string | undefined {
+  if (!outputPath) return undefined;
+  const rel = relative(getEnv().root, outputPath).split(sep).join('/');
+  return Object.values(EXAMPLES).find((example) => example.clip === rel)?.model;
 }
 
 /** Which demo file a backend output is, from where it lies; undefined for any other file (a model's, or the bars). */

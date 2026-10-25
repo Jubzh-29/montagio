@@ -1,0 +1,50 @@
+# The Motion library: reference motions for the motion transfer and the restyle, made by Montagio itself
+# on 2026-10-24 (infra/modal/motion_library.py). Each character is fictional, drawn by Z-Image-Turbo
+# (Apache-2.0) from a text, then animated by Wan 2.1 I2V 480p 14B with its 4-step lightx2v LoRA
+# (Apache-2.0), a locked-off camera, 16 fps, no sound. No third-party video, no real person: no rights
+# to clear. The clips are in previews/, each with its poster; the long dance chains six clips, each
+# starting on the last frame of the one before.
+schema: montagio/motion-library@0.1
+motions:
+  - id: hip-hop
+    name: Hip-hop
+    name_fr: Hip-hop
+    description: A young woman dances hip-hop, bouncing and swinging her arms.
+    description_fr: Une jeune femme danse le hip-hop, en rebondissant et en balançant les bras.
+    duration_s: 5
+  - id: hip-hop-30s
+    name: Long hip-hop
+    name_fr: Hip-hop long
+    description: The same dancer for 30 s, spins and arm waves, ending on a pose.
+    description_fr: La même danseuse pendant 30 s, tours et grands gestes, jusqu’à une pose finale.
+    duration_s: 30
+  - id: wave-clap
+    name: Wave and clap
+    name_fr: Salut et bravo
+    description: A man waves both hands above his head, then claps.
+    description_fr: Un homme salue des deux mains au-dessus de la tête, puis applaudit.
+    duration_s: 5
+  - id: jumping-jacks
+    name: Jumping jacks
+    name_fr: Jumping jacks
+    description: An athlete does fast jumping jacks.
+    description_fr: Un athlète enchaîne des jumping jacks rapides.
+    duration_s: 5
+  - id: ballet-spin
+    name: Ballet spin
+    name_fr: Pirouette
+    description: A ballet dancer rises on her toes and spins, arms opening.
+    description_fr: Une danseuse classique monte sur pointes et tourne, les bras qui s’ouvrent.
+    duration_s: 5
+  - id: shadow-boxing
+    name: Shadow boxing
+    name_fr: Boxe dans le vide
+    description: A boxer throws jabs and hooks into the air.
+    description_fr: Un boxeur enchaîne directs et crochets dans le vide.
+    duration_s: 5
+  - id: robot-dance
+    name: Robot dance
+    name_fr: Danse robot
+    description: A teenager does a robot dance with stiff, sharp moves.
+    description_fr: Un adolescent fait la danse du robot, aux gestes raides et saccadés.
+    duration_s: 5

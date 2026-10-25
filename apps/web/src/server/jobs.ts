@@ -9,14 +9,16 @@ import {
   type SubmitJob,
 } from '@montagio/comfy-adapter';
 import { CompileError, type ApiWorkflow, type Aspect, type Library } from '@montagio/presets';
+import type { InputSlot } from '@montagio/recipe';
 import type { ExtensionId } from '@montagio/registry';
-import { ensureTools, probe, tagAudio, tagClip, tagImage } from '@montagio/sequence';
+import { AI_IMAGE_METADATA, DEMO_MOVE_METADATA, ensureTools, probe, tagAudio, tagClip, tagImage } from '@montagio/sequence';
 import type { DemoKind, JobSummary } from '@/lib/api-types';
 import { demoKindOf } from './demo-render';
 import { getEnv } from './env';
 import { JobError } from './errors';
 import { markRejected } from './extensions';
-import { failureResponse, mediaUrlFor } from './generations';
+import { failureResponse, mediaFileFor, mediaUrlFor } from './generations';
+import { inputFiles, replaySeed, slotsOf } from './inputs';
 import { withLock } from './lock';
 import { getServices } from './services';
 import { writeAtomic } from './store';
@@ -25,7 +27,7 @@ import { saveUploadFromFile, type Provenance } from './uploads';
 
 export { JobError } from './errors';
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad' | 'voice-change' | 'moodboard' | 'translate';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'restyle' | 'swap' | 'ad' | 'voice-change' | 'moodboard' | 'translate' | 'captions';
 
 export type StepRecord = {
   name: string;
@@ -67,6 +69,8 @@ export type JobRecord = {
   frames?: number;
   /** A film's 9:16 cut, when the task makes one (music under a film). */
   verticalUrl?: string;
+  /** The backend that rendered it ("demo", "local"): its recipe says so whatever the app runs later. */
+  backendKind?: string;
   /** A demo render: what it is, since no model made it. */
   demo?: DemoKind;
   error?: string;
@@ -87,6 +91,8 @@ export type StepPlan = {
   presetId: string;
   extension: ExtensionId | null;
   compile: (record: JobRecord) => Promise<CompiledStep>;
+  /** What hides the step's feature when ComfyUI refuses its workflow, besides its extension (the captions within the avatar's). */
+  onRejected?: (reason: string) => void;
 };
 
 export type Prepared = {
@@ -131,6 +137,8 @@ const jobsDir = () => join(getEnv().data, 'jobs');
 export const jobDir = (id: string) => join(jobsDir(), id);
 const keyFile = (key: string) => join(jobsDir(), '_keys', `${createHash('sha256').update(key).digest('hex')}.json`);
 const stepWorkflowFile = (id: string, index: number) => join(jobDir(id), `step${index}.workflow.json`);
+/** The input files of a step, by sha256: what the recipe says each step was given. */
+const stepInputsFile = (id: string, index: number) => join(jobDir(id), `step${index}.inputs.json`);
 
 async function saveJob(record: JobRecord): Promise<void> {
   record.updatedAt = new Date().toISOString();
@@ -159,6 +167,26 @@ export async function readJobWorkflow(id: string): Promise<{ record: JobRecord; 
     }
   }
   return null;
+}
+
+/** Every step submitted so far, with its workflow and its input files (null for a step submitted before they were noted). */
+export async function readJobSteps(id: string): Promise<{ record: JobRecord; steps: { name: string; workflow: ApiWorkflow; inputs: InputSlot[] | null }[] } | null> {
+  const record = await readJob(id);
+  if (!record) return null;
+  const steps: { name: string; workflow: ApiWorkflow; inputs: InputSlot[] | null }[] = [];
+  for (let index = 0; index < record.steps.length; index++) {
+    let workflow: ApiWorkflow;
+    try {
+      workflow = JSON.parse(await readFile(stepWorkflowFile(id, index), 'utf8')) as ApiWorkflow;
+    } catch {
+      break; // not submitted yet
+    }
+    const inputs = await readFile(stepInputsFile(id, index), 'utf8')
+      .then((text) => JSON.parse(text) as InputSlot[])
+      .catch(() => null);
+    steps.push({ name: record.steps[index]!.name, workflow, inputs });
+  }
+  return { record, steps };
 }
 
 /** A compile error is the request's fault: a stable code for the client, the details in the log. */
@@ -190,6 +218,12 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
     step.outputNode = compiled.output.node;
     await mkdir(jobDir(record.id), { recursive: true });
     await writeFile(stepWorkflowFile(record.id, index), JSON.stringify(compiled.workflow, null, 2));
+    // Where each file comes from: a field of the request, or the output of an earlier step.
+    const known = [
+      ...inputFiles(record.inputs, { clipUrl: mediaFileFor }),
+      ...record.steps.slice(0, index).flatMap((earlier, n) => (earlier.outputPath ? [{ from: `step:${n}`, path: earlier.outputPath }] : [])),
+    ];
+    await writeFile(stepInputsFile(record.id, index), JSON.stringify(await slotsOf(compiled.files, known), null, 2));
     try {
       const { backendJobId } = await getServices().backend.submit({
         workflow: compiled.workflow,
@@ -203,8 +237,10 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
       step.state = 'queued';
       record.current = index;
     } catch (error) {
-      if (isBackendError(error) && error.code === 'workflow-rejected' && plan.extension) {
-        markRejected(plan.extension, `ComfyUI refused the ${plan.name} workflow (${error.message})`);
+      if (isBackendError(error) && error.code === 'workflow-rejected') {
+        const reason = `ComfyUI refused the ${plan.name} workflow (${error.message})`;
+        if (plan.extension) markRejected(plan.extension, reason);
+        plan.onRejected?.(reason);
       }
       throw error;
     }
@@ -217,33 +253,42 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
     if (own) {
       try {
         Object.assign(record, await own(record, outputPath, dir));
+        // Its own delivery (an ad, a film's music, a voice change) writes no tag: the recipe goes beside the record.
+        await (await import('./recipe')).snapshotRecipe('job', record.id);
         return true;
       } catch (error) {
         console.error(`[montagio] job ${record.id}: the ${record.task} delivery failed`, error);
         return false;
       }
     }
+    // recipe.ts reads this module: imported when needed, not at load.
+    const recipeTags = async (kind: 'video' | 'image') => (await import('./recipe')).recipeTags('job', record.id, kind);
     try {
       if (step.output === 'video') {
         const out = join(dir, 'output.mp4');
         const demo = demoKindOf(outputPath);
         if (demo) record.demo = demo;
         // A clip FFmpeg moved (demo) keeps its own mention: no model made it.
-        await access(out).catch(() => (demo === 'moved' ? copyFile(outputPath, out) : tagClip(outputPath, out)));
+        await access(out).catch(async () => tagClip(outputPath, out, { ...(demo === 'moved' ? DEMO_MOVE_METADATA : {}), ...(await recipeTags('video')) }));
         const info = await probe(out);
         record.frames = Math.round(info.duration_s * info.fps);
         record.outputUrl = mediaUrlFor(out);
       } else if (step.output === 'image') {
         const out = join(dir, 'output.png');
-        await access(out).catch(() => tagImage(outputPath, out));
+        await access(out).catch(async () => tagImage(outputPath, out, { ...AI_IMAGE_METADATA, ...(await recipeTags('image')) }));
         const provenance = (await taskOf(record.task).imageOrigin?.(record)) ?? UNKNOWN_PROVENANCE;
         const upload = await saveUploadFromFile(out, provenance);
         record.outputImageRef = upload.imageRef;
         record.personal = provenance.personal;
         record.outputUrl = mediaUrlFor(join(getEnv().data, ...upload.imageRef.split('/')));
-      } else {
+      } else if (step.output === 'audio') {
         const out = join(dir, 'output.flac');
         await access(out).catch(() => tagAudio(outputPath, out));
+        record.outputUrl = mediaUrlFor(out);
+      } else {
+        // A JSON document (a transcription): data, not media, so no mention to write in it.
+        const out = join(dir, 'output.json');
+        await access(out).catch(() => copyFile(outputPath, out));
         record.outputUrl = mediaUrlFor(out);
       }
     } catch (error) {
@@ -267,6 +312,9 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
     const def = taskOf(task);
     const lib = await getServices().library;
     const prepared = await def.prepare(body, lib).catch((error: unknown) => compileFailure(error, task));
+    // The seed of a result reproduced: the same render again, on the same inputs.
+    const seed = replaySeed(body.seed);
+    if (seed !== undefined) prepared.seed = seed;
     try {
       await ensureTools();
     } catch (error) {
@@ -278,6 +326,7 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
       id: randomUUID(),
       task,
       ...prepared,
+      backendKind: getServices().backend.kind,
       steps: [],
       current: 0,
       state: 'queued',
@@ -410,6 +459,20 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
 /** The engine of the app, on its task table. */
 export const jobs = createJobEngine(TASKS);
 
+/**
+ * Change a finished job's record outside the engine (a captions export points its result to the new
+ * clip), under the job's lock so a poll does not write over it. Null for an unknown job.
+ */
+export function updateJob(id: string, change: (record: JobRecord) => void): Promise<JobRecord | null> {
+  return withLock(id, async () => {
+    const record = await readJob(id);
+    if (!record) return null;
+    change(record);
+    await saveJob(record);
+    return record;
+  });
+}
+
 const STATUS: Record<JobError['code'], number> = {
   'extension-disabled': 404,
   'invalid-input': 400,
@@ -420,6 +483,8 @@ const STATUS: Record<JobError['code'], number> = {
   'speech-too-long': 400,
   'speech-too-short': 400,
   'rights-required': 400,
+  'language-unsupported': 400,
+  'no-speech': 400,
 };
 
 /** The HTTP answer for a known failure of a job route, or null for an unexpected error. */

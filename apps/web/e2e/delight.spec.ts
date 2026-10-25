@@ -7,15 +7,35 @@ async function cameraWithSample(page: Page) {
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
 }
 
-test('render times read in minutes, and Quality and Fast say what they trade', async ({ page }) => {
+test('render times read in minutes, and Turbo, Quality and Fast say what they trade', async ({ page }) => {
   await cameraWithSample(page);
-  await expect(page.getByRole('button', { name: /^Generate/ })).toHaveText('Generate (~9 min)');
+  // Crash Push starts on the Turbo, which a GPU session validated for it.
+  await expect(page.getByRole('button', { name: /^Generate/ })).toHaveText('Generate (~1 min)');
   // By Generate, each tier with its time, and what the chosen one buys.
   const picker = page.getByRole('group', { name: 'Model' });
+  await expect(picker).toContainText('The same moves in 4 steps: a little less detail');
+  await picker.getByRole('radio', { name: /^Quality · ~9 min/ }).check({ force: true });
   await expect(picker).toContainText('Follows the move exactly');
+  await expect(page.getByRole('button', { name: /^Generate/ })).toHaveText('Generate (~9 min)');
   await expect(picker.getByRole('radio', { name: /^Fast · ~2 min/ })).toBeAttached();
   await picker.getByRole('radio', { name: /^Fast/ }).check({ force: true });
   await expect(picker).toContainText('Follows the move from its text');
+});
+
+test('each move starts on its own default model until the visitor picks one', async ({ page }) => {
+  await cameraWithSample(page);
+  const picker = page.getByRole('group', { name: 'Model' });
+  await expect(picker.getByRole('radio', { name: /^Turbo/ })).toBeChecked();
+  await page.getByRole('button', { name: 'Gallery', exact: true }).click();
+  // Rise & Push keeps the 20 steps: in 4 the subject leaves the frame.
+  await page.getByRole('button', { name: 'Rise & Push' }).click();
+  await expect(picker.getByRole('radio', { name: /^Quality/ })).toBeChecked();
+  await page.getByRole('button', { name: 'Slow Push' }).click();
+  await expect(picker.getByRole('radio', { name: /^Turbo/ })).toBeChecked();
+  // A choice of the visitor stays.
+  await picker.getByRole('radio', { name: /^Fast/ }).check({ force: true });
+  await page.getByRole('button', { name: 'Pan Left' }).click();
+  await expect(picker.getByRole('radio', { name: /^Fast/ })).toBeChecked();
 });
 
 test('while a clip renders, the slate counts, the tab title records, and the visitor may leave; then the clip is revealed', async ({ page }) => {
@@ -34,7 +54,7 @@ test('while a clip renders, the slate counts, the tab title records, and the vis
   await expect(page).toHaveTitle(/^● REC 2\s?%/);
   const slate = page.getByTestId('slate');
   await expect(slate).toContainText(/REC \d+:\d\d/);
-  await expect(slate).toContainText('~9 min left');
+  await expect(slate).toContainText('~1 min left');
   await expect(page.getByTestId('leave-hint')).toHaveText('You can leave this tab: the clip goes to History when it is ready.');
   // The camera plan keeps moving over the photo while the clip renders.
   await expect(page.locator('[class*="photoPlan"]')).toHaveAttribute('data-rendering', 'true');

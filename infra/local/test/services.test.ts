@@ -107,6 +107,13 @@ test('a full install starts the app with the extensions it installed, or none', 
   expect(app({ ...full, extensions: [] }).env.MONTAGIO_EXTENSIONS).toBe('none');
 });
 
+test('the 12 GB profile reaches the app as MONTAGIO_VRAM_PROFILE', () => {
+  const app = (state: InstallState) => specsOf(state).find((s) => s.name === 'app')!;
+  expect(app({ ...full, vramProfile: '12gb' }).env.MONTAGIO_VRAM_PROFILE).toBe('12gb');
+  expect(app({ ...full, vramProfile: 'standard' }).env.MONTAGIO_VRAM_PROFILE).toBeUndefined();
+  expect(app({ ...full, mode: 'app-only', vramProfile: '12gb' }).env.MONTAGIO_VRAM_PROFILE).toBeUndefined();
+});
+
 test('the app alone, or a state from before the extensions were recorded, keeps the user MONTAGIO_EXTENSIONS', () => {
   const app = (state: InstallState) => specsOf(state, { MONTAGIO_EXTENSIONS: 'all' }).find((s) => s.name === 'app')!;
   expect(app({ ...full, mode: 'app-only', extensions: ['edit'] }).env.MONTAGIO_EXTENSIONS).toBe('all');

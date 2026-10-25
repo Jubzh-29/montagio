@@ -3,6 +3,7 @@ import { compileImage, IMAGE_PROMPT_MAX, parseImageStyle, type Aspect, type Imag
 import { JobError } from '../errors';
 import { assertNoBlockedName } from '../guards';
 import type { TaskDef } from '../jobs';
+import { replaySeed } from '../inputs';
 
 /** The core text-to-image model (registry/models/z-image-turbo.yaml): not an extension, always on. */
 export const T2I_MODEL = 'z-image-turbo';
@@ -19,7 +20,7 @@ export const t2iTask: TaskDef = {
     await assertNoBlockedName(prompt);
     const model = lib.models.get(T2I_MODEL);
     if (!model) throw new Error(`the core model ${T2I_MODEL} is missing from registry/models`);
-    const seed = Number.isInteger(body.seed) && (body.seed as number) >= 0 ? (body.seed as number) : randomInt(0, 2 ** 32);
+    const seed = replaySeed(body.seed) ?? randomInt(0, 2 ** 32);
     return { inputs: { prompt, ...(Object.keys(style).length > 0 ? { style } : {}) }, label: { name: model.name }, modelId: model.id, seed, aspect };
   },
 

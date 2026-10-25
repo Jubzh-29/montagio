@@ -6,6 +6,7 @@ import type { CallToolResult, ServerNotification, ServerRequest } from '@modelco
 import { z } from 'zod';
 import { TERMINAL_STATES, type ExtensionsInfo, type RenderStatus, type MontagioClient, type UploadResult } from './client';
 import { messageFor, toFailure, ToolFailure } from './errors';
+import { HONESTY, loadRecipe, reproduce, withPhoto } from './reproduce';
 
 type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
@@ -13,6 +14,7 @@ type Extra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 export const TOOL_NAMES = [
   'list_camera_presets',
   'list_effects_and_hooks',
+  'list_motion_library',
   'upload_photo',
   'use_sample_photo',
   'text_to_image',
@@ -22,13 +24,26 @@ export const TOOL_NAMES = [
   'apply_hook',
   'talking_avatar',
   'motion_transfer',
+  'restyle_video',
+  'swap_object',
   'upscale_to_1080p',
   'get_job',
   'list_history',
   'get_workflow',
+  'get_recipe',
+  'reproduce',
 ] as const;
 
 const CODE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * The windows a motion transfer of `seconds` is sampled in, as motionWindows of @montagio/presets counts them
+ * (81 frames at 16 fps in one; past that, 21 latent frames overlapping by 8): what its time scales with.
+ */
+function motionWindowsOf(seconds: number): number {
+  const frames = Math.min(481, 4 * Math.ceil((Math.floor(seconds * 16) - 1) / 4) + 1);
+  return frames <= 81 ? 1 : Math.ceil(((frames - 1) / 4 + 1 - 21) / 13) + 1;
+}
 
 // ---------------------------------------------------------------- shared schemas
 
@@ -111,6 +126,17 @@ async function photoOf(client: MontagioClient, args: PhotoArgs, names = { ref: '
     return { imageRef: uploaded.imageRef, uploaded };
   }
   throw new ToolFailure('invalid-arguments', `Give the photo: ${names.ref} (from upload_photo, use_sample_photo, text_to_image…) or ${names.path} (a local image file).`);
+}
+
+/** The clip of a motion transfer, a restyle or a swap: a local file, an earlier videoRef, or a motion of the library. */
+type ClipArgs = { videoPath?: string; videoRef?: string; libraryMotion?: string };
+async function clipOf(client: MontagioClient, args: ClipArgs): Promise<{ videoRef: string; video?: Record<string, unknown> }> {
+  const given = [args.videoPath, args.videoRef, args.libraryMotion].filter(Boolean).length;
+  if (given > 1) throw new ToolFailure('invalid-arguments', 'Give one of videoPath, videoRef and libraryMotion.');
+  if (given === 0) throw new ToolFailure('invalid-arguments', 'Give the clip: videoPath (a local file), videoRef, or libraryMotion (list_motion_library).');
+  if (args.videoRef) return { videoRef: args.videoRef };
+  const made = args.videoPath ? await client.uploadVideo(args.videoPath) : await client.pickLibraryMotion(args.libraryMotion!);
+  return { videoRef: made.videoRef, video: { duration_s: made.duration_s, sourceDuration_s: made.sourceDuration_s, frames: made.frames, aspect: made.aspect } };
 }
 
 /** An estimate in seconds from GET /api/extensions; none when the app does not give one. */
@@ -209,7 +235,7 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
       description:
         'List what this installation renders beyond camera moves: the one-photo effects (Squish, Explode…) for apply_effect, the hooks (keyframe ' +
         'transitions; references: 2 means a second photo, an outfit) for apply_hook, the extensions switched on (edit, effects, transitions, avatar, ' +
-        'upscale, motion…), and the time estimates in seconds.',
+        'upscale, motion, restyle…), and the time estimates in seconds.',
       annotations: readOnly,
     },
     async () =>
@@ -240,9 +266,26 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
             }),
           ),
           estimates_s: info.estimates,
-          models: defined({ edit: info.editModel, avatar: info.avatarModel, upscale: info.upscaleModel, motion: info.motionModel }),
+          models: defined({ edit: info.editModel, avatar: info.avatarModel, upscale: info.upscaleModel, motion: info.motionModel, restyle: info.restyleModel, swap: info.swapModel }),
         });
       }),
+  );
+
+  server.registerTool(
+    'list_motion_library',
+    {
+      title: 'List the motion library',
+      description:
+        'List the reference motions of the library (a dance, jumping jacks, a ballet spin, a 30 s dance…): made by Montagio itself from ' +
+        'fictional characters, so no rights to clear. Give an id as libraryMotion to motion_transfer, restyle_video or swap_object.',
+      annotations: readOnly,
+    },
+    async () =>
+      guard(async () =>
+        (await client.motions()).map((motion) =>
+          defined({ id: motion.id, name: motion.name, description: motion.description, duration_s: motion.duration_s, previewUrl: client.absolute(motion.previewUrl) }),
+        ),
+      ),
   );
 
   server.registerTool(
@@ -484,14 +527,16 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
     {
       title: 'Motion transfer',
       description:
-        'Make the character of a photo move like a reference video (a dance, a gesture). The video is cut to its first 5 s, without sound. ' +
+        'Make the character of a photo move like a reference video (a dance, a gesture). The video is cut to its first 30 s, without sound; ' +
+        'past 5 s the render takes about that many times longer, window by window. ' +
         'Needs rights: true, the user\'s word that they hold the rights on the photo and the video; checked before anything is uploaded. ' +
         'Blocks until the clip is ready. Needs the motion extension.',
       inputSchema: {
         imageRef,
         path,
         videoPath: z.string().min(1).optional().describe('The reference video, a local MP4, WebM or MOV file (50 MB at most). Give this or videoRef.'),
-        videoRef: z.string().min(1).optional().describe('A reference video already uploaded (the videoRef of an earlier motion_transfer). Give this or videoPath.'),
+        videoRef: z.string().min(1).optional().describe('A reference video already uploaded (the videoRef of an earlier motion_transfer). Give one of videoPath, videoRef, libraryMotion.'),
+        libraryMotion: z.string().min(1).optional().describe('A motion of the library (an id from list_motion_library), generated from a fictional character.'),
         character: z.string().max(500).optional().describe('Who the character of the photo is, in a few words (optional).'),
         motion: z.string().max(500).optional().describe('What the character does in the video, in a few words (optional).'),
         rights: z
@@ -506,21 +551,18 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
       guard(async () => {
         // Nothing is sent without the user's word: the app would refuse the same way (rights-required).
         if (args.rights !== true) throw new ToolFailure('rights-required');
-        if (args.videoPath && args.videoRef) throw new ToolFailure('invalid-arguments', 'Give videoPath or videoRef, not both.');
-        if (!args.videoPath && !args.videoRef) throw new ToolFailure('invalid-arguments', 'Give the reference video: videoPath (a local file) or videoRef.');
         const photo = await photoOf(client, args);
-        let videoRef = args.videoRef;
-        let video: Record<string, unknown> = {};
-        if (args.videoPath) {
-          try {
-            const uploaded = await client.uploadVideo(args.videoPath);
-            videoRef = uploaded.videoRef;
-            video = { video: { duration_s: uploaded.duration_s, sourceDuration_s: uploaded.sourceDuration_s, frames: uploaded.frames, aspect: uploaded.aspect } };
-          } catch (error) {
-            throw annotate(error, { inputImageRef: photo.imageRef });
-          }
+        let clip: Awaited<ReturnType<typeof clipOf>>;
+        try {
+          clip = await clipOf(client, args);
+        } catch (error) {
+          throw annotate(error, { inputImageRef: photo.imageRef });
         }
-        const estimate_s = await estimateOf(client, (info) => info.estimates.motion);
+        const { videoRef } = clip;
+        const video = clip.video ? { video: clip.video } : {};
+        // A clip past one window of 5 s is sampled in context windows: the estimate scales with them.
+        const seconds = typeof clip.video?.duration_s === 'number' ? clip.video.duration_s : 5;
+        const estimate_s = await estimateOf(client, (info) => (info.estimates.motion === undefined ? undefined : info.estimates.motion * motionWindowsOf(seconds)));
         const more = { inputImageRef: photo.imageRef, videoRef, ...video, estimate_s };
         return render(client, extra, { timeoutMinutes: args.timeoutMinutes, more }, () =>
           client.startJob('/api/motion', {
@@ -535,11 +577,117 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
   );
 
   server.registerTool(
+    'restyle_video',
+    {
+      title: 'Restyle a video',
+      description:
+        'Rebuild the whole scene of a short clip from a text ("a snowy winter evening", "a watercolor painting"), keeping its motion, camera move ' +
+        'and timing. Its first 5 s are rebuilt, without sound. An optional image gives a look to follow; without one, the edit first ' +
+        'restyles the clip\'s first frame from the text (when the edit extension is on). Needs rights: true, the user\'s word that they hold the ' +
+        'rights on the clip and the image; checked before anything is uploaded. Blocks until the clip is ready. Needs the restyle extension.',
+      inputSchema: {
+        prompt: z.string().min(1).max(500).describe('What the scene becomes, in a few words.'),
+        videoPath: z.string().min(1).optional().describe('The clip, a local MP4, WebM or MOV file (50 MB at most). Give this or videoRef.'),
+        videoRef: z.string().min(1).optional().describe('A clip already uploaded (the videoRef of an earlier restyle_video or motion_transfer). Give one of videoPath, videoRef, libraryMotion.'),
+        libraryMotion: z.string().min(1).optional().describe('A motion of the library (an id from list_motion_library), generated from a fictional character.'),
+        imageRef: z.string().min(1).optional().describe('An image whose look to follow, already in the app (optional). Give this, path, or neither.'),
+        path: z.string().min(1).optional().describe('An image whose look to follow, a local file (optional). Give this, imageRef, or neither.'),
+        rights: z
+          .boolean()
+          .default(false)
+          .describe('The user holds the rights on the clip (and the image). Defaults to false. Set it to true only when the user has said so; never assume it.'),
+        timeoutMinutes,
+      },
+      annotations: renders,
+    },
+    async (args, extra) =>
+      guard(async () => {
+        // Nothing is sent without the user's word: the app would refuse the same way (rights-required).
+        if (args.rights !== true) throw new ToolFailure('rights-required');
+        const look = args.imageRef || args.path ? await photoOf(client, args) : undefined;
+        let clip: Awaited<ReturnType<typeof clipOf>>;
+        try {
+          clip = await clipOf(client, args);
+        } catch (error) {
+          throw look ? annotate(error, { inputImageRef: look.imageRef }) : error;
+        }
+        const { videoRef } = clip;
+        const video = clip.video ? { video: clip.video } : {};
+        // The restyle, and the edit of its first frame when there is no look image and the edit is on.
+        const estimate_s = await estimateOf(client, (info) =>
+          info.estimates.restyle === undefined ? undefined : info.estimates.restyle + (!look && info.extensions.includes('edit') ? (info.estimates.edit ?? 0) : 0),
+        );
+        const more = { ...(look ? { inputImageRef: look.imageRef } : {}), videoRef, ...video, estimate_s };
+        return render(client, extra, { timeoutMinutes: args.timeoutMinutes, more }, () =>
+          client.startJob('/api/restyle', { videoRef, prompt: args.prompt.trim(), ...(look ? { imageRef: look.imageRef } : {}), rights: args.rights }),
+        );
+      }),
+  );
+
+  // A point of the clip's first frame, in fractions of its width and height.
+  const point = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) });
+
+  server.registerTool(
+    'swap_object',
+    {
+      title: 'Swap an object in a video',
+      description:
+        'Replace one object of a short clip ("a red vintage motorbike", "a golden retriever"): the object the points mark on the clip\'s first ' +
+        'frame is followed through the clip by SAM 2.1, then redrawn; everything else stays as filmed. Its first 5 s are used, without sound. ' +
+        'An optional photo of the new object makes it more faithful; without one, the text alone draws it. Points are fractions of the first ' +
+        'frame (x from the left, y from the top, 0 to 1): one or a few on the object, and optionally on what is not it. Never replace a real ' +
+        'person in a real video without their consent. Needs rights: true, the user\'s word that they hold the rights on the clip and the photo ' +
+        'and that the people filmed agree; checked before anything is uploaded. Blocks until the clip is ready. Needs the swap extension.',
+      inputSchema: {
+        prompt: z.string().min(1).max(500).describe('What replaces the object, in a few words.'),
+        points: z.array(point).min(1).max(8).describe('Points on the object to replace, on the clip\'s first frame, in fractions of its width and height.'),
+        exclude: z.array(point).max(8).optional().describe('Points on what is not the object (optional), when the tracker would take too much.'),
+        videoPath: z.string().min(1).optional().describe('The clip, a local MP4, WebM or MOV file (50 MB at most). Give one of videoPath, videoRef, libraryMotion.'),
+        videoRef: z.string().min(1).optional().describe('A clip already uploaded (the videoRef of an earlier swap_object, restyle_video or motion_transfer).'),
+        libraryMotion: z.string().min(1).optional().describe('A motion of the library (an id from list_motion_library), generated from a fictional character.'),
+        imageRef: z.string().min(1).optional().describe('A photo of the new object, already in the app (optional). Give this, path, or neither.'),
+        path: z.string().min(1).optional().describe('A photo of the new object, a local file (optional). Give this, imageRef, or neither.'),
+        rights: z
+          .boolean()
+          .default(false)
+          .describe('The user holds the rights on the clip and the photo, and the people filmed agree. Defaults to false. Set it to true only when the user has said so; never assume it.'),
+        timeoutMinutes,
+      },
+      annotations: renders,
+    },
+    async (args, extra) =>
+      guard(async () => {
+        // Nothing is sent without the user's word: the app would refuse the same way (rights-required).
+        if (args.rights !== true) throw new ToolFailure('rights-required');
+        const photo = args.imageRef || args.path ? await photoOf(client, args) : undefined;
+        let clip: Awaited<ReturnType<typeof clipOf>>;
+        try {
+          clip = await clipOf(client, args);
+        } catch (error) {
+          throw photo ? annotate(error, { inputImageRef: photo.imageRef }) : error;
+        }
+        const { videoRef } = clip;
+        const video = clip.video ? { video: clip.video } : {};
+        const estimate_s = await estimateOf(client, (info) => info.estimates.swap);
+        const more = { ...(photo ? { inputImageRef: photo.imageRef } : {}), videoRef, ...video, estimate_s };
+        const body = {
+          videoRef,
+          prompt: args.prompt.trim(),
+          points: args.points,
+          ...(args.exclude?.length ? { exclude: args.exclude } : {}),
+          ...(photo ? { imageRef: photo.imageRef } : {}),
+          rights: args.rights,
+        };
+        return render(client, extra, { timeoutMinutes: args.timeoutMinutes, more }, () => client.startJob('/api/swap', body));
+      }),
+  );
+
+  server.registerTool(
     'upscale_to_1080p',
     {
       title: 'Upscale to 1080p',
       description:
-        'Make an HD 1080p copy of a finished clip: a camera_move clip, or an effect, hook, avatar or motion clip. The clip must be 121 frames at ' +
+        'Make an HD 1080p copy of a finished clip: a camera_move clip, or an effect, hook, avatar, motion or restyle clip. The clip must be 121 frames at ' +
         'most (upscale model\'s maxFrames in list_effects_and_hooks). Blocks until done. Needs the upscale extension.',
       inputSchema: {
         id: z.string().min(1).describe('The id of the finished clip (returned by the tool that made it, or from list_history).'),
@@ -677,6 +825,78 @@ export function registerTools(server: McpServer, client: MontagioClient): void {
           }
         }
         throw new ToolFailure('save-failed', `The output folder already holds 100 files named ${stem}*.json.`);
+      }),
+  );
+
+  server.registerTool(
+    'get_recipe',
+    {
+      title: 'Get the recipe',
+      description:
+        'Get the recipe of a render: the preset (or the remix YAML), the exact ComfyUI workflow and its sha256, the weight files with their lock sha256, ' +
+        'source and licence, the seed, texts and settings, the sha256 of each input (never the photo itself) and the versions of Montagio, ComfyUI and ' +
+        'the node packs. reproduce renders it again.',
+      inputSchema: {
+        id: z.string().min(1).describe('The id of the render (returned by the tool that made it, or from list_history).'),
+        kind: z.enum(['generation', 'job', 'sequence']).optional().describe('A camera clip, a job (photo, effect, hook, avatar, HD…) or a film. Found by its id when left out.'),
+      },
+      annotations: readOnly,
+    },
+    async (args) =>
+      guard(async () => {
+        const kinds = args.kind ? [args.kind] : (['generation', 'job', 'sequence'] as const);
+        for (const [index, kind] of kinds.entries()) {
+          try {
+            return await client.recipe(kind, args.id);
+          } catch (error) {
+            if (!(error instanceof ToolFailure) || error.code !== 'not-found' || index === kinds.length - 1) throw error;
+          }
+        }
+        throw new ToolFailure('not-found');
+      }),
+  );
+
+  server.registerTool(
+    'reproduce',
+    {
+      title: 'Reproduce a recipe',
+      description:
+        'Render a Montagio recipe again on this Montagio and its local ComfyUI: the same preset, texts, model and seed, on the photo the user gives (a recipe ' +
+        'never carries the photo, only its sha256). The recipe is a .json file, an MP4 or PNG Montagio exported (it carries a compact one), or the JSON ' +
+        'itself. Returns the render, sameInputs (each file given has the sha256 the recipe noted) and sameWorkflow (the workflow made here has the ' +
+        `recipe's sha256, step for step). ${HONESTY}`,
+      inputSchema: {
+        recipe: z
+          .union([z.string().min(1), z.record(z.string(), z.unknown())])
+          .describe('The recipe: a local .json, .mp4 or .png path (prefer an absolute path), or the recipe JSON from get_recipe.'),
+        photo: z.string().min(1).optional().describe('The photo to render on: a local image file (uploaded first) or an imageRef. It fills the photo the recipe asks for.'),
+        inputs: z
+          .record(z.string(), z.string().min(1))
+          .optional()
+          .describe('Other files the recipe names, by field ("image2Ref", "videoRef", "compose.place"…): a local path or a ref the app holds.'),
+        consent,
+        rights: z
+          .boolean()
+          .default(false)
+          .describe('For a motion transfer: the user holds the rights on the photo and the video. Set it only when the user has said so.'),
+        voiceConsent: z
+          .boolean()
+          .default(false)
+          .describe('For an avatar in someone\'s own voice (inputs.voiceRef): that person agreed. Set it only when the user has said so.'),
+        timeoutMinutes,
+      },
+      annotations: renders,
+    },
+    async (args, extra) =>
+      guard(async () => {
+        const recipe = await loadRecipe(args.recipe);
+        const inputs = args.photo ? withPhoto(recipe, args.inputs ?? {}, args.photo) : (args.inputs ?? {});
+        const result = await reproduce(
+          client,
+          { recipe, inputs, consent: args.consent, rights: args.rights, voiceConsent: args.voiceConsent },
+          { ...(args.timeoutMinutes ? { timeoutMs: args.timeoutMinutes * 60_000 } : {}), signal: extra.signal, onProgress: progressOf(extra) },
+        );
+        return finished(client, result.render, { sameInputs: result.sameInputs, sameWorkflow: result.sameWorkflow, stack: result.stack, note: result.note });
       }),
   );
 }

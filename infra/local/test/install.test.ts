@@ -215,6 +215,55 @@ test('a 4 GB GPU: a yes installs the app alone, no terminal stops', async () => 
   expect(accepted.events).toEqual(['startAll']);
 });
 
+test('a 12 GB GPU: the dry run points to --low-vram; a yes installs the 12 GB profile and keeps it', async () => {
+  const rtx3060 = facts({ gpus: [{ index: 0, name: 'NVIDIA GeForce RTX 3060', vramMiB: 12288, driver: '580.65' }] });
+  const dry = harness({ facts: rtx3060 });
+  expect(await install(repo, options({ dryRun: true }), dry.deps)).toBe(2);
+  expect(dry.output()).toContain('--low-vram');
+  expect(dry.calls).toEqual([]);
+
+  const questions: string[] = [];
+  const accepted = harness({ facts: rtx3060, ask: async (q) => (questions.push(q), true) });
+  expect(await install(repo, options({ start: false }), accepted.deps)).toBe(0);
+  expect(questions).toHaveLength(1);
+  expect(questions[0]).toContain('12 GB profile');
+  expect(accepted.output()).toContain('full install, 12 GB profile');
+  expect(readState(accepted.L.statePath)).toMatchObject({ mode: 'full', vramProfile: '12gb' });
+
+  // The next run (an update) keeps the profile without asking again.
+  const again = harness({ facts: rtx3060, ask: async (q) => (questions.push(q), false) });
+  expect(await install(repo, options({ start: false }), again.deps)).toBe(0);
+  expect(questions).toHaveLength(1);
+  expect(readState(again.L.statePath).vramProfile).toBe('12gb');
+
+  // A 24 GB card later: every model comes back.
+  const upgraded = harness();
+  expect(await install(repo, options({ start: false }), upgraded.deps)).toBe(0);
+  expect(readState(upgraded.L.statePath).vramProfile).toBe('standard');
+});
+
+test('--low-vram installs the 12 GB profile without asking, and only the extensions validated within 12 GB', async () => {
+  withMusicWeight(5);
+  writeFileSync(
+    join(repo, 'registry', 'models.lock.yaml'),
+    readFileSync(join(repo, 'registry', 'models.lock.yaml'), 'utf8') +
+      `  - id: tiny-effect\n    file: tiny_effect.safetensors\n    url: https://huggingface.co/Comfy-Org/x/resolve/main/split_files/vae/tiny_effect.safetensors\n` +
+      `    sha256: ${'b'.repeat(64)}\n    size: 5\n    license: Apache-2.0\n    source: https://huggingface.co/x/y\n    extension: effects\n`,
+  );
+  const config = join(repo, 'registry', 'extensions.yaml');
+  writeFileSync(config, readFileSync(config, 'utf8').replace(/gpu_validated: null/g, 'gpu_validated: 2026-10-21'));
+  const rtx4070 = facts({ gpus: [{ index: 0, name: 'NVIDIA GeForce RTX 4070', vramMiB: 12282, driver: '580.65' }] });
+  const notYet = harness({ facts: rtx4070 });
+  expect(await install(repo, options({ start: false, lowVram: true }), notYet.deps)).toBe(0);
+  expect(fetchedIds(notYet.calls).sort()).toEqual(['tiny-te', 'tiny-vae']);
+  expect(readState(notYet.L.statePath)).toMatchObject({ vramProfile: '12gb', extensions: [] });
+
+  writeFileSync(config, readFileSync(config, 'utf8').replace('priority: 2\n    gpu_validated: 2026-10-21', 'priority: 2\n    gpu_validated: 2026-10-21\n    low_vram_validated: 2026-10-25'));
+  const validated = harness({ facts: rtx4070 });
+  expect(await install(repo, options({ start: false, lowVram: true }), validated.deps)).toBe(0);
+  expect(readState(validated.L.statePath).extensions).toEqual(['effects']);
+});
+
 test('a full install runs every step and records it', async () => {
   const h = harness();
   expect(await install(repo, options(), h.deps)).toBe(0);
@@ -342,10 +391,11 @@ function withMusicWeight(size: number): void {
   );
   writeFileSync(
     join(repo, 'registry', 'extensions.yaml'),
-    ['schema: montagio/extensions@0.1', 'extensions:', ...['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion'].flatMap((id, i) => [
+    ['schema: montagio/extensions@0.1', 'extensions:', ...['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap'].flatMap((id, i) => [
         `  - id: ${id}`,
         `    priority: ${i + 1}`,
         ...(id === 'transitions' ? ['    requires: [edit]'] : []),
+        ...(id === 'swap' ? ['    requires: [restyle]'] : []),
         '    gpu_validated: null',
       ]),
       '',
@@ -406,6 +456,30 @@ test('the local installer leaves the avatar out, whose voice node it does not in
   expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
   expect(fetchedIds(h.calls).sort()).toEqual(['tiny-music', 'tiny-te', 'tiny-vae']);
   expect(h.output()).toMatch(/avatar.*infra\/runpod\/bootstrap\.sh/);
+});
+
+test('the local installer leaves the object swap out, whose SAM 2 node it does not install yet', async () => {
+  withMusicWeight(5);
+  writeFileSync(
+    join(repo, 'registry', 'models.lock.yaml'),
+    readFileSync(join(repo, 'registry', 'models.lock.yaml'), 'utf8') +
+      `  - id: tiny-sam2
+    file: tiny_sam2.safetensors
+    url: https://huggingface.co/Kijai/x/resolve/main/tiny_sam2.safetensors
+` +
+      `    sha256: ${'b'.repeat(64)}
+    size: 5
+    license: Apache-2.0
+    source: https://huggingface.co/x/y
+    extension: swap
+    folder: sam2
+`,
+  );
+  const h = harness();
+  expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
+  expect(fetchedIds(h.calls)).not.toContain('tiny-sam2');
+  expect(h.output()).toMatch(/object swap.*infra\/runpod\/bootstrap\.sh/);
+  expect(readState(h.L.statePath).extensions).not.toContain('swap');
 });
 
 test('a full install records the extensions it fetched, never the avatar, for the app to show', async () => {

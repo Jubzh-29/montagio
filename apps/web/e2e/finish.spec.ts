@@ -50,7 +50,7 @@ test('in demo mode, another photo is moved by FFmpeg, and the caption says so', 
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('ai-caption')).toHaveText(
-    /^Demo render: FFmpeg moves the photo, no model ran here\. With a GPU, Wan 2\.2 Fun Camera \(Apache-2\.0\) makes it\.$/,
+    /^Demo render: FFmpeg moves the photo, no model ran here\. With a GPU, Wan 2\.2 Fun Camera Turbo \(Apache-2\.0\) makes it\.$/,
   );
 });
 
@@ -90,14 +90,20 @@ test('the Open Stack row a caption links to is marked in ink, not in the lime of
 test.describe('on a 1440×900 screen', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test('Quality and Fast sit by Generate, each with its time', async ({ page }) => {
+  test('Quality, Turbo and Fast sit by Generate, each with its time', async ({ page }) => {
     await page.goto('/?tab=camera');
     const block = page.locator('[class*="generateBlock"]');
     // The pill (its radio is visually hidden) is on screen, beside Generate.
     // "2 min" holds a no-break space: \s matches it.
     await expect(block.locator('label').filter({ hasText: /^Fast · ~2\smin/ })).toBeInViewport();
-    await expect(block.getByRole('radio', { name: /^Quality · ~9 min/ })).toBeChecked();
+    await expect(block.locator('label').filter({ hasText: /^Turbo · ~1\smin/ })).toBeInViewport();
+    await expect(block.getByRole('radio', { name: /^Turbo · ~1 min/ })).toBeChecked();
+    await expect(block.getByRole('radio', { name: /^Quality · ~9 min/ })).toBeAttached();
     await block.getByRole('radio', { name: /^Fast/ }).check({ force: true });
     await expect(page.getByRole('button', { name: /^Generate/ })).toHaveText('Generate (~2 min)');
+    // Turbo says what its minute costs.
+    await block.getByRole('radio', { name: /^Turbo/ }).check({ force: true });
+    await expect(page.getByRole('button', { name: /^Generate/ })).toHaveText('Generate (~1 min)');
+    await expect(block).toContainText('The same moves in 4 steps: a little less detail');
   });
 });

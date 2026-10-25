@@ -41,9 +41,9 @@ test('an unknown limit is refused', () => {
   expect(() => parseExtensionModel(replaceOnce(music, 'max_chars: 300', 'max_chars: 300, fps: 16'), 'm.yaml')).toThrow(/limits/);
 });
 
-test('the config needs each of the 7 extensions exactly once', () => {
+test('the config needs each of the 9 extensions exactly once', () => {
   const parsed = parseExtensionsConfig(config, 'extensions.yaml');
-  expect(parsed.map((e) => e.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion']);
+  expect(parsed.map((e) => e.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
   expect(() => parseExtensionsConfig(replaceOnce(config, '- id: upscale', '- id: music'), 'e.yaml')).toThrow(/music.*once|upscale/);
   const withoutAvatar = config.slice(0, config.indexOf('  - id: avatar'));
   expect(() => parseExtensionsConfig(withoutAvatar, 'e.yaml')).toThrow(/avatar/);
@@ -54,12 +54,12 @@ test('two extensions cannot share a priority', () => {
 });
 
 test('gpu_validated is a date or null', () => {
-  expect(parseExtensionsConfig(config, 'e.yaml').map((e) => e.gpu_validated)).toEqual(['2026-10-22', null, '2026-10-22', null, '2026-10-22', null, null]);
+  expect(parseExtensionsConfig(config, 'e.yaml').map((e) => e.gpu_validated)).toEqual(['2026-10-22', null, '2026-10-22', null, '2026-10-22', null, null, null, null]);
   expect(() => parseExtensionsConfig(replaceOnce(config, 'gpu_validated: 2026-10-22', 'gpu_validated: yes'), 'e.yaml')).toThrow(/gpu_validated/);
 });
 
 test('an extension may require others, never itself', () => {
-  expect(parseExtensionsConfig(config, 'e.yaml').map((e) => e.requires)).toEqual([[], [], ['edit'], [], [], [], []]);
+  expect(parseExtensionsConfig(config, 'e.yaml').map((e) => e.requires)).toEqual([[], [], ['edit'], [], [], [], [], [], ['restyle']]);
   expect(() => parseExtensionsConfig(replaceOnce(config, 'requires: [edit]', 'requires: [karaoke]'), 'e.yaml')).toThrow(/requires/);
   expect(() => parseExtensionsConfig(replaceOnce(config, 'requires: [edit]', 'requires: [transitions]'), 'e.yaml')).toThrow(/transitions.*itself/);
 });
@@ -78,7 +78,7 @@ describe('enabledExtensions', () => {
     expect(enabledExtensions(editNotValidated, 'validated')).toEqual(['music']);
   });
   test('all and none', () => {
-    expect(enabledExtensions(parsed, 'all')).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion']);
+    expect(enabledExtensions(parsed, 'all')).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
     expect(enabledExtensions(parsed, 'none')).toEqual([]);
   });
   test('a list, in priority order whatever its own order', () => {
@@ -125,4 +125,25 @@ test('a lock entry may pin the git blob id of a small file Hugging Face keeps ou
   const sha1 = 'd27fb3f2fd38ca39b7bbfbf83a13b3c617e551df';
   expect(parseLock(`${lock}    git_sha1: ${sha1}\n`, 'l.yaml')[0]?.git_sha1).toBe(sha1);
   expect(() => parseLock(`${lock}    git_sha1: d27fb3f2\n`, 'l.yaml')).toThrow(/git_sha1/);
+});
+
+const WORDS_MODEL = `schema: montagio/extension-model@0.1
+id: whisper-turbo-words
+name: Whisper large-v3 turbo (captions)
+extension: avatar
+task: a2t-words
+license: MIT
+weights: [whisper-turbo-model]
+workflow: workflows/whisper-words.api.json
+bindings:
+  audio: { node: "1", field: audio }
+  language: { node: "2", field: language }
+output: { node: "3", kind: file }
+estimate_s: 8
+`;
+
+test('a2t-words: the words of a speech, as a JSON file, need the audio and the language', () => {
+  expect(parseExtensionModel(WORDS_MODEL, 'w.yaml')).toMatchObject({ task: 'a2t-words', output: { node: '3', kind: 'file' } });
+  expect(() => parseExtensionModel(replaceOnce(WORDS_MODEL, /  language: .*\n/, ''), 'w.yaml')).toThrow(/binding "language" is required by task "a2t-words"/);
+  expect(() => parseExtensionModel(replaceOnce(WORDS_MODEL, 'kind: file', 'kind: audio'), 'w.yaml')).toThrow(/output\.kind.*a2t-words.*file/);
 });

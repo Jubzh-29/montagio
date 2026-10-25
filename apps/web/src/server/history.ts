@@ -2,12 +2,13 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Library } from '@montagio/presets';
 import { TERMINAL_STATES, type HistoryItem, type JobState, type Reprise } from '@/lib/api-types';
+import { recipeUrlOf, type RecipeSource } from '@/lib/recipe-url';
 import { getEnv } from './env';
 import { getGeneration } from './generations';
 import { jobs, type JobRecord } from './jobs';
 import { advanceSequence, readSequence, type SequenceRecord } from './sequences';
 import { getServices } from './services';
-import type { GenerationRecord } from './store';
+import { readRecord, type GenerationRecord } from './store';
 import { readUploadMeta, readVideoMeta } from './uploads';
 
 export const HISTORY_LIMIT = 200;
@@ -80,7 +81,9 @@ async function fromGeneration(lib: Library, record: GenerationRecord): Promise<H
       modelId: record.modelId,
       ...(record.userPrompt ? { prompt: record.userPrompt } : {}),
       ...(record.remix ? { remixGenerationId: record.id } : {}),
+      seed: record.seed,
     },
+    recipeUrl: recipeUrlOf('generation', record.id),
   };
 }
 
@@ -100,8 +103,13 @@ async function fromSequence(lib: Library, record: SequenceRecord): Promise<Histo
       tab: 'film',
       ...(await photo(record.imageRef)),
       ...(modelId ? { modelId } : {}),
-      shots: record.shots.map((shot) => ({ presetId: shot.presetId, ...(shot.userPrompt ? { prompt: shot.userPrompt } : {}) })),
+      shots: record.shots.map((shot) => ({
+        presetId: shot.presetId,
+        ...(shot.userPrompt ? { prompt: shot.userPrompt } : {}),
+        ...(shot.seed !== undefined ? { seed: shot.seed } : {}),
+      })),
     },
+    recipeUrl: recipeUrlOf('sequence', record.id),
   };
 }
 
@@ -127,6 +135,7 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
     createdAt: record.createdAt,
     previewUrl: record.outputUrl!,
     downloadUrl: record.outputUrl!,
+    recipeUrl: recipeUrlOf('job', record.id),
   };
   switch (record.task) {
     case 't2i':
@@ -155,6 +164,7 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
           ...(await photo(typeof record.inputs.imageRef === 'string' ? record.inputs.imageRef : undefined)),
           effectId: String(record.inputs.effectId),
           ...(record.inputs.subject ? { prompt: String(record.inputs.subject) } : {}),
+          seed: record.seed,
         },
       };
     case 'hook':
@@ -166,6 +176,7 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
           tab: 'effects',
           ...(await photo(typeof record.inputs.imageRef === 'string' ? record.inputs.imageRef : undefined)),
           hookId: String(record.inputs.hookId),
+          seed: record.seed,
         },
       };
     case 'avatar':
@@ -178,6 +189,7 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
           ...(await photo(typeof record.inputs.imageRef === 'string' ? record.inputs.imageRef : undefined)),
           prompt: String(record.inputs.text),
           language: record.inputs.language === 'fr' ? 'fr' : 'en',
+          seed: record.seed,
         },
       };
     case 'music': {
@@ -204,6 +216,40 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
           ...((await readVideoMeta(videoRef)) ? { videoRef } : {}),
           ...(record.inputs.character ? { prompt: String(record.inputs.character) } : {}),
           ...(record.inputs.motion ? { motion: String(record.inputs.motion) } : {}),
+          seed: record.seed,
+        },
+      };
+    }
+    case 'restyle': {
+      // Reuse reopens the Motion tab in its restyle mode: the clip, the text, and the look image if any.
+      const videoRef = typeof record.inputs.videoRef === 'string' ? record.inputs.videoRef : '';
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'restyle',
+        reprise: {
+          tab: 'motion',
+          restyle: true,
+          ...(typeof record.inputs.imageRef === 'string' ? await photo(record.inputs.imageRef) : {}),
+          ...((await readVideoMeta(videoRef)) ? { videoRef } : {}),
+          prompt: String(record.inputs.prompt),
+        },
+      };
+    }
+    case 'swap': {
+      // Reuse reopens the Motion tab in its swap mode: the clip, the text, and the new object's photo if
+      // any. The object is marked again: the points belong to the frame as it was painted.
+      const videoRef = typeof record.inputs.videoRef === 'string' ? record.inputs.videoRef : '';
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'swap',
+        reprise: {
+          tab: 'motion',
+          swap: true,
+          ...(typeof record.inputs.imageRef === 'string' ? await photo(record.inputs.imageRef) : {}),
+          ...((await readVideoMeta(videoRef)) ? { videoRef } : {}),
+          prompt: String(record.inputs.prompt),
         },
       };
     }
@@ -216,6 +262,19 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
     case 'ad':
       // A ready-to-post ad: Reuse goes back to the Effects wall with its effect chosen.
       return { ...base, kind: 'clip', task: 'ad', reprise: { tab: 'effects', effectId: String(record.inputs.effectId) } };
+    case 'captions': {
+      // A transcription alone is not a result; its 9:16 export is a clip of its own, made from the talking clip.
+      if (!record.outputUrl?.endsWith('.mp4')) return null;
+      const parent = await parentItem(lib, record.parent);
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'captions',
+        name: parent ? `${parent.name} · 9:16 captions` : base.name,
+        reprise: parent?.reprise ?? { tab: 'avatar' },
+        ...(parent?.recipeUrl ? { reproduces: parent.recipeUrl } : {}),
+      };
+    }
     case 'upscale': {
       // An HD clip is a clip of its own; Reuse reopens the setup of the clip it was made from.
       const parent = await parentItem(lib, record.parent);
@@ -225,11 +284,28 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
         task: 'upscale',
         name: parent ? `${parent.name} · HD` : base.name,
         reprise: parent?.reprise ?? { tab: 'camera' },
+        ...(parent?.recipeUrl ? { reproduces: parent.recipeUrl } : {}),
       };
     }
     default:
       return null;
   }
+}
+
+/** The history item of one record, finished or not (the recipe of a render being delivered reads it too); null if unknown. */
+export async function historyItem(source: RecipeSource, id: string): Promise<HistoryItem | null> {
+  const lib = await getServices().library;
+  // As stored: moving a render forward here would deliver it again from inside its own delivery.
+  if (source === 'generation') {
+    const record = await readRecord(id);
+    return record ? fromGeneration(lib, record) : null;
+  }
+  if (source === 'sequence') {
+    const record = await readSequence(id);
+    return record ? fromSequence(lib, record) : null;
+  }
+  const record = await jobs.read(id);
+  return record ? fromJob(lib, record) : null;
 }
 
 /** What was made, newest first: finished items only, films whole (their shots are not listed apart). */

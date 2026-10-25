@@ -1,0 +1,35 @@
+# Captions (extension "avatar", 2026-10-25): the words of a talking clip with the moment each one is
+# said, for the word-by-word captions of the 9:16 export. Whisper large-v3 turbo (MIT, openai) runs in
+# the Montagio Transcribe Words node of the pack (comfy-nodes), on transformers, which ComfyUI already
+# needs: no other node pack. The core Save Text node writes the words as JSON (comfy-api-proxy types it
+# "file"). The app sends the speech as mono FLAC at 16 kHz; "auto" lets Whisper detect the language.
+# Optional within the extension: a ComfyUI without the node or the folder hides the captions only.
+schema: montagio/extension-model@0.1
+id: whisper-turbo-words
+name: Whisper large-v3 turbo (captions)
+extension: avatar
+task: a2t-words
+license: MIT
+weights:
+  - whisper-turbo-model
+  - whisper-turbo-config
+  - whisper-turbo-generation-config
+  - whisper-turbo-preprocessor-config
+  - whisper-turbo-tokenizer
+  - whisper-turbo-tokenizer-config
+  - whisper-turbo-vocab
+  - whisper-turbo-merges
+  - whisper-turbo-added-tokens
+  - whisper-turbo-special-tokens-map
+  - whisper-turbo-normalizer
+workflow: workflows/whisper-words.api.json
+bindings:
+  # the speech: mono FLAC at 16 kHz, as the app prepares it
+  audio: { node: "1", field: audio }
+  language: { node: "2", field: language }
+output: { node: "3", kind: file }
+# the talking clips last 30 s at most; Whisper reads 30 s windows
+limits: { max_duration_s: 60 }
+# GPU seconds for 15 s of speech, the model loading included: an estimate (a CPU run is measured in
+# docs/BUILD_NOTES.md; no GPU session ran it)
+estimate_s: 8

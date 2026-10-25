@@ -293,25 +293,45 @@ export function compileEdit(
  * together by the edit in one coherent photo. The place comes first, as image 1: its frame
  * is the output's; then who, then what.
  */
-export const COMPOSE_ROLES = ['location', 'character', 'product'] as const;
+export const COMPOSE_ROLES = ['location', 'character', 'outfit', 'product'] as const;
 export type ComposeRole = (typeof COMPOSE_ROLES)[number];
+/**
+ * The order of the edit's images: the product before the outfit, as image 2 rather than 3, where the
+ * edit keeps an object closer to itself (as image 3 beside an outfit, a toy car became a bottle, then
+ * a phone, on 2026-10-24).
+ */
+const COMPOSE_IMAGE_ORDER: readonly ComposeRole[] = ['location', 'character', 'product', 'outfit'];
 export type ComposeRefs = Partial<Record<ComposeRole, string>>;
 
-/** The instruction for the roles in image order. */
-export function composeInstruction(order: readonly ComposeRole[]): string {
+/** The edit takes three images at most: a composition is two or three of the four roles. */
+const COMPOSE_MAX = 3;
+
+/**
+ * The instruction for the roles in image order. An outfit is worn by the character, who then keeps
+ * only its face and hair. `fullBody` (a motion transfer animates the whole figure) asks for the
+ * character from head to feet; without it, the instructions the effects were validated with stay.
+ */
+export function composeInstruction(order: readonly ComposeRole[], opts: { fullBody?: boolean } = {}): string {
   const n = (role: ComposeRole) => `image ${order.indexOf(role) + 1}`;
   const has = (role: ComposeRole) => order.includes(role);
   const keep = [
-    has('character') ? "the character's face, hair and outfit" : '',
-    has('product') ? "the product's exact shape, colors and label" : '',
+    has('character') ? (has('outfit') ? "the character's face and hair" : "the character's face, hair and outfit") : '',
+    has('outfit') ? "the outfit's cut, colors and fabric" : '',
+    // With an outfit (a motion's character), the product is any object in hand: "label" made the edit draw a bottle.
+    has('product') ? (has('outfit') ? "the object's exact shape and colors" : "the product's exact shape, colors and label") : '',
     has('location') ? "the place's look" : '',
   ].filter(Boolean);
   const keeps = `Keep ${keep.length > 1 ? `${keep.slice(0, -1).join(', ')} and ${keep.at(-1)}` : keep[0]}.`;
+  const holding = has('product') ? (has('outfit') ? `, holding in one hand the very object of ${n('product')}` : `, holding the product from ${n('product')}`) : '';
+  const body = opts.fullBody ? ', seen full body from head to feet' : '';
   let scene: string;
   if (has('character') && has('location')) {
-    scene = `Show the character from ${n('character')} in the place of ${n('location')}${has('product') ? `, holding the product from ${n('product')}` : ''}.`;
+    const wearing = has('outfit') ? `, wearing the outfit from ${n('outfit')},` : '';
+    scene = `Show the character from ${n('character')}${wearing} in the place of ${n('location')}${holding}${body}.`;
+  } else if (has('character') && has('outfit')) {
+    scene = `Show the character from ${n('character')} wearing the outfit from ${n('outfit')}${holding}${body}, in a simple setting.`;
   } else if (has('character')) {
-    scene = `Show the character from ${n('character')} holding the product from ${n('product')}, in a simple setting.`;
+    scene = `Show the character from ${n('character')} holding the product from ${n('product')}${body}, in a simple setting.`;
   } else {
     scene = `Place the product from ${n('product')} in the place of ${n('location')}, as the hero of the shot.`;
   }
@@ -319,20 +339,32 @@ export function composeInstruction(order: readonly ComposeRole[]): string {
   return `${scene} ${keeps}${light} Photorealistic, one coherent photo.`;
 }
 
-/** The start photo of an effect composed from two or three references; `order` says which file goes to image 1, 2, 3. */
+/**
+ * A photo composed from two or three references (a place, a character, an outfit, a product); `order`
+ * says which file goes to image 1, 2, 3. An effect animates it; a motion transfer asks it full body.
+ */
 export function compileCompose(
   model: ExtensionModel,
   template: ApiWorkflow,
-  inputs: { refs: ComposeRefs; seed: number; fast?: boolean },
+  inputs: { refs: ComposeRefs; seed: number; fast?: boolean; fullBody?: boolean },
   lock: ReadonlyMap<string, LockEntry>,
 ): ExtensionCompiled<{ instruction: string; seed: number; fast: boolean; look: EditLook | null }> & { order: ComposeRole[] } {
-  const order = COMPOSE_ROLES.filter((role) => Boolean(inputs.refs[role]));
+  const order = COMPOSE_IMAGE_ORDER.filter((role) => Boolean(inputs.refs[role]));
   if (order.length < 2) throw new CompileError('a composed start photo needs two of a place, a character and a product');
+  if (order.length > COMPOSE_MAX) throw new CompileError(`a composition takes three references at most, not ${order.length}`);
+  if (order.includes('outfit') && !order.includes('character')) throw new CompileError('an outfit needs a character to wear it');
   const [first, second, third] = order.map((role) => inputs.refs[role]!);
   const compiled = compileEdit(
     model,
     template,
-    { imageRef: first!, image2Ref: second, ...(third ? { image3Ref: third } : {}), instruction: composeInstruction(order), seed: inputs.seed, fast: inputs.fast ?? true },
+    {
+      imageRef: first!,
+      image2Ref: second,
+      ...(third ? { image3Ref: third } : {}),
+      instruction: composeInstruction(order, { fullBody: inputs.fullBody ?? false }),
+      seed: inputs.seed,
+      fast: inputs.fast ?? true,
+    },
     lock,
   );
   return { ...compiled, order };
@@ -380,6 +412,23 @@ export function compileVoiceChange(
   if (!inputs.audioRef || !inputs.voiceRef) throw new CompileError('a voice change needs the speech and the voice sample');
   const workflow = bindExtension(model, template, { audio: inputs.audioRef, voice: inputs.voiceRef });
   return { workflow, output: { ...model.output }, params: { ...inputs } };
+}
+
+/**
+ * The words of a speech (Whisper large-v3 turbo in the Montagio Transcribe Words node): the speech as
+ * the app prepares it (mono FLAC, 16 kHz), and "auto" for Whisper to detect the language, or the code
+ * of a language to impose. Which languages captions are made in is the app's rule, not the compiler's.
+ */
+export function compileTranscribe(
+  model: ExtensionModel,
+  template: ApiWorkflow,
+  inputs: { audioRef: string; language: string },
+): ExtensionCompiled<{ language: string }> {
+  expectTask(model, 'a2t-words');
+  if (!inputs.audioRef) throw new CompileError('a transcription needs the speech');
+  if (inputs.language !== 'auto' && !/^[a-z]{2,3}$/.test(inputs.language)) throw new CompileError(`language "${inputs.language}" is not a language code`);
+  const workflow = bindExtension(model, template, { audio: inputs.audioRef, language: inputs.language });
+  return { workflow, output: { ...model.output }, params: { language: inputs.language } };
 }
 
 export type SpeechInputs = {

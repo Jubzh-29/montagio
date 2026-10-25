@@ -88,6 +88,29 @@ test('decide offers the app alone when only the GPU fails, and stops otherwise',
   expect(decide(evaluate(facts(), ctx), 'full')).toEqual({ kind: 'proceed', mode: 'full' });
 });
 
+test('a 12 to 20 GB card: the 12 GB profile is offered instead of the app alone', () => {
+  for (const vram of [12288, 16376]) {
+    const checks = evaluate(facts({ gpus: [gpu(vram, 0, 'NVIDIA GeForce RTX 3060')] }), ctx);
+    expect(byId(checks, 'gpu')).toMatchObject({ severity: 'fail', offer: 'low-vram' });
+    expect(byId(checks, 'gpu')!.fix).toContain('--low-vram');
+    expect(decide(checks, 'full')).toMatchObject({ kind: 'offer-low-vram' });
+  }
+  // a GPU under 11 GiB still gets the app alone
+  expect(decide(evaluate(facts({ gpus: [gpu(10240)] }), ctx), 'full')).toMatchObject({ kind: 'offer-app-only' });
+});
+
+test('in the 12 GB profile a 12 GB card passes, and a GPU under 11 GiB does not', () => {
+  const lowVram = { ...ctx, profile: '12gb' as const };
+  expect(byId(evaluate(facts({ gpus: [gpu(12288)] }), lowVram), 'gpu')).toMatchObject({ severity: 'ok', message: expect.stringContaining('12 GB profile') });
+  expect(byId(evaluate(facts(), lowVram), 'gpu')).toMatchObject({ severity: 'ok', message: expect.stringContaining('--low-vram') });
+  expect(decide(evaluate(facts({ gpus: [gpu(8192)] }), lowVram), 'full')).toMatchObject({ kind: 'offer-app-only' });
+});
+
+test('the 12 GB profile is offered only when nothing but the GPU fails', () => {
+  const checks = evaluate(facts({ gpus: [gpu(12288)], pythons: [] }), ctx);
+  expect(decide(checks, 'full')).toMatchObject({ kind: 'offer-app-only' });
+});
+
 test('decide still offers the app alone when full-mode checks fail beside the GPU', () => {
   // A 4 GB laptop: no room for 70 GB of weights, no Python in range, yet the app alone fits.
   const checks = evaluate(facts({ gpus: [gpu(4096)], pythons: [], freeBytes: { installDir: 40 * GiB, repo: 40 * GiB } }), ctx);

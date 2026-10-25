@@ -26,7 +26,9 @@ import {
   previewClip,
   probe,
   probeAudio,
+  readSentTags,
   readTags,
+  RECIPE_TAG,
   replaceAudio,
   SequenceToolError,
   SHOWCASE_COLOUR,
@@ -77,6 +79,12 @@ test('extractLastFrame writes a PNG of the clip size', async () => {
   expect(await probe(png)).toMatchObject({ width: 832, height: 480 });
 }, FFMPEG_TEST_TIMEOUT_MS);
 
+test('extractFirstFrame writes a PNG of the clip size', async () => {
+  const png = join(dir, 'first.png');
+  await extractFirstFrame(clipA, png);
+  expect(await probe(png)).toMatchObject({ width: 832, height: 480 });
+}, FFMPEG_TEST_TIMEOUT_MS);
+
 test('concat of three 2 s clips lasts about 6 s', async () => {
   const film = join(dir, 'film.mp4');
   await concatClips([clipA, clipB, clipA], film, { width: 832, height: 480 }, 16);
@@ -105,6 +113,33 @@ test('tagClip writes the AI-generated mention and drops the source tags', async 
   expect(tags).toMatchObject(AI_METADATA);
   expect(tags.title).toBeUndefined();
   expect(await probe(tagged)).toMatchObject({ width: 832, height: 480 });
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('tagClip writes a recipe beside the mention, which stays as it is', async () => {
+  const tagged = join(dir, 'tagged-recipe.mp4');
+  await tagClip(clipWithTitle, tagged, { [RECIPE_TAG.video]: '{"schema":"montagio/recipe@1","seed":7}' });
+  const tags = await readTags(tagged);
+  expect(tags).toMatchObject(AI_METADATA);
+  expect(tags.synopsis).toBe('{"schema":"montagio/recipe@1","seed":7}');
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('the film and its 9:16 cut can carry the recipe too', async () => {
+  const film = join(dir, 'recipe-film.mp4');
+  const vertical = join(dir, 'recipe-vertical.mp4');
+  const tags = { ...AI_METADATA, [RECIPE_TAG.video]: '{"seed":8}' };
+  await concatClips([clipA, clipB], film, { width: 832, height: 480 }, 16, { tags });
+  await exportVertical(film, vertical, { tags });
+  for (const file of [film, vertical]) expect((await readTags(file)).synopsis, file).toBe('{"seed":8}');
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('the tags of a file from anywhere are read from that file alone: a list named .mp4 is refused', async () => {
+  const tagged = join(dir, 'sent-recipe.mp4');
+  await tagClip(clipA, tagged, { [RECIPE_TAG.video]: '{"seed":9}' });
+  expect((await readSentTags(tagged)).synopsis).toBe('{"seed":9}');
+  // An ffconcat list would make FFmpeg open the files it names: the tags of another clip.
+  const list = join(dir, 'sent-list.mp4');
+  writeFileSync(list, ['ffconcat version 1.0', 'file sent-recipe.mp4', ''].join('\n'));
+  await expect(readSentTags(list)).rejects.toThrow(SequenceToolError);
 }, FFMPEG_TEST_TIMEOUT_MS);
 
 test('a WebM clip is remuxed to an MP4 carrying the mention', async () => {

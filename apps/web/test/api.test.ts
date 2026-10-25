@@ -167,7 +167,7 @@ describe('generations', () => {
     expect(res.status).toBe(201);
     expect(await res.json()).toMatchObject({
       presetId: 'crash-push',
-      modelId: 'wan22-i2v-a14b-fun-camera',
+      modelId: 'wan22-i2v-a14b-fun-camera-turbo',
       aspect: '16:9',
       state: 'queued',
       backendKind: 'demo',
@@ -329,7 +329,7 @@ describe('downloads and catalog', () => {
   test('presets list exposes ids, names and poses', async () => {
     const list = await (await getPresets()).json();
     expect(list).toContainEqual(
-      expect.objectContaining({ id: 'crash-push', name: 'Crash Push', poses: ['zoom_in'], defaultModel: 'wan22-i2v-a14b-fun-camera' }),
+      expect.objectContaining({ id: 'crash-push', name: 'Crash Push', poses: ['zoom_in'], defaultModel: 'wan22-i2v-a14b-fun-camera-turbo' }),
     );
   });
 
@@ -376,7 +376,8 @@ describe('downloads and catalog', () => {
 
   test('models list exposes licenses', async () => {
     const list = await (await getModels()).json();
-    expect(list.map((m: { license: string }) => m.license)).toEqual(['Apache-2.0', 'Apache-2.0', 'Apache-2.0']);
+    expect(list.map((m: { license: string }) => m.license)).toEqual(['Apache-2.0', 'Apache-2.0', 'Apache-2.0', 'Apache-2.0']);
+    expect(list.map((m: { tier: string }) => m.tier)).toEqual(['quality', 'turbo', 'fast', 'fast']);
   });
 
   test('open-stack report is ok for the repository', async () => {

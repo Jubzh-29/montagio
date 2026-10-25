@@ -66,8 +66,8 @@ function EntryCard({ entry, paused, onRemove }: { entry: CommunityEntry; paused:
         </Link>
         {mine && !IS_SHOWCASE && (
           <>
-            <a className={styles.action} href={`/api/community/${encodeURIComponent(entry.id)}/recipe`} download>
-              {t('communityRecipe')}
+            <a className={styles.action} href={`/api/community/${encodeURIComponent(entry.id)}/share`} download>
+              {t('communityShareFile')}
             </a>
             <button
               type="button"
@@ -85,7 +85,7 @@ function EntryCard({ entry, paused, onRemove }: { entry: CommunityEntry; paused:
   );
 }
 
-/** The community gallery: creations with their settings, remixed in one click; recipes in and out as files. */
+/** The community gallery: creations with their settings, remixed in one click; share files in and out. */
 export function CommunityPage() {
   const { t } = useI18n();
   const [entries, setEntries] = useState<CommunityEntry[] | null>(null);
@@ -105,12 +105,12 @@ export function CommunityPage() {
     };
   }, []);
 
-  const importRecipe = async (file: File | undefined) => {
+  const importShared = async (file: File | undefined) => {
     if (!file) return;
     setImportState('busy');
     try {
-      const recipe = JSON.parse(await file.text()) as unknown;
-      const res = await apiFetch('/api/community/import', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(recipe) });
+      const shared = JSON.parse(await file.text()) as unknown;
+      const res = await apiFetch('/api/community/import', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(shared) });
       const entry = await jsonOrThrow<CommunityEntry>(res);
       setEntries((current) => [entry, ...(current ?? [])]);
       setFilter('all');
@@ -139,17 +139,17 @@ export function CommunityPage() {
         {!IS_SHOWCASE && (
           <div className={own.importRow}>
             <input
-              id="recipe-input"
+              id="share-input"
               className="visually-hidden"
               type="file"
               accept="application/json,.json"
               disabled={importState === 'busy'}
               onChange={(event) => {
-                void importRecipe(event.target.files?.[0]);
+                void importShared(event.target.files?.[0]);
                 event.target.value = '';
               }}
             />
-            <label htmlFor="recipe-input" className={styles.action} aria-disabled={importState === 'busy' || undefined}>
+            <label htmlFor="share-input" className={styles.action} aria-disabled={importState === 'busy' || undefined}>
               {t('communityImport')}
             </label>
             <p className={own.hint} role="status">

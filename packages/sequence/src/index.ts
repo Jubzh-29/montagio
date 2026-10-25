@@ -1,5 +1,7 @@
 export {
   AI_METADATA,
+  captionFrame,
+  type CaptionLayer,
   concatClips,
   concatCopy,
   decodeCheck,
@@ -7,9 +9,11 @@ export {
   exportVertical,
   extractFirstFrame,
   extractLastFrame,
+  extractSpeech,
   headerHash,
   mixMusic,
   normalizeClip,
+  outputFps,
   overlayImage,
   moodboardSheet,
   MOODBOARD_TILE,
@@ -22,7 +26,9 @@ export {
   withJpegComment,
   probe,
   probeAudio,
+  readSentTags,
   readTags,
+  renderVertical,
   replaceAudio,
   SequenceToolError,
   SHOWCASE_COLOUR,
@@ -31,5 +37,5 @@ export {
   tagClip,
   type ZoompanExpr,
 } from './ffmpeg';
-export { AI_AUDIO_METADATA, AI_IMAGE_METADATA, DEMO_MOVE_METADATA, metadataArgs, PLACEHOLDER_METADATA, type VideoTags } from './tags';
+export { AI_AUDIO_METADATA, AI_IMAGE_METADATA, DEMO_MOVE_METADATA, metadataArgs, PLACEHOLDER_METADATA, RECIPE_TAG, type VideoTags } from './tags';
 export { ImageTagError, readImageTags, tagImage } from './image-tags';

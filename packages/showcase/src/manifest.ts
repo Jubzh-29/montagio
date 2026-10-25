@@ -190,6 +190,8 @@ export async function loadManifest(root: string): Promise<Manifest> {
 export const clipFile = (preset: string, sample: string) => `clips/${preset}--${sample}.mp4`;
 export const verticalFile = (preset: string, sample: string) => `clips/${preset}--${sample}.9x16.mp4`;
 export const workflowFile = (preset: string, sample: string) => `workflows/${preset}--${sample}.json`;
+/** The recipe of a rendered clip (@montagio/recipe), shown by its Recipe panel and saved from it. */
+export const recipeFile = (preset: string, sample: string) => `recipes/${preset}--${sample}.json`;
 export const effectFile = (effect: string, sample: string) => `effects/${effect}--${sample}.mp4`;
 export const hookFile = (hook: string, sample: string) => `hooks/${hook}--${sample}.mp4`;
 export const exampleWorkflowFile = (kind: 'effect' | 'hook', id: string, sample: string) => `workflows/${kind}-${id}--${sample}.json`;

@@ -20,6 +20,8 @@ const FUNCTION_TITLES: Record<StackFunction, MessageKey> = {
   music: 'stackMusic',
   hd: 'stackHd',
   motion: 'stackMotion',
+  restyle: 'stackRestyle',
+  swap: 'stackSwap',
 };
 
 function subscribeToHash(onChange: () => void): () => void {
@@ -77,6 +79,11 @@ export function OpenStack() {
       <main id="content" tabIndex={-1} className={styles.page}>
         <h1 className={styles.title}>{t('openStackTitle')}</h1>
         <p className={styles.intro}>{t('openStackIntro')}</p>
+        {/* What the render path is built on, under the intro: the Comfy SDK run locally, and the node pack. */}
+        <ul className={styles.platform} data-testid="open-stack-platform">
+          <li>{t('openStackSdk')}</li>
+          <li>{t('openStackNodePack')}</li>
+        </ul>
         {report ? (
           <>
             <p className={styles.checked} data-state={report.ok ? 'ok' : 'failed'}>

@@ -1,0 +1,47 @@
+# Object swap (extension "swap"): an object of a short clip, marked by a few points on its first
+# frame, replaced by another, from a photo of it and a text, or from the text alone; the rest of the
+# scene, the camera and the timing stay. 480p, 16 fps, silent. The clip is prepared first
+# (prepareMotionClip of @montagio/sequence: 16 fps, no sound) and its first 5 s are used. SAM 2.1
+# base+ follows the object from the points through every frame (kijai/ComfyUI-segment-anything-2,
+# pinned in infra/runpod/versions.env); the mask, grown a little, is painted grey over the frames,
+# and Wan 2.1 VACE 14B redraws that part only (cast to fp8 as it loads, 4 steps with the lightx2v
+# T2V LoRA). The photo of the new object is fitted on white (VACE's reference input).
+schema: montagio/extension-model@0.1
+id: wan21-vace-swap
+name: Wan 2.1 VACE 14B (object swap)
+extension: swap
+task: v2v-swap
+license: Apache-2.0
+weights: [wan21-vace-14b-fp16, lightx2v-wan21-t2v-4step, sam21-hiera-base-plus, umt5-xxl-fp8, wan21-vae]
+workflow: workflows/wan21-vace-swap.api.json
+bindings:
+  video: { node: "1", field: file }
+  # the photo of the new object (optional): removed with its node when a job has none
+  image: { node: "20", field: image }
+  prompt: { node: "14", field: text }
+  negative: { node: "15", field: text }
+  seed: { node: "31", field: seed }
+  # the points on the object and, when there are some, on what is not it: JSON lists of {x, y}
+  # in pixels of the scaled first frame
+  points: { node: "41", field: coordinates_positive }
+  exclude_points: { node: "41", field: coordinates_negative }
+  # the clip's size: its frames, the grey that covers the object, the new object's photo and VACE
+  width:
+    - { node: "3", field: width }
+    - { node: "44", field: width }
+    - { node: "21", field: target_width }
+    - { node: "30", field: width }
+  height:
+    - { node: "3", field: height }
+    - { node: "44", field: height }
+    - { node: "21", field: target_height }
+    - { node: "30", field: height }
+  # the frames kept from the clip (its first 5 s at most), and VACE's length
+  frames:
+    - { node: "7", field: length }
+    - { node: "30", field: length }
+output: { node: "35", kind: video }
+# a clip of up to 30 s (the motion transfer's): its first 5 s are used, one VACE window
+limits: { min_duration_s: 1, max_duration_s: 30, max_chars: 500 }
+# GPU seconds for 5 s on an RTX 4090: the restyle's VACE pass (4 steps), SAM 2.1 instead of the depth.
+estimate_s: 120

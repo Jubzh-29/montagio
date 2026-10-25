@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
-import { checkOpenStack } from '../src/index';
+import { checkOpenStack, loadedFile } from '../src/index';
 
 const fixture = (name: string) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
 
@@ -51,8 +51,9 @@ test('clean repo passes', async () => {
 test('the repository report lists every weight it ships, each under what it makes', async () => {
   const r = await checkOpenStack(repoRoot(), { configDir: toolDir });
   // Every function the Studio offers, in the order of the Open Stack page.
-  expect([...new Set(r.models.map((model) => model.function))]).toEqual(['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion']);
+  expect([...new Set(r.models.map((model) => model.function))]).toEqual(['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion', 'restyle', 'swap']);
   expect(r.models.find((model) => model.id === 'wan-animate2-motion')).toMatchObject({ function: 'motion', extension: 'motion' });
+  expect(r.models.find((model) => model.id === 'wan21-vace-restyle')).toMatchObject({ function: 'restyle', extension: 'restyle' });
   expect(r.models.find((model) => model.id === 'z-image-turbo')).toMatchObject({ function: 'photo' });
   expect(r.models.find((model) => model.id === 'z-image-turbo')).not.toHaveProperty('extension');
   // Nothing fetched goes unlisted: each lock weight is a weight of a listed model, with its size and source.
@@ -104,6 +105,15 @@ test('a workflow loading a file that is not a declared weight of its model fails
   );
 });
 
+test('the SAM 2 loader reads a "-fp16" file in fp16 or bf16 for a SAM 2.1 model, the name as written otherwise', () => {
+  const sam = (precision: string, model = 'sam2.1_hiera_base_plus.safetensors') => loadedFile('DownloadAndLoadSAM2Model', { model, precision }, model);
+  expect(sam('fp16')).toBe('sam2.1_hiera_base_plus-fp16.safetensors');
+  expect(sam('bf16')).toBe('sam2.1_hiera_base_plus-fp16.safetensors');
+  expect(sam('fp32')).toBe('sam2.1_hiera_base_plus.safetensors');
+  expect(sam('fp16', 'sam2_hiera_base_plus.safetensors')).toBe('sam2_hiera_base_plus.safetensors');
+  expect(loadedFile('UNETLoader', { unet_name: 'x.safetensors' }, 'x.safetensors')).toBe('x.safetensors');
+});
+
 test('a workflow of an extension may load only the weights of its own model', async () => {
   const clean = (path: string) => readFileSync(join(fixture('clean'), path), 'utf8');
   const root = scratchRepo({
@@ -118,7 +128,8 @@ test('a workflow of an extension may load only the weights of its own model', as
       'schema: montagio/extensions@0.1\nextensions:\n  - { id: edit, priority: 1, gpu_validated: null }\n  - { id: effects, priority: 2, gpu_validated: null }\n' +
       '  - { id: transitions, priority: 3, requires: [edit], gpu_validated: null }\n  - { id: avatar, priority: 4, gpu_validated: null }\n' +
       '  - { id: music, priority: 5, gpu_validated: null }\n  - { id: upscale, priority: 6, gpu_validated: null }\n' +
-      '  - { id: motion, priority: 7, gpu_validated: null }\n',
+      '  - { id: motion, priority: 7, gpu_validated: null }\n  - { id: restyle, priority: 8, gpu_validated: null }\n' +
+      '  - { id: swap, priority: 9, requires: [restyle], gpu_validated: null }\n',
     'registry/extensions/ace-music.yaml': [
       'schema: montagio/extension-model@0.1',
       'id: ace-music',
@@ -451,7 +462,8 @@ test('cli exits 0 on a clean repo', () => {
 test('the real repository is clean', async () => {
   const r = await checkOpenStack(repoRoot());
   expect(r.violations).toEqual([]);
-});
+  // it reads every file of the repository: past 5 s on a laptop running the other suites
+}, 30_000);
 
 test('the source scan skips the static export of the web app (out/), its own bundle output', async () => {
   // Next's minified router reads `x.router`; the showcase export holds it under apps/web/out.

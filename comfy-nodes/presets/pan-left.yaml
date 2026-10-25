@@ -19,3 +19,4 @@ defaults:
 models:
   preferred: wan22-i2v-a14b-fun-camera
   fallback: wan22-ti2v-5b
+# Quality (20 steps) by default: in 4 steps (GPU session of 2026-10-25) a person in the frame doubles into a ghost; the car stayed clean.

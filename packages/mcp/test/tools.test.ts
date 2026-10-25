@@ -50,11 +50,16 @@ describe('MCP tools', () => {
         'camera_move',
         'edit_photo',
         'get_job',
+        'get_recipe',
         'get_workflow',
         'list_camera_presets',
         'list_effects_and_hooks',
         'list_history',
+        'list_motion_library',
         'motion_transfer',
+        'reproduce',
+        'restyle_video',
+        'swap_object',
         'talking_avatar',
         'text_to_image',
         'upload_photo',
@@ -160,6 +165,87 @@ describe('MCP tools', () => {
     expect(isError).toBe(true);
     expect(data.error).toBe('rights-required');
     expect(app.calls).toHaveLength(0);
+  });
+
+  it('restyle_video sends nothing without rights: true', async () => {
+    const app = fakeFetch(() => reply({}));
+    client = await connect(testConfig(), { fetch: app.fetch });
+    const { isError, data } = await callTool(client, 'restyle_video', { videoRef: 'videos/v1', prompt: 'a snowy winter evening' });
+
+    expect(isError).toBe(true);
+    expect(data.error).toBe('rights-required');
+    expect(app.calls).toHaveLength(0);
+  });
+
+  it('restyle_video sends the clip and the text, and a look image only when given', async () => {
+    const app = jobApp('restyle', [{ state: 'succeeded', progress: 1, outputUrl: '/media/data/jobs/j1/out.mp4' }]);
+    client = await connect(testConfig(), { fetch: app.fetch, ...fakeClock() });
+    const plain = await callTool(client, 'restyle_video', { videoRef: 'videos/v1', prompt: ' a snowy winter evening ', rights: true });
+    expect(plain.isError).toBeFalsy();
+    expect(app.calls.find((call) => call.path === '/api/restyle')!.json).toEqual({ videoRef: 'videos/v1', prompt: 'a snowy winter evening', rights: true });
+
+    const look = jobApp('restyle', [{ state: 'succeeded', progress: 1, outputUrl: '/media/data/jobs/j1/out.mp4' }]);
+    client = await connect(testConfig(), { fetch: look.fetch, ...fakeClock() });
+    await callTool(client, 'restyle_video', { videoRef: 'videos/v1', prompt: 'a watercolor painting', imageRef: 'samples/s.png', rights: true });
+    expect(look.calls.find((call) => call.path === '/api/restyle')!.json).toEqual({ videoRef: 'videos/v1', prompt: 'a watercolor painting', imageRef: 'samples/s.png', rights: true });
+  });
+
+  it('swap_object sends nothing without rights: true, nor without a point on the object', async () => {
+    const app = fakeFetch(() => reply({}));
+    client = await connect(testConfig(), { fetch: app.fetch });
+    const noRights = await callTool(client, 'swap_object', { videoRef: 'videos/v1', prompt: 'a red motorbike', points: [{ x: 0.5, y: 0.5 }] });
+    expect(noRights.isError).toBe(true);
+    expect(noRights.data.error).toBe('rights-required');
+    const noPoint = await callTool(client, 'swap_object', { videoRef: 'videos/v1', prompt: 'a red motorbike', points: [], rights: true });
+    expect(noPoint.isError).toBe(true);
+    const offFrame = await callTool(client, 'swap_object', { videoRef: 'videos/v1', prompt: 'a red motorbike', points: [{ x: 412, y: 300 }], rights: true });
+    expect(offFrame.isError).toBe(true);
+    expect(app.calls).toHaveLength(0);
+  });
+
+  it('swap_object sends the clip, the points, the text, and the photo and excluded points only when given', async () => {
+    const app = jobApp('swap', [{ state: 'succeeded', progress: 1, outputUrl: '/media/data/jobs/j1/out.mp4' }]);
+    client = await connect(testConfig(), { fetch: app.fetch, ...fakeClock() });
+    const plain = await callTool(client, 'swap_object', { videoRef: 'videos/v1', prompt: ' a red motorbike ', points: [{ x: 0.4, y: 0.6 }], rights: true });
+    expect(plain.isError).toBeFalsy();
+    expect(app.calls.find((call) => call.path === '/api/swap')!.json).toEqual({ videoRef: 'videos/v1', prompt: 'a red motorbike', points: [{ x: 0.4, y: 0.6 }], rights: true });
+
+    const full = jobApp('swap', [{ state: 'succeeded', progress: 1, outputUrl: '/media/data/jobs/j1/out.mp4' }]);
+    client = await connect(testConfig(), { fetch: full.fetch, ...fakeClock() });
+    await callTool(client, 'swap_object', {
+      videoRef: 'videos/v1',
+      prompt: 'a golden retriever',
+      points: [{ x: 0.4, y: 0.6 }],
+      exclude: [{ x: 0.9, y: 0.1 }],
+      imageRef: 'samples/dog.png',
+      rights: true,
+    });
+    expect(full.calls.find((call) => call.path === '/api/swap')!.json).toEqual({
+      videoRef: 'videos/v1',
+      prompt: 'a golden retriever',
+      points: [{ x: 0.4, y: 0.6 }],
+      exclude: [{ x: 0.9, y: 0.1 }],
+      imageRef: 'samples/dog.png',
+      rights: true,
+    });
+  });
+
+  it('a motion of the library is picked as the clip, then animated; the library lists its motions', async () => {
+    const app = jobApp('motion', [{ state: 'succeeded', progress: 1, outputUrl: '/media/data/jobs/j1/out.mp4' }], (call) => {
+      if (call.path === '/api/uploads/video/library') return reply({ videoRef: 'videos/lib.mp4', duration_s: 30, sourceDuration_s: 30, frames: 480, width: 480, height: 832, aspect: '9:16' }, 201);
+      return undefined;
+    });
+    client = await connect(testConfig(), { fetch: app.fetch, ...fakeClock() });
+    const { isError, data } = await callTool(client, 'motion_transfer', { imageRef: 'samples/s.png', libraryMotion: 'hip-hop-30s', rights: true });
+    expect(isError).toBeFalsy();
+    expect(app.calls.find((call) => call.path === '/api/uploads/video/library')!.json).toEqual({ id: 'hip-hop-30s' });
+    expect(app.calls.find((call) => call.path === '/api/motion')!.json).toMatchObject({ imageRef: 'samples/s.png', videoRef: 'videos/lib.mp4', rights: true });
+    expect(data.video).toMatchObject({ duration_s: 30 });
+
+    const listing = fakeFetch((call) => (call.path === '/api/motions' ? reply([{ id: 'hip-hop', name: 'Hip-hop', description: 'A dance', duration_s: 5, previewUrl: '/media/presets/motions/previews/hip-hop.mp4' }]) : reply({ error: 'not-found' }, 404)));
+    client = await connect(testConfig(), { fetch: listing.fetch });
+    const listed = await callTool(client, 'list_motion_library', {});
+    expect(JSON.stringify(listed.data)).toMatch(/hip-hop/);
   });
 
   it('camera_move sends the description as userPrompt and polls the generation', async () => {

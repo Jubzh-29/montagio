@@ -3,7 +3,7 @@ import type { HistoryItem, Reprise } from './api-types';
 /**
  * The community gallery: creations shown with the settings that made them, remixed in one click.
  * No account and no public server: a creation is published to this machine's gallery, and shared
- * as a recipe file (its settings, never a photo) that anyone imports into theirs. The examples are
+ * as a share file (its settings, never a photo) that anyone imports into theirs. The examples are
  * the catalogue's moves and effects; in the static showcase, its rendered clips.
  */
 export type CommunitySource = 'example' | 'local' | 'imported';
@@ -24,9 +24,9 @@ export type CommunityEntry = {
   reprise: Reprise;
 };
 
-/** A recipe file: a creation's settings, shared by hand (a chat, a forum, a pull request). */
-export type Recipe = {
-  schema: 'montagio/recipe@0.1';
+/** A share file: a creation's settings, shared by hand (a chat, a forum, a pull request). */
+export type SharedEntry = {
+  schema: 'montagio/share@0.1';
   title: string;
   author?: string;
   kind: HistoryItem['kind'];
@@ -38,11 +38,11 @@ export type Recipe = {
   createdAt: string;
 };
 
-export const RECIPE_SCHEMA = 'montagio/recipe@0.1';
+export const SHARE_SCHEMA = 'montagio/share@0.1';
 export const COMMUNITY_TITLE_MAX = 80;
 export const COMMUNITY_AUTHOR_MAX = 40;
-export const RECIPE_TEXT_MAX = 500;
-export const RECIPE_PRESET_MAX = 64 * 1024;
+export const SHARE_TEXT_MAX = 500;
+export const SHARE_PRESET_MAX = 64 * 1024;
 
 const TABS: readonly Reprise['tab'][] = ['effects', 'camera', 'film', 'avatar', 'motion'];
 const KINDS: readonly HistoryItem['kind'][] = ['photo', 'clip', 'film'];
@@ -71,7 +71,7 @@ export function entryAsHistoryItem(entry: CommunityEntry): HistoryItem {
 }
 
 /**
- * The part of a reprise a recipe carries: the settings, never this machine's photo, clip or ids.
+ * The part of a reprise a share file carries: the settings, never this machine's photo, clip or ids.
  * Without its photo the Studio starts from its sample photo, and the visitor can change it.
  */
 export function shareableReprise(reprise: Reprise): Reprise {
@@ -94,11 +94,11 @@ const text = (value: unknown, max: number): string | undefined => {
 };
 const id = (value: unknown): string | undefined => (typeof value === 'string' && ID.test(value) ? value : undefined);
 
-/** A recipe read from a file someone sent: known fields only, each checked; null when it is not one. */
-export function parseRecipe(raw: unknown): Recipe | null {
+/** A share file read from someone: known fields only, each checked; null when it is not one. */
+export function parseShared(raw: unknown): SharedEntry | null {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
   const input = raw as Record<string, unknown>;
-  if (input.schema !== RECIPE_SCHEMA) return null;
+  if (input.schema !== SHARE_SCHEMA) return null;
   const title = text(input.title, COMMUNITY_TITLE_MAX);
   const kind = KINDS.find((value) => value === input.kind);
   const task = TASKS.find((value) => value === input.task);
@@ -117,23 +117,23 @@ export function parseRecipe(raw: unknown): Recipe | null {
     ...(id(reprise.effectId) ? { effectId: id(reprise.effectId)! } : {}),
     ...(id(reprise.hookId) ? { hookId: id(reprise.hookId)! } : {}),
     ...(id(reprise.modelId) ? { modelId: id(reprise.modelId)! } : {}),
-    ...(text(reprise.prompt, RECIPE_TEXT_MAX) ? { prompt: text(reprise.prompt, RECIPE_TEXT_MAX)! } : {}),
+    ...(text(reprise.prompt, SHARE_TEXT_MAX) ? { prompt: text(reprise.prompt, SHARE_TEXT_MAX)! } : {}),
     ...(reprise.language === 'en' || reprise.language === 'fr' ? { language: reprise.language } : {}),
-    ...(text(reprise.motion, RECIPE_TEXT_MAX) ? { motion: text(reprise.motion, RECIPE_TEXT_MAX)! } : {}),
+    ...(text(reprise.motion, SHARE_TEXT_MAX) ? { motion: text(reprise.motion, SHARE_TEXT_MAX)! } : {}),
     ...(shots && shots.every((shot) => id(shot.presetId))
-      ? { shots: shots.map((shot) => ({ presetId: shot.presetId as string, ...(text(shot.prompt, RECIPE_TEXT_MAX) ? { prompt: text(shot.prompt, RECIPE_TEXT_MAX)! } : {}) })) }
+      ? { shots: shots.map((shot) => ({ presetId: shot.presetId as string, ...(text(shot.prompt, SHARE_TEXT_MAX) ? { prompt: text(shot.prompt, SHARE_TEXT_MAX)! } : {}) })) }
       : {}),
     sample: true,
   };
-  const presetYaml = typeof input.presetYaml === 'string' && input.presetYaml.length <= RECIPE_PRESET_MAX ? input.presetYaml : undefined;
+  const presetYaml = typeof input.presetYaml === 'string' && input.presetYaml.length <= SHARE_PRESET_MAX ? input.presetYaml : undefined;
   if (input.presetYaml !== undefined && presetYaml === undefined) return null;
   if (presetYaml && !settings.presetId) return null;
   const createdAt = typeof input.createdAt === 'string' && !Number.isNaN(Date.parse(input.createdAt)) ? new Date(input.createdAt).toISOString() : new Date().toISOString();
-  return { schema: RECIPE_SCHEMA, title, ...(author ? { author } : {}), kind, task, name, reprise: settings, ...(presetYaml ? { presetYaml } : {}), createdAt };
+  return { schema: SHARE_SCHEMA, title, ...(author ? { author } : {}), kind, task, name, reprise: settings, ...(presetYaml ? { presetYaml } : {}), createdAt };
 }
 
-/** The file name a recipe downloads as: its title, readable, then ".montagio.json". */
-export function recipeFileName(title: string): string {
+/** The file name a share file downloads as: its title, readable, then ".montagio-share.json". */
+export function shareFileName(title: string): string {
   const slug = title.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
-  return `${slug || 'recipe'}.montagio.json`;
+  return `${slug || 'shared'}.montagio-share.json`;
 }

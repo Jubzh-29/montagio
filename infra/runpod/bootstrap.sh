@@ -5,6 +5,7 @@
 #   - ComfyUI at a pinned tag (commit verified) in its own venv, with a pinned PyTorch;
 #   - comfy-api-proxy (MIT) at a pinned version, in its own venv;
 #   - the avatar's voice node (wildminder/ComfyUI-Chatterbox) at a pinned commit, patched;
+#   - the object swap's tracker (kijai/ComfyUI-segment-anything-2) at a pinned commit;
 #   - Node.js 22 (checksum verified) and the repository's npm dependencies.
 # Then links the Montagio node pack (comfy-nodes) into ComfyUI's custom_nodes,
 # starts ComfyUI with --disable-partner-nodes on :8188 and the proxy on
@@ -175,6 +176,25 @@ install_extension_nodes() {
 # Last and optional: without its voice node the avatar is refused, the presets and the other extensions are not.
 install_voice_node() {
   install_extension_nodes || warn "the avatar's voice node is not installed (see above): the avatar job will be refused, the presets and the other extensions run as usual"
+}
+
+# The object swap's tracker: kijai/ComfyUI-segment-anything-2 at the commit of versions.env, as it is.
+# Every step is checked here, not by set -e: install_segment_node calls it where a failure must not end the script.
+install_segment_nodes() {
+  local dir=$COMFY_DIR/custom_nodes/ComfyUI-segment-anything-2
+  if [ "$(cat "$dir/.montagio-stamp" 2>/dev/null)" = "$SAM2_NODE_COMMIT" ]; then return 0; fi
+  if [ ! -d "$dir/.git" ]; then
+    log "cloning the SAM 2 node (object swap) at ${SAM2_NODE_COMMIT:0:8}"
+    git clone --quiet "$SAM2_NODE_REPO" "$dir" || return 1
+  fi
+  git -C "$dir" checkout --quiet --force "$SAM2_NODE_COMMIT" || return 1
+  [ "$(git -C "$dir" rev-parse HEAD)" = "$SAM2_NODE_COMMIT" ] || { warn "the SAM 2 node in $dir is not at $SAM2_NODE_COMMIT"; return 1; }
+  echo "$SAM2_NODE_COMMIT" >"$dir/.montagio-stamp"
+}
+
+# Last and optional, as the voice: without its tracker the object swap is refused, nothing else.
+install_segment_node() {
+  install_segment_nodes || warn "the object swap's SAM 2 node is not installed (see above): the swap job will be refused, the presets and the other extensions run as usual"
 }
 
 install_proxy() {
@@ -352,11 +372,11 @@ main() {
 
   case $command in
     install)
-      preflight; install_node; install_comfyui; install_proxy; install_npm; write_env; install_voice_node ;;
+      preflight; install_node; install_comfyui; install_proxy; install_npm; write_env; install_voice_node; install_segment_node ;;
     start)
       mkdir -p "$LOG_DIR" "$RUN_DIR"; start_comfyui; start_proxy; summary ;;
     all)
-      preflight; install_node; install_comfyui; install_proxy; install_npm; write_env; install_voice_node
+      preflight; install_node; install_comfyui; install_proxy; install_npm; write_env; install_voice_node; install_segment_node
       start_comfyui; start_proxy; summary ;;
     stop) stop_services ;;
     status) status ;;

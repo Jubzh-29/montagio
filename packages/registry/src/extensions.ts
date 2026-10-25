@@ -1,17 +1,32 @@
 import { z } from 'zod';
 import { RegistryError } from './errors';
-import { ALLOWED_WEIGHT_LICENSES, EXTENSION_IDS, kebabId, type ExtensionId } from './schema';
+import { ALLOWED_WEIGHT_LICENSES, EXTENSION_IDS, gpuDate, kebabId, type ExtensionId, type VramProfile } from './schema';
 
 /**
  * The extensions (edit, effects, transitions, avatar, music, upscale) run models that are
  * not camera presets: their entries live in registry/extensions/, apart from registry/models/,
  * so nothing that lists preset models (the Studio, the showcase, compileJob) sees them.
  */
-export const EXTENSION_TASKS = ['t2a', 'v2v-upscale', 'i2i-upscale', 'i2i-edit', 'tts', 'a2a-vc', 'a2a-translate', 'ia2v-talk', 'i2v-effect', 'flf2v', 'motion-transfer'] as const;
+export const EXTENSION_TASKS = [
+  't2a',
+  'v2v-upscale',
+  'i2i-upscale',
+  'i2i-edit',
+  'tts',
+  'a2a-vc',
+  'a2a-translate',
+  'a2t-words',
+  'ia2v-talk',
+  'i2v-effect',
+  'flf2v',
+  'motion-transfer',
+  'v2v-restyle',
+  'v2v-swap',
+] as const;
 export type ExtensionTask = (typeof EXTENSION_TASKS)[number];
 
-/** What a job delivers (the same three kinds as @montagio/comfy-adapter, which the registry does not depend on). */
-export const OUTPUT_KINDS = ['video', 'audio', 'image'] as const;
+/** What a job delivers (the same kinds as @montagio/comfy-adapter, which the registry does not depend on); a file is a JSON document. */
+export const OUTPUT_KINDS = ['video', 'audio', 'image', 'file'] as const;
 export type OutputKind = (typeof OUTPUT_KINDS)[number];
 
 export const EXTENSION_BINDING_KEYS = [
@@ -37,6 +52,8 @@ export const EXTENSION_BINDING_KEYS = [
   'motion_prompt',
   'mask',
   'voice',
+  'points',
+  'exclude_points',
 ] as const;
 export type ExtensionBindingKey = (typeof EXTENSION_BINDING_KEYS)[number];
 
@@ -48,10 +65,16 @@ export const REQUIRED_EXTENSION_BINDINGS: Record<ExtensionTask, ExtensionBinding
   tts: ['text', 'language', 'seed', 'cfg'],
   'a2a-vc': ['audio', 'voice'],
   'a2a-translate': ['audio', 'prompt', 'language', 'cfg', 'seed'],
+  // the words of a speech with their moments (Whisper): language "auto" or an imposed one
+  'a2t-words': ['audio', 'language'],
   'ia2v-talk': ['image', 'audio', 'prompt', 'seed', 'width', 'height', 'frames'],
   'i2v-effect': ['image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames', 'lora', 'lora_strength'],
   flf2v: ['image', 'end_image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames'],
   'motion-transfer': ['image', 'video', 'prompt', 'motion_prompt', 'negative', 'seed', 'width', 'height', 'frames'],
+  // `image` is the optional reference: the compiler removes its nodes when a job has none
+  'v2v-restyle': ['video', 'image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames'],
+  // `image` (the new object) is optional as well; `exclude_points` is set only when a job has some
+  'v2v-swap': ['video', 'image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames', 'points'],
 };
 
 export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
@@ -62,10 +85,13 @@ export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
   tts: 'audio',
   'a2a-vc': 'audio',
   'a2a-translate': 'audio',
+  'a2t-words': 'file',
   'ia2v-talk': 'video',
   'i2v-effect': 'video',
   flf2v: 'video',
   'motion-transfer': 'video',
+  'v2v-restyle': 'video',
+  'v2v-swap': 'video',
 };
 
 const binding = z.object({ node: z.string().min(1), field: z.string().min(1) }).strict();
@@ -96,6 +122,8 @@ export const ExtensionModelSchema = z
       .default({}),
     /** Seconds of GPU for a typical job, until a GPU session measures it. */
     estimate_s: z.number().positive(),
+    /** The same job in the 12 GB profile, once a GPU held to 12 GB ran it. */
+    low_vram: z.object({ estimate_s: z.number().positive() }).strict().optional(),
   })
   .strict()
   .superRefine((model, ctx) => {
@@ -120,6 +148,8 @@ const ExtensionEntrySchema = z
     requires: z.array(z.enum(EXTENSION_IDS)).default([]),
     /** The day a GPU session validated the extension; null until then. */
     gpu_validated: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'gpu_validated must be a date (YYYY-MM-DD) or null').nullable(),
+    /** The day a GPU held to 12 GB ran it: the 12 GB profile offers only these. */
+    low_vram_validated: gpuDate.default(null),
   })
   .strict();
 
@@ -157,12 +187,15 @@ export const ExtensionsConfigSchema = z
  * an extension not validated on GPU by the evening of 25/10 is hidden from the demo), less
  * those whose requirement is not kept; "all" and "none" say what they say; anything else
  * is a comma-separated list of ids, which must also name the requirements of each.
+ * In the 12 GB profile, "validated" keeps those a GPU held to 12 GB ran (`low_vram_validated`).
  */
-export function enabledExtensions(config: ExtensionsConfig, flag: string | undefined): ExtensionId[] {
+export function enabledExtensions(config: ExtensionsConfig, flag: string | undefined, profile: VramProfile = 'standard'): ExtensionId[] {
   const byPriority = [...config].sort((a, b) => a.priority - b.priority);
   const value = flag?.trim() ?? '';
   if (value === '' || value === 'validated') {
-    const kept = new Set(byPriority.filter((entry) => entry.gpu_validated !== null).map((entry) => entry.id));
+    // In the 12 GB profile, validated means run on a GPU held to 12 GB.
+    const validated = (entry: ExtensionEntry) => (profile === '12gb' ? entry.low_vram_validated : entry.gpu_validated) !== null;
+    const kept = new Set(byPriority.filter(validated).map((entry) => entry.id));
     for (let changed = true; changed; ) {
       changed = false;
       for (const entry of byPriority) {

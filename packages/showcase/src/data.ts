@@ -32,13 +32,13 @@ export type ShowcaseData = {
   model: { id: string; name: string; license: string };
   /** `preview` is a light loop of the preset on the first sample, for the gallery tile; `poster` its first frame. */
   presets: { id: string; name: string; description: string; poses: string[]; speed: number; defaultModel: string; preview: string; poster?: string; yaml: string }[];
-  models: { id: string; name: string; kind: 'video' | 'image'; tier: 'quality' | 'fast'; license: string; estimate_s: { '480p': number; '720p'?: number } }[];
+  models: { id: string; name: string; kind: 'video' | 'image'; tier: 'quality' | 'turbo' | 'fast'; license: string; estimate_s: { '480p': number; '720p'?: number } }[];
   /** What validatePreset needs, as Map entries. */
   library: { models: [string, ModelEntry][]; templates: [string, ApiWorkflow][]; lock: [string, LockEntry][] };
   /** `prompt`: the text the photo was made from, offered by the showcase's Text to image. */
   samples: { id: string; title: { en: string; fr: string }; aspect: Aspect; url: string; placeholder: boolean; credit: string; prompt?: string }[];
-  /** `hd`: the clip had an HD pass (absent in data written before it, or for a 480p clip). */
-  clips: { preset: string; sample: string; url: string; verticalUrl: string; workflowUrl: string; placeholder: boolean; hd?: ShowcaseHdModel }[];
+  /** `hd`: the clip had an HD pass (absent in data written before it, or for a 480p clip); `recipeUrl`: a rendered clip's recipe. */
+  clips: { preset: string; sample: string; url: string; verticalUrl: string; workflowUrl: string; recipeUrl?: string; placeholder: boolean; hd?: ShowcaseHdModel }[];
   /** The effects and hooks rendered on a sample in a GPU session; one without an example is not listed. */
   effects: ShowcaseExampleItem[];
   hooks: (ShowcaseExampleItem & { references: 1 | 2 })[];

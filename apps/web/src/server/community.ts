@@ -4,10 +4,10 @@ import { extname, join } from 'node:path';
 import {
   COMMUNITY_AUTHOR_MAX,
   COMMUNITY_TITLE_MAX,
-  RECIPE_SCHEMA,
+  SHARE_SCHEMA,
   shareableReprise,
   type CommunityEntry,
-  type Recipe,
+  type SharedEntry,
 } from '@/lib/community';
 import { getEnv } from './env';
 import { JobError } from './errors';
@@ -21,7 +21,7 @@ import { readPresetText, writeAtomic } from './store';
 
 /**
  * The community gallery of this machine: the examples of the catalogue, and the entries published
- * here or imported from a recipe, each a JSON file in MONTAGIO_DATA/community with its media and,
+ * here or imported from a share file, each a JSON file in MONTAGIO_DATA/community with its media and,
  * for a remixed move, its preset text beside it.
  */
 type Stored = CommunityEntry & { source: 'local' | 'imported'; media?: string; presetFile?: string };
@@ -183,42 +183,42 @@ export async function publishToCommunity(body: Record<string, unknown>): Promise
   });
 }
 
-/** A recipe someone shared, added to this gallery; it shows the example of its move or effect, when there is one. */
-export async function importRecipe(recipe: Recipe): Promise<CommunityEntry> {
-  await assertNoBlockedName(recipe.title, recipe.author ?? '', recipe.reprise.prompt ?? '', recipe.reprise.motion ?? '');
+/** A share file someone sent, added to this gallery; it shows the example of its move or effect, when there is one. */
+export async function importShared(shared: SharedEntry): Promise<CommunityEntry> {
+  await assertNoBlockedName(shared.title, shared.author ?? '', shared.reprise.prompt ?? '', shared.reprise.motion ?? '');
   const id = randomUUID();
   const example = (await examples()).find(
-    (entry) => (recipe.reprise.presetId && entry.reprise.presetId === recipe.reprise.presetId) || (recipe.reprise.effectId && entry.reprise.effectId === recipe.reprise.effectId),
+    (entry) => (shared.reprise.presetId && entry.reprise.presetId === shared.reprise.presetId) || (shared.reprise.effectId && entry.reprise.effectId === shared.reprise.effectId),
   );
   let presetFile: string | undefined;
-  if (recipe.presetYaml) {
+  if (shared.presetYaml) {
     await mkdir(dir(), { recursive: true });
     presetFile = presetOf(id);
-    await writeFile(presetFile, recipe.presetYaml);
+    await writeFile(presetFile, shared.presetYaml);
   }
   return save({
     id,
     source: 'imported',
-    title: recipe.title,
-    ...(recipe.author ? { author: recipe.author } : {}),
-    kind: recipe.kind,
-    task: recipe.task,
-    name: recipe.name,
+    title: shared.title,
+    ...(shared.author ? { author: shared.author } : {}),
+    kind: shared.kind,
+    task: shared.task,
+    name: shared.name,
     ...(example?.previewUrl ? { previewUrl: example.previewUrl } : {}),
     ...(example?.posterUrl ? { posterUrl: example.posterUrl } : {}),
     createdAt: new Date().toISOString(),
-    reprise: { ...recipe.reprise, ...(presetFile ? { presetUrl: `/api/community/${id}/preset` } : {}) },
+    reprise: { ...shared.reprise, ...(presetFile ? { presetUrl: `/api/community/${id}/preset` } : {}) },
     ...(presetFile ? { presetFile } : {}),
   });
 }
 
-/** The recipe of an entry published or imported here: its settings, without this machine's photo. */
-export async function recipeOf(id: string): Promise<Recipe | null> {
+/** The share file of an entry published or imported here: its settings, without this machine's photo. */
+export async function shareOf(id: string): Promise<SharedEntry | null> {
   const stored = await readStored(id);
   if (!stored) return null;
   const presetYaml = stored.presetFile ? await readFile(stored.presetFile, 'utf8').catch(() => undefined) : undefined;
   return {
-    schema: RECIPE_SCHEMA,
+    schema: SHARE_SCHEMA,
     title: stored.title,
     ...(stored.author ? { author: stored.author } : {}),
     kind: stored.kind,

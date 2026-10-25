@@ -21,7 +21,7 @@ export type Violation = {
 };
 
 /** What a model makes, in the order the Open Stack page lists them. */
-export const STACK_FUNCTIONS = ['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion'] as const;
+export const STACK_FUNCTIONS = ['camera', 'effects', 'transitions', 'photo', 'avatar', 'music', 'hd', 'motion', 'restyle', 'swap'] as const;
 export type StackFunction = (typeof STACK_FUNCTIONS)[number];
 
 /** Exhaustive on purpose: a new capability or task does not compile until it says what it makes. */
@@ -33,11 +33,15 @@ const FUNCTION_OF_TASK: Record<ExtensionTask, StackFunction> = {
   tts: 'avatar',
   'a2a-vc': 'avatar',
   'a2a-translate': 'avatar',
+  // the captions of a talking clip
+  'a2t-words': 'avatar',
   'ia2v-talk': 'avatar',
   t2a: 'music',
   'v2v-upscale': 'hd',
   'i2i-upscale': 'hd',
   'motion-transfer': 'motion',
+  'v2v-restyle': 'restyle',
+  'v2v-swap': 'swap',
 };
 
 /** A weight file of a model, as the lock fetches it: its licence, its size and the repository it comes from. */
@@ -53,6 +57,18 @@ export type OpenStackReport = {
   models: StackModel[];
   violations: Violation[];
 };
+
+/**
+ * The file a loader really reads for `value`, when the node derives it: in fp16 or bf16,
+ * DownloadAndLoadSAM2Model loads "<name>-fp16.safetensors" for a SAM 2.1 model
+ * (kijai/ComfyUI-segment-anything-2 at 0c35fff5, nodes.py).
+ */
+export function loadedFile(classType: string | undefined, inputs: Record<string, unknown>, value: string): string {
+  if (classType === 'DownloadAndLoadSAM2Model' && inputs.model === value && inputs.precision !== 'fp32' && value.includes('2.1')) {
+    return value.replace(/\.([^.]+)$/, '-fp16.$1');
+  }
+  return value;
+}
 
 /** Input values that name a model weight file. */
 const WEIGHT_FILE = /\.(safetensors|sft|ckpt|pt|pth|bin|gguf|onnx)$/i;
@@ -494,11 +510,13 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
         });
       }
       for (const value of Object.values(node.inputs ?? {})) {
-        if (typeof value === 'string' && WEIGHT_FILE.test(value) && !files.has(value)) {
+        if (typeof value !== 'string' || !WEIGHT_FILE.test(value)) continue;
+        const loaded = loadedFile(node.class_type, node.inputs ?? {}, value);
+        if (!files.has(loaded)) {
           violations.push({
             rule: 'weight-file',
             file: relative(root, path),
-            detail: `node ${id} loads "${value}", which is not one of ${owner}`,
+            detail: `node ${id} loads "${loaded}", which is not one of ${owner}`,
           });
         }
       }

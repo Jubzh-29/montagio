@@ -55,14 +55,21 @@ test('the ComfyUI folder of each weight is the one fetch-weights writes it to', 
     const entry = library.lock.get(weight.id)!;
     expect(weight.folder, weight.id).toBe(folderFor(weight.file, parseHfUrl(weight.url).path!, folders, entry.folder));
   }
-});
+  // loading the whole library takes more than the default 5 s on a loaded laptop
+}, 30_000);
 
 test('parseExtensionsConfig reads registry/extensions.yaml as @montagio/registry does', () => {
   const text = readFileSync(join(repoRoot, 'registry', 'extensions.yaml'), 'utf8');
   expect(parseExtensionsConfig(text)).toEqual(
-    registryExtensions(text, 'extensions.yaml').map(({ id, priority, requires, gpu_validated }) => ({ id, priority, requires, gpuValidated: gpu_validated })),
+    registryExtensions(text, 'extensions.yaml').map(({ id, priority, requires, gpu_validated, low_vram_validated }) => ({
+      id,
+      priority,
+      requires,
+      gpuValidated: gpu_validated,
+      lowVramValidated: low_vram_validated,
+    })),
   );
-  expect(readExtensions(repoRoot).map((e) => e.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion']);
+  expect(readExtensions(repoRoot).map((e) => e.id)).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
 });
 
 describe('requires: an inline list, as registry/extensions.yaml keeps it', () => {
@@ -114,6 +121,13 @@ describe('selectExtensions agrees with enabledExtensions', () => {
     '    gpu_validated: null',
     '  - id: motion',
     '    priority: 7',
+    '    gpu_validated: null',
+    '  - id: restyle',
+    '    priority: 8',
+    '    gpu_validated: null',
+    '  - id: swap',
+    '    priority: 9',
+    '    requires: [restyle]',
     '    gpu_validated: null',
     '',
   ].join('\n');

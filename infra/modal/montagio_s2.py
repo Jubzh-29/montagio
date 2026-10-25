@@ -18,6 +18,8 @@ From the repository root, with the modal CLI of the project's venv:
   modal run --detach infra/modal/montagio_s2.py::series --jobs "--extension edit;--extension edit --look infl8" \
       --label edit                                                          one container, the jobs in a row
   modal run infra/modal/montagio_s2.py::cmd --cmd "…"                          any command, services started
+  modal run --detach infra/modal/montagio_s2.py::lowvram --jobs "--preset crash-push …" --label twelve-gb
+                                                                            a series on a GPU held to 12 GB (and 32 GiB of RAM)
 
 Every function stops on its own when its work is done. There is no long-lived GPU terminal: `modal shell`
 is not supported on Windows, and a shell is billed at Sandbox rates (CPU and memory about 3x a function's).
@@ -79,10 +81,11 @@ def _image() -> modal.Image:
         )
         .add_local_dir(runpod / "patches", f"{REMOTE_REPO}/infra/runpod/patches", copy=True)
         # The pod's install, on a GPU: bootstrap.sh picks the PyTorch build from the driver and checks
-        # that torch sees CUDA. Node.js, ComfyUI, PyTorch, the proxy, then the voice node (a warning if it fails).
+        # that torch sees CUDA. Node.js, ComfyUI, PyTorch, the proxy, then the voice node and the object
+        # swap's tracker (a warning if one fails).
         .run_commands(
             f"cd {REMOTE_REPO} && bash -c '{BOOTSTRAP} && preflight && install_node && install_comfyui"
-            " && install_proxy && install_voice_node'",
+            " && install_proxy && install_voice_node && install_segment_node'",
             gpu=BUILD_GPU,
         )
     )
@@ -108,6 +111,11 @@ app = modal.App("montagio-s2", image=image)
 GPU_OPTIONS = dict(gpu=GPU, volumes=VOLUMES, cpu=2.0, memory=16384)
 # At most 4 smoke containers at once: Modal advises 5 writers at most on a volume, and it caps the spend rate.
 MAX_PARALLEL = 4
+# The low-memory profile's machine: a 12 GB card whose desktop keeps about half a gigabyte (vram_cap.py holds
+# the rest of the L4), and 32 GiB of RAM, a hard limit: what ComfyUI offloads must fit there, as on such a PC.
+LOW_VRAM_FREE_GIB = 11.5
+LOW_VRAM_OPTIONS = dict(GPU_OPTIONS, memory=(16384, 32768))
+VRAM_CAP_READY = "/tmp/vram-cap.json"
 
 
 def _sh(command: str) -> int:
@@ -128,6 +136,29 @@ def _start_services(expose_ui: bool = False) -> None:
     if code != 0:
         _keep_logs(f"/results/runs/failed-start-{int(time.time())}")
         raise SystemExit(f"ComfyUI or the proxy did not start (code {code}): see the logs under /results/runs")
+
+
+def _cap_vram(free_gib: float, out: str) -> None:
+    """Holds the L4's memory until `free_gib` stays free (vram_cap.py), before ComfyUI starts; the report goes to `out`."""
+    python = f"{WORKSPACE}/venvs/comfyui/bin/python"
+    script = (
+        f"mkdir -p {WORKSPACE}/logs {shlex.quote(out)} && rm -f {VRAM_CAP_READY}"
+        f" && (setsid nohup {python} -I infra/modal/vram_cap.py {free_gib} {VRAM_CAP_READY} >{WORKSPACE}/logs/vram-cap.log 2>&1 &)"
+        f" && for i in $(seq 120); do [ -s {VRAM_CAP_READY} ] && break; sleep 1; done"
+        f" && cp {VRAM_CAP_READY} {shlex.quote(out)}/vram-cap.json && cat {VRAM_CAP_READY} && nvidia-smi --query-gpu=memory.used,memory.total --format=csv"
+    )
+    if _sh(script) != 0:
+        _keep_logs(out)
+        raise SystemExit(f"could not hold the VRAM down to {free_gib} GiB free: see {out}/logs/vram-cap.log")
+
+
+def _memory_report(out: str) -> None:
+    """The RAM the container and ComfyUI used at their peak, into `out`/memory.txt (what a PC must have)."""
+    _sh(
+        f"{{ echo cgroup memory.peak: $(cat /sys/fs/cgroup/memory.peak 2>/dev/null || echo n/a);"
+        f" grep -E 'VmHWM|VmRSS' /proc/$(cat {WORKSPACE}/run/comfyui.pid)/status 2>/dev/null; free -m; }}"
+        f" | tee {shlex.quote(out)}/memory.txt"
+    )
 
 
 def _keep_logs(folder: str) -> None:
@@ -204,6 +235,29 @@ def series(jobs: str, label: str = "series") -> int:
         print(f"\n[{index}/{len(commands)}] $ {command}", flush=True)
         if _sh(command) != 0:
             failed += 1
+    _keep_logs(out)
+    print(f"results: modal volume get montagio-results {out.removeprefix('/results/')} .", flush=True)
+    return failed
+
+
+@app.function(**LOW_VRAM_OPTIONS, timeout=SMOKE_TIMEOUT_S, max_containers=MAX_PARALLEL)
+def lowvram(jobs: str, label: str = "lowvram", free_gib: float = LOW_VRAM_FREE_GIB) -> int:
+    """`series` on the machine of the low-memory profile: the L4 held to `free_gib` of free VRAM, 32 GiB of RAM.
+
+    The VRAM peaks of smoke.jsonl count the memory vram_cap.py holds (its `held_mib` is in vram-cap.json);
+    memory.txt has the RAM peaks. Returns the number of runs that failed.
+    """
+    items = s2lib.split_jobs(jobs)
+    out = s2lib.run_dir(label)
+    commands = [s2lib.smoke_command(item, out) for item in items]
+    _cap_vram(free_gib, out)
+    _start_services()
+    failed = 0
+    for index, command in enumerate(commands, 1):
+        print(f"\n[{index}/{len(commands)}] $ {command}", flush=True)
+        if _sh(command) != 0:
+            failed += 1
+    _memory_report(out)
     _keep_logs(out)
     print(f"results: modal volume get montagio-results {out.removeprefix('/results/')} .", flush=True)
     return failed
