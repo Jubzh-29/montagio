@@ -58,7 +58,7 @@ test("an extension's tool shows only when the extension is shown", () => {
   const restyle = exploreTools([], info({ extensions: ['restyle'] })).find((tool) => tool.id === 'restyle');
   expect(restyle).toMatchObject({ href: '/?tab=motion&mode=restyle', name: 'restyleTitle' });
   // The object swap opens it in its swap mode, after the restyle it requires.
-  expect(exploreTools([], info({ extensions: ['restyle', 'swap'] })).map((tool) => tool.id)).toEqual(['camera', 'film', 'characters', 'restyle', 'swap', 't2i', 'comfy']);
+  expect(exploreTools([], info({ extensions: ['restyle', 'swap'] })).map((tool) => tool.id)).toEqual(['camera', 'film', 'characters', 'community', 'restyle', 'swap', 't2i', 'comfy']);
   expect(exploreTools([], info({ extensions: ['restyle', 'swap'] })).find((tool) => tool.id === 'swap')).toMatchObject({ href: '/?tab=motion&mode=swap', name: 'swapTitle' });
   // The community gallery is in the showcase too: its rendered clips, remixed on their sample photo.
   expect(exploreTools([], info(), true).map((tool) => tool.id)).toContain('community');
