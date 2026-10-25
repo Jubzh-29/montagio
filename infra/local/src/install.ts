@@ -20,7 +20,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { decide, evaluate, pickGpu, pickPython, pickTorch, type Check, type Decision, type Mode, type Ports, type VramProfile } from './checks.ts';
+import { decide, evaluate, MIN_VRAM_MIB, pickGpu, pickPython, pickTorch, type Check, type Decision, type Mode, type Ports, type VramProfile } from './checks.ts';
 import { npmInvocation, nextBin, tsxCli, type Capture, type Stream } from './exec.ts';
 import { installDefaultExtensions, readExtensions, readLock, readVersions, selectExtensions, weightsFor, type LockWeight } from './pins.ts';
 import {
@@ -181,7 +181,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
   const execPath = deps.execPath ?? process.execPath;
   const versions = readVersions(repoRoot);
   let state: InstallState = readState(L.statePath);
-  // The 12 GB profile once asked for (--low-vram, or accepted on a 12 to 20 GB card) stays for the next runs.
+  // The 12 GB profile once asked for (--low-vram, or accepted on a 12 to 20 GB card) stays for the next runs, on that card.
   let profile: VramProfile = opts.lowVram || state.vramProfile === '12gb' ? '12gb' : 'standard';
   const flag = opts.extensions ?? env.MONTAGIO_EXTENSIONS;
   const config = readExtensions(repoRoot);
@@ -207,6 +207,17 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
   const proxyUrl = opts.demo ? null : (opts.proxyUrl ?? state.proxyUrl);
   const own = await deps.runningPorts();
   const facts = await deps.probe({ os, repoRoot, installDir: opts.dir, ports: [ports.comfy, ports.proxy, ports.app], capture: deps.capture });
+  // A saved 12 GB profile ends on a 24 GB card (a new GPU): every model comes back, unless --low-vram asks again.
+  if (profile === '12gb' && !opts.lowVram && (pickGpu(facts.gpus)?.vramMiB ?? 0) >= MIN_VRAM_MIB) {
+    profile = 'standard';
+    try {
+      enabled = extensionsFor(profile);
+    } catch (error) {
+      deps.log(`error: ${(error as Error).message}`);
+      return 2;
+    }
+    lock = weightsFor(fullLock, enabled);
+  }
 
   const gitHead = async (where: string) => {
     const answer = await deps.capture('git', ['-C', where, 'rev-parse', 'HEAD']);

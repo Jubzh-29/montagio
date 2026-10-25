@@ -234,6 +234,12 @@ test('a 12 GB GPU: the dry run points to --low-vram; a yes installs the 12 GB pr
   const again = harness({ facts: rtx3060, ask: async (q) => (questions.push(q), false) });
   expect(await install(repo, options({ start: false }), again.deps)).toBe(0);
   expect(questions).toHaveLength(1);
+  expect(readState(again.L.statePath).vramProfile).toBe('12gb');
+
+  // A 24 GB card later: every model comes back.
+  const upgraded = harness();
+  expect(await install(repo, options({ start: false }), upgraded.deps)).toBe(0);
+  expect(readState(upgraded.L.statePath).vramProfile).toBe('standard');
 });
 
 test('--low-vram installs the 12 GB profile without asking, and only the extensions validated within 12 GB', async () => {
