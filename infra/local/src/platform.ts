@@ -16,6 +16,9 @@ export type Layout = {
   modelsDir: string;
   /** ComfyUI/custom_nodes/montagio, a link (a junction on Windows) to the repository's comfy-nodes. */
   packLink: string;
+  /** The third-party node packs, cloned at their pinned commits: the avatar's voice, the object swap's tracker. */
+  voiceNodeDir: string;
+  segmentNodeDir: string;
   logsDir: string;
   /** fetch-weights writes weights-report.json here. */
   weightsOut: string;
@@ -70,6 +73,8 @@ export function layout(dir: string, os: Os): Layout {
     proxyExe: bin(proxyVenv, 'comfy-api-proxy'),
     modelsDir: join(comfyDir, 'models'),
     packLink: join(comfyDir, 'custom_nodes', 'montagio'),
+    voiceNodeDir: join(comfyDir, 'custom_nodes', 'ComfyUI-Chatterbox'),
+    segmentNodeDir: join(comfyDir, 'custom_nodes', 'ComfyUI-segment-anything-2'),
     logsDir,
     weightsOut: join(logsDir, 'weights'),
     runDir: join(dir, 'run'),

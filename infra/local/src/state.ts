@@ -9,7 +9,7 @@ import { DEFAULT_PORTS, type Mode, type Ports, type VramProfile } from './checks
 import type { LockWeight } from './pins.ts';
 
 export type WeightRecord = { sha256: string; size: number; mtimeMs: number };
-export type StampId = 'comfyui' | 'comfyEnv' | 'proxy' | 'npm' | 'build' | 'ytDlp';
+export type StampId = 'comfyui' | 'comfyEnv' | 'proxy' | 'npm' | 'build' | 'ytDlp' | 'voiceNode' | 'segmentNode';
 
 export type InstallState = {
   schema: 'montagio/install@0.1';
@@ -19,8 +19,8 @@ export type InstallState = {
   /** App alone with a remote GPU: the comfy-api-proxy URL the app talks to. */
   proxyUrl: string | null;
   /**
-   * Full install: the extensions whose weights it fetched (never the avatar nor the object swap,
-   * whose custom nodes it does not install), passed to the app as MONTAGIO_EXTENSIONS; null before an install
+   * Full install: the extensions whose weights it fetched (the avatar and the object swap only once their
+   * custom node pack is installed), passed to the app as MONTAGIO_EXTENSIONS; null before an install
    * recorded them, or for the app alone, which keeps the user's variable.
    */
   extensions: string[] | null;

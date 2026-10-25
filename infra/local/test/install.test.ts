@@ -12,7 +12,8 @@ import { readState } from '../src/state.ts';
 
 const realRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const os = osOf(process.platform)!;
-const COMMIT = parseVersionsEnv(readFileSync(join(realRoot, 'infra', 'runpod', 'versions.env'), 'utf8')).COMFYUI_COMMIT!;
+const PINS = parseVersionsEnv(readFileSync(join(realRoot, 'infra', 'runpod', 'versions.env'), 'utf8'));
+const COMMIT = PINS.COMFYUI_COMMIT!;
 const GiB = 1024 ** 3;
 /** What the simulated download of yt-dlp gives: the test repository pins its sha256 (never the network). */
 const YTDLP_BYTES = new TextEncoder().encode('a yt-dlp binary');
@@ -34,6 +35,9 @@ beforeEach(() => {
   // A small repository: the real pins, a two-file lock, the files the plan looks at.
   mkdirSync(join(repo, 'infra', 'runpod'), { recursive: true });
   cpSync(join(realRoot, 'infra', 'runpod', 'versions.env'), join(repo, 'infra', 'runpod', 'versions.env'));
+  // The voice pack's patch and requirements: the installer hashes them, and applies and installs them.
+  cpSync(join(realRoot, 'infra', 'runpod', 'patches'), join(repo, 'infra', 'runpod', 'patches'), { recursive: true });
+  cpSync(join(realRoot, 'infra', 'runpod', 'requirements-chatterbox.txt'), join(repo, 'infra', 'runpod', 'requirements-chatterbox.txt'));
   // The yt-dlp the simulated download gives: never the real release, never the network.
   appendFileSync(join(repo, 'infra', 'runpod', 'versions.env'), `\nYTDLP_SHA256_WINDOWS=${YTDLP_SHA256}\nYTDLP_SHA256_LINUX=${YTDLP_SHA256}\n`);
   mkdirSync(join(repo, 'registry'));
@@ -115,6 +119,8 @@ function harness(
       mkdirSync(join(target, 'custom_nodes'));
       writeFileSync(join(target, 'requirements.txt'), 'torch\n');
     }
+    // A node pack, cloned with core.autocrlf off: `git -c core.autocrlf=false clone --quiet <repo> <dir>`.
+    if (cmd === 'git' && args[2] === 'clone') mkdirSync(join(args.at(-1)!, '.git'), { recursive: true });
     const fetch = args.indexOf('--models-dir');
     if (fetch > 0) {
       const models = args[fetch + 1]!;
@@ -136,6 +142,9 @@ function harness(
       const where = args[1]!;
       if (where === repo) return { code: 0, stdout: 'abc123\n', stderr: '' };
       if (!existsSync(join(where, '.git'))) return { code: 128, stdout: '', stderr: 'not a git repository' };
+      // A node pack is at the commit versions.env pins.
+      if (where === L.voiceNodeDir) return { code: 0, stdout: `${PINS.CHATTERBOX_NODE_COMMIT}\n`, stderr: '' };
+      if (where === L.segmentNodeDir) return { code: 0, stdout: `${PINS.SAM2_NODE_COMMIT}\n`, stderr: '' };
       return { code: 0, stdout: `${where === L.comfyDir && opts.comfyHead ? opts.comfyHead : COMMIT}\n`, stderr: '' };
     }
     if (cmd === 'git' && args[2] === 'status') return opts.gitStatus ?? { code: 0, stdout: '', stderr: '' };
@@ -187,7 +196,7 @@ test('dry run executes nothing and writes nothing', async () => {
   expect(h.events).toEqual([]);
   expect(existsSync(dir)).toBe(false);
   const out = h.output();
-  for (const id of ['npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights', 'yt-dlp', 'open-stack', 'app-build', 'save-state', 'start']) {
+  for (const id of ['npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'extension-nodes', 'weights', 'yt-dlp', 'open-stack', 'app-build', 'save-state', 'start']) {
     expect(out).toMatch(new RegExp(`\\[(run|skip)\\]\\s+${id}\\b`));
   }
   expect(out).toContain(`git clone --depth 1 --branch v0.41.0 https://github.com/Comfy-Org/ComfyUI.git ${h.L.comfyTmp}`);
@@ -456,51 +465,97 @@ test('--extensions all fetches the extension weights with --only', async () => {
   expect(fetchedIds(h.calls).sort()).toEqual(['tiny-music', 'tiny-te', 'tiny-vae']);
 });
 
-test('the local installer leaves the avatar out, whose voice node it does not install yet', async () => {
+/** A weight of the avatar and one of the object swap in the lock: their packs are asked for with them. */
+function withNodeExtensionWeights(): void {
   withMusicWeight(5);
   writeFileSync(
     join(repo, 'registry', 'models.lock.yaml'),
     readFileSync(join(repo, 'registry', 'models.lock.yaml'), 'utf8') +
       `  - id: tiny-avatar\n    file: tiny_avatar.safetensors\n    url: https://huggingface.co/Comfy-Org/x/resolve/main/split_files/vae/tiny_avatar.safetensors\n` +
-      `    sha256: ${'a'.repeat(64)}\n    size: 5\n    license: MIT\n    source: https://huggingface.co/x/y\n    extension: avatar\n`,
+      `    sha256: ${'a'.repeat(64)}\n    size: 5\n    license: MIT\n    source: https://huggingface.co/x/y\n    extension: avatar\n` +
+      `  - id: tiny-sam2\n    file: tiny_sam2.safetensors\n    url: https://huggingface.co/Kijai/x/resolve/main/tiny_sam2.safetensors\n` +
+      `    sha256: ${'b'.repeat(64)}\n    size: 5\n    license: Apache-2.0\n    source: https://huggingface.co/x/y\n    extension: swap\n    folder: sam2\n`,
   );
+}
+
+test('the avatar and the object swap get their node packs at the pinned commits, the voice patched and its packages installed', async () => {
+  withNodeExtensionWeights();
   const h = harness();
   expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
-  expect(fetchedIds(h.calls).sort()).toEqual(['tiny-music', 'tiny-te', 'tiny-vae']);
-  expect(h.output()).toMatch(/avatar.*infra\/runpod\/bootstrap\.sh/);
+  const voice = h.L.voiceNodeDir;
+  const sam2 = h.L.segmentNodeDir;
+  const patch = join(repo, 'infra', 'runpod', 'patches', 'comfyui-chatterbox-no-routes.patch');
+  const steps = described(h.calls).filter((line) => line.includes(voice) || line.includes(sam2) || line.includes('--require-hashes') || line.includes('import torchaudio'));
+  expect(steps).toEqual([
+    `git -c core.autocrlf=false clone --quiet ${PINS.CHATTERBOX_NODE_REPO} ${voice}`,
+    `git -C ${voice} -c core.autocrlf=false checkout --quiet --force ${PINS.CHATTERBOX_NODE_COMMIT}`,
+    `git -C ${voice} apply --check ${patch}`,
+    `git -C ${voice} apply ${patch}`,
+    `${h.L.comfyPython} -m pip install --no-deps --require-hashes -r ${join(repo, 'infra', 'runpod', 'requirements-chatterbox.txt')}`,
+    `${h.L.comfyPython} -I -c import torchaudio, s3tokenizer, onnx`,
+    `git -c core.autocrlf=false clone --quiet ${PINS.SAM2_NODE_REPO} ${sam2}`,
+    `git -C ${sam2} -c core.autocrlf=false checkout --quiet --force ${PINS.SAM2_NODE_COMMIT}`,
+  ]);
+  // The packs come before the weights, which the app reads with them.
+  const order = described(h.calls);
+  expect(order.findIndex((line) => line.includes(sam2))).toBeLessThan(order.findIndex((line) => line.includes('--models-dir')));
+  expect(fetchedIds(h.calls)).toEqual(expect.arrayContaining(['tiny-avatar', 'tiny-sam2']));
+  const state = readState(h.L.statePath);
+  expect(state.extensions).toEqual(expect.arrayContaining(['avatar', 'swap', 'music']));
+  expect(state.stamps.voiceNode).toMatch(new RegExp(`^${PINS.CHATTERBOX_NODE_COMMIT} [0-9a-f]{16}$`));
+  expect(state.stamps.segmentNode).toBe(PINS.SAM2_NODE_COMMIT);
+  expect(readFileSync(join(sam2, '.montagio-stamp'), 'utf8').trim()).toBe(PINS.SAM2_NODE_COMMIT);
+  // Installed: the next run clones nothing.
+  const again = harness();
+  expect(await install(repo, options({ start: false, extensions: 'all' }), again.deps)).toBe(0);
+  expect(described(again.calls).filter((line) => line.includes(voice) || line.includes(sam2))).toEqual([]);
 });
 
-test('the local installer leaves the object swap out, whose SAM 2 node it does not install yet', async () => {
-  withMusicWeight(5);
-  writeFileSync(
-    join(repo, 'registry', 'models.lock.yaml'),
-    readFileSync(join(repo, 'registry', 'models.lock.yaml'), 'utf8') +
-      `  - id: tiny-sam2
-    file: tiny_sam2.safetensors
-    url: https://huggingface.co/Kijai/x/resolve/main/tiny_sam2.safetensors
-` +
-      `    sha256: ${'b'.repeat(64)}
-    size: 5
-    license: Apache-2.0
-    source: https://huggingface.co/x/y
-    extension: swap
-    folder: sam2
-`,
-  );
-  const h = harness();
+test('a node pack that fails leaves its extension out, never half installed, and the install goes on', async () => {
+  withNodeExtensionWeights();
+  const h = harness({ failOn: (call) => call.args.includes('--require-hashes') });
   expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
-  expect(fetchedIds(h.calls)).not.toContain('tiny-sam2');
-  expect(h.output()).toMatch(/object swap.*infra\/runpod\/bootstrap\.sh/);
+  expect(h.output()).toMatch(/warning: python(\.exe)? -m pip install \.\.\. exited with code 1; the avatar extension is left out/);
+  // An unpatched or half-installed voice pack would open its /chatterbox/* routes: its folder is gone.
+  expect(existsSync(h.L.voiceNodeDir)).toBe(false);
+  expect(fetchedIds(h.calls)).not.toContain('tiny-avatar');
+  expect(fetchedIds(h.calls)).toContain('tiny-sam2');
+  const state = readState(h.L.statePath);
+  expect(state.extensions).not.toContain('avatar');
+  expect(state.extensions).toContain('swap');
+  expect(state.stamps.voiceNode).toBeUndefined();
+});
+
+test('a folder Montagio did not clone stays as it is, and its extension is left out', async () => {
+  withNodeExtensionWeights();
+  // A first install makes ComfyUI; then someone puts their own copy of the SAM 2 pack in its place.
+  await install(repo, options({ start: false }), harness().deps);
+  const h = harness();
+  mkdirSync(h.L.segmentNodeDir, { recursive: true });
+  writeFileSync(join(h.L.segmentNodeDir, 'mine.py'), '# my own copy\n');
+  expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
+  expect(h.output()).toMatch(/ComfyUI-segment-anything-2 is a folder Montagio did not clone.*the object swap extension is left out/);
+  expect(readFileSync(join(h.L.segmentNodeDir, 'mine.py'), 'utf8')).toBe('# my own copy\n');
   expect(readState(h.L.statePath).extensions).not.toContain('swap');
 });
 
-test('a full install records the extensions it fetched, never the avatar, for the app to show', async () => {
+test.runIf(os === 'windows')("on Windows, the voice pack needs Python 3.12: another one leaves the avatar out", async () => {
+  withNodeExtensionWeights();
+  const h = harness({ facts: facts({ pythons: [{ command: ['py', '-3.13'], version: [3, 13, 1], hasVenv: true }] }) });
+  expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
+  expect(h.output()).toMatch(/voice node has its packages for Python 3\.12 on Windows.*not 3\.13.*the avatar extension is left out/);
+  expect(described(h.calls).some((line) => line.includes(h.L.voiceNodeDir))).toBe(false);
+  expect(readState(h.L.statePath).extensions).toEqual(expect.arrayContaining(['swap']));
+  expect(readState(h.L.statePath).extensions).not.toContain('avatar');
+});
+
+test('a full install records the extensions it fetched, for the app to show', async () => {
   withMusicWeight(5);
   const h = harness();
   expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
   const recorded = readState(h.L.statePath).extensions;
   expect(recorded).toContain('music');
-  expect(recorded).not.toContain('avatar');
+  expect(recorded).toContain('avatar');
 });
 
 test('a plain install fetches the effects pack once it is validated, not the other validated extensions', async () => {

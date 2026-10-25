@@ -177,5 +177,5 @@ How the times were taken: `smoke.ts` ([`infra/runpod`](../infra/runpod)) compile
   - Films and ads have no voice to caption: their music is instrumental.
 - Fun Camera renders push-ins, pull-backs and side moves well, vertical moves and rolls poorly.
 - Motion transfer needs a photo framed like the reference video.
-- The local installer leaves the talking avatar out: its voice node is installed by the GPU-session tooling only.
+- The local installer installs the avatar's voice node and the object swap's SAM 2 node when those extensions are asked for; the voice node's packages exist for Python 3.12 only on Windows.
 - The checks above prove each graph and measure each render; they are not a benchmark across GPUs.

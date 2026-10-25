@@ -18,7 +18,13 @@ export type Versions = {
   torchFallback: TorchPin;
   /** The remix's link importer: a release binary per system, by its sha256. */
   ytDlp: { version: string; sha256: { windows: string; linux: string } };
+  /** The custom node packs an extension needs, at their pinned commits: the avatar's voice, the object swap's tracker. */
+  voiceNode: NodePack;
+  segmentNode: NodePack;
 };
+
+/** A third-party ComfyUI node pack: its repository and the commit it is checked out at. */
+export type NodePack = { repo: string; commit: string };
 
 /** `folder` is relative to ComfyUI's models/; `extension` is null for the weights of the camera presets. */
 export type LockWeight = { id: string; file: string; url: string; sha256: string; size: number; folder: string; extension: string | null };
@@ -80,6 +86,8 @@ export function versionsFrom(env: Record<string, string>): Versions {
     torch: pin('TORCH_VERSION', 'TORCHVISION_VERSION', 'TORCH_CUDA'),
     torchFallback: pin('TORCH_FALLBACK_VERSION', 'TORCHVISION_FALLBACK_VERSION', 'TORCH_FALLBACK_CUDA'),
     ytDlp: { version: get('YTDLP_VERSION'), sha256: { windows: get('YTDLP_SHA256_WINDOWS'), linux: get('YTDLP_SHA256_LINUX') } },
+    voiceNode: { repo: get('CHATTERBOX_NODE_REPO'), commit: get('CHATTERBOX_NODE_COMMIT') },
+    segmentNode: { repo: get('SAM2_NODE_REPO'), commit: get('SAM2_NODE_COMMIT') },
   };
 }
 

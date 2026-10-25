@@ -1,7 +1,21 @@
 import { win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readLock, readVersions, weightsFor } from '../src/pins.ts';
-import { buildPlan, buildStamp, diskNeed, envStamp, proxyStamp, weightsToClear, weightsToFetch, ytDlpStamp, ytDlpUrl, type PlanInput, type Step } from '../src/plan.ts';
+import {
+  buildPlan,
+  buildStamp,
+  diskNeed,
+  envStamp,
+  proxyStamp,
+  voiceNodeStamp,
+  voiceWheelsFit,
+  weightsToClear,
+  weightsToFetch,
+  ytDlpStamp,
+  ytDlpUrl,
+  type PlanInput,
+  type Step,
+} from '../src/plan.ts';
 import { layout } from '../src/platform.ts';
 import { emptyState, type InstallState } from '../src/state.ts';
 
@@ -28,6 +42,9 @@ function fresh(over: Partial<PlanInput> = {}): PlanInput {
     weightStat: () => null,
     comfy: { head: null, exists: false, tmpExists: false, marked: false },
     packTarget: null,
+    extensions: [],
+    nodeStamps: { voice: null, segment: null },
+    voiceExtras: '0123456789abcdef',
     artifacts: { comfyPython: false, proxyExe: false, appBuild: false, ytDlp: false },
     repo: { head: 'abc123', lockHash: 'h1', nodeModules: false },
     servicesRunning: false,
@@ -70,7 +87,7 @@ const step = (steps: Step[], id: Step['id']) => steps.find((s) => s.id === id)!;
 test('a fresh machine runs every install step, in order', () => {
   const steps = buildPlan(fresh());
   expect(steps.map((s) => s.id)).toEqual([
-    'stop-services', 'npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights', 'yt-dlp', 'open-stack', 'app-build', 'save-state', 'start',
+    'stop-services', 'npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'extension-nodes', 'weights', 'yt-dlp', 'open-stack', 'app-build', 'save-state', 'start',
   ]);
   expect(running(steps)).toEqual(['npm-ci', 'comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights', 'yt-dlp', 'open-stack', 'app-build', 'save-state', 'start']);
 });
@@ -135,7 +152,7 @@ test('a clone left half done is removed first, then cloned again', () => {
 
 test('the app alone has no ComfyUI, proxy, pack or weights step', () => {
   const ids = buildPlan(fresh({ mode: 'app-only', python: null, torch: null })).map((s) => s.id);
-  for (const id of ['comfyui', 'comfyui-env', 'proxy', 'node-pack', 'weights'] as const) expect(ids).not.toContain(id);
+  for (const id of ['comfyui', 'comfyui-env', 'proxy', 'node-pack', 'extension-nodes', 'weights'] as const) expect(ids).not.toContain(id);
 });
 
 test('the app alone says whether it renders through a saved proxy URL or runs the demo', () => {
@@ -235,3 +252,36 @@ test('envStamp and buildStamp change with what they depend on', () => {
   expect(buildStamp(null, 'h')).toBeNull();
   expect(buildStamp('a', 'h')).not.toBe(buildStamp('a', 'h2'));
 });
+
+test('the avatar and the object swap get their node packs, at the commits of versions.env', () => {
+  const extras = '0123456789abcdef';
+  const nodes = step(buildPlan(installed({ extensions: ['avatar', 'swap'] })), 'extension-nodes');
+  expect(nodes.run).toBe(true);
+  expect(nodes.why).toBe('the voice pack: not installed; the SAM 2 pack: not installed');
+  expect(nodes.detail).toEqual([
+    `git -c core.autocrlf=false clone https://github.com/wildminder/ComfyUI-Chatterbox.git ${L.voiceNodeDir}`,
+    `git -C ${L.voiceNodeDir} checkout --force ${versions.voiceNode.commit}, then check that HEAD is ${versions.voiceNode.commit}`,
+    `git -C ${L.voiceNodeDir} apply ${win32.join(repoRoot, 'infra/runpod/patches/comfyui-chatterbox-no-routes.patch')} (its /chatterbox/* HTTP routes removed)`,
+    `${L.comfyPython} -m pip install --no-deps --require-hashes -r ${win32.join(repoRoot, 'infra/runpod/requirements-chatterbox.txt')}`,
+    `${L.comfyPython} -I -c "import torchaudio, s3tokenizer, onnx"`,
+    `git -c core.autocrlf=false clone https://github.com/kijai/ComfyUI-segment-anything-2.git ${L.segmentNodeDir}`,
+    `git -C ${L.segmentNodeDir} checkout --force ${versions.segmentNode.commit}, then check that HEAD is ${versions.segmentNode.commit}`,
+  ]);
+  // Installed: nothing to do; a new patch or requirements file (another hash) installs the voice pack again.
+  const done = { voice: voiceNodeStamp(versions, extras), segment: versions.segmentNode.commit };
+  expect(step(buildPlan(installed({ extensions: ['avatar', 'swap'], nodeStamps: done })), 'extension-nodes')).toMatchObject({ run: false, why: 'up to date' });
+  const again = step(buildPlan(installed({ extensions: ['avatar', 'swap'], nodeStamps: done, voiceExtras: 'ffffffffffffffff' })), 'extension-nodes');
+  expect(again).toMatchObject({ run: true, why: 'the voice pack: another version' });
+  // Without those extensions, no pack.
+  expect(step(buildPlan(installed()), 'extension-nodes')).toMatchObject({ run: false, why: 'no extension of this install needs one', detail: [] });
+});
+
+test("the voice pack's wheels: Python 3.12 on Windows, 3.10 to 3.13 on Linux", () => {
+  expect(voiceWheelsFit('windows', [3, 12, 10])).toBe(true);
+  expect(voiceWheelsFit('windows', [3, 13, 1])).toBe(false);
+  expect(voiceWheelsFit('windows', [3, 11, 9])).toBe(false);
+  expect(voiceWheelsFit('linux', [3, 10, 12])).toBe(true);
+  expect(voiceWheelsFit('linux', [3, 13, 0])).toBe(true);
+  expect(voiceWheelsFit('linux', [3, 14, 0])).toBe(false);
+});
+

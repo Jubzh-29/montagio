@@ -1,3 +1,5 @@
 # Shell scripts and files they source run on Linux pods: keep LF everywhere.
 *.sh text eol=lf
 *.env text eol=lf
+# A patch applies to a node pack cloned with core.autocrlf off: a CRLF copy on Windows would not apply.
+*.patch text eol=lf

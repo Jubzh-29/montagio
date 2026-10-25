@@ -13,6 +13,7 @@ export type Violation = {
     | 'weight-file'
     | 'weight-unlisted'
     | 'node-not-allowed'
+    | 'node-pack'
     | 'forbidden-pattern'
     | 'closed-package'
     | 'library';
@@ -417,6 +418,62 @@ function weightSourceProblems(lock: LockEntry[], sources: AllowedSources): strin
   return problems;
 }
 
+/** A node of allowed-nodes.yaml: its class, where it comes from ("comfyui-core", or "owner/repo@commit"), its license. */
+type AllowedNode = { class_type: string; source?: string; license?: string };
+
+/** The licenses a third-party node pack the installers clone may carry, read at its pinned commit. */
+const NODE_PACK_LICENSES = ['Apache-2.0', 'MIT'];
+
+/**
+ * The third-party node packs infra/runpod/versions.env pins (FOO_NODE_REPO and FOO_NODE_COMMIT), which the GPU tooling
+ * and the local installer clone, against the sources of allowed-nodes.yaml ("owner/repo@commit"): each pack must be
+ * the source of an allowed node, at its commit, under Apache-2.0 or MIT; each such source must be a pinned pack.
+ */
+function nodePackProblems(versionsEnv: string, nodes: readonly AllowedNode[]): string[] {
+  const values = new Map<string, string>();
+  for (const raw of versionsEnv.split(/\r?\n/)) {
+    const line = raw.trim();
+    const eq = line.indexOf('=');
+    if (line && !line.startsWith('#') && eq > 0) values.set(line.slice(0, eq).trim(), line.slice(eq + 1).trim());
+  }
+  const pinned: { name: string; repo: string; commit: string }[] = [];
+  for (const [key, url] of values) {
+    const name = /^(\w+)_NODE_REPO$/.exec(key)?.[1];
+    if (!name) continue;
+    const repo = /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(url)?.[1];
+    const commit = values.get(`${name}_NODE_COMMIT`) ?? '';
+    if (!repo) pinned.push({ name, repo: url, commit });
+    else pinned.push({ name, repo: repo.toLowerCase(), commit });
+  }
+  const sources = nodes.flatMap((node) => {
+    const match = /^([\w.-]+\/[\w.-]+)@([0-9a-f]{7,40})$/.exec(node.source ?? '');
+    return match ? [{ node, repo: match[1]!.toLowerCase(), commit: match[2]! }] : [];
+  });
+  const problems: string[] = [];
+  for (const pack of pinned) {
+    if (!/^[0-9a-f]{40}$/.test(pack.commit)) {
+      problems.push(`${pack.name}_NODE_COMMIT is not a full commit hash: a node pack is cloned at a pinned commit, never a branch`);
+      continue;
+    }
+    const nodesOf = sources.filter((source) => source.repo === pack.repo);
+    if (nodesOf.length === 0) problems.push(`${pack.name}_NODE_REPO ${pack.repo} is the source of no node in allowed-nodes.yaml`);
+    for (const source of nodesOf) {
+      if (!pack.commit.startsWith(source.commit)) {
+        problems.push(`${source.node.class_type} comes from ${pack.repo}@${source.commit}, but ${pack.name}_NODE_COMMIT pins ${pack.commit.slice(0, 8)}`);
+      }
+      if (!NODE_PACK_LICENSES.includes(source.node.license ?? '')) {
+        problems.push(`${source.node.class_type} (${pack.repo}) is under ${source.node.license ?? 'no license'}, not ${NODE_PACK_LICENSES.join(' or ')}`);
+      }
+    }
+  }
+  for (const source of sources) {
+    if (!pinned.some((pack) => pack.repo === source.repo)) {
+      problems.push(`${source.node.class_type} comes from ${source.repo}, which infra/runpod/versions.env does not pin`);
+    }
+  }
+  return problems;
+}
+
 /**
  * `configDir` holds allowed-nodes.yaml, allowed-sources.yaml and forbidden-patterns.yaml; it defaults to
  * this package directory and must be passed explicitly when the code is bundled.
@@ -492,8 +549,14 @@ export async function checkOpenStack(root: string, opts: { configDir?: string } 
   }
 
   // Workflow nodes: allow-list only, so partner nodes and unknown nodes are refused.
-  const allowed = await readYaml<{ nodes: { class_type: string }[] }>(join(configDir, 'allowed-nodes.yaml'));
+  const allowed = await readYaml<{ nodes: AllowedNode[] }>(join(configDir, 'allowed-nodes.yaml'));
   const allowedNodes = new Set(allowed.nodes.map((node) => node.class_type));
+  // The node packs the installers clone: those of allowed-nodes.yaml, at their commits, under an open license.
+  const versionsFile = join('infra', 'runpod', 'versions.env');
+  const versionsEnv = await readIfPresent(join(root, versionsFile));
+  if (versionsEnv) {
+    for (const problem of nodePackProblems(versionsEnv, allowed.nodes)) violations.push({ rule: 'node-pack', file: versionsFile, detail: problem });
+  }
   for (const path of await listFiles(join(root, 'workflows'))) {
     if (!path.endsWith('.json')) continue;
     const workflow = JSON.parse(await readFile(path, 'utf8')) as Record<

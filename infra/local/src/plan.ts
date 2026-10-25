@@ -17,6 +17,7 @@ export type StepId =
   | 'comfyui-env'
   | 'proxy'
   | 'node-pack'
+  | 'extension-nodes'
   | 'weights'
   | 'yt-dlp'
   | 'open-stack'
@@ -46,6 +47,12 @@ export type PlanInput = {
   comfy: { head: string | null; exists: boolean; tmpExists: boolean; marked: boolean };
   /** Where custom_nodes/montagio points today: null if it does not exist, its own path if it is a real folder. */
   packTarget: string | null;
+  /** The extensions this install fetches: the avatar needs the voice node pack, the object swap the SAM 2 one. */
+  extensions: readonly string[];
+  /** What each node pack's folder says it holds (its .montagio-stamp), null without one. */
+  nodeStamps: { voice: string | null; segment: string | null };
+  /** The hash of the voice pack's patch and requirements: a new one installs the pack again. */
+  voiceExtras: string;
   /** What the stamps stand for is still there: the venv Python, the proxy launcher, the app build (BUILD_ID), yt-dlp. */
   artifacts: { comfyPython: boolean; proxyExe: boolean; appBuild: boolean; ytDlp: boolean };
   /** head: the repository's commit (null outside git); lockHash: sha256 of package-lock.json. */
@@ -62,6 +69,11 @@ export const BUILD_BYTES = 1 * GiB;
 export const MARGIN_BYTES = 2 * GiB;
 
 export const OPEN_STACK_REPORT = 'apps/web/public/open-stack-report.json';
+/** The avatar's voice pack is patched (its /chatterbox/* HTTP routes removed) and gets its Python packages, pinned and hashed. */
+export const VOICE_NODE_PATCH = 'infra/runpod/patches/comfyui-chatterbox-no-routes.patch';
+export const VOICE_NODE_REQUIREMENTS = 'infra/runpod/requirements-chatterbox.txt';
+/** What the voice pack's packages must import once installed, in ComfyUI's Python. */
+export const VOICE_NODE_IMPORTS = 'import torchaudio, s3tokenizer, onnx';
 export const FETCH_WEIGHTS = 'infra/runpod/fetch-weights.ts';
 export const CHECK_OPEN_STACK = 'tools/check-open-stack/src/cli.ts';
 
@@ -78,6 +90,28 @@ export function ytDlpUrl(versions: Versions, os: Os): string {
 
 export function ytDlpStamp(versions: Versions, os: Os): string {
   return `yt-dlp==${versions.ytDlp.version} sha256:${versions.ytDlp.sha256[os]}`;
+}
+
+/** What a voice pack's folder holds once installed: its commit, and the hash of the patch and requirements it got. */
+export function voiceNodeStamp(versions: Versions, extras: string): string {
+  return `${versions.voiceNode.commit} ${extras}`;
+}
+
+/**
+ * Whether the voice pack's wheels (requirements-chatterbox.txt) exist for this system: Linux x86_64 for CPython
+ * 3.10 to 3.13, Windows x64 for 3.12 only.
+ */
+export function voiceWheelsFit(os: Os, python: readonly number[]): boolean {
+  return python[0] === 3 && (os === 'linux' ? python[1]! >= 10 && python[1]! <= 13 : python[1] === 12);
+}
+
+export type NodePackId = 'voice' | 'segment';
+/** The node packs `extensions` need, with the stamp each must reach. */
+export function nodePacksFor(input: Pick<PlanInput, 'extensions' | 'versions' | 'voiceExtras'>): { id: NodePackId; extension: 'avatar' | 'swap'; want: string }[] {
+  return [
+    ...(input.extensions.includes('avatar') ? [{ id: 'voice' as const, extension: 'avatar' as const, want: voiceNodeStamp(input.versions, input.voiceExtras) }] : []),
+    ...(input.extensions.includes('swap') ? [{ id: 'segment' as const, extension: 'swap' as const, want: input.versions.segmentNode.commit }] : []),
+  ];
 }
 
 /** null outside a git checkout: the app is then rebuilt on every install. */
@@ -230,6 +264,36 @@ export function buildPlan(input: PlanInput): Step[] {
       run: !linked,
       why: linked ? 'already linked' : input.packTarget ? `points to ${input.packTarget}` : 'not linked',
       detail: [`${L.packLink} -> ${packDir} (${os === 'windows' ? 'junction' : 'symbolic link'})`],
+    });
+
+    // The third-party node packs of the avatar and the object swap, at the commits of versions.env (both Apache-2.0,
+    // in tools/check-open-stack/allowed-nodes.yaml). A pack that fails leaves its extension out, not the install.
+    const packs = nodePacksFor(input);
+    const stale = packs.filter((pack) => input.nodeStamps[pack.id] !== pack.want);
+    const clone = (repo: string, dir: string, commit: string) => [
+      `git -c core.autocrlf=false clone ${repo} ${dir}`,
+      `git -C ${dir} checkout --force ${commit}, then check that HEAD is ${commit}`,
+    ];
+    add({
+      id: 'extension-nodes',
+      title: 'the node packs of the avatar (voice) and the object swap (SAM 2), at their pinned commits',
+      run: stale.length > 0,
+      why:
+        packs.length === 0
+          ? 'no extension of this install needs one'
+          : stale.length === 0
+            ? 'up to date'
+            : stale.map((pack) => `${pack.id === 'voice' ? 'the voice pack' : 'the SAM 2 pack'}: ${input.nodeStamps[pack.id] ? 'another version' : 'not installed'}`).join('; '),
+      detail: stale.flatMap((pack) =>
+        pack.id === 'voice'
+          ? [
+              ...clone(versions.voiceNode.repo, L.voiceNodeDir, versions.voiceNode.commit),
+              `git -C ${L.voiceNodeDir} apply ${path.join(input.repoRoot, VOICE_NODE_PATCH)} (its /chatterbox/* HTTP routes removed)`,
+              `${L.comfyPython} -m pip install --no-deps --require-hashes -r ${path.join(input.repoRoot, VOICE_NODE_REQUIREMENTS)}`,
+              `${L.comfyPython} -I -c "${VOICE_NODE_IMPORTS}"`,
+            ]
+          : clone(versions.segmentNode.repo, L.segmentNodeDir, versions.segmentNode.commit),
+      ),
     });
 
     const toFetch = weightsToFetch(input.lock, state, input.weightStat);

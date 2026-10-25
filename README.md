@@ -196,7 +196,7 @@ What gets downloaded:
 | `--extensions none` | the camera presets alone | about 90 GB |
 | `--app-only` | none: the app alone, in demo mode or rendering on a remote GPU with `--proxy-url` | — |
 
-Add `--dry-run` to see every step without changing anything. A stopped download resumes when you run the same command again. The local installer leaves the talking avatar, the voice change and the object swap out for now: they run on custom nodes that only the GPU-session tooling installs.
+Add `--dry-run` to see every step without changing anything. A stopped download resumes when you run the same command again. Asked for with `--extensions`, the talking avatar (and with it the voice change and the captions) and the object swap come with the custom node each runs on, cloned at a pinned commit: the voice node, patched to remove its HTTP routes, with its Python packages pinned by hash (Python 3.12 on Windows), and the SAM 2 tracker. A node that fails to install leaves its extension out, not the rest of the install.
 
 Everything else, from everyday commands to troubleshooting and uninstalling: [docs/INSTALL.md](docs/INSTALL.md).
 
@@ -214,7 +214,7 @@ The next steps follow the same rule as everything above: an open model enters th
 | Camera moves | orbits and bullet time from keyframes: Edit-2511 viewpoints, then Wan 2.2 FLF2V |
 | Photo edit | more looks and finer relights as Apache-2.0 LoRAs on Edit-2511 |
 | Music | songs with lyrics on ACE-Step 1.5 |
-| Install | the avatar, the voice change and the object swap in the local installer; a container image |
+| Install | a container image |
 | Restyle and object swap | longer clips over several VACE windows, several objects swapped at once, on the weights already here |
 | ComfyUI | the node pack published on the Comfy Registry, the workflows on the Comfy Hub (both prepared) |
 | Provenance | C2PA manifests on every output (c2pa-python, Apache-2.0) |

@@ -619,3 +619,44 @@ test('every third-party node is allowed at the commit that versions.env pins for
     expect(pinned.get(repo), `${node.class_type} from ${repo}`).toMatch(new RegExp(`^${commit}`));
   }
 });
+
+describe('check-open-stack holds the node packs the installers clone to allowed-nodes.yaml', () => {
+  /** A configuration folder: the tool's own, with `allowedNodes` as allowed-nodes.yaml. */
+  const configWith = (allowedNodes: string) => {
+    const dir = mkdtempSync(join(tmpdir(), 'montagio-config-'));
+    scratchRepos.push(dir);
+    for (const name of ['allowed-sources.yaml', 'forbidden-packages.yaml', 'forbidden-patterns.yaml', 'forbidden-python-packages.yaml']) {
+      writeFileSync(join(dir, name), readFileSync(join(toolDir, name), 'utf8'));
+    }
+    writeFileSync(join(dir, 'allowed-nodes.yaml'), allowedNodes);
+    return dir;
+  };
+  const voice = 'a'.repeat(40);
+  const pins = (commit: string) =>
+    scratchRepo({ 'infra/runpod/versions.env': `# pins\nCHATTERBOX_NODE_REPO=https://github.com/wildminder/ComfyUI-Chatterbox.git\nCHATTERBOX_NODE_COMMIT=${commit}\n` });
+  const nodes = (source: string, license = 'Apache-2.0') =>
+    `schema: montagio/allowed-nodes@0.1\nnodes:\n  - { class_type: LoadImage, source: comfyui-core, license: GPL-3.0 }\n  - { class_type: ChatterboxMTLTTS, source: ${source}, license: ${license} }\n`;
+  const packProblems = async (root: string, config: string) =>
+    (await checkOpenStack(root, { configDir: config })).violations.filter((v) => v.rule === 'node-pack').map((v) => v.detail);
+  const listed = `wildminder/ComfyUI-Chatterbox@${voice.slice(0, 8)}`;
+
+  test('a pack at the commit of its source, under Apache-2.0, passes', async () => {
+    expect(await packProblems(pins(voice), configWith(nodes(listed)))).toEqual([]);
+  });
+
+  test('another commit, another license, a pack no node comes from, a source nobody pins, a branch: each fails', async () => {
+    expect(await packProblems(pins('b'.repeat(40)), configWith(nodes(listed)))).toEqual([
+      'ChatterboxMTLTTS comes from wildminder/comfyui-chatterbox@aaaaaaaa, but CHATTERBOX_NODE_COMMIT pins bbbbbbbb',
+    ]);
+    expect(await packProblems(pins(voice), configWith(nodes(listed, 'GPL-3.0')))).toEqual([
+      'ChatterboxMTLTTS (wildminder/comfyui-chatterbox) is under GPL-3.0, not Apache-2.0 or MIT',
+    ]);
+    expect(await packProblems(pins(voice), configWith(nodes(`someone/other-pack@${voice.slice(0, 8)}`)))).toEqual([
+      'CHATTERBOX_NODE_REPO wildminder/comfyui-chatterbox is the source of no node in allowed-nodes.yaml',
+      'ChatterboxMTLTTS comes from someone/other-pack, which infra/runpod/versions.env does not pin',
+    ]);
+    expect(await packProblems(pins('main'), configWith(nodes(listed)))).toEqual([
+      'CHATTERBOX_NODE_COMMIT is not a full commit hash: a node pack is cloned at a pinned commit, never a branch',
+    ]);
+  });
+});

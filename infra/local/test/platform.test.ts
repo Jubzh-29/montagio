@@ -50,6 +50,8 @@ test('the Linux layout uses bin/', () => {
     proxyExe: '/s/venvs/comfy-api-proxy/bin/comfy-api-proxy',
     modelsDir: '/s/ComfyUI/models',
     packLink: '/s/ComfyUI/custom_nodes/montagio',
+    voiceNodeDir: '/s/ComfyUI/custom_nodes/ComfyUI-Chatterbox',
+    segmentNodeDir: '/s/ComfyUI/custom_nodes/ComfyUI-segment-anything-2',
     logsDir: '/s/logs',
     weightsOut: '/s/logs/weights',
     runDir: '/s/run',

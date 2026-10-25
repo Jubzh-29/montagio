@@ -30,13 +30,19 @@ import {
   diskNeed,
   envStamp,
   FETCH_WEIGHTS,
+  nodePacksFor,
   OPEN_STACK_REPORT,
   proxyStamp,
+  VOICE_NODE_IMPORTS,
+  VOICE_NODE_PATCH,
+  VOICE_NODE_REQUIREMENTS,
+  voiceWheelsFit,
   weightsToClear,
   weightsToFetch,
   ytDlpStamp,
   ytDlpUrl,
   type FileStat,
+  type NodePackId,
   type Step,
   type StepId,
 } from './plan.ts';
@@ -80,6 +86,8 @@ export type InstallDeps = {
 };
 
 const LABEL = { ok: 'ok  ', warn: 'warn', fail: 'FAIL' } as const;
+/** What a node pack's folder holds once installed, as infra/runpod/bootstrap.sh writes it. */
+const NODE_STAMP = '.montagio-stamp';
 const CUDA_CHECK =
   'import torch; assert torch.cuda.is_available(), "torch sees no CUDA device"; ' +
   'print(f"[montagio] torch {torch.__version__} (CUDA {torch.version.cuda}) on {torch.cuda.get_device_name(0)}")';
@@ -189,18 +197,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
   let profile: VramProfile = opts.lowVram || state.vramProfile === '12gb' ? '12gb' : 'standard';
   const flag = opts.extensions ?? env.MONTAGIO_EXTENSIONS;
   const config = readExtensions(repoRoot);
-  const extensionsFor = (asked: VramProfile) => {
-    const chosen = flag?.trim() ? selectExtensions(config, flag, asked) : installDefaultExtensions(config, asked);
-    if (chosen.includes('avatar')) {
-      // Its voice runs on a pinned, patched custom node that only infra/runpod/bootstrap.sh installs for now.
-      deps.log('note: the avatar extension is left out: its voice node is installed by infra/runpod/bootstrap.sh only, not by this installer yet');
-    }
-    if (chosen.includes('swap')) {
-      // Its tracker runs on a pinned custom node (SAM 2) that only infra/runpod/bootstrap.sh installs for now.
-      deps.log('note: the object swap extension is left out: its SAM 2 tracking node is installed by infra/runpod/bootstrap.sh only, not by this installer yet');
-    }
-    return chosen.filter((id) => id !== 'avatar' && id !== 'swap');
-  };
+  const extensionsFor = (asked: VramProfile) => (flag?.trim() ? selectExtensions(config, flag, asked) : installDefaultExtensions(config, asked));
   let enabled: string[];
   try {
     enabled = extensionsFor(profile);
@@ -239,6 +236,21 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     if (file) return file.size === w.size ? w.size : 0;
     return statOrNull(join(L.modelsDir, w.folder, `${w.file}.part`))?.size ?? 0;
   };
+  // What each node pack's folder holds, and the hash of the voice pack's patch and requirements (a new one installs it again).
+  const stampIn = (dir: string) => {
+    try {
+      return readFileSync(join(dir, NODE_STAMP), 'utf8').trim() || null;
+    } catch {
+      return null;
+    }
+  };
+  const nodeDirs: Record<NodePackId, string> = { voice: L.voiceNodeDir, segment: L.segmentNodeDir };
+  const nodeStamps = { voice: stampIn(L.voiceNodeDir), segment: stampIn(L.segmentNodeDir) };
+  const voiceExtras = createHash('sha256')
+    .update(readFileSync(join(repoRoot, VOICE_NODE_PATCH)))
+    .update(readFileSync(join(repoRoot, VOICE_NODE_REQUIREMENTS)))
+    .digest('hex')
+    .slice(0, 16);
   const comfyExists = existsSync(L.comfyDir);
   const comfy = {
     exists: comfyExists,
@@ -268,6 +280,9 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
       weightStat,
       comfy,
       packTarget: readLink(L.packLink),
+      extensions: mode === 'full' ? enabled : [],
+      nodeStamps,
+      voiceExtras,
       artifacts: {
         comfyPython: existsSync(L.comfyPython),
         proxyExe: existsSync(L.proxyExe),
@@ -323,6 +338,30 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     if (code !== 0) throw new Error(`${basename(cmd)} ${args.slice(0, 3).join(' ')} ... exited with code ${code}`);
   };
   const { torch, python } = plan;
+
+  /** A node pack cloned at its pinned commit (the voice pack patched, its packages installed and imported), then stamped. */
+  const installNodePack = async (id: NodePackId, dir: string, want: string) => {
+    const pin = id === 'voice' ? versions.voiceNode : versions.segmentNode;
+    if (id === 'voice' && python && !voiceWheelsFit(os ?? 'linux', python.version)) {
+      throw new Error(`the avatar's voice node has its packages for Python 3.12 on Windows (3.10 to 3.13 on Linux), not ${python.version[0]}.${python.version[1]}`);
+    }
+    if (existsSync(dir) && !existsSync(join(dir, '.git'))) {
+      throw new Error(`${dir} is a folder Montagio did not clone: move it away, then run the same command again`);
+    }
+    if (!existsSync(dir)) await run('git', ['-c', 'core.autocrlf=false', 'clone', '--quiet', pin.repo, dir]);
+    // --force drops an earlier copy of the patch, so that it is applied once, to the pinned files.
+    await run('git', ['-C', dir, '-c', 'core.autocrlf=false', 'checkout', '--quiet', '--force', pin.commit]);
+    const head = await gitHead(dir);
+    if (head !== pin.commit) throw new Error(`${dir} is at ${head ?? 'an unreadable commit'}, expected ${pin.commit}`);
+    if (id === 'voice') {
+      const patch = join(repoRoot, VOICE_NODE_PATCH);
+      await run('git', ['-C', dir, 'apply', '--check', patch]);
+      await run('git', ['-C', dir, 'apply', patch]);
+      await run(L.comfyPython, ['-m', 'pip', 'install', '--no-deps', '--require-hashes', '-r', join(repoRoot, VOICE_NODE_REQUIREMENTS)]);
+      await run(L.comfyPython, ['-I', '-c', VOICE_NODE_IMPORTS]);
+    }
+    writeFileSync(join(dir, NODE_STAMP), `${want}\n`);
+  };
 
   const actions: Record<StepId, () => Promise<number | void>> = {
     'stop-services': () => deps.stopAll(),
@@ -404,7 +443,9 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
         }
         save({ ...state, weights });
       }
-      const ids = plan.toFetch.map((w) => w.id);
+      // A node pack that failed left its extension out, and its weights with it.
+      const ids = plan.toFetch.filter((w) => lock.some((kept) => kept.id === w.id)).map((w) => w.id);
+      if (ids.length === 0) return;
       const report = join(L.weightsOut, 'weights-report.json');
       rmSync(report, { force: true });
       const code = await deps.stream(execPath, [tsxCli(repoRoot), FETCH_WEIGHTS, '--models-dir', L.modelsDir, '--only', ids.join(','), '--out', L.weightsOut], {
@@ -428,6 +469,22 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
       writeFileSync(`${L.ytDlpExe}.part`, bytes, { mode: 0o755 });
       renameSync(`${L.ytDlpExe}.part`, L.ytDlpExe);
       stamp('ytDlp', ytDlpStamp(versions, system));
+    },
+    'extension-nodes': async () => {
+      for (const pack of nodePacksFor({ extensions: enabled, versions, voiceExtras })) {
+        if (nodeStamps[pack.id] === pack.want) continue;
+        const dir = nodeDirs[pack.id];
+        try {
+          await installNodePack(pack.id, dir, pack.want);
+          stamp(pack.id === 'voice' ? 'voiceNode' : 'segmentNode', pack.want);
+        } catch (error) {
+          // A pack half installed never stays: an unpatched voice pack would open its /chatterbox/* routes.
+          if (existsSync(join(dir, '.git'))) rmSync(dir, { recursive: true, force: true });
+          deps.log(`warning: ${(error as Error).message}; the ${pack.extension === 'avatar' ? 'avatar' : 'object swap'} extension is left out, the rest of the install goes on`);
+          enabled = enabled.filter((id) => id !== pack.extension);
+          lock = weightsFor(fullLock, enabled);
+        }
+      }
     },
     'open-stack': () => run(execPath, [tsxCli(repoRoot), CHECK_OPEN_STACK, '.', '--out', OPEN_STACK_REPORT], { cwd: repoRoot }),
     'app-build': async () => {
