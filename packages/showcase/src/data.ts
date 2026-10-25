@@ -3,6 +3,9 @@ import type { OpenStackReport } from '@montagio/check-open-stack';
 import type { ApiWorkflow, Aspect } from '@montagio/presets';
 import type { LockEntry, ModelEntry } from '@montagio/registry';
 
+/** The model that restored a rendered file to 1080p (its HD pass, SeedVR2), named as the caption shows it. */
+export type ShowcaseHdModel = { id: string; name: string; license: string };
+
 /** An effect or a hook of the showcase, with the sample photos it was rendered on. */
 export type ShowcaseExampleItem = {
   id: string;
@@ -11,8 +14,8 @@ export type ShowcaseExampleItem = {
   modelId: string;
   modelName: string;
   license: string;
-  /** `poster`: the clip's first frame, shown while it loads (absent in data written before it). */
-  examples: { sample: string; url: string; workflowUrl: string; poster?: string }[];
+  /** `poster`: the clip's first frame, shown while it loads (absent in data written before it); `hd`: its HD pass. */
+  examples: { sample: string; url: string; workflowUrl: string; poster?: string; hd?: ShowcaseHdModel }[];
 };
 
 /**
@@ -34,7 +37,8 @@ export type ShowcaseData = {
   library: { models: [string, ModelEntry][]; templates: [string, ApiWorkflow][]; lock: [string, LockEntry][] };
   /** `prompt`: the text the photo was made from, offered by the showcase's Text to image. */
   samples: { id: string; title: { en: string; fr: string }; aspect: Aspect; url: string; placeholder: boolean; credit: string; prompt?: string }[];
-  clips: { preset: string; sample: string; url: string; verticalUrl: string; workflowUrl: string; placeholder: boolean }[];
+  /** `hd`: the clip had an HD pass (absent in data written before it, or for a 480p clip); `recipeUrl`: a rendered clip's recipe. */
+  clips: { preset: string; sample: string; url: string; verticalUrl: string; workflowUrl: string; recipeUrl?: string; placeholder: boolean; hd?: ShowcaseHdModel }[];
   /** The effects and hooks rendered on a sample in a GPU session; one without an example is not listed. */
   effects: ShowcaseExampleItem[];
   hooks: (ShowcaseExampleItem & { references: 1 | 2 })[];

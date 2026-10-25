@@ -1,5 +1,9 @@
-import type { Library, Preset } from '@montagio/presets';
+import { dimensionsFor, UPSCALE_TARGETS, type Aspect, type Library, type Preset, type Resolution } from '@montagio/presets';
 import { clipFile, verticalFile, workflowFile, type ClipEntry, type Manifest, type SampleEntry } from './manifest';
+
+/** The size of a rendered file of the showcase: the render's own, or 1080p once it had its HD pass. */
+export const renderedSize = (aspect: Aspect, resolution: Resolution, hd: boolean): { width: number; height: number } =>
+  hd ? { ...UPSCALE_TARGETS[aspect] } : dimensionsFor(aspect, resolution);
 
 /** One preset × sample pair of the showcase, with the clip rendered for it if there is one. */
 export type PlannedClip = {

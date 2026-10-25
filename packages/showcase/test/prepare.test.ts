@@ -60,6 +60,17 @@ test('copies a rendered clip as it is and marks it not placeholder', async () =>
   expect(workflow).toMatch(/"(noise_)?seed": 7/);
 }, PREPARE_TIMEOUT_MS);
 
+test('writes the recipe of a rendered clip, and none for a placeholder', async () => {
+  await addRenderedClip(root, rawA, 'crash-push', { seed: 7 });
+  const data = await prepareShowcase(root, { outDir: out, strict: false, repoUrl: null });
+  const clip = data.clips.find((entry) => entry.preset === 'crash-push')!;
+  expect(clip.recipeUrl).toBe('recipes/crash-push--landscape-a.json');
+  const recipe = JSON.parse(readFileSync(join(out, clip.recipeUrl!), 'utf8')) as { schema: string; seed: number; steps: { name: string }[]; stack: { comfyui: { tag: string } } };
+  expect(recipe).toMatchObject({ schema: 'montagio/recipe@1', seed: 7, steps: [{ name: 'camera' }], stack: { comfyui: { tag: 'v0.41.0' } } });
+  expect(data.clips.find((entry) => entry.preset === 'pan-left')!.recipeUrl).toBeUndefined();
+  expect(existsSync(join(out, 'recipes', 'pan-left--landscape-a.json'))).toBe(false);
+}, PREPARE_TIMEOUT_MS);
+
 test('data.json lists presets with their YAML, the library, the samples and the clips', async () => {
   const returned = await prepareShowcase(root, { outDir: out, strict: false, repoUrl: 'https://example.org/montagio' });
   const data = JSON.parse(readFileSync(join(out, 'data.json'), 'utf8')) as ShowcaseData;

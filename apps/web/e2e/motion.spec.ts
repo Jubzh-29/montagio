@@ -10,7 +10,7 @@ test('a motion transfer in demo mode: the photo, a reference clip, the rights bo
   // No wall on this tab: the canvas shows the monitor.
   await expect(page.getByRole('button', { name: 'Gallery', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
-  await expect(page.getByText('Add a reference video to generate.')).toBeVisible();
+  // A clip of one's own replaces the sample dance, and asks for the rights.
   await page.setInputFiles('#motion-video-input', referenceClip);
   // The server keeps 5 s at most, without the sound, and says so.
   await expect(page.getByTestId('motion-video-kept')).toHaveText(/^[\d.]+ s kept of [\d.]+ s, without its sound$/, { timeout: 30_000 });
@@ -22,6 +22,17 @@ test('a motion transfer in demo mode: the photo, a reference clip, the rights bo
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('ai-caption')).toHaveText(/Animate/);
   await expect(page.getByTestId('motion-no-sound')).toBeVisible();
+});
+
+test('Sample brings the character and its dance: no rights to confirm, and the GPU render of that pair', async ({ page }) => {
+  await page.goto(MOTION);
+  await expect(page.getByRole('link', { name: 'Motion', exact: true })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await expect(page.getByTestId('motion-video-kept')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('checkbox', { name: 'I hold the rights on this video and on this photo' })).toHaveCount(0);
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('ai-caption')).toHaveText(/^Demo render: no model ran here\. On a GPU, .*Animate.* made this clip of the same sample photo · AI-generated$/);
 });
 
 test('the Motion tab draws no camera move over the photo', async ({ page }) => {

@@ -84,3 +84,22 @@ test('the examples have canonical names too', () => {
   expect(hookFile('iris-dive', 'portrait-a')).toBe('hooks/iris-dive--portrait-a.mp4');
   expect(exampleWorkflowFile('hook', 'iris-dive', 'portrait-a')).toBe('workflows/hook-iris-dive--portrait-a.json');
 });
+
+test('a withheld render names its sample and cannot be listed as well', () => {
+  const withheld = "withheld:\n  - { effect: squish, sample: landscape-a, reason: 'hands crush a person' }\n  - { preset: crash-push, sample: nowhere, reason: 'a test' }\n";
+  const text = `${INITIAL_MANIFEST}effects:\n${example('effect', 'squish', 'landscape-a')}${withheld}`;
+  expect(problemsOf(text)).toEqual(['withheld.0: squish × landscape-a is withheld but listed in effects', 'withheld.1.sample: unknown sample "nowhere"']);
+  const ok = parseManifest(`${INITIAL_MANIFEST}withheld:\n  - { effect: squish, sample: portrait-a, reason: 'hands crush a person' }\n`, 'm.yaml');
+  expect(ok.withheld).toEqual([{ effect: 'squish', sample: 'portrait-a', reason: 'hands crush a person' }]);
+  expect(problemsOf(`${INITIAL_MANIFEST}withheld:\n  - { effect: squish, sample: portrait-a }\n`)).toContainEqual(expect.stringMatching(/^withheld\.0/));
+});
+
+test('a clip may carry its own texts and its HD pass', () => {
+  const hd = `hd: { model: seedvr2-upscale, seed: 42, input: up--crash-push--landscape-a.mp4, source_sha256: ${SHA}, workflow_sha256: ${SHA}, rendered_at: 2026-10-24 }`;
+  const entry = clip('crash-push', 'landscape-a').replace('seed: 42,', "seed: 7, description: 'the boat stays still', negative: 'ghosting',").replace(' }\n', `, ${hd} }\n`);
+  const manifest = parseManifest(INITIAL_MANIFEST.replace('clips: []\n', `clips:\n${entry}`), 'm.yaml');
+  expect(manifest.clips[0]).toMatchObject({ seed: 7, description: 'the boat stays still', negative: 'ghosting', hd: { model: 'seedvr2-upscale', input: 'up--crash-push--landscape-a.mp4' } });
+  expect(problemsOf(INITIAL_MANIFEST.replace('clips: []\n', `clips:\n${entry.replace('input: up--crash-push--landscape-a.mp4', 'input: ../clip.mp4')}`))).toContainEqual(
+    expect.stringMatching(/^clips\.0\.hd\.input: must be the file name of an \.mp4 clip/),
+  );
+});

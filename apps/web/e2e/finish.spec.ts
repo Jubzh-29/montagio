@@ -1,4 +1,8 @@
+import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
+
+// Not a sample: a gradient the demo has no GPU render of.
+const ownPhoto = resolve(__dirname, '../../../demo-assets/images/_default.png');
 
 test('Sample keeps a description the visitor typed before it', async ({ page }) => {
   await page.goto('/?tab=camera');
@@ -20,12 +24,34 @@ test('the latest creations are labelled, and a clip shows a frame past its first
   await expect(item.locator('video')).toHaveAttribute('src', /#t=0\.5$/);
 });
 
-test('in demo mode, a result says that no model ran', async ({ page }) => {
+test('in demo mode, the sample photo gets the GPU render of that photo, and says no model ran here', async ({ page }) => {
   await page.goto('/?tab=camera');
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId('ai-caption')).toHaveText(/^Demo render: no model ran here\. With a GPU, Wan 2\.2 Fun Camera Turbo \(Apache-2\.0\) makes it\.$/);
+  await expect(page.getByTestId('ai-caption')).toHaveText(
+    /^Demo render: no model ran here\. On a GPU, Wan 2\.2 Fun Camera \(Apache-2\.0\) made this clip of the same sample photo · AI-generated$/,
+  );
+});
+
+test('in demo mode, an effect on the sample subject is the GPU render of that subject', async ({ page }) => {
+  await page.goto('/?tab=effects');
+  await expect(page.getByRole('link', { name: 'Effects', exact: true })).toHaveAttribute('aria-current', 'page');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('ai-caption')).toHaveText(/^Demo render: no model ran here\. On a GPU, .+ made this clip of the same sample photo · AI-generated$/);
+});
+
+test('in demo mode, another photo is moved by FFmpeg, and the caption says so', async ({ page }) => {
+  await page.goto('/?tab=camera');
+  await page.setInputFiles('input[type=file]', ownPhoto);
+  await page.getByRole('textbox', { name: 'What the photo shows', exact: true }).fill('a gradient from blue to rust');
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('ai-caption')).toHaveText(
+    /^Demo render: FFmpeg moves the photo, no model ran here\. With a GPU, Wan 2\.2 Fun Camera Turbo \(Apache-2\.0\) makes it\.$/,
+  );
 });
 
 test('the sample photo fits the tab: a subject for an effect, a face for an avatar, a character for a motion', async ({ page }) => {

@@ -1,16 +1,44 @@
 # Montagio nodes for ComfyUI
 
-Two nodes that read a Montagio camera preset (a YAML file) and output the values ComfyUI's own nodes take: camera move and speed, size, frame count, fps, prompt and negative prompt. The same preset file drives a clip in the Montagio app and in a ComfyUI graph. A third node, Montagio Camera Embedding, gives the Wan 2.2 Fun Camera models two camera moves at once or one after the other; in `camera_mode` `combined`, the preset nodes feed it both moves of a preset.
+**Camera presets as files, and two camera moves in one clip, for Wan 2.2 Fun Camera.**
 
-The nodes use the V3 node API, so they need ComfyUI 0.41.0 or newer.
+![The Montagio nodes in a Wan 2.2 Fun Camera graph: Load Montagio Preset feeds Montagio Camera Embedding, the prompts and the video size](docs/graph-pack.jpg)
+
+The core `WanCameraEmbedding` node takes one camera move. This pack adds three nodes:
+
+- **Montagio Camera Embedding** takes two moves, run **at once** (a crane that rises while it pushes in) or **one after the other** (push in, then hold; zoom in, then out). It is a drop-in for `WanCameraEmbedding`: same inputs, same outputs, and the same tensor when the second move is `Static` and `combine` is `together`.
+- **Load Montagio Preset** turns a camera preset, a small YAML file, into everything the graph needs: the moves and their speed, the video size and frame count, the fps, the prompt and the negative prompt. Pick a preset in its menu instead of rewiring the graph.
+- **Montagio Preset from YAML** does the same from a text field: paste a preset remixed in the Montagio app.
+
+The preset files are the ones the [Montagio app](../README.md) renders, under CC-BY-4.0: the same file gives the same clip in the app and in a ComfyUI graph, and in ComfyUI's App Mode a whole graph becomes a preset menu, an image and a prompt. The 11 presets bundled here were rendered on a 24 GB GPU (an NVIDIA L4) on 2026-10-21, five of them with two moves.
+
+The nodes use the V3 node API, so they need ComfyUI 0.41.0 or newer. They are light: they read a file and compute a camera path. The video model they feed needs a 24 GB GPU.
 
 ## Install
 
-The pack is not on the Comfy Registry yet (see [Publishing](#publishing)). For now, copy the `comfy-nodes` folder of this repository to `ComfyUI/custom_nodes/montagio` and restart ComfyUI. Its two dependencies, PyYAML and numpy, come with ComfyUI. The nodes appear in the `Montagio` category.
+Once the pack is on the Comfy Registry, install it with the ComfyUI Manager (search "Montagio") or with `comfy node install montagio`. Until then, copy the `comfy-nodes` folder of this repository to `ComfyUI/custom_nodes/montagio` and restart ComfyUI. Its two dependencies, PyYAML and numpy, come with ComfyUI. The nodes appear in the `Montagio` category.
 
-Once the pack is published, `comfy node install montagio` will install it.
+## Example workflow
 
-No example workflow ships with the pack yet.
+The pack ships one example, [`example_workflows/montagio-camera-presets.json`](example_workflows/montagio-camera-presets.json). ComfyUI lists it under **Templates**, in the pack's own category, with its thumbnail. It is the Wan 2.2 Fun Camera 14B graph of the official template (20 steps, 480p), with Load Montagio Preset on Rise & Push (two moves at once) feeding Montagio Camera Embedding, the two prompts and `CreateVideo`. A note in the graph lists the model files.
+
+![The whole example graph, with its note](docs/graph-full.jpg)
+
+| File | Put under `ComfyUI/models/` | License, source |
+|---|---|---|
+| `wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors` | `diffusion_models/` | Apache-2.0, [alibaba-pai/Wan2.2-Fun-A14B-Control-Camera](https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera) |
+| `wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors` | `diffusion_models/` | Apache-2.0, same |
+| `umt5_xxl_fp8_e4m3fn_scaled.safetensors` | `text_encoders/` | Apache-2.0, [google/umt5-xxl](https://huggingface.co/google/umt5-xxl) |
+| `wan_2.1_vae.safetensors` | `vae/` | Apache-2.0, [Wan-AI/Wan2.1-I2V-14B-480P](https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P) |
+
+The files are Comfy-Org's repackagings in [Comfy-Org/Wan_2.2_ComfyUI_Repackaged](https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged) and [Comfy-Org/Wan_2.1_ComfyUI_repackaged](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged); their exact URLs and sha256 are in the repository's [`registry/models.lock.yaml`](../registry/models.lock.yaml). On the L4, a 5 s clip at 480p took 1,110 to 1,170 s, with a peak of 18 to 21 GB of VRAM; an RTX 4090 is about twice as fast.
+
+Two rules from those renders:
+
+- **Say what the photo shows.** Write it in the preset node's `prompt`, before the preset's own text. Without it, Fun Camera invents what it cannot see and the clip turns ghostly.
+- **Push-ins, pull-backs and side moves work best.** Vertical moves and rolls barely show on Fun Camera, which is why the library has Crane Up (Pan Up at speed 2) and no tilt or Dutch preset.
+
+The other Montagio workflows (effects, hooks, avatar, motion transfer, HD), in the same format, are in [`comfy-hub/`](../comfy-hub/README.md).
 
 ## Nodes
 
@@ -158,9 +186,19 @@ Three tests of `tests/test_camera.py` run Montagio Camera Embedding beside the c
 
 ## Publishing
 
-`PublisherId` in the `[tool.comfy]` table and `Repository` in `[project.urls]` of `pyproject.toml` are marked TODO. Fill them in once the GitHub repository and the Registry publisher exist.
+Nothing is published automatically. `pyproject.toml` holds two placeholders, and the publish workflow refuses to run while either is left:
 
-The workflow `.github/workflows/publish-comfy-nodes.yml` runs `comfy node publish` from the `comfy-nodes` folder. It starts only by hand (`workflow_dispatch`, from the Actions tab) and needs a Registry API key in the repository secret `REGISTRY_ACCESS_TOKEN`. `.comfyignore` keeps `tests/`, `scripts/` and `requirements-dev.txt` out of the published folder. Nothing is published automatically.
+- `PublisherId = "YOUR-PUBLISHER-ID"` in `[tool.comfy]`;
+- `OWNER` in the `Repository`, `Documentation` and `"Bug Tracker"` URLs of `[project.urls]` and in the `Icon` URL.
+
+To publish:
+
+1. Push the repository to GitHub, then replace `OWNER` with its account in `pyproject.toml`.
+2. On [registry.comfy.org](https://registry.comfy.org), sign in, create a publisher and put its id in `PublisherId`. Create an API key for that publisher.
+3. In the GitHub repository's settings, add the key as the secret `REGISTRY_ACCESS_TOKEN`.
+4. From the Actions tab, run **Publish ComfyUI node pack** (`.github/workflows/publish-comfy-nodes.yml`, `workflow_dispatch` only). It checks the placeholders, then runs `comfy node publish` from the `comfy-nodes` folder with comfy-cli 1.22.0, telemetry off.
+
+`.comfyignore` keeps `tests/`, `scripts/` and `requirements-dev.txt` out of the published folder; `example_workflows/`, the bundled presets and the images of this README go with it. Bump `version` (three-part semantic version) for each new release.
 
 ## Licenses
 
