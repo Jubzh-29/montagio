@@ -229,9 +229,9 @@ export type LibraryMotionSummary = {
 export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'restyle' | 'swap' | 'ad' | 'voice-change' | 'moodboard' | 'translate' | 'captions' | 'remix' | 'remix-skeleton';
 
 import type { CaptionStyleId, CaptionWord } from '@montagio/captions';
-import type { CharacterKind, CharacterType } from './characters';
+import type { CharacterKind, CharacterTraits, CharacterType } from './characters';
 
-export type { CharacterKind, CharacterType };
+export type { CharacterKind, CharacterTraits, CharacterType };
 
 /** A picture of a character: its portrait's edit in a new scene (the photodump). */
 export type CharacterPhotoSummary = {
@@ -251,10 +251,14 @@ export type CharacterSummary = {
   type: CharacterType;
   /** Who the character is; absent on the characters made before the kinds. */
   kind?: CharacterKind;
+  /** Its fine traits, when some were picked. */
+  traits?: CharacterTraits;
+  /** The starting face it was made from, instead of a portrait made here. */
+  faceId?: string;
   description: string;
   imageRef: string;
   imageUrl: string;
-  /** The history item that brings the portrait back in the Studio. */
+  /** The history item (or the starting face, "face:<id>") that brings the portrait back in the Studio. */
   portraitHistoryKey?: string;
   createdAt: string;
   photos: CharacterPhotoSummary[];

@@ -335,3 +335,30 @@
   cursor: default;
   opacity: 0.6;
 }
+
+.traits {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.traits legend {
+  padding: 0;
+}
+
+.faces {
+  display: grid;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.showcaseFaces {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 720px;
+  margin-top: var(--space-5);
+}

@@ -4,14 +4,17 @@ import Link from 'next/link';
 import { useState, type DragEvent } from 'react';
 import { useI18n } from '@/i18n';
 import type { SampleSummary } from '@/lib/api-types';
+import type { BankFace } from '@/lib/character-bank';
+import { FacePicker } from './FacePicker';
 import type { UploadState } from './Monitor';
 import { SamplePicker } from './SamplePicker';
 import styles from './studio.module.css';
 
 /**
  * The start photo, in the composer: its thumbnail (a drop zone while empty) and the
- * ways to get one: import, sample, create from a text, edit. In the showcase the
- * sample photos replace the import, unless its `uploads` capability says otherwise.
+ * ways to get one: import, sample, create from a text, edit, or a starting face for the
+ * tabs that need a person. In the showcase the sample photos replace the import, unless
+ * its `uploads` capability says otherwise.
  */
 export function PhotoSource({
   upload,
@@ -22,6 +25,7 @@ export function PhotoSource({
   t2i,
   edit,
   showcase,
+  faces,
 }: {
   upload: UploadState;
   disabled: boolean;
@@ -37,6 +41,8 @@ export function PhotoSource({
     uploads: boolean;
     onRefusedFile: () => void;
   };
+  /** The starting faces, for a tab whose photo is a person or a character. */
+  faces?: { list: readonly BankFace[]; selectedId: string | null; onPick: (face: BankFace) => void };
 }) {
   const { t } = useI18n();
   const [dragging, setDragging] = useState(false);
@@ -123,6 +129,14 @@ export function PhotoSource({
           )}
         </div>
       </div>
+      {faces && faces.list.length > 0 && (
+        <>
+          <p className={styles.facesLead}>
+            {t('facesStudioLead')}
+          </p>
+          <FacePicker faces={faces.list} selectedId={faces.selectedId} disabled={disabled} label={t('facesTitle')} onPick={faces.onPick} />
+        </>
+      )}
       {showcase && <SamplePicker samples={showcase.samples} selectedId={showcase.selectedId} onPick={showcase.onPick} />}
       {upload.status === 'error' && (
         <p className={styles.photoError} role="alert">

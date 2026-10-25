@@ -369,7 +369,29 @@ Avec l'accord de l'utilisateur (« Oui, lance la validation GPU du remix de tend
 - **Coût réel : 0,23 $** (les plans et l'image 0,19 $, Gemma sur le volume 0,01 $, les deux passages du squelette 0,03 $). Relevé du mois : 22,60 $.
 - **Daté** : `gpu_validated: 2026-10-25`. L'aperçu `presets/extensions/previews/remix.mp4` (l'exemple et son remix côte à côte, 153 Ko) vient de ce rendu.
 
-## 19. Sous-titres sur GPU (25/10)
+## 19. Banque de visages de départ (25/10)
+
+Un conteneur L4 du compte « montagio-2 » (fonction `series`), le 25/10 à 15 h 13 (heure de Paris), puis une reprise de 5 visages à 15 h 22, avec l'accord de l'utilisateur (environ 0,13 $ annoncés, plafond 0,20 $).
+
+**Méthode.** 28 personnages fictifs (`apps/web/src/lib/character-bank.ts`) : humains hors norme, animaux debout, robots, extraterrestres, quelques-uns en pâte à modeler et en anime. Chacun a son espèce, son style, ses traits (coiffure, proportions, peau, ajouts, yeux), sa description et sa graine. Le texte est celui de l'onglet Personnages (`characterPrompt`), à 720p en 9:16, comme `/api/images`. Avant toute dépense, le smoke en `--dry-run` a compilé les 28 workflows : identiques, après normalisation, à ceux du Studio, et acceptés par le ComfyUI CPU (`node_errors` vide). Le smoke donne sa graine à chaque image (`--t2i "id@9:16#graine=texte"`).
+
+| Mesure | Valeur |
+|---|---|
+| 1er portrait, chargement compris | 45,9 s |
+| Portraits suivants | 8,6 à 9,3 s |
+| Pic de VRAM | 20,5 à 22,3 Go |
+| Coût | 0,098 $ (28 visages) + 0,033 $ (reprise de 5), soit 0,13 $ |
+
+**Revue, visage par visage.** 23 sur 28 étaient bons du premier coup. Trois montraient trop de peau malgré « a modest outfit » : Inès (veste sans haut dessous), Tavi (veste ouverte sur les rayures de la peau) et Ren (« cropped bomber » rendu en haut court). Deux animaux étaient assis comme de vrais animaux : Duke et Mochi. Leurs descriptions ont été précisées (haut à col roulé, veste fermée, « standing upright on two legs ») puis rendues de nouveau avec les mêmes graines. Inès, Tavi, Ren et Mochi sont corrigés ; Duke reste assis, et il est gardé. Aucun trait ne ressemble à une maladie réelle, et aucun visage ne rappelle une personne connue.
+
+**Livré.** Pour chaque visage, `apps/web/scripts/character-bank.mts ingest` vérifie que le workflow rendu est celui que le Studio compile, puis écrit :
+- `demo-assets/faces/<id>.jpg` : 720 × 1280, 1,9 Mo pour les 28, marqué AI-generated ;
+- `demo-assets/faces/<id>.recipe.json` : une recette `montagio/recipe@1`, avec la requête `/api/images` qui le refait (texte, 9:16, graine), le workflow, les poids et le sha256 du JPEG ;
+- `apps/web/public/characters/faces/<id>.webp` : une vignette de 240 × 320, recadrée depuis le haut, 244 Ko pour les 28.
+
+La vitrine statique n'en montre que 6 (`SHOWCASE_FACES`). Elle copie tout `public/`, donc les 244 Ko des 28 vignettes ; les JPEG de `demo-assets/faces/` n'y vont pas. Planches et sorties brutes : `s3/validation/20261025-151310-character-bank/` et `…-152254-character-bank-retake/`, hors dépôt.
+
+## 20. Sous-titres sur GPU (25/10)
 
 Demandé par l'utilisateur (« go » à « On boucle les deux trous (sous-titres sur GPU et installeur) avant la coupe ? », environ 0,05 à 0,10 $, plafond 0,15 $). Le node Montagio Transcribe Words (Whisper large-v3 turbo) n'avait tourné que sur le ComfyUI CPU.
 

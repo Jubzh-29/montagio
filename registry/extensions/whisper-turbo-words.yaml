@@ -4,7 +4,7 @@
 # needs: no other node pack. The core Save Text node writes the words as JSON (comfy-api-proxy types it
 # "file"). The app sends the speech as mono FLAC at 16 kHz; "auto" lets Whisper detect the language.
 # Optional within the extension: a ComfyUI without the node or the folder hides the captions only.
-# Validated on an L4 on 2026-10-25 (docs/S2_RESULTATS.md, part 19): the words and moments of the avatar example,
+# Validated on an L4 on 2026-10-25 (docs/S2_RESULTATS.md, part 20): the words and moments of the avatar example,
 # the same as on the CPU ComfyUI, in 10.5 s with the model's loading, 4.9 GB.
 schema: montagio/extension-model@0.1
 id: whisper-turbo-words

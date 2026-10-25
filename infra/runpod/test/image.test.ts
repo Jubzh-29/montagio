@@ -12,6 +12,15 @@ test('imagePrompts reads NAME=TEXT and NAME@ASPECT=TEXT, 16:9 by default', () =>
   expect(imagePrompts(['a-b_2@1:1=x=y'])).toEqual([{ name: 'a-b_2', aspect: '1:1', text: 'x=y' }]);
 });
 
+test('imagePrompts reads the own seed of an image, NAME@ASPECT#SEED=TEXT, within 32 bits', () => {
+  expect(imagePrompts(['marlo@9:16#7101=a portrait', 'odile#0=x'])).toEqual([
+    { name: 'marlo', aspect: '9:16', text: 'a portrait', seed: 7101 },
+    { name: 'odile', aspect: '16:9', text: 'x', seed: 0 },
+  ]);
+  expect(() => imagePrompts(['marlo@9:16#4294967296=x'])).toThrow(/#SEED/);
+  expect(() => imagePrompts(['marlo#-1=x'])).toThrow(/NAME=TEXT/);
+});
+
 test('imagePrompts refuses a missing name or text, an unknown aspect and a repeated name', () => {
   expect(() => imagePrompts(['a harbor at dusk'])).toThrow(/NAME=TEXT/);
   expect(() => imagePrompts(['start=  '])).toThrow(/NAME=TEXT/);

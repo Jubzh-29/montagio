@@ -11,6 +11,7 @@ import { POST as cancelJob } from '@/app/api/jobs/[id]/cancel/route';
 import { POST as postTrendImport } from '@/app/api/remix/import/route';
 import { POST as postTrendShots } from '@/app/api/remix/shots/route';
 import { POST as cancelSequence } from '@/app/api/sequences/[id]/cancel/route';
+import { POST as postFaceUpload } from '@/app/api/uploads/face/route';
 import { POST as postTrend } from '@/app/api/uploads/remix/route';
 import { POST as postTrendSample } from '@/app/api/uploads/remix/sample/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
@@ -40,6 +41,8 @@ const form = (field: string | null, site?: string) => {
   return new Request('http://localhost/api/x', { method: 'POST', headers: site ? { 'sec-fetch-site': site } : {}, body });
 };
 const bare = (method: string, site?: string) => new Request('http://localhost/api/x', { method, headers: site ? { 'sec-fetch-site': site } : {} });
+// A starting face that ships: past the guard, it is copied.
+const face = (site?: string) => new Request('http://localhost/api/uploads/face?id=marlo', { method: 'POST', headers: site ? { 'sec-fetch-site': site } : {} });
 const text = (body: unknown, headers: Record<string, string> = {}) =>
   new Request('http://localhost/api/x', { method: 'POST', headers: { 'content-type': 'text/plain', ...headers }, body: JSON.stringify(body) });
 const json = (body: unknown, site?: string) =>
@@ -59,6 +62,7 @@ test('another site cannot send a photo, a video or a voice, nor copy a sample', 
     await refused(await postSpeech(form('video', site)));
     await refused(await postSampleUpload(bare('POST', site)));
     await refused(await postSampleVideo(bare('POST', site)));
+    await refused(await postFaceUpload(face(site)));
   }
   expect(existsSync(join(dataDir(), 'uploads'))).toBe(false);
 });
@@ -67,6 +71,8 @@ test("the app's own pages, and a script that names no site, still send them", as
   expect((await postUpload(form('image', 'same-origin'))).status).toBe(200);
   expect((await postUpload(uploadRequest(pngFile(1920, 1080)))).status).toBe(200);
   expect((await postSampleUpload(bare('POST', 'same-origin'))).status).toBe(201);
+  expect((await postFaceUpload(face('same-origin'))).status).toBe(201);
+  expect((await postFaceUpload(face())).status).toBe(201);
   // Past the guard, an empty form is the route's own refusal.
   for (const route of [postVideo, postVoice, postSpeech]) expect((await route(form(null, 'same-origin'))).status).toBe(400);
 });

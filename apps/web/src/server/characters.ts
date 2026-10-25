@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { CharacterKind, CharacterSummary, CharacterType } from '@/lib/api-types';
-import { CHARACTER_KINDS, CHARACTER_TYPES } from '@/lib/characters';
+import type { CharacterKind, CharacterSummary, CharacterTraits, CharacterType } from '@/lib/api-types';
+import { FACE_KEY_PREFIX, faceById } from '@/lib/character-bank';
+import { CHARACTER_KINDS, CHARACTER_TYPES, knownTraits } from '@/lib/characters';
 import { getEnv } from './env';
 import { JobError } from './errors';
 import { assertNoBlockedName } from './guards';
@@ -21,10 +22,13 @@ type CharacterRecord = {
   type: CharacterType;
   /** Who the character is (absent on the characters made before the kinds). */
   kind?: CharacterKind;
+  traits?: CharacterTraits;
   description: string;
   imageRef: string;
   /** The text-to-image job that made the portrait: its history item brings the portrait back in the Studio. */
   jobId?: string;
+  /** Or the starting face it was made from: the Studio loads that face again. */
+  faceId?: string;
   photos: CharacterPhoto[];
   createdAt: string;
 };
@@ -45,10 +49,16 @@ function summary(record: CharacterRecord): CharacterSummary {
     name: record.name,
     type: record.type,
     ...(record.kind ? { kind: record.kind } : {}),
+    ...(record.traits && Object.keys(record.traits).length > 0 ? { traits: record.traits } : {}),
+    ...(record.faceId ? { faceId: record.faceId } : {}),
     description: record.description,
     imageRef: record.imageRef,
     imageUrl: mediaOf(record.imageRef),
-    ...(record.jobId ? { portraitHistoryKey: `job:${record.jobId}` } : {}),
+    ...(record.jobId
+      ? { portraitHistoryKey: `job:${record.jobId}` }
+      : record.faceId
+        ? { portraitHistoryKey: `${FACE_KEY_PREFIX}${record.faceId}` }
+        : {}),
     createdAt: record.createdAt,
     photos: record.photos.map((photo) => ({
       imageRef: photo.imageRef,
@@ -112,7 +122,11 @@ export async function createCharacter(body: Record<string, unknown>): Promise<Ch
   const type = CHARACTER_TYPES.find((value) => value === body.type);
   // A person when nothing says otherwise; an unknown kind is refused.
   const kind = body.kind === undefined ? 'human' : CHARACTER_KINDS.find((value) => value === body.kind);
-  if (!name || !description || !type || !kind) throw new JobError('invalid-input');
+  // Known traits only, like the kind.
+  const traits = knownTraits(body.traits);
+  // A starting face of the bank, by its id; its picture is checked like any other below.
+  const faceId = body.faceId === undefined ? undefined : typeof body.faceId === 'string' ? faceById(body.faceId)?.id : undefined;
+  if (!name || !description || !type || !kind || !traits || (body.faceId !== undefined && !faceId)) throw new JobError('invalid-input');
   const imageRef = await assertFictionalPhoto(body.imageRef);
   await assertNoBlockedName(name, description);
   const jobId = typeof body.jobId === 'string' && SAFE_ID.test(body.jobId) ? body.jobId : undefined;
@@ -121,9 +135,10 @@ export async function createCharacter(body: Record<string, unknown>): Promise<Ch
     name,
     type,
     kind,
+    ...(Object.keys(traits).length > 0 ? { traits } : {}),
     description,
     imageRef,
-    ...(jobId ? { jobId } : {}),
+    ...(jobId ? { jobId } : faceId ? { faceId } : {}),
     photos: [],
     createdAt: new Date().toISOString(),
   };
