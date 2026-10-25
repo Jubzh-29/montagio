@@ -40,6 +40,8 @@ test('the showcase opens on a clip, then plays the pre-generated clip of another
   // What the showcase is stays in sight under the clip.
   await expect(page.getByText(/clips pre-generated with Montagio on open weights/)).toBeVisible();
   await expect(page.getByTestId('result-caption')).toHaveText(/Placeholder|Pre-generated with Montagio/);
+  // The showcase opens on the Effects tab: the camera presets are on the Camera one.
+  await page.getByRole('link', { name: 'Camera', exact: true }).click();
   await showGallery(page);
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await page.getByRole('button', { name: /^Show clip/ }).click();
@@ -88,10 +90,10 @@ test('a dropped photo is explained, never uploaded', async ({ page }) => {
 });
 
 test('the remix is checked for real but not rendered', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?tab=camera');
   await showGallery(page);
   await page.getByRole('button', { name: 'Crash Push' }).click();
-  // Once the arrival clip shows, the result has its own "Remix preset": take the gallery's.
+  // Once a clip shows, the result has its own "Remix preset": take the gallery's.
   await page.locator('aside').getByRole('button', { name: 'Remix preset', exact: true }).click();
   const editor = page.locator('#remix-yaml');
   await expect(editor).toHaveValue(/id: crash-push/);
@@ -133,7 +135,8 @@ test('a portrait clip fits the monitor instead of being cropped', async ({ page 
   await page.goto('/');
   await arrival(page);
   await page.getByRole('button', { name: 'Other sample photo' }).click();
-  await page.getByRole('button', { name: /Placeholder portrait A/ }).click();
+  await page.getByRole('button', { name: /Yellow raincoat on a rainy night/ }).click();
+  await page.getByRole('link', { name: 'Camera', exact: true }).click();
   await showGallery(page);
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await page.getByRole('button', { name: /^Show clip/ }).click();
@@ -145,7 +148,7 @@ test('a portrait clip fits the monitor instead of being cropped', async ({ page 
 });
 
 test('disabled controls say why', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?tab=camera');
   await expect(page.getByLabel('What the photo shows', { exact: true })).toBeDisabled();
   await expect(page.getByText('Locally, you describe your own photo here.')).toBeVisible();
   // By Generate, the showcase's model choice says Fast is for a local install.
@@ -166,7 +169,7 @@ test('the open stack page loads directly', async ({ page }) => {
   await page.goto('/open-stack/');
   const rows = page.locator('[data-testid=model-row]');
   // Every model the jury can see a result of, the effects and hooks included, not only the camera's.
-  await expect(rows).toHaveCount(11);
+  await expect(rows).toHaveCount(14);
   for (const row of await rows.all()) await expect(row).toContainText(/Apache-2\.0|MIT/);
   await expect(page.locator('#model-wan21-i2v-effects')).toBeVisible();
   // Back to the studio by the header link: a client navigation, no failed prefetch.
@@ -199,14 +202,17 @@ test('when FFmpeg cannot load, the film says so and single clips still play', as
   await expect(result(page)).toHaveAttribute('src', /crash-push--landscape-a\.mp4$/);
 });
 
-test('the showcase shows the camera and film tabs only, and no photo tool beyond the samples', async ({ page }) => {
+test('the showcase shows only the tabs it can play, and no photo tool beyond the samples', async ({ page }) => {
   await page.goto('/');
   await arrival(page);
-  // The creation tabs, then the History link that closes the row.
+  // Explore, the creation tabs the showcase has clips for, then the History link that closes the row.
   const tabs = page.getByRole('navigation', { name: 'Creation' }).getByRole('link');
-  await expect(tabs).toHaveText(['Camera', 'Film', 'History']);
+  await expect(tabs).toHaveText(['Explore', 'Effects', 'Camera', 'Film', 'History']);
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Text to image', exact: true })).toHaveCount(0);
+  // Text to image offers the texts the sample photos were made from, never a text of one's own.
+  await page.getByRole('button', { name: 'Text to image', exact: true }).click();
+  await expect(page.getByRole('radiogroup', { name: 'The texts of the sample photos' }).getByRole('radio')).toHaveCount(3);
+  await expect(page.getByRole('textbox', { name: 'Describe the photo' })).toHaveCount(0);
 });
 
 test('the showcase history shows the clip of this visit, and says it keeps only this visit', async ({ page }) => {
@@ -264,7 +270,7 @@ test('with an effect example, the showcase opens on it, and offers it only on it
   await expect(page.getByText('What the photo shows applies when you generate locally.')).toBeVisible();
   // Another sample photo has no example: the wall offers nothing there.
   await page.getByRole('button', { name: 'Other sample photo' }).click();
-  await page.getByRole('button', { name: /Placeholder portrait A/ }).click();
+  await page.getByRole('button', { name: /Yellow raincoat on a rainy night/ }).click();
   await showGallery(page);
   await expect(page.getByRole('button', { name: 'Squish' })).toHaveCount(0);
   expect(problems()).toEqual([]);
