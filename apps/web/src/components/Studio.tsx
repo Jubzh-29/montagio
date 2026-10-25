@@ -25,7 +25,7 @@ import { entryAsHistoryItem, type CommunityEntry } from '@/lib/community';
 import { recipeUrlOf } from '@/lib/recipe-url';
 import { applyReprise, replayOn, reproducedRecipeUrl, reproducibleResult, type Replay } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
-import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
+import { primaryLabelKey, showcaseArrival, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { useMotionPaused } from '@/lib/use-motion';
 import { needsConsent } from '@/lib/consent';
 import { defaultSubject, forSample, pickWallChoice } from '@/lib/effect-choice';
@@ -797,16 +797,15 @@ export function Studio() {
         setCatalog('ready');
         setPresetId((current) => current ?? presetList[0]?.id ?? null);
         setModelId((current) => current ?? presetList[0]?.defaultModel ?? null);
-        const sample = info?.samples[0];
+        // Effects first: the showcase opens on its first effect rendered on a sample photo, unless the URL asks for another tab.
+        const opening = info ? showcaseArrival(info.samples, shown?.effects, new URLSearchParams(window.location.search).get('tab')) : undefined;
         const first = presetList[0];
-        if (sample && first && !touched.current) {
+        if (opening && first && !touched.current) {
+          const { sample, effect } = opening;
           setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef, personal: false });
           setPrompt(sceneOf(sample.prompt));
           sceneOfPhoto.current = true;
           setCanvas({ view: 'result', before: 'gallery' });
-          // Effects first: the showcase opens on its first effect rendered on this photo, unless the URL asks for another tab.
-          const asked = new URLSearchParams(window.location.search).get('tab');
-          const effect = !asked || asked === 'effects' ? shown?.effects.find((entry) => entry.samples?.includes(sample.id)) : undefined;
           if (effect) setEffectId(effect.id);
           const arrival = effect
             ? submit('job', { imageRef: sample.imageRef, effectId: effect.id }, undefined, '/api/effects')

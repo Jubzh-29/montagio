@@ -30,22 +30,25 @@ const result = (page: Page) => page.locator('video[data-testid=result]');
 /** The canvas shows the monitor on arrival; the wall of presets is its other view. */
 const showGallery = (page: Page) => page.getByRole('button', { name: 'Gallery', exact: true }).click();
 
-/** The showcase opens on a clip already playing: the first sample photo with the first preset. */
-const arrival = (page: Page) => expect(result(page)).toHaveAttribute('src', /\/showcase\/clips\/crash-push--landscape-a\.mp4$/);
+/** The showcase opens on a clip already playing: the wall's first effect on the first sample photo it was rendered on, Squish on the convertible. */
+const arrival = (page: Page) => expect(result(page)).toHaveAttribute('src', /\/showcase\/effects\/squish--landscape-b\.mp4$/);
 
-test('the showcase opens on a clip, then plays the pre-generated clip of another preset', async ({ page }) => {
+test('the showcase opens on an effect, then plays the pre-generated clip of a camera preset', async ({ page }) => {
   const foreign = watchRequests(page);
   await page.goto('/');
   await arrival(page);
+  // The tab, the effect and the caption match the clip: Effects, Squish, the effects model.
+  await expect(page.getByRole('link', { name: 'Effects', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('region', { name: 'Squish' })).toBeVisible();
+  await expect(page.getByTestId('result-caption')).toHaveText(/Pre-generated with Montagio · Wan 2[.]1 I2V 480p [(]effects[)]/);
   // What the showcase is stays in sight under the clip.
   await expect(page.getByText(/clips pre-generated with Montagio on open weights/)).toBeVisible();
-  await expect(page.getByTestId('result-caption')).toHaveText(/Placeholder|Pre-generated with Montagio/);
-  // The showcase opens on the Effects tab: the camera presets are on the Camera one.
+  // The camera presets are on the Camera tab, on the photo the arrival picked.
   await page.getByRole('link', { name: 'Camera', exact: true }).click();
   await showGallery(page);
   await page.getByRole('button', { name: 'Pan Left' }).click();
   await page.getByRole('button', { name: /^Show clip/ }).click();
-  await expect(result(page)).toHaveAttribute('src', /\/showcase\/clips\/pan-left--landscape-a\.mp4$/);
+  await expect(result(page)).toHaveAttribute('src', /\/showcase\/clips\/pan-left--landscape-b\.mp4$/);
 
   const download = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Open in ComfyUI' }).click();
@@ -60,6 +63,12 @@ test('a pre-generated clip shows its recipe, and Reproduce at home leads to the 
   const foreign = watchRequests(page);
   await page.goto('/');
   await arrival(page);
+  // The recipes are the camera clips': the arrival's effect example has none.
+  await page.getByRole('link', { name: 'Camera', exact: true }).click();
+  await showGallery(page);
+  await page.getByRole('button', { name: 'Crash Push' }).click();
+  await page.getByRole('button', { name: /^Show clip/ }).click();
+  await expect(result(page)).toHaveAttribute('src', /\/showcase\/clips\/crash-push--landscape-b\.mp4$/);
   const panel = page.getByTestId('recipe-panel');
   await panel.getByText('Recipe', { exact: true }).click();
   await expect(panel.getByText('Seed', { exact: true })).toBeVisible();
@@ -109,7 +118,7 @@ test('the remix is checked for real but not rendered', async ({ page }) => {
 test('a three-shot film is assembled by FFmpeg in the browser', async ({ page }) => {
   const foreign = watchRequests(page);
   await page.goto('/');
-  // The arrival clip has already picked the first sample photo.
+  // The arrival clip has already picked a sample photo.
   await arrival(page);
   await page.getByRole('link', { name: 'Film', exact: true }).click();
   await expect(page.getByText(/every shot starts from the sample photo/)).toBeVisible();
@@ -199,7 +208,7 @@ test('when FFmpeg cannot load, the film says so and single clips still play', as
   await page.getByRole('link', { name: 'Camera', exact: true }).click();
   await page.getByRole('button', { name: 'Crash Push' }).click();
   await page.getByRole('button', { name: /^Show clip/ }).click();
-  await expect(result(page)).toHaveAttribute('src', /crash-push--landscape-a\.mp4$/);
+  await expect(result(page)).toHaveAttribute('src', /crash-push--landscape-b\.mp4$/);
 });
 
 test('the showcase shows only the tabs it can play, and no photo tool beyond the samples', async ({ page }) => {
@@ -221,7 +230,7 @@ test('the showcase history shows the clip of this visit, and says it keeps only 
   await arrival(page);
   await page.getByRole('link', { name: 'History', exact: true }).click();
   await expect(page.getByText(/keeps only this visit/)).toBeVisible();
-  await expect(page.getByRole('listitem').filter({ hasText: 'Clip · Crash Push' })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'Clip · Squish' })).toBeVisible();
   expect(problems()).toEqual([]);
 });
 

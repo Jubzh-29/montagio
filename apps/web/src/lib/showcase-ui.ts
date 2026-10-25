@@ -28,6 +28,26 @@ export function primaryLabelKey(
   return mode === 'single' ? 'generate' : 'generateFilm';
 }
 
+/**
+ * The showcase's arrival clip. Effects first: the first sample photo with an effect example,
+ * and the first effect rendered on it, so the Effects tab opens on a clip of its own. When
+ * the URL asks for another tab, or no photo has an effect example, the first sample photo
+ * (for the first camera preset).
+ */
+export function showcaseArrival<S extends { id: string }, E extends { id: string; samples?: string[] }>(
+  samples: S[],
+  effects: E[] | undefined,
+  askedTab: string | null,
+): { sample: S; effect?: E } | undefined {
+  if (askedTab === null || askedTab === 'effects') {
+    for (const sample of samples) {
+      const effect = effects?.find((entry) => entry.samples?.includes(sample.id));
+      if (effect) return { sample, effect };
+    }
+  }
+  return samples[0] ? { sample: samples[0] } : undefined;
+}
+
 /** The showcase's note under the sample photos: one more sentence while some clips are placeholders. */
 export function showcaseNoteKeys(placeholders: boolean): MessageKey[] {
   return placeholders ? ['showcaseNote', 'showcasePlaceholderNote'] : ['showcaseNote'];
