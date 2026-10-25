@@ -337,6 +337,15 @@ test('an extension without examples answers like the server hides it: 404 extens
   }
 });
 
+test('the trend remix, its skeleton and its import by link do not exist in the showcase', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
+  for (const [method, path] of [['POST', '/api/remix'], ['POST', '/api/remix/skeleton'], ['POST', '/api/remix/shots'], ['GET', '/api/remix/import'], ['POST', '/api/remix/import']] as const) {
+    const { status, json } = await call(router, method, path, method === 'POST' ? { url: 'https://www.tiktok.com/@a/video/1' } : undefined);
+    expect([path, status, json]).toEqual([path, 404, { error: 'extension-disabled' }]);
+  }
+  expect((await call(router, 'POST', '/api/uploads/remix/sample', {})).json).toEqual({ error: 'showcase-upload' });
+});
+
 test('the showcase history holds the clips of this visit only, newest first', async () => {
   const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage });
   expect((await call(router, 'GET', '/api/history')).json).toEqual([]);

@@ -400,6 +400,8 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     if (method === 'POST' && !id && (resource === 'edits' || resource === 'avatars' || resource === 'motion' || resource === 'restyle' || resource === 'swap')) {
       return refuse('extension-disabled', 404);
     }
+    // The trend remix, its skeleton and its import by link run only in the app on a machine of its own.
+    if (resource === 'remix') return refuse('extension-disabled', 404);
     if (resource === 'jobs' && id) {
       const record = jobs.get(id);
       if (record && ((method === 'GET' && action === undefined) || (method === 'POST' && action === 'cancel'))) return json(clone(record));
