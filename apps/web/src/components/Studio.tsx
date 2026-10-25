@@ -675,7 +675,7 @@ export function Studio() {
     } else if (back.remixPresetUrl && back.presetId) {
       void openRemix(back.presetId, back.remixPresetUrl);
     }
-    // A community recipe or example brings no photo of its own: the tab's sample photo stands in.
+    // A community share file or example brings no photo of its own: the tab's sample photo stands in.
     if (back.sample && !IS_SHOWCASE) void loadSample(Boolean(back.prompt));
     // The link did its work: the address keeps the tab only. A photo goes to the tab the link asked for.
     window.history.replaceState(null, '', tabHref(item.kind === 'photo' ? tab : back.tab));

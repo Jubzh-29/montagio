@@ -284,7 +284,7 @@ export type Reprise = {
   remixGenerationId?: string;
   /** Where the remix editor reads the preset text from, when it is not a generation of this machine (a community entry). */
   presetUrl?: string;
-  /** No photo of its own: the Studio starts from the tab's sample photo (a community recipe or example). */
+  /** No photo of its own: the Studio starts from the tab's sample photo (a community share file or example). */
   sample?: true;
   /** The seed it was rendered with: Reproduce sends it back, Reuse leaves it out. */
   seed?: number;

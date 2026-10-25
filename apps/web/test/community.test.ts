@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { GET as getCommunityPreset } from '@/app/api/community/[id]/preset/route';
-import { GET as getRecipe } from '@/app/api/community/[id]/recipe/route';
+import { GET as getShare } from '@/app/api/community/[id]/share/route';
 import { DELETE as deleteEntry, GET as getEntry } from '@/app/api/community/[id]/route';
 import { POST as postImport } from '@/app/api/community/import/route';
 import { GET as listCommunity, POST as publish } from '@/app/api/community/route';
@@ -11,7 +11,7 @@ import { POST as postImages } from '@/app/api/images/route';
 import { GET as getJob } from '@/app/api/jobs/[id]/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import type { GenerationRecord, JobSummary } from '@/lib/api-types';
-import { parseRecipe, recipeFileName, shareableReprise, type CommunityEntry, type Recipe } from '@/lib/community';
+import { parseShared, shareFileName, shareableReprise, type CommunityEntry, type SharedEntry } from '@/lib/community';
 import { mediaFileFor } from '@/server/generations';
 import { generationRequest, params, repoRoot, setupTempData } from './helpers';
 
@@ -34,8 +34,8 @@ async function photoJob(key: string): Promise<JobSummary> {
   throw new Error('the photo did not settle');
 }
 
-const recipe = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
-  schema: 'montagio/recipe@0.1',
+const shareFile = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  schema: 'montagio/share@0.1',
   title: 'Golden harbour push',
   author: 'Mira',
   kind: 'clip',
@@ -46,27 +46,27 @@ const recipe = (overrides: Record<string, unknown> = {}): Record<string, unknown
   ...overrides,
 });
 
-describe('recipes', () => {
-  test('a recipe keeps the settings and drops the photo, the clip and anything unknown', () => {
-    const parsed = parseRecipe({ ...recipe(), extra: 'x' })!;
+describe('share files', () => {
+  test('a share file keeps the settings and drops the photo, the clip and anything unknown', () => {
+    const parsed = parseShared({ ...shareFile(), extra: 'x' })!;
     expect(parsed.reprise).toEqual({ tab: 'camera', presetId: 'slow-push', prompt: 'a fishing harbour at golden hour', sample: true });
     expect(parsed).not.toHaveProperty('extra');
     expect(shareableReprise({ tab: 'effects', effectId: 'squish', imageRef: 'uploads/me.png', personal: true, remixGenerationId: 'g' })).toEqual({ tab: 'effects', effectId: 'squish', sample: true });
   });
 
-  test('a file that is not a recipe, or one with a bad field, is refused', () => {
-    expect(parseRecipe(null)).toBeNull();
-    expect(parseRecipe({ ...recipe(), schema: 'montagio/recipe@9' })).toBeNull();
-    expect(parseRecipe({ ...recipe(), title: '' })).toBeNull();
-    expect(parseRecipe({ ...recipe(), title: 'x'.repeat(81) })).toBeNull();
-    expect(parseRecipe({ ...recipe(), reprise: { tab: 'nowhere' } })).toBeNull();
-    expect(parseRecipe({ ...recipe(), presetYaml: 'id: x' , reprise: { tab: 'effects' } })).toBeNull();
-    expect(parseRecipe({ ...recipe(), reprise: { tab: 'camera', presetId: '../../etc' } })!.reprise.presetId).toBeUndefined();
+  test('a file that is not a share file, or one with a bad field, is refused', () => {
+    expect(parseShared(null)).toBeNull();
+    expect(parseShared({ ...shareFile(), schema: 'montagio/share@9' })).toBeNull();
+    expect(parseShared({ ...shareFile(), title: '' })).toBeNull();
+    expect(parseShared({ ...shareFile(), title: 'x'.repeat(81) })).toBeNull();
+    expect(parseShared({ ...shareFile(), reprise: { tab: 'nowhere' } })).toBeNull();
+    expect(parseShared({ ...shareFile(), presetYaml: 'id: x' , reprise: { tab: 'effects' } })).toBeNull();
+    expect(parseShared({ ...shareFile(), reprise: { tab: 'camera', presetId: '../../etc' } })!.reprise.presetId).toBeUndefined();
   });
 
-  test('a recipe downloads under its title', () => {
-    expect(recipeFileName('Café au port — test')).toBe('cafe-au-port-test.montagio.json');
-    expect(recipeFileName('***')).toBe('recipe.montagio.json');
+  test('a share file downloads under its title', () => {
+    expect(shareFileName('Café au port — test')).toBe('cafe-au-port-test.montagio-share.json');
+    expect(shareFileName('***')).toBe('shared.montagio-share.json');
   });
 });
 
@@ -79,7 +79,7 @@ describe('the community gallery', () => {
     expect((await getEntry(get(), params({ id: 'nope' }))).status).toBe(404);
   });
 
-  test('a creation of the history is published with a copy of its media and its settings; its recipe shares no photo', async () => {
+  test('a creation of the history is published with a copy of its media and its settings; its share file sends no photo', async () => {
     const job = await photoJob('c-photo-1');
     const res = await publish(json({ historyKey: `job:${job.id}`, title: 'Lighthouse', author: 'Mira' }));
     expect(res.status).toBe(201);
@@ -90,10 +90,10 @@ describe('the community gallery', () => {
     const listed = (await (await listCommunity()).json()) as CommunityEntry[];
     expect(listed[0]!.id).toBe(entry.id);
 
-    const download = await getRecipe(get(), params({ id: entry.id }));
-    expect(download.headers.get('content-disposition')).toContain('lighthouse.montagio.json');
-    const shared = (await download.json()) as Recipe;
-    expect(shared).toMatchObject({ schema: 'montagio/recipe@0.1', title: 'Lighthouse', author: 'Mira' });
+    const download = await getShare(get(), params({ id: entry.id }));
+    expect(download.headers.get('content-disposition')).toContain('lighthouse.montagio-share.json');
+    const shared = (await download.json()) as SharedEntry;
+    expect(shared).toMatchObject({ schema: 'montagio/share@0.1', title: 'Lighthouse', author: 'Mira' });
     expect(JSON.stringify(shared)).not.toContain('imageRef');
     expect(shared.reprise.sample).toBe(true);
 
@@ -121,26 +121,26 @@ describe('the community gallery', () => {
     expect(entry.reprise).toMatchObject({ presetId: 'crash-push', presetUrl: `/api/community/${entry.id}/preset` });
     expect(entry.reprise.remixGenerationId).toBeUndefined();
     expect(await (await getCommunityPreset(get(), params({ id: entry.id }))).text()).toBe(yaml);
-    const shared = (await (await getRecipe(get(), params({ id: entry.id }))).json()) as Recipe;
+    const shared = (await (await getShare(get(), params({ id: entry.id }))).json()) as SharedEntry;
     expect(shared.presetYaml).toBe(yaml);
 
-    // That recipe, imported elsewhere: the same settings and preset, the example's clip as its picture.
+    // That share file, imported elsewhere: the same settings and preset, the example's clip as its picture.
     const imported = (await (await postImport(json(shared))).json()) as CommunityEntry;
     expect(imported).toMatchObject({ source: 'imported', title: 'Slower crash', reprise: { tab: 'camera', presetId: 'crash-push', sample: true } });
     expect(imported.previewUrl).toBeTruthy();
     expect(await (await getCommunityPreset(get(), params({ id: imported.id }))).text()).toBe(yaml);
   });
 
-  test('an import that is not a recipe is refused', async () => {
-    expect(await (await postImport(json({ hello: 'world' }))).json()).toEqual({ error: 'invalid-recipe' });
-    expect(await (await postImport(json(recipe({ title: 'Kamala Harris remix' })))).json()).toEqual({ error: 'blocked-name' });
+  test('an import that is not a share file is refused', async () => {
+    expect(await (await postImport(json({ hello: 'world' }))).json()).toEqual({ error: 'invalid-share' });
+    expect(await (await postImport(json(shareFile({ title: 'Kamala Harris remix' })))).json()).toEqual({ error: 'blocked-name' });
   });
 });
 
 test('another site cannot publish nor import: plain text or a cross-site request is refused', async () => {
-  const plain = new Request('http://localhost/api/x', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(recipe()) });
+  const plain = new Request('http://localhost/api/x', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(shareFile()) });
   expect((await postImport(plain)).status).toBe(403);
-  expect((await postImport(json(recipe(), { 'sec-fetch-site': 'cross-site' }))).status).toBe(403);
+  expect((await postImport(json(shareFile(), { 'sec-fetch-site': 'cross-site' }))).status).toBe(403);
   expect((await publish(json({ historyKey: 'job:x', title: 'x' }, { 'sec-fetch-site': 'cross-site' }))).status).toBe(403);
-  expect((await postImport(json(recipe(), { 'sec-fetch-site': 'same-origin' }))).status).toBe(201);
+  expect((await postImport(json(shareFile(), { 'sec-fetch-site': 'same-origin' }))).status).toBe(201);
 });
