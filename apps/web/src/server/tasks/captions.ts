@@ -6,7 +6,7 @@ import { extractSpeech, probe, probeAudio } from '@montagio/sequence';
 import type { Transcript } from '@/lib/api-types';
 import { exportNow, readExportRequest, TRANSCRIPT_FILE, writeTranscript, type CaptionExportRequest } from '../captions';
 import { JobError } from '../errors';
-import { captionsRejected, markCaptionsRejected, requireExperimental, requireExtension, transcribeModel } from '../extensions';
+import { captionsRejected, markCaptionsRejected, requireExtension, transcribeModel } from '../extensions';
 import { mediaFileFor, mediaUrlFor } from '../generations';
 import { jobDir, jobs, type JobRecord, type TaskDef } from '../jobs';
 import { extensionFile } from './files';
@@ -70,7 +70,6 @@ export function buildTranscript(
 export const captionsTask: TaskDef = {
   async prepare(body, lib) {
     await requireExtension('avatar');
-    requireExperimental('captions');
     const model = transcribeModel(lib);
     if (!model || captionsRejected()) throw new JobError('extension-disabled');
     const language = body.language === undefined ? 'auto' : body.language;

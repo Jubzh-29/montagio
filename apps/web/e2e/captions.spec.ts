@@ -37,7 +37,7 @@ test('a talking avatar gets 9:16 captions: the words, a style, the exact preview
   expect((await clip.body()).length).toBeGreaterThan(10_000);
 });
 
-test('without the captions flag, a talking avatar shows no captions panel', async ({ page }) => {
+test('when the server offers no captions, a talking avatar shows no captions panel', async ({ page }) => {
   await page.route('**/api/extensions', async (route) => {
     const response = await route.fetch();
     const info = await response.json();

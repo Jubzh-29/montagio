@@ -181,7 +181,7 @@ export type HookSummary = {
 export type ExtensionsInfo = {
   extensions: ExtensionId[];
   /** Features shown only with MONTAGIO_EXPERIMENTAL (not validated on a GPU yet). */
-  experimental?: ('moodboard' | 'palette-photo' | 'captions')[];
+  experimental?: ('moodboard' | 'palette-photo')[];
   effects: EffectSummary[];
   hooks: HookSummary[];
   estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; imageUpscale?: number; motion?: number; voiceChange?: number; translate?: number };

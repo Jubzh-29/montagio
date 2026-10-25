@@ -44,10 +44,18 @@ export function markCaptionsRejected(reason: string): void {
 
 export const captionsRejected = () => captionsRefusal.reason !== null;
 
+/**
+ * The captions are offered with the extension "avatar" (validated for real on a CPU ComfyUI and in the
+ * browser on 2026-10-25), unless ComfyUI refused their workflow.
+ */
+export async function captionsOffered(): Promise<boolean> {
+  return !captionsRejected() && (await visibleExtensions()).includes('avatar');
+}
+
 const showsEverything = () => process.env.MONTAGIO_EXTENSIONS?.trim() === 'all';
 
 /** Features kept behind a flag until a GPU session validates them (MONTAGIO_EXPERIMENTAL, a comma list). */
-export const EXPERIMENTAL_FEATURES = ['moodboard', 'palette-photo', 'captions'] as const;
+export const EXPERIMENTAL_FEATURES = ['moodboard', 'palette-photo'] as const;
 export type ExperimentalFeature = (typeof EXPERIMENTAL_FEATURES)[number];
 
 export function experimentalFeatures(): ExperimentalFeature[] {
@@ -204,7 +212,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const voiceChange = extensions.includes('avatar') ? [...lib.extensionModels.values()].find((entry) => entry.task === 'a2a-vc') : undefined;
   const translate = extensions.includes('avatar') ? [...lib.extensionModels.values()].find((entry) => entry.task === 'a2a-translate') : undefined;
   const motion = extensions.includes('motion') ? motionModel(lib) : null;
-  const words = extensions.includes('avatar') && experimentalFeatures().includes('captions') && !captionsRejected() ? transcribeModel(lib) : undefined;
+  const words = extensions.includes('avatar') && !captionsRejected() ? transcribeModel(lib) : undefined;
   // A tab without a wall shows what it makes: a render of the GPU session, looping (presets/extensions/previews).
   const examples: NonNullable<ExtensionsInfo['examples']> = {};
   for (const id of ['avatar', 'motion'] as const) {

@@ -179,21 +179,21 @@ Without a GPU of 12 GB at least, `install --app-only` installs the app alone: no
 |---|---|
 | `MONTAGIO_HOME` | install folder |
 | `MONTAGIO_EXTENSIONS` | the default of `--extensions`; the app reads it too |
-| `MONTAGIO_EXPERIMENTAL` | features not validated on a GPU yet, shown anyway: `moodboard`, `palette-photo`, `captions` (comma list). `captions` adds the 9:16 export with word-by-word captions under a talking clip (avatar, voice change, translation): Whisper large-v3 turbo, MIT, 1.6 GB, fetched with the extension `avatar` in `models/whisper/whisper-large-v3-turbo/` |
+| `MONTAGIO_EXPERIMENTAL` | features not validated on a GPU yet, shown anyway: `moodboard`, `palette-photo` (comma list) |
 | `MONTAGIO_COMFYUI_ARGS` | extra ComfyUI arguments, separated by spaces, for example `--reserve-vram 1` (ComfyUI v0.41.0's dynamic VRAM makes `--lowvram` a no-op); `--listen` and `--port` are refused, ComfyUI stays on 127.0.0.1 and the install's port |
 | `HF_TOKEN` | a Hugging Face token; not needed for the files of the lock |
 | `MONTAGIO_FFMPEG`, `MONTAGIO_FFPROBE` | FFmpeg and ffprobe outside the `PATH` |
 
 ### Extensions
 
-Seven extensions run models of their own, beyond the camera presets, in their order of priority: photo edit (Qwen-Image-Edit-2511, 4 steps with a Lightning LoRA, three looks and a second image), a pack of six one-photo effects (Wan 2.1 I2V 480p with effect LoRAs), keyframe transitions (Wan 2.2 FLF2V; the edit makes their end frame, so `transitions` requires `edit`), the talking avatar (Wan 2.2 S2V and a Chatterbox voice), film music (ACE-Step 1.5) HD upscale (SeedVR2) and, last, motion transfer (Wan2.2-Animate-2 distilled: the character of a photo moves like a short reference video). Their weights are in the lock, marked with their extension, and the installer fetches them only for the extensions asked for. By default that is the ones a GPU session validated, listed with a date in `registry/extensions.yaml` (GPU session S2 dated all seven on 2026-10-21). A plain install takes the **effects pack** alone, the most shareable one and among the lightest; `--extensions all` takes the seven, about 112 GB more (the avatar aside, see below), and `--extensions none` keeps the 72 GB of the camera presets. Extra disk space, all Apache-2.0 or MIT (the effect LoRAs declare it in their card metadata only):
+Seven extensions run models of their own, beyond the camera presets, in their order of priority: photo edit (Qwen-Image-Edit-2511, 4 steps with a Lightning LoRA, three looks and a second image), a pack of six one-photo effects (Wan 2.1 I2V 480p with effect LoRAs), keyframe transitions (Wan 2.2 FLF2V; the edit makes their end frame, so `transitions` requires `edit`), the talking avatar (Wan 2.2 S2V and a Chatterbox voice), film music (ACE-Step 1.5) HD upscale (SeedVR2) and, last, motion transfer (Wan2.2-Animate-2 distilled: the character of a photo moves like a short reference video). Their weights are in the lock, marked with their extension, and the installer fetches them only for the extensions asked for. By default that is the ones a GPU session validated, listed with a date in `registry/extensions.yaml` (GPU session S2 dated all seven on 2026-10-21). A plain install takes the **effects pack** alone, the most shareable one and among the lightest; `--extensions all` takes the seven, about 114 GB more (the avatar aside, see below), and `--extensions none` keeps the 72 GB of the camera presets. Extra disk space, all Apache-2.0 or MIT (the effect LoRAs declare it in their card metadata only):
 
 | Extension | Weights |
 |---|---|
 | `edit` | 31.9 GB |
 | `effects` | 20.6 GB |
 | `transitions` | 28.6 GB (its two 4-step LoRAs come with the camera presets) |
-| `avatar` | 31.7 GB |
+| `avatar` | 33.3 GB (1.6 GB of it is Whisper large-v3 turbo, MIT, for the captions, in `models/whisper/whisper-large-v3-turbo/`) |
 | `music` | 10.0 GB |
 | `upscale` | 4.0 GB |
 | `motion` | 16.7 GB |
@@ -202,7 +202,7 @@ The avatar is left out by this installer for now: its voice runs on a custom nod
 
 A full install starts the app with the extensions whose weights it fetched, so the Studio shows only what this machine can run. With `--app-only` (the demo, or a remote GPU with `--proxy-url`), or when you start the app yourself, `MONTAGIO_EXTENSIONS` decides what the Studio shows. An effect or a hook also needs its own date in its preset file (`gpu_validated`), unless `MONTAGIO_EXTENSIONS=all`. `--extensions all` at install time fetches every weight but starts the app with that list, not with `all`: undated effects and hooks stay hidden until you start the app with `MONTAGIO_EXTENSIONS=all`.
 
-What each shown extension adds to the Studio: `edit`, the Edit button of the start photo; `effects`, the Effects tab and its wall; `transitions`, the hooks on that wall; `avatar`, the Avatar tab; `music`, "Add music" under a finished film; `upscale`, "HD 1080p" under a finished clip of 121 frames at most. A workflow ComfyUI refuses (a missing node or file) hides its extension until the app restarts, and the log says which.
+What each shown extension adds to the Studio: `edit`, the Edit button of the start photo; `effects`, the Effects tab and its wall; `transitions`, the hooks on that wall; `avatar`, the Avatar tab, and "Captions 9:16" under a talking clip (an avatar, a voice change, a translation), which burns word-by-word captions into a 1080x1920 export; a ComfyUI without Whisper's node or folder hides the captions alone; `music`, "Add music" under a finished film; `upscale`, "HD 1080p" under a finished clip of 121 frames at most. A workflow ComfyUI refuses (a missing node or file) hides its extension until the app restarts, and the log says which.
 
 ## Troubleshooting
 

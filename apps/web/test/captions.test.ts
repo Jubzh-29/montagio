@@ -18,9 +18,8 @@ import { params, setupTempData } from './helpers';
 setupTempData();
 const saved: Record<string, string | undefined> = {};
 beforeEach(() => {
-  for (const name of ['MONTAGIO_EXTENSIONS', 'MONTAGIO_EXPERIMENTAL', 'MONTAGIO_DEMO_CAPTIONS']) saved[name] = process.env[name];
+  for (const name of ['MONTAGIO_EXTENSIONS', 'MONTAGIO_DEMO_CAPTIONS']) saved[name] = process.env[name];
   process.env.MONTAGIO_EXTENSIONS = 'all';
-  process.env.MONTAGIO_EXPERIMENTAL = 'captions';
   process.env.MONTAGIO_DEMO_DURATION_MS = '0';
   resetRejectedForTests();
 });
@@ -55,9 +54,9 @@ async function avatar(key = 'av'): Promise<string> {
 const captions = (parent: string, body: unknown, key: string) => postCaptions(json(`/api/jobs/${parent}/captions`, body, key), params({ id: parent }));
 const info = async (id: string) => getCaptions(new Request('http://localhost/x'), params({ id }));
 
-test('without MONTAGIO_EXPERIMENTAL=captions, captions are hidden', async () => {
+test('without the extension avatar, captions are hidden', async () => {
   const parent = await avatar();
-  delete process.env.MONTAGIO_EXPERIMENTAL;
+  process.env.MONTAGIO_EXTENSIONS = 'edit';
   const res = await captions(parent, {}, 'c0');
   expect(res.status).toBe(404);
   expect(await res.json()).toEqual({ error: 'extension-disabled' });
