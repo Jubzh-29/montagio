@@ -96,9 +96,10 @@ test('the caption under a clip links to its model on the open stack page', async
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
-  await page.getByTestId('ai-caption').getByRole('link', { name: 'Wan 2.2 Fun Camera Turbo' }).click();
-  await expect(page).toHaveURL(/\/open-stack\/?#model-wan22-i2v-a14b-fun-camera-turbo$/);
-  const row = page.locator('#model-wan22-i2v-a14b-fun-camera-turbo');
+  // The demo shows the 20-step GPU render of the sample photo: its caption names that model, not the Turbo Crash Push starts on.
+  await page.getByTestId('ai-caption').getByRole('link', { name: 'Wan 2.2 Fun Camera', exact: true }).click();
+  await expect(page).toHaveURL(/\/open-stack\/?#model-wan22-i2v-a14b-fun-camera$/);
+  const row = page.locator('#model-wan22-i2v-a14b-fun-camera');
   await expect(row).toHaveAttribute('data-target', 'true');
   await expect(row).toBeInViewport();
 });
