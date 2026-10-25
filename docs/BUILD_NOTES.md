@@ -123,7 +123,7 @@ At install: torch 2.14.1 (CUDA 13.0), **687 node classes loaded and 0 partner no
 |---|---|---|
 | HD 1080p then RIFE 4.26 ×2: 81 frames at 16 fps to 161 at 32 fps | 410 s cold, loading included; RIFE alone 4.8 s | 8.6 GB |
 
-**The showcase**: 33 clips (the 11 presets on 3 photos), 12 effect examples and the Ignite hook, rendered in GPU session S3 with the same settings, 480p and the photo's description.
+**The showcase**, 2026-10-24: 43 clips in 1080p, the 11 presets on 3 photos, 9 effect examples and the Ignite hook. Each was rendered at 480p with the description of its photo (15 camera clips again that day, from the exact sample photos), then passed through SeedVR2; the showcase's manifest records the whole chain, photo, 480p render and HD pass, for every clip ([VITRINE.md](VITRINE.md), part 7, in French).
 
 How the times were taken: `smoke.ts` ([`infra/runpod`](../infra/runpod)) compiles each job with the app's own compilers, submits it through comfy-api-proxy and writes one line per run (`smoke.jsonl`) with its wall time, its execution time and the peak VRAM (from `nvidia-smi`, or ComfyUI's `/system_stats`). "Cold" includes loading the weights from the volume; "warm" is a later run with the models in memory.
 
