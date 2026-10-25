@@ -54,6 +54,39 @@ describe('parseTrendSkeleton (the two answers, as Gemma gives them)', () => {
     });
   });
 
+  test("Gemma's answer on the GPU (25/10): two code fences, the hashtags left without quotes", () => {
+    const file = [
+      '```json',
+      '{',
+      '  "shots": [',
+      '    "A young woman in a yellow hoodie and blue jeans stands against a light gray background.",',
+      '    "An older man with a beard in an olive green jacket and dark pants stands against a light gray background."',
+      '  ],',
+      '  "hook": "",',
+      '  "style": "fashion advertisement"',
+      '}',
+      '```',
+      '=====',
+      '```json',
+      '{',
+      '  "caption": "Le style qui fait tourner les têtes. Adoptez cette vibe !",',
+      '  "hashtags": [',
+      '    mode,',
+      '    styleurbain,',
+      '    tendancemode',
+      '  ],',
+      '  "onscreen": "Le look parfait pour toi"',
+      '}',
+      '```',
+    ].join('\n');
+    const read = parseTrendSkeleton(file);
+    expect(read.skeleton.shots).toHaveLength(2);
+    expect(read.skeleton.style).toBe('fashion advertisement');
+    expect(read.post).toEqual({ caption: 'Le style qui fait tourner les têtes. Adoptez cette vibe !', hashtags: ['mode', 'styleurbain', 'tendancemode'], onscreen: 'Le look parfait pour toi' });
+    // A quoted text that holds a comma and a bracket is left as it is.
+    expect(parseTrendSkeleton('{"shots": ["a, b]", "c"], "hook": "x", "style": "y"}').skeleton.shots).toEqual(['a, b]', 'c']);
+  });
+
   test('one JSON document with both (the demo file) reads the same', () => {
     const doc = JSON.stringify({ skeleton: { shots: ['a wave'], hook: 'POV', style: 'calm' }, post: { caption: 'Hi.', hashtags: ['#remix'], onscreen: 'POV' } });
     expect(parseTrendSkeleton(doc)).toEqual({

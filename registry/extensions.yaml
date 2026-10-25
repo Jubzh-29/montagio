@@ -54,7 +54,9 @@ extensions:
   # the same references and the same seed, then put back on the same frames. Each shot runs on the
   # motion transfer (and, in the scene, on the object swap when it is shown); the skeleton and the post
   # come from Gemma 4 E4B, within the avatar's weights, when the avatar is shown. It has no model of its own.
+  # Validated on an L4 on 2026-10-25: the sample's three shots made again by the sample character, put back
+  # on their frames; Gemma read the sheet and wrote the post (docs/S2_RESULTATS.md, part 18).
   - id: remix
     priority: 10
     requires: [motion]
-    gpu_validated: null
+    gpu_validated: 2026-10-25

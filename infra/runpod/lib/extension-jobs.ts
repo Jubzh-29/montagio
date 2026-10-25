@@ -221,7 +221,8 @@ function known<T>(map: Map<string, T>, id: string, what: string): T {
  * several do, since it would feed them all (the edit instruction becoming the effects' subject).
  */
 export function jobTexts(values: readonly string[], jobs: readonly ExtensionJobName[]): Partial<Record<TextJobName, string>> {
-  const readers = TEXT_JOBS.filter((job) => jobs.includes(job));
+  // The remix's skeleton reads the remix's text (who performs the shots), with or without the remix.
+  const readers = TEXT_JOBS.filter((job) => jobs.includes(job) || (job === 'remix' && jobs.includes('remix-skeleton')));
   const texts: Partial<Record<TextJobName, string>> = {};
   for (const value of values) {
     const named = TEXT_JOBS.find((job) => value.startsWith(`${job}=`));

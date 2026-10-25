@@ -347,3 +347,25 @@ Sur GPU le 25/10, avec l'accord de l'utilisateur (« Oui, lance (≈ 0,45 $) »)
 | `swap:photo`, 3 points, photo `sample-character.png` | la danse du 5B (S2), 480×832, 80 images | 207 s | 22,5 Go | ✅ la danseuse devient le garçon cartoon (veste verte, écharpe rouge), poses et poussée de caméra suivies, décor gardé |
 
 - **Daté** : `gpu_validated: 2026-10-25`. L'aperçu `presets/extensions/previews/swap.mp4` (avant et après, côte à côte, 373 Ko) vient du second rendu.
+
+## 18. Remix de tendance (25/10)
+
+Avec l'accord de l'utilisateur (« Oui, lance la validation GPU du remix de tendance sur montagio-2 (≈ 0,30 $), avec l'exemple de 3 plans »). L'exemple de l'app (hip-hop, salut et bravo, jumping jacks de la bibliothèque Motion, 2 s chacun, 480×832, 16 i/s) monté en local, envoyé sur le volume (`inputs/remix-sample.mp4`), puis `smoke --extension remix-skeleton,remix --motion … --cuts 32,64 --input demo-assets/images/sample-character.png --text 'remix=a cartoon boy in a green jacket and a red scarf' --language fr`. Résultats sur le volume `montagio-results` (`runs/20261025-193044-remix`, `runs/20261025-194213-remix-skeleton`), et hors dépôt dans `s3/validation/20261025-193044-remix/`.
+
+| Job | Entrées | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|---|
+| `remix:shot1` (Animate-2 distillé, 33 images, 1 fenêtre) | hip-hop, images 0 à 31 | 166 s, chargement compris | 21,9 Go | ✅ |
+| `remix:shot2` | salut et bravo, images 32 à 63 | 125 s | 21,5 Go | ✅ |
+| `remix:shot3` | jumping jacks, images 64 à 95 | 125 s | 21,8 Go | ✅ |
+| recollage et 9:16 (FFmpeg, dans le conteneur) | les trois rendus | quelques secondes | — | ✅ 96 images à 16 i/s, coupes aux images 32 et 64 ; 9:16 en 1080×1920 à 32 i/s |
+| `remix-skeleton` (1er essai) | — | — | — | ❌ refusé au contrôle : le fichier de Gemma 4 E4B n'était pas sur le volume de ce compte (la traduction avait été validée sur l'autre) ; téléchargé par `weights --only gemma4-e4b-it` (8,1 Go, sha256 vérifié) |
+| `remix-skeleton` (2e essai) | — | — | — | ❌ `--text remix=…` refusé quand le squelette tourne seul : le smoke corrigé (le squelette lit le texte du remix), avec un test |
+| `remix-skeleton` | la planche des trois premières images | 22,8 s | 7,9 Go | ✅ les trois plans décrits (« A young woman in a yellow hoodie… »), ton « fashion advertisement » ; post en français : « Le style qui fait tourner les têtes. Adoptez cette vibe ! », #mode #styleurbain #tendancemode #lookdujour #couleursvives, texte à l'écran « Le look parfait pour toi » |
+
+- Le même personnage (veste verte, écharpe rouge, bottes marron) dans les trois plans : une seule graine et la même photo suffisent. Chaque plan suit sa source image par image : dans le troisième, l'athlète reste immobile 1,5 s puis s'élance, et le personnage aussi.
+- Gemma a laissé ses hashtags sans guillemets, ce qui donnait un JSON invalide et un post vide. `parseTrendSkeleton` met désormais entre guillemets les mots nus d'une liste, et sa réponse réelle est un test.
+- Limite : Gemma ne lit que la première image de chaque plan. Les danseurs y sont encore immobiles, d'où le ton « publicité de mode ». Une image du milieu de chaque plan donnerait mieux le mouvement.
+- L'image Modal a reconstruit sa couche GPU (198 s) bien que `versions.env` ait été remis comme avant le temps du lancement : son cache ne correspondait plus. Les deux lancements suivants l'ont réutilisée.
+- **Coût réel : 0,23 $** (les plans et l'image 0,19 $, Gemma sur le volume 0,01 $, les deux passages du squelette 0,03 $). Relevé du mois : 22,60 $.
+- **Daté** : `gpu_validated: 2026-10-25`. L'aperçu `presets/extensions/previews/remix.mp4` (l'exemple et son remix côte à côte, 153 Ko) vient de ce rendu.
+

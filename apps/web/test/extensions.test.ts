@@ -72,7 +72,7 @@ test('unset flag: nothing dated, nothing shown', async () => {
 });
 
 test('unset flag: the dates of the GPU sessions show the nine extensions, the six effects, Wardrobe Swap and Ignite', async () => {
-  expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
+  expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap', 'remix']);
   expect(await visibleEffects()).toHaveLength(6);
   // Iris Dive failed its transition in S2, Figurine barely changed the photo in S3: undated, so hidden.
   expect((await visibleHooks()).map((hook) => hook.id)).toEqual(['wardrobe-swap', 'ignite']);

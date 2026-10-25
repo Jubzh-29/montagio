@@ -249,6 +249,8 @@ describe('jobTexts (smoke --text)', () => {
     expect(jobTexts(['Bonjour, ceci est un essai.'], ['voice', 'avatar'])).toEqual({ voice: 'Bonjour, ceci est un essai.' });
     expect(jobTexts(['style=noir'], ['edit', 'upscale'])).toEqual({ edit: 'style=noir' });
     expect(jobTexts([], [...EXTENSION_JOBS])).toEqual({});
+    // The remix's skeleton names who performs the shots: it reads the remix's text even run alone.
+    expect(jobTexts(['remix=a cartoon boy'], ['remix-skeleton'])).toEqual({ remix: 'a cartoon boy' });
   });
 
   test('when several jobs read a text, a bare one is refused and each text names its job', () => {

@@ -250,7 +250,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const skeleton = extensions.includes('remix') && extensions.includes('avatar') && !skeletonRejected() ? skeletonModel(lib) : undefined;
   // A tab without a wall shows what it makes: a render of the GPU session, looping (presets/extensions/previews).
   const examples: NonNullable<ExtensionsInfo['examples']> = {};
-  for (const id of ['avatar', 'motion', 'restyle', 'swap'] as const) {
+  for (const id of ['avatar', 'motion', 'restyle', 'swap', 'remix'] as const) {
     if (!extensions.includes(id)) continue;
     const previewUrl = await presetPreviewUrl(root, `previews/${id}.mp4`, 'extensions');
     const posterUrl = previewUrl && (await presetPosterUrl(root, `previews/${id}.mp4`, 'extensions'));

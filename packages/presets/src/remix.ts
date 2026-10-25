@@ -57,17 +57,27 @@ export function compileTrendSkeleton(
 
 const isObject = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-/** The first JSON object of a model's answer: it may come in a code fence or after a sentence. */
+/** Words left bare in a list (Gemma wrote `"hashtags": [mode, styleurbain]` on the GPU), quoted. */
+const BARE_ITEM = /([[,]\s*)(#?[\p{L}\p{N}_][\p{L}\p{N}_-]*)(?=\s*[,\]])/gu;
+
+/**
+ * The first JSON object of a model's answer: it may come in a code fence or after a sentence, and the
+ * words of a list may lack their quotes.
+ */
 function jsonIn(text: string): Record<string, unknown> | null {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start < 0 || end <= start) return null;
-  try {
-    const value = JSON.parse(text.slice(start, end + 1)) as unknown;
-    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-  } catch {
-    return null;
+  const body = text.slice(start, end + 1);
+  for (const candidate of [body, body.replace(BARE_ITEM, '$1"$2"')]) {
+    try {
+      const value = JSON.parse(candidate) as unknown;
+      return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+    } catch {
+      // the next candidate, else nothing
+    }
   }
+  return null;
 }
 
 const text = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
