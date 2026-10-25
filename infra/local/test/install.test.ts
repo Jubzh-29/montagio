@@ -530,6 +530,17 @@ test('a node pack that fails leaves its extension out, never half installed, and
   expect(state.stamps.voiceNode).toBeUndefined();
 });
 
+test('a clone of the voice pack without its stamp (unpatched, from elsewhere) does not survive a failed install', async () => {
+  withNodeExtensionWeights();
+  await install(repo, options({ start: false }), harness().deps);
+  const h = harness({ failOn: (call) => call.args.includes('--require-hashes') });
+  // Someone cloned the pack by hand: its /chatterbox/* routes are open.
+  mkdirSync(join(h.L.voiceNodeDir, '.git'), { recursive: true });
+  expect(await install(repo, options({ start: false, extensions: 'all' }), h.deps)).toBe(0);
+  expect(existsSync(h.L.voiceNodeDir)).toBe(false);
+  expect(readState(h.L.statePath).extensions).not.toContain('avatar');
+});
+
 test('a folder Montagio did not clone stays as it is, and its extension is left out', async () => {
   withNodeExtensionWeights();
   // A first install makes ComfyUI; then someone puts their own copy of the SAM 2 pack in its place.

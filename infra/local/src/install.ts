@@ -486,8 +486,10 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
           await installNodePack(pack.id, dir, pack.want);
           stamp(pack.id === 'voice' ? 'voiceNode' : 'segmentNode', pack.want);
         } catch (error) {
-          // What was made of it goes; a pack Montagio installed before, patched, stays as it was.
+          // What was made of it goes. A pack Montagio installed before (stamped, so patched) stays as it was; a clone
+          // without its stamp, from elsewhere, may be the unpatched voice pack with its /chatterbox/* routes: it goes too.
           rmSync(buildDirOf(dir), { recursive: true, force: true });
+          if (existsSync(join(dir, '.git')) && stampIn(dir) === null) rmSync(dir, { recursive: true, force: true });
           deps.log(`warning: ${(error as Error).message}; the ${pack.extension === 'avatar' ? 'avatar' : 'object swap'} extension is left out, the rest of the install goes on`);
           enabled = enabled.filter((id) => id !== pack.extension);
           lock = weightsFor(fullLock, enabled);
