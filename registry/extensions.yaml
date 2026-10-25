@@ -42,8 +42,9 @@ extensions:
     gpu_validated: 2026-10-24
   # Object swap (2026-10-24): an object marked on a clip's first frame, followed through the clip by
   # SAM 2.1 (a pinned third-party node pack, kijai/ComfyUI-segment-anything-2), then replaced by VACE
-  # from a photo or a text. It runs on the restyle's weights, so it requires it.
+  # from a photo or a text. It runs on the restyle's weights, so it requires it. Both paths (a photo,
+  # the text alone) ran through the smoke on an L4 on 2026-10-25 (docs/S2_RESULTATS.md, part 15).
   - id: swap
     priority: 9
     requires: [restyle]
-    gpu_validated: null
+    gpu_validated: 2026-10-25
