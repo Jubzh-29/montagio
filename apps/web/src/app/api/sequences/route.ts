@@ -1,7 +1,8 @@
 import { failureResponse } from '@/server/generations';
+import { replaySeed } from '@/server/inputs';
 import { createSequence } from '@/server/sequences';
 
-type ShotInput = { presetId?: unknown; modelId?: unknown; userPrompt?: unknown };
+type ShotInput = { presetId?: unknown; modelId?: unknown; userPrompt?: unknown; seed?: unknown };
 
 const optionalString = (value: unknown) => (typeof value === 'string' && value.length > 0 ? value : undefined);
 
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
         presetId: shot.presetId as string,
         modelId: optionalString(shot.modelId),
         userPrompt: optionalString(shot.userPrompt)?.slice(0, 500),
+        seed: replaySeed(shot.seed),
       })),
       idempotencyKey: idempotencyKey.slice(0, 200),
     });

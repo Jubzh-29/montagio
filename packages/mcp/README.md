@@ -57,10 +57,14 @@ It talks to a running Montagio app over the app's HTTP API, the same one the Stu
 | `get_job` | a render's state by id; `wait: true` follows it to its end |
 | `list_history` | what this Montagio has made, newest first |
 | `get_workflow` | the ComfyUI workflow (API JSON) behind a clip or an image, returned, or saved as a new file in `MONTAGIO_MCP_OUT` |
+| `get_recipe` | the recipe of a render: preset or remix, workflow and its sha256, weight files with their lock sha256 and licence, seed, texts, settings, the sha256 of each input (never the photo) and the versions of the stack |
+| `reproduce` | a recipe rendered again with the same seed, on the photo the user gives: a `.json`, or the MP4 or PNG Montagio exported (it carries a compact recipe); says whether the inputs and the workflow have the recipe's sha256 |
 
 Every tool that takes a photo accepts either `imageRef` or `path` (a local file, uploaded first). A render blocks until it is done and returns the absolute URL of its file, its id, the time estimate the app gives, and, when `MONTAGIO_MCP_OUT` is set, the local path of the downloaded file. The default wait is 30 minutes, `timeoutMinutes` changes it per call; past it, the render goes on in the app and `get_job` with `wait: true` picks it up.
 
 `camera_move` works much better with `description`: a sentence on what the photo shows (the subject, the setting, the light). Without it, the video model tends to invent the scene instead of following the photo.
+
+The same replay runs from a terminal: `npm run reproduce -- <recipe.json|clip.mp4|image.png> --photo <file>`. Same recipe, same stack: identical result on the same setup, very close elsewhere (diffusion is not always bit-exact from one graphics card to another).
 
 A refusal or a failed render comes back as a tool result with `isError: true`, the app's code (`consent-required`, `extension-disabled`, `speech-too-long`…) and a sentence that says what to do.
 

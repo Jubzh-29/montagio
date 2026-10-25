@@ -8,7 +8,7 @@ import styles from './studio.module.css';
 export type MotionVideo =
   | { status: 'idle' }
   | { status: 'uploading' }
-  | { status: 'ready'; videoRef: string; url: string; duration_s?: number; sourceDuration_s?: number }
+  | { status: 'ready'; videoRef: string; url: string; duration_s?: number; sourceDuration_s?: number; sample?: boolean }
   | { status: 'error'; message: string };
 
 const TEXT_MAX = 500;

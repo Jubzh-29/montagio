@@ -111,19 +111,25 @@ export async function readTags(media: string): Promise<Record<string, string>> {
   return (JSON.parse(out) as { format?: { tags?: Record<string, string> } }).format?.tags ?? {};
 }
 
+/** The tags of a video someone sent (a recipe's clip): the local file alone, read as a real container. */
+export async function readSentTags(media: string): Promise<Record<string, string>> {
+  const out = await run(ffprobe(), ['-v', 'error', '-show_entries', 'format_tags', '-of', 'json', ...LOCAL_FILE_ONLY, ...SENT_VIDEO, media]);
+  return (JSON.parse(out) as { format?: { tags?: Record<string, string> } }).format?.tags ?? {};
+}
+
 /**
- * Copy a clip into an MP4 that carries the AI mention, without re-encoding.
+ * Copy a clip into an MP4 that carries the AI mention (and `extra` tags: its recipe), without re-encoding.
  * Whatever the source container (ComfyUI's SaveWEBM writes WebM), the result is
  * an MP4; it is written next to `out` first, so `out` is never half-written.
  */
-export async function tagClip(input: string, out: string): Promise<void> {
+export async function tagClip(input: string, out: string, extra: VideoTags = {}): Promise<void> {
   const partial = `${out}.part`;
   try {
     await run(ffmpeg(), [
       '-loglevel', 'error', '-y',
       '-i', input,
       '-map', '0:v', '-map', '0:a?', '-c', 'copy',
-      ...metadataArgs(AI_METADATA),
+      ...metadataArgs({ ...AI_METADATA, ...extra }),
       '-movflags', '+faststart',
       '-f', 'mp4', partial,
     ]);
@@ -160,6 +166,7 @@ export async function concatClips(
   out: string,
   size: { width: number; height: number },
   fps: number,
+  opts: { tags?: VideoTags } = {},
 ): Promise<void> {
   if (clips.length === 0) throw new SequenceToolError('concatClips needs at least one clip');
   const { width: w, height: h } = size;
@@ -178,7 +185,7 @@ export async function concatClips(
     '-map', '[out]',
     '-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast',
     '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an',
-    ...metadataArgs(AI_METADATA),
+    ...metadataArgs(opts.tags ?? AI_METADATA),
     out,
   ]);
 }
@@ -222,10 +229,12 @@ export async function exportVertical(
  * The one encoding of every showcase clip, placeholder and 9:16 cut. Identical
  * settings give identical H.264 headers, so the browser can join clips with
  * `-c copy`; no B-frames and a keyframe every 16 frames keep each clip a clean
- * series of closed GOPs.
+ * series of closed GOPs. CRF 23 with the slow preset keeps a 1080p clip at about
+ * 5 MB, 42 to 43 dB PSNR from its SeedVR2 output (CRF 18 veryfast: 10 MB, 45 dB),
+ * so the showcase stays well under the 1 GB of a Hugging Face Space.
  */
 export const SHOWCASE_X264: readonly string[] = [
-  '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'veryfast', '-crf', '18',
+  '-c:v', 'libx264', '-profile:v', 'high', '-preset', 'slow', '-crf', '23',
   '-bf', '0', '-g', '16', '-keyint_min', '16', '-sc_threshold', '0',
   '-pix_fmt', 'yuv420p', '-color_range', 'tv', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
   '-an', '-movflags', '+faststart',

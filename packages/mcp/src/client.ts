@@ -25,6 +25,15 @@ export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 const IMAGE_TYPES: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 const VIDEO_TYPES: Record<string, string> = { '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime' };
+export const MAX_VOICE_BYTES = 10 * 1024 * 1024;
+const VOICE_TYPES: Record<string, string> = {
+  '.wav': 'audio/wav',
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.flac': 'audio/flac',
+  '.ogg': 'audio/ogg',
+  '.webm': 'audio/webm',
+};
 
 /** POST /api/uploads, /api/uploads/sample. */
 export type UploadResult = {
@@ -67,6 +76,17 @@ export type JobSummary = {
   error?: string;
   frames?: number;
   verticalUrl?: string;
+  createdAt?: string;
+};
+
+/** GET /api/sequences/:id and POST /api/sequences: a film of two or three shots. */
+export type SequenceRecord = {
+  id: string;
+  state: 'running' | 'assembling' | 'succeeded' | 'failed' | 'canceled';
+  progress: number;
+  outputUrl?: string;
+  verticalUrl?: string;
+  error?: string;
   createdAt?: string;
 };
 
@@ -133,13 +153,13 @@ export type HistoryItem = {
   reprise?: { imageRef?: string; presetId?: string; effectId?: string; hookId?: string; prompt?: string };
 };
 
-export type RenderKind = 'job' | 'generation';
+export type RenderKind = 'job' | 'generation' | 'sequence';
 
 /** A render as the tools return it: a job or a camera clip, its URLs absolute. */
 export type RenderStatus = {
   kind: RenderKind;
   id: string;
-  /** The job's task, or "camera" for a camera clip. */
+  /** The job's task, "camera" for a camera clip, "film" for a film. */
   task: string;
   state: JobState;
   progress: number;
@@ -300,6 +320,21 @@ export class MontagioClient {
     };
   }
 
+  fromSequence(record: SequenceRecord): RenderStatus {
+    return {
+      kind: 'sequence',
+      id: record.id,
+      task: 'film',
+      // The montage after the last shot is part of the render.
+      state: record.state === 'assembling' ? 'running' : record.state,
+      progress: record.progress,
+      outputUrl: this.absolute(record.outputUrl),
+      verticalUrl: this.absolute(record.verticalUrl),
+      error: record.error,
+      createdAt: record.createdAt,
+    };
+  }
+
   // Read-only catalogue.
   presets = () => this.get<PresetSummary[]>('/api/presets');
   models = () => this.get<ModelSummary[]>('/api/models');
@@ -335,6 +370,14 @@ export class MontagioClient {
     return { ...value, ...(value.url ? { url: this.absolute(value.url) } : {}) };
   }
 
+  /** A voice sample for an avatar (field "audio"): the app keeps 20 s of it at most, as a mono FLAC. */
+  async uploadVoice(path: string): Promise<{ voiceRef: string; duration_s: number }> {
+    const file = await readLocalFile(path, VOICE_TYPES, MAX_VOICE_BYTES, 'a WAV, MP3, M4A, FLAC, OGG or WebM sound');
+    const form = new FormData();
+    form.append('audio', file.blob, file.name);
+    return (await this.call<{ voiceRef: string; duration_s: number }>('POST', '/api/uploads/voice', { form })).value;
+  }
+
   /** Start a job (/api/images, /api/edits, /api/effects, /api/hooks, /api/avatars, /api/motion, /api/restyle, /api/swap). */
   async startJob(route: string, body: Record<string, unknown>): Promise<RenderStatus> {
     return this.fromJob((await this.call<JobSummary>('POST', route, { json: body }, true)).value);
@@ -353,9 +396,22 @@ export class MontagioClient {
 
   /** One poll: the app moves the render forward when it is asked. */
   async status(kind: RenderKind, id: string): Promise<RenderStatus> {
-    return kind === 'generation'
-      ? this.fromGeneration(await this.get<GenerationRecord>(`/api/generations/${encodeURIComponent(id)}`))
-      : this.fromJob(await this.get<JobSummary>(`/api/jobs/${encodeURIComponent(id)}`));
+    if (kind === 'generation') return this.fromGeneration(await this.get<GenerationRecord>(`/api/generations/${encodeURIComponent(id)}`));
+    if (kind === 'sequence') return this.fromSequence(await this.get<SequenceRecord>(`/api/sequences/${encodeURIComponent(id)}`));
+    return this.fromJob(await this.get<JobSummary>(`/api/jobs/${encodeURIComponent(id)}`));
+  }
+
+  /** Any creation route of the app (a recipe's request): a camera clip, a film, or a job. */
+  async startRequest(route: string, body: Record<string, unknown>): Promise<RenderStatus> {
+    const { value } = await this.call<unknown>('POST', route, { json: body }, true);
+    if (route === '/api/generations') return this.fromGeneration(value as GenerationRecord);
+    if (route === '/api/sequences') return this.fromSequence(value as SequenceRecord);
+    return this.fromJob(value as JobSummary);
+  }
+
+  /** The recipe of a render (GET /api/recipes/:kind/:id): its workflow, weights, seed and stack. */
+  recipe(kind: RenderKind, id: string): Promise<unknown> {
+    return this.get<unknown>(`/api/recipes/${kind}/${encodeURIComponent(id)}`);
   }
 
   /** A render by id alone: a job, else a camera clip. */

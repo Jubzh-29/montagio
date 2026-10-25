@@ -1,0 +1,1510 @@
+{
+  "id": "cc216280-c8d3-40bb-85c7-64a0933486dd",
+  "revision": 0,
+  "last_node_id": 104,
+  "last_link_id": 26,
+  "nodes": [
+    {
+      "id": 48,
+      "type": "VAEEncodeTiled",
+      "pos": [
+        1947.9011718749998,
+        0
+      ],
+      "size": [
+        270,
+        150
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "pixels",
+          "name": "pixels",
+          "type": "IMAGE",
+          "link": 1
+        },
+        {
+          "localized_name": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 2
+        },
+        {
+          "localized_name": "tile_size",
+          "name": "tile_size",
+          "type": "INT",
+          "widget": {
+            "name": "tile_size"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "overlap",
+          "name": "overlap",
+          "type": "INT",
+          "widget": {
+            "name": "overlap"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temporal_size",
+          "name": "temporal_size",
+          "type": "INT",
+          "widget": {
+            "name": "temporal_size"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temporal_overlap",
+          "name": "temporal_overlap",
+          "type": "INT",
+          "widget": {
+            "name": "temporal_overlap"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "LATENT",
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            21
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEEncodeTiled"
+      },
+      "widgets_values": [
+        512,
+        128,
+        64,
+        8
+      ],
+      "widgets_values_named": {
+        "tile_size": 512,
+        "overlap": 128,
+        "temporal_size": 64,
+        "temporal_overlap": 8
+      }
+    },
+    {
+      "id": 51,
+      "type": "VAELoader",
+      "pos": [
+        580,
+        0
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "vae_name",
+          "name": "vae_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "vae_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VAE",
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            2,
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "seedvr2_ema_vae_fp16.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "seedvr2_ema_vae_fp16.safetensors"
+      }
+    },
+    {
+      "id": 52,
+      "type": "UNETLoader",
+      "pos": [
+        580,
+        118
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "unet_name",
+          "name": "unet_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "unet_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "weight_dtype",
+          "name": "weight_dtype",
+          "type": "COMBO",
+          "widget": {
+            "name": "weight_dtype"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "MODEL",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            3,
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "seedvr2_3b_int8_convrot.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "seedvr2_3b_int8_convrot.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 54,
+      "type": "KSampler",
+      "pos": [
+        2898.633203125,
+        0
+      ],
+      "size": [
+        270,
+        262
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 3
+        },
+        {
+          "localized_name": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 4
+        },
+        {
+          "localized_name": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 5
+        },
+        {
+          "localized_name": "latent_image",
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 6
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "steps",
+          "name": "steps",
+          "type": "INT",
+          "widget": {
+            "name": "steps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "cfg",
+          "name": "cfg",
+          "type": "FLOAT",
+          "widget": {
+            "name": "cfg"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "sampler_name",
+          "name": "sampler_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "sampler_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "scheduler",
+          "name": "scheduler",
+          "type": "COMBO",
+          "widget": {
+            "name": "scheduler"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "denoise",
+          "name": "denoise",
+          "type": "FLOAT",
+          "widget": {
+            "name": "denoise"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "LATENT",
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            22
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        42,
+        "fixed",
+        1,
+        1,
+        "euler",
+        "simple",
+        1
+      ],
+      "widgets_values_named": {
+        "seed": 42,
+        "control_after_generate": "fixed",
+        "steps": 1,
+        "cfg": 1,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1
+      }
+    },
+    {
+      "id": 55,
+      "type": "VAEDecodeTiled",
+      "pos": [
+        3488.576171875,
+        0
+      ],
+      "size": [
+        270,
+        150
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "samples",
+          "name": "samples",
+          "type": "LATENT",
+          "link": 7
+        },
+        {
+          "localized_name": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 8
+        },
+        {
+          "localized_name": "tile_size",
+          "name": "tile_size",
+          "type": "INT",
+          "widget": {
+            "name": "tile_size"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "overlap",
+          "name": "overlap",
+          "type": "INT",
+          "widget": {
+            "name": "overlap"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temporal_size",
+          "name": "temporal_size",
+          "type": "INT",
+          "widget": {
+            "name": "temporal_size"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "temporal_overlap",
+          "name": "temporal_overlap",
+          "type": "INT",
+          "widget": {
+            "name": "temporal_overlap"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecodeTiled"
+      },
+      "widgets_values": [
+        512,
+        128,
+        64,
+        8
+      ],
+      "widgets_values_named": {
+        "tile_size": 512,
+        "overlap": 128,
+        "temporal_size": 64,
+        "temporal_overlap": 8
+      }
+    },
+    {
+      "id": 57,
+      "type": "ResizeImageMaskNode",
+      "pos": [
+        1203.6837890625,
+        0
+      ],
+      "size": [
+        270,
+        154
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "input",
+          "name": "input",
+          "type": "IMAGE,MASK",
+          "link": 9
+        },
+        {
+          "localized_name": "resize_type",
+          "name": "resize_type",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "resize_type"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "width",
+          "name": "resize_type.width",
+          "type": "INT",
+          "widget": {
+            "name": "resize_type.width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "height",
+          "name": "resize_type.height",
+          "type": "INT",
+          "widget": {
+            "name": "resize_type.height"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "crop",
+          "name": "resize_type.crop",
+          "type": "COMBO",
+          "widget": {
+            "name": "resize_type.crop"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "scale_method",
+          "name": "scale_method",
+          "type": "COMBO",
+          "widget": {
+            "name": "scale_method"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "resized",
+          "name": "resized",
+          "type": "IMAGE",
+          "links": [
+            10,
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ResizeImageMaskNode"
+      },
+      "widgets_values": [
+        "scale dimensions",
+        1920,
+        1080,
+        "center",
+        "lanczos"
+      ],
+      "widgets_values_named": {
+        "resize_type": "scale dimensions",
+        "resize_type.width": 1920,
+        "resize_type.height": 1080,
+        "resize_type.crop": "center",
+        "scale_method": "lanczos"
+      }
+    },
+    {
+      "id": 58,
+      "type": "SeedVR2Preprocess",
+      "pos": [
+        1663.6837890625,
+        0
+      ],
+      "size": [
+        224.2173828125,
+        26
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "resized_images",
+          "name": "resized_images",
+          "type": "IMAGE",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SeedVR2Preprocess"
+      }
+    },
+    {
+      "id": 59,
+      "type": "SeedVR2PostProcessing",
+      "pos": [
+        3818.576171875,
+        0
+      ],
+      "size": [
+        305.134765625,
+        78
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 11
+        },
+        {
+          "localized_name": "original_resized_images",
+          "name": "original_resized_images",
+          "type": "IMAGE",
+          "link": 12
+        },
+        {
+          "localized_name": "color_correction_method",
+          "name": "color_correction_method",
+          "type": "COMBO",
+          "widget": {
+            "name": "color_correction_method"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            25
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SeedVR2PostProcessing"
+      },
+      "widgets_values": [
+        "lab"
+      ],
+      "widgets_values_named": {
+        "color_correction_method": "lab"
+      }
+    },
+    {
+      "id": 61,
+      "type": "SeedVR2Conditioning",
+      "pos": [
+        2607.901171875,
+        0
+      ],
+      "size": [
+        230.73203125,
+        46
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": 13
+        },
+        {
+          "localized_name": "latent",
+          "name": "vae_conditioning",
+          "type": "LATENT",
+          "link": 14
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            4
+          ]
+        },
+        {
+          "localized_name": "negative",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SeedVR2Conditioning"
+      }
+    },
+    {
+      "id": 73,
+      "type": "LoadVideo",
+      "pos": [
+        580,
+        260
+      ],
+      "size": [
+        282.798828125,
+        82
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "file",
+          "name": "file",
+          "type": "COMBO",
+          "widget": {
+            "name": "file"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "IMAGEUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "crash-push.mp4",
+        "image"
+      ],
+      "widgets_values_named": {
+        "file": "crash-push.mp4",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 74,
+      "type": "GetVideoComponents",
+      "pos": [
+        950.1529296875,
+        0
+      ],
+      "size": [
+        193.530859375,
+        106
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            9
+          ]
+        },
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            18
+          ]
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "FLOAT",
+          "links": [
+            26
+          ]
+        },
+        {
+          "localized_name": "bit_depth",
+          "name": "bit_depth",
+          "type": "COMBO",
+          "links": [
+            19
+          ]
+        },
+        {
+          "localized_name": "color_space",
+          "name": "color_space",
+          "type": "COMBO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "GetVideoComponents"
+      }
+    },
+    {
+      "id": 75,
+      "type": "CreateVideo",
+      "pos": [
+        4546.542578125,
+        0
+      ],
+      "size": [
+        270,
+        150
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 16
+        },
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": 18
+        },
+        {
+          "localized_name": "fps",
+          "name": "fps",
+          "type": "FLOAT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": 17
+        },
+        {
+          "localized_name": "bit_depth",
+          "name": "bit_depth",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "bit_depth"
+          },
+          "link": 19
+        },
+        {
+          "localized_name": "color_space",
+          "name": "color_space",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "color_space"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VIDEO",
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            20
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CreateVideo"
+      },
+      "widgets_values": [
+        30,
+        "auto",
+        "sRGB",
+        "none"
+      ],
+      "widgets_values_named": {
+        "fps": 30,
+        "bit_depth": "auto",
+        "color_space": "sRGB",
+        "codec": "none"
+      }
+    },
+    {
+      "id": 76,
+      "type": "SaveVideo",
+      "pos": [
+        4876.542578125,
+        0
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "link": 20
+        },
+        {
+          "localized_name": "filename_prefix",
+          "name": "filename_prefix",
+          "type": "STRING",
+          "widget": {
+            "name": "filename_prefix"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "format",
+          "name": "format",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "format.codec",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "encoding",
+          "name": "format.codec.encoding",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "format.codec.encoding"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "codec",
+          "name": "codec",
+          "shape": 7,
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "codec"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "video",
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "montagio/upscale",
+        "mp4",
+        "h264",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "montagio/upscale",
+        "format": "mp4",
+        "format.codec": "h264",
+        "format.codec.encoding": "auto",
+        "codec": "auto"
+      }
+    },
+    {
+      "id": 99,
+      "type": "SeedVR2TemporalChunk",
+      "pos": [
+        2277.901171875,
+        0
+      ],
+      "size": [
+        270,
+        126
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "type": "LATENT",
+          "link": 21
+        },
+        {
+          "localized_name": "temporal_overlap",
+          "name": "temporal_overlap",
+          "type": "INT",
+          "widget": {
+            "name": "temporal_overlap"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "chunking_mode",
+          "name": "chunking_mode",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "chunking_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "frames_per_chunk",
+          "name": "chunking_mode.frames_per_chunk",
+          "type": "INT",
+          "widget": {
+            "name": "chunking_mode.frames_per_chunk"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "latents",
+          "name": "latents",
+          "shape": 6,
+          "type": "LATENT",
+          "links": [
+            6,
+            14
+          ]
+        },
+        {
+          "localized_name": "temporal_overlap",
+          "name": "temporal_overlap",
+          "type": "INT",
+          "links": [
+            23
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SeedVR2TemporalChunk"
+      },
+      "widgets_values": [
+        3,
+        "manual",
+        33
+      ],
+      "widgets_values_named": {
+        "temporal_overlap": 3,
+        "chunking_mode": "manual",
+        "chunking_mode.frames_per_chunk": 33
+      }
+    },
+    {
+      "id": 100,
+      "type": "SeedVR2TemporalMerge",
+      "pos": [
+        3228.633203125,
+        0
+      ],
+      "size": [
+        199.94296875,
+        46
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "latents",
+          "name": "latents",
+          "type": "LATENT",
+          "link": 22
+        },
+        {
+          "localized_name": "temporal_overlap",
+          "name": "temporal_overlap",
+          "type": "INT",
+          "link": 23
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SeedVR2TemporalMerge"
+      }
+    },
+    {
+      "id": 101,
+      "type": "FrameInterpolationModelLoader",
+      "pos": [
+        580,
+        402
+      ],
+      "size": [
+        310.1529296875,
+        58
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model_name",
+          "name": "model_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "model_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "INTERP_MODEL",
+          "name": "INTERP_MODEL",
+          "type": "INTERP_MODEL",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FrameInterpolationModelLoader"
+      },
+      "widgets_values": [
+        "rife_v4.26.safetensors"
+      ],
+      "widgets_values_named": {
+        "model_name": "rife_v4.26.safetensors"
+      }
+    },
+    {
+      "id": 102,
+      "type": "FrameInterpolate",
+      "pos": [
+        4183.7109375,
+        0
+      ],
+      "size": [
+        302.831640625,
+        78
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "interp_model",
+          "name": "interp_model",
+          "type": "INTERP_MODEL",
+          "link": 24
+        },
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": 25
+        },
+        {
+          "localized_name": "multiplier",
+          "name": "multiplier",
+          "type": "INT",
+          "widget": {
+            "name": "multiplier"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FrameInterpolate"
+      },
+      "widgets_values": [
+        2
+      ],
+      "widgets_values_named": {
+        "multiplier": 2
+      }
+    },
+    {
+      "id": 103,
+      "type": "ComfyMathExpression",
+      "pos": [
+        1203.6837890625,
+        214
+      ],
+      "size": [
+        400,
+        200
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "a",
+          "name": "values.a",
+          "type": "FLOAT,INT,BOOLEAN",
+          "link": 26
+        },
+        {
+          "localized_name": "b",
+          "name": "values.b",
+          "shape": 7,
+          "type": "FLOAT,INT,BOOLEAN",
+          "link": null
+        },
+        {
+          "localized_name": "expression",
+          "name": "expression",
+          "type": "STRING",
+          "widget": {
+            "name": "expression"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "FLOAT",
+          "name": "FLOAT",
+          "type": "FLOAT",
+          "links": [
+            17
+          ]
+        },
+        {
+          "localized_name": "INT",
+          "name": "INT",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "localized_name": "BOOL",
+          "name": "BOOL",
+          "type": "BOOLEAN",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ComfyMathExpression"
+      },
+      "widgets_values": [
+        "a * 2"
+      ],
+      "widgets_values_named": {
+        "expression": "a * 2"
+      }
+    },
+    {
+      "id": 104,
+      "type": "MarkdownNote",
+      "pos": [
+        0,
+        0
+      ],
+      "size": [
+        520,
+        760
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "## Montagio · HD 1080p, smooth motion\n\nA 480p, 16 fps clip becomes 1080p at 32 fps: SeedVR2 3B restores each frame in temporal chunks of 33, then RIFE 4.26 puts a frame between each two.\n\n**Tip:** The resize before SeedVR2 sets the output size (1920x1080 here).\n\n**Models**, under `ComfyUI/models/`:\n- `vae/seedvr2_ema_vae_fp16.safetensors` (Apache-2.0, from ByteDance-Seed/SeedVR2-3B)\n- `diffusion_models/seedvr2_3b_int8_convrot.safetensors` (Apache-2.0, from ByteDance-Seed/SeedVR2-3B)\n- `frame_interpolation/rife_v4.26.safetensors` (MIT, from hzwer/RIFE)\n\nCore nodes only. 410 s cold for 81 frames, RIFE 4.8 s of it, on an NVIDIA L4 (24 GB), peak 8.6 GB.\n\nOpen weights only: every file is Apache-2.0 or MIT, pinned by sha256 in Montagio's `registry/models.lock.yaml`."
+      ],
+      "widgets_values_named": {
+        "text": "## Montagio · HD 1080p, smooth motion\n\nA 480p, 16 fps clip becomes 1080p at 32 fps: SeedVR2 3B restores each frame in temporal chunks of 33, then RIFE 4.26 puts a frame between each two.\n\n**Tip:** The resize before SeedVR2 sets the output size (1920x1080 here).\n\n**Models**, under `ComfyUI/models/`:\n- `vae/seedvr2_ema_vae_fp16.safetensors` (Apache-2.0, from ByteDance-Seed/SeedVR2-3B)\n- `diffusion_models/seedvr2_3b_int8_convrot.safetensors` (Apache-2.0, from ByteDance-Seed/SeedVR2-3B)\n- `frame_interpolation/rife_v4.26.safetensors` (MIT, from hzwer/RIFE)\n\nCore nodes only. 410 s cold for 81 frames, RIFE 4.8 s of it, on an NVIDIA L4 (24 GB), peak 8.6 GB.\n\nOpen weights only: every file is Apache-2.0 or MIT, pinned by sha256 in Montagio's `registry/models.lock.yaml`."
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    }
+  ],
+  "links": [
+    [
+      1,
+      58,
+      0,
+      48,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      51,
+      0,
+      48,
+      1,
+      "VAE"
+    ],
+    [
+      3,
+      52,
+      0,
+      54,
+      0,
+      "MODEL"
+    ],
+    [
+      4,
+      61,
+      0,
+      54,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      5,
+      61,
+      1,
+      54,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      6,
+      99,
+      0,
+      54,
+      3,
+      "LATENT"
+    ],
+    [
+      7,
+      100,
+      0,
+      55,
+      0,
+      "LATENT"
+    ],
+    [
+      8,
+      51,
+      0,
+      55,
+      1,
+      "VAE"
+    ],
+    [
+      9,
+      74,
+      0,
+      57,
+      0,
+      "IMAGE"
+    ],
+    [
+      10,
+      57,
+      0,
+      58,
+      0,
+      "IMAGE"
+    ],
+    [
+      11,
+      55,
+      0,
+      59,
+      0,
+      "IMAGE"
+    ],
+    [
+      12,
+      57,
+      0,
+      59,
+      1,
+      "IMAGE"
+    ],
+    [
+      13,
+      52,
+      0,
+      61,
+      0,
+      "MODEL"
+    ],
+    [
+      14,
+      99,
+      0,
+      61,
+      1,
+      "LATENT"
+    ],
+    [
+      15,
+      73,
+      0,
+      74,
+      0,
+      "VIDEO"
+    ],
+    [
+      16,
+      102,
+      0,
+      75,
+      0,
+      "IMAGE"
+    ],
+    [
+      17,
+      103,
+      0,
+      75,
+      2,
+      "FLOAT"
+    ],
+    [
+      18,
+      74,
+      1,
+      75,
+      1,
+      "AUDIO"
+    ],
+    [
+      19,
+      74,
+      3,
+      75,
+      3,
+      "COMBO"
+    ],
+    [
+      20,
+      75,
+      0,
+      76,
+      0,
+      "VIDEO"
+    ],
+    [
+      21,
+      48,
+      0,
+      99,
+      0,
+      "LATENT"
+    ],
+    [
+      22,
+      54,
+      0,
+      100,
+      0,
+      "LATENT"
+    ],
+    [
+      23,
+      99,
+      1,
+      100,
+      1,
+      "INT"
+    ],
+    [
+      24,
+      101,
+      0,
+      102,
+      0,
+      "INTERP_MODEL"
+    ],
+    [
+      25,
+      59,
+      0,
+      102,
+      1,
+      "IMAGE"
+    ],
+    [
+      26,
+      74,
+      2,
+      103,
+      0,
+      "FLOAT"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.39918474921716435,
+      "offset": [
+        100.20422894021739,
+        130.20422894021738
+      ]
+    }
+  },
+  "version": 0.4
+}

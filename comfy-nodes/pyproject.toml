@@ -1,6 +1,6 @@
 [project]
 name = "montagio"
-description = "ComfyUI nodes that read Montagio camera presets and apply them to image-to-video workflows."
+description = "Camera presets for Wan 2.2 Fun Camera: load a Montagio preset file, and run two camera moves at once or one after the other."
 version = "0.1.0"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
@@ -8,14 +8,18 @@ dependencies = ["PyYAML>=6.0", "numpy>=1.25.0"]
 classifiers = ["Operating System :: OS Independent"]
 
 [project.urls]
-# TODO: real repository URL before publishing
+# Placeholder: replace OWNER with the GitHub account that hosts the repository before
+# publishing (README, "Publishing"); the publish workflow refuses to run while it is there.
 Repository = "https://github.com/OWNER/montagio"
+Documentation = "https://github.com/OWNER/montagio/tree/main/comfy-nodes#readme"
+"Bug Tracker" = "https://github.com/OWNER/montagio/issues"
 
 [tool.comfy]
-# TODO: Comfy Registry publisher id before publishing
-PublisherId = ""
+# Placeholder: the publisher id created on https://registry.comfy.org (README, "Publishing").
+PublisherId = "YOUR-PUBLISHER-ID"
 DisplayName = "Montagio Camera Presets"
-Icon = ""
+# Square SVG, the Montagio mark; the same OWNER placeholder.
+Icon = "https://raw.githubusercontent.com/OWNER/montagio/main/docs/brand/montagio-mark.svg"
 requires-comfyui = ">=0.41.0"
 
 [tool.pytest.ini_options]

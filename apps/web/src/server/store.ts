@@ -3,6 +3,8 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { JobState } from '@montagio/comfy-adapter';
 import type { ApiWorkflow, Aspect } from '@montagio/presets';
+import type { InputSlot } from '@montagio/recipe';
+import type { DemoKind } from '@/lib/api-types';
 import { getEnv } from './env';
 
 export type GenerationRecord = {
@@ -11,6 +13,8 @@ export type GenerationRecord = {
   modelId: string;
   imageRef: string;
   userPrompt?: string;
+  /** The negative prompt sent in place of the preset's (a showcase clip's recipe). */
+  negative?: string;
   seed: number;
   aspect: Aspect;
   state: JobState;
@@ -23,6 +27,8 @@ export type GenerationRecord = {
   remix?: true;
   /** The delivered clip's frame count, read by probe (HD takes 121 at most); absent for a clip delivered before. */
   frames?: number;
+  /** A demo render: what it is, since no model made it. */
+  demo?: DemoKind;
   idempotencyKey: string;
   createdAt: string;
   updatedAt: string;
@@ -91,6 +97,23 @@ export async function readWorkflow(id: string): Promise<ApiWorkflow | null> {
   if (!SAFE_ID.test(id)) return null;
   try {
     return JSON.parse(await readFile(join(generationsDir(), id, 'workflow.api.json'), 'utf8')) as ApiWorkflow;
+  } catch {
+    return null;
+  }
+}
+
+/** The start photo the backend uploaded, by sha256 (the recipe's input), next to the workflow. */
+export async function saveInputs(id: string, slots: InputSlot[]): Promise<void> {
+  const dir = join(generationsDir(), id);
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, 'inputs.json'), JSON.stringify(slots, null, 2));
+}
+
+/** What saveInputs kept, or null: a clip rendered before the inputs were noted has none. */
+export async function readInputs(id: string): Promise<InputSlot[] | null> {
+  if (!SAFE_ID.test(id)) return null;
+  try {
+    return JSON.parse(await readFile(join(generationsDir(), id, 'inputs.json'), 'utf8')) as InputSlot[];
   } catch {
     return null;
   }

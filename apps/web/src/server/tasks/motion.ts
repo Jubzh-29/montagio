@@ -18,7 +18,8 @@ export const MOTION_COMPOSE_ROLES: readonly ComposeRole[] = ['character', 'outfi
  * A motion transfer (Wan2.2-Animate-2 distilled): the character of the photo performs the
  * motion of the reference clip, prepared at upload. The character may be composed first by the
  * edit (a character with an outfit and a product, seen full body). The user's word that they hold
- * the rights on the video and the photos is required (it stands for the rights box on this tab).
+ * the rights on the video and the photos is required (it stands for the rights box on this tab),
+ * except on the sample dance with a photo nobody imported.
  */
 export const motionTask: TaskDef = {
   async prepare(body, lib) {
@@ -32,7 +33,9 @@ export const motionTask: TaskDef = {
     const videoRef = typeof body.videoRef === 'string' ? body.videoRef : '';
     const video = await readVideoMeta(videoRef);
     if (!video) throw new JobError('invalid-input');
-    if (body.rights !== true) throw new JobError('rights-required');
+    // The sample dance on a photo nobody imported: Montagio's own files, no rights to confirm.
+    const ownFiles = video.origin === 'sample' && !photo.personal;
+    if (body.rights !== true && !ownFiles) throw new JobError('rights-required');
     const model = motionModel(lib);
     const max = model.limits.max_chars ?? TEXT_MAX;
     const character = typeof body.character === 'string' ? body.character.trim() : '';

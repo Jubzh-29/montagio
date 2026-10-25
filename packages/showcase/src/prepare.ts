@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, sep } from 'node:path';
 import type { OpenStackReport } from '@montagio/check-open-stack';
 import { dimensionsFor, frameCount, loadLibrary, type Library } from '@montagio/presets';
+import { readStack } from '@montagio/recipe';
 import {
   AI_METADATA,
   concatCopy,
@@ -17,10 +18,11 @@ import {
   SHOWCASE_COLOUR,
   SHOWCASE_X264,
 } from '@montagio/sequence';
-import type { ShowcaseData } from './data';
-import { effectFile, exampleWorkflowFile, hookFile, loadManifest, SHOWCASE_DIR } from './manifest';
+import type { ShowcaseData, ShowcaseExampleItem, ShowcaseHdModel } from './data';
+import { effectFile, exampleWorkflowFile, hookFile, loadManifest, recipeFile, SHOWCASE_DIR, type HdPass } from './manifest';
 import { motionKeyframes, toZoompan } from './motion';
 import { planClips, type PlannedClip } from './plan';
+import { showcaseRecipe } from './recipe';
 import { sha256File, verifyShowcase } from './verify';
 import { DEFAULT_PLACEHOLDER_SEED, showcaseWorkflow } from './workflow';
 
@@ -101,7 +103,7 @@ export async function prepareShowcase(
     throw new PrepareError([`apps/web/public/open-stack-report.json is missing or unreadable: run "npm run check:open-stack" first`]);
   }
 
-  const [library, manifest] = await Promise.all([loadLibrary(root), loadManifest(root)]);
+  const [library, manifest, stack] = await Promise.all([loadLibrary(root), loadManifest(root), readStack(root)]);
   const planned = planClips(manifest, library);
   let cache: Record<string, string> = {};
   try {
@@ -145,15 +147,25 @@ export async function prepareShowcase(
         posterFrame(join(outDir, item.file), path, { width: PREVIEW_WIDTH, comment: tags.comment }),
       );
     }
-    const workflow = showcaseWorkflow(library, manifest, item.preset, item.sample, item.rendered?.seed ?? DEFAULT_PLACEHOLDER_SEED);
+    // The workflow that rendered the clip, with its own texts (the HD pass is in the manifest).
+    const workflow = showcaseWorkflow(library, manifest, item.preset, item.sample, item.rendered?.seed ?? DEFAULT_PLACEHOLDER_SEED, item.rendered ?? {});
     const workflowPath = join(outDir, item.workflow);
     produced.add(item.workflow);
     await mkdir(dirname(workflowPath), { recursive: true });
     await writeFile(workflowPath, `${JSON.stringify(workflow, null, 2)}\n`);
+    // A rendered clip's recipe: its photo, render and HD pass by sha256, and the request that renders it at home.
+    if (item.rendered) {
+      const yaml = await readFile(join(root, ...(library.presetFiles.get(item.preset.id) ?? `presets/${item.preset.id}.yaml`).split('/')), 'utf8');
+      const recipe = showcaseRecipe(library, manifest, item.rendered, item.sample, yaml, stack);
+      const file = recipeFile(item.preset.id, item.sample.id);
+      produced.add(file);
+      await mkdir(dirname(join(outDir, file)), { recursive: true });
+      await writeFile(join(outDir, file), `${JSON.stringify(recipe, null, 2)}\n`);
+    }
   }
 
   // The effect and hook examples, copied as ingest wrote them, with their workflows.
-  const exampleUrls = new Map<string, { sample: string; url: string; workflowUrl: string; poster: string }[]>();
+  const exampleUrls = new Map<string, ShowcaseExampleItem['examples']>();
   for (const [kind, entries] of [
     ['effect', manifest.effects.map((entry) => ({ id: entry.effect, entry }))],
     ['hook', manifest.hooks.map((entry) => ({ id: entry.hook, entry }))],
@@ -167,7 +179,8 @@ export async function prepareShowcase(
       );
       await ensure(workflowUrl, hash('example-workflow', entry.workflow_sha256), (path) => copyFile(join(showcaseDir, workflowUrl), path));
       const key = `${kind}:${id}`;
-      exampleUrls.set(key, [...(exampleUrls.get(key) ?? []), { sample: entry.sample, url: file, workflowUrl, poster: posterOf(file) }]);
+      const hd = hdModelOf(library, entry.hd);
+      exampleUrls.set(key, [...(exampleUrls.get(key) ?? []), { sample: entry.sample, url: file, workflowUrl, poster: posterOf(file), ...(hd ? { hd } : {}) }]);
     }
   }
   const exampleItem = (kind: 'effect' | 'hook', preset: { id: string; name: string; description: string; models: { preferred: string } }) => {
@@ -232,14 +245,19 @@ export async function prepareShowcase(
       credit: sample.credit,
       ...(sample.prompt ? { prompt: sample.prompt } : {}),
     })),
-    clips: planned.map((item) => ({
-      preset: item.preset.id,
-      sample: item.sample.id,
-      url: item.file,
-      verticalUrl: item.vertical,
-      workflowUrl: item.workflow,
-      placeholder: item.rendered === null,
-    })),
+    clips: planned.map((item) => {
+      const hd = hdModelOf(library, item.rendered?.hd);
+      return {
+        preset: item.preset.id,
+        sample: item.sample.id,
+        url: item.file,
+        verticalUrl: item.vertical,
+        workflowUrl: item.workflow,
+        ...(item.rendered ? { recipeUrl: recipeFile(item.preset.id, item.sample.id) } : {}),
+        placeholder: item.rendered === null,
+        ...(hd ? { hd } : {}),
+      };
+    }),
     effects: [...library.effects.values()].map((preset) => exampleItem('effect', preset)).filter((item) => item.examples.length > 0),
     hooks: [...library.hooks.values()]
       .map((preset) => ({ ...exampleItem('hook', preset), references: preset.end_frame.references }))
@@ -296,4 +314,10 @@ async function checkJoin(files: string[], label: string): Promise<void> {
 function modelSummary(library: Library, id: string): ShowcaseData['model'] {
   const model = library.models.get(id)!;
   return { id: model.id, name: model.name, license: model.license };
+}
+
+/** The upscaler of a file's HD pass, as the caption names it (verify has checked it is in the registry). */
+function hdModelOf(library: Library, hd: HdPass | undefined): ShowcaseHdModel | undefined {
+  const model = hd && library.extensionModels.get(hd.model);
+  return model ? { id: model.id, name: model.name, license: model.license } : undefined;
 }

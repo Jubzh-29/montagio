@@ -462,7 +462,8 @@ test('cli exits 0 on a clean repo', () => {
 test('the real repository is clean', async () => {
   const r = await checkOpenStack(repoRoot());
   expect(r.violations).toEqual([]);
-});
+  // it reads every file of the repository: past 5 s on a laptop running the other suites
+}, 30_000);
 
 test('the source scan skips the static export of the web app (out/), its own bundle output', async () => {
   // Next's minified router reads `x.router`; the showcase export holds it under apps/web/out.
