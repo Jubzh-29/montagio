@@ -30,6 +30,8 @@ export default defineConfig({
       MONTAGIO_DEMO_DURATION_MS: '1500',
       // Every extension and every effect, dated or not: the suite covers what the GPU sessions will validate.
       MONTAGIO_EXTENSIONS: 'all',
+      // The captions of talking clips, behind their flag until the cut: the suite covers them.
+      MONTAGIO_EXPERIMENTAL: 'captions',
       MONTAGIO_DATA: join(tmpdir(), `montagio-e2e-${Date.now()}`),
     },
   },
