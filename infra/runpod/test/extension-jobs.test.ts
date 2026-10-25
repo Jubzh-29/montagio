@@ -14,7 +14,7 @@ beforeAll(async () => {
 
 const base = { language: 'en' as const, duration_s: 10, seed: 7, aspect: '16:9' as const };
 
-const files = { input: '/data/photo.png', input2: '/data/outfit.png', input3: '/data/product.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, voice: '/data/voice.flac', motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const, restyleFrame: '/data/first.png', restyleReference: { path: '/data/restyled.png', mode: 'first-frame' as const }, motionSize: { width: 480, height: 832 }, swapPoints: [{ x: 0.5, y: 0.4 }], swapImage: '/data/bike.png' };
+const files = { input: '/data/photo.png', input2: '/data/outfit.png', input3: '/data/product.png', end: '/data/end.png', clip: '/data/clip.mp4', clipAspect: '9:16' as const, clipFrames: 81, audio: '/data/speech.flac', audio_s: 6, voice: '/data/voice.flac', motion: '/data/motion.mp4', motion_s: 5, motionAspect: '9:16' as const, restyleFrame: '/data/first.png', restyleReference: { path: '/data/restyled.png', mode: 'first-frame' as const }, motionSize: { width: 480, height: 832 }, swapPoints: [{ x: 0.5, y: 0.4 }], swapImage: '/data/bike.png', remixShots: [{ path: '/data/shot1.mp4', seconds: 2 }, { path: '/data/shot2.mp4', seconds: 1.5 }], remixAspect: '9:16' as const, remixSheet: '/data/shots.png' };
 
 test('one job per extension, in the order of the session, each accepted by ComfyUI v0.41.0 once its files are uploaded', () => {
   const jobs = extensionJobs(library, { ...base, ...files, jobs: [...EXTENSION_JOBS], effects: ['squish'], hook: 'wardrobe-swap' });
@@ -35,6 +35,9 @@ test('one job per extension, in the order of the session, each accepted by Comfy
     ['restyle-edit', 'qwen-image-edit-2511'],
     ['restyle:first-frame', 'wan21-vace-restyle'],
     ['swap:photo', 'wan21-vace-swap'],
+    ['remix-skeleton', 'gemma4-trend-skeleton'],
+    ['remix:shot1', 'wan-animate2-motion'],
+    ['remix:shot2', 'wan-animate2-motion'],
   ]);
   for (const job of jobs) {
     const skip = job.files.map((file) => `${file.node}.${file.field}`);
@@ -83,6 +86,21 @@ test('each job uploads the files it reads and nothing else', () => {
     { node: '52', field: 'image', path: '/data/photo.png' },
     { node: '58', field: 'audio', path: '/data/speech.flac' },
   ]);
+  expect(uploads['remix-skeleton']).toEqual([{ node: '1', field: 'image', path: '/data/shots.png' }]);
+});
+
+test("a remix makes each shot again with the same photo and the same seed, and Gemma reads the sheet of their first frames", () => {
+  const jobs = extensionJobs(library, { ...base, ...files, jobs: ['remix-skeleton', 'remix'], text: { remix: 'a cartoon boy' }, language: 'fr' });
+  const [skeleton, ...shots] = jobs;
+  expect(skeleton!.workflow['1']!.inputs.image).toBe('shots.png');
+  expect(skeleton!.workflow['4']!.inputs.string_a).toMatch(/in which a cartoon boy performs the same shots/);
+  expect(skeleton!.params).toEqual({ language: 'fr', character: 'a cartoon boy' });
+  expect(shots.map((job) => job.files.map((file) => file.path))).toEqual([
+    ['/data/photo.png', '/data/shot1.mp4'],
+    ['/data/photo.png', '/data/shot2.mp4'],
+  ]);
+  expect(shots.map((job) => job.workflow['597']!.inputs.noise_seed)).toEqual([7, 7]);
+  expect(() => extensionJobs(library, { ...base, input: '/data/photo.png', jobs: ['remix'] })).toThrow(/--motion, the trend cut into its shots/);
 });
 
 test('an extension record carries the sha256 of its photo', () => {
@@ -105,6 +123,8 @@ test('an extension record carries the sha256 of its photo', () => {
     'restyle-edit': '/data/first.png',
     restyle: '/data/restyled.png',
     swap: '/data/bike.png',
+    'remix-skeleton': '/data/shots.png',
+    remix: '/data/photo.png',
   });
 });
 
@@ -232,7 +252,7 @@ describe('jobTexts (smoke --text)', () => {
   });
 
   test('when several jobs read a text, a bare one is refused and each text names its job', () => {
-    expect(() => jobTexts(['night rain'], [...EXTENSION_JOBS])).toThrow(/edit, effect, voice, music, motion, restyle, swap read a text: name the job, as in --text edit=/);
+    expect(() => jobTexts(['night rain'], [...EXTENSION_JOBS])).toThrow(/edit, effect, voice, music, motion, restyle, swap, remix read a text: name the job, as in --text edit=/);
     expect(jobTexts(['music=calm piano', 'edit=make it snow'], [...EXTENSION_JOBS])).toEqual({ music: 'calm piano', edit: 'make it snow' });
   });
 
