@@ -9,7 +9,23 @@ import { POST as postUpload } from '@/app/api/uploads/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import type { CharacterSummary, HistoryItem, JobSummary } from '@/lib/api-types';
 import { IMAGE_PROMPT_MAX } from '@montagio/presets';
-import { CHARACTER_KINDS, CHARACTER_STYLES, characterPrompt, photodumpInstruction, photodumpScene, placeOf, PORTRAIT_PROMPT_MAX, scenePhrase } from '@/lib/characters';
+import en from '@/i18n/en.json';
+import fr from '@/i18n/fr.json';
+import {
+  CHARACTER_KINDS,
+  CHARACTER_STYLES,
+  characterPrompt,
+  knownTraits,
+  photodumpInstruction,
+  photodumpScene,
+  placeOf,
+  PORTRAIT_PROMPT_MAX,
+  scenePhrase,
+  TRAIT_GROUP_NAMES,
+  TRAIT_GROUPS,
+  traitGroupKey,
+  traitKey,
+} from '@/lib/characters';
 import { params, pngFile, setupTempData, uploadRequest } from './helpers';
 
 setupTempData();
@@ -166,6 +182,68 @@ test('a character of another kind: its body, its style, always clothed, and ever
       expect(prompt).toMatch(/no text\.$/);
     }
   }
+});
+
+test('the traits join the portrait text after the style, and a skin trait covers the fur, feathers or plating of a kind', () => {
+  expect(characterPrompt('bold', 'a red coat', 'human', { hair: 'sculptural', eyes: 'violet' })).toContain(
+    'a person with a bold, striking personal style, with sculptural swirling hair and vivid violet eyes: a red coat. Fully clothed in a modest outfit',
+  );
+  expect(characterPrompt('everyday', 'x', 'fox', { skin: 'spots' })).toContain('in everyday clothes, with fur patterned with leopard-like spots: x.');
+  expect(characterPrompt('everyday', 'x', 'owl', { skin: 'stone' })).toContain('with feathers of carved grey stone');
+  expect(characterPrompt('everyday', 'x', 'robot', { skin: 'chrome' })).toContain('with mirror-chrome plating');
+  expect(characterPrompt('everyday', 'x', 'human', { skin: 'chrome', build: 'longNeck', extra: 'horns' })).toContain(
+    'with a long graceful neck, mirror-chrome skin and two small curved horns: x.',
+  );
+  expect(characterPrompt('everyday', 'x', 'human', {})).toBe(characterPrompt('everyday', 'x'));
+});
+
+test('with every trait on the longest kind and style, the text stays within the limit and keeps room for the visitor\'s words', () => {
+  const longest = { hair: 'sculptural', build: 'elongated', skin: 'spots', extra: 'pointedEars', eyes: 'huge' } as const;
+  for (const kind of CHARACTER_KINDS) {
+    for (const style of CHARACTER_STYLES) {
+      for (const skin of TRAIT_GROUPS.skin) {
+        const prompt = characterPrompt(style, 'word '.repeat(48), kind, { ...longest, skin });
+        expect(prompt.length).toBeLessThanOrEqual(PORTRAIT_PROMPT_MAX);
+        expect(prompt).toMatch(/\. Fully clothed in a modest outfit, .*no text\.$/);
+        // The words are cut after a whole one, never inside it, and at least 70 characters of them stay.
+        const words = prompt.slice(prompt.indexOf(': ') + 2, prompt.indexOf('. Fully clothed'));
+        expect(words).toMatch(/^(word )*word$/);
+        expect(words.length).toBeGreaterThanOrEqual(70);
+      }
+    }
+  }
+});
+
+test('the traits are known choices, one per group; nothing else is kept', () => {
+  expect(knownTraits(undefined)).toEqual({});
+  expect(knownTraits({ hair: 'geometric', eyes: 'huge' })).toEqual({ hair: 'geometric', eyes: 'huge' });
+  for (const wrong of [null, 'horns', ['horns'], { hair: 'mohawk' }, { tail: 'long' }, { eyes: 3 }, { hair: 'sculptural', extra: 'wings' }]) expect(knownTraits(wrong)).toBeNull();
+});
+
+test('every trait and group has its label in English and in French', () => {
+  for (const group of TRAIT_GROUP_NAMES) {
+    for (const key of [traitGroupKey(group), ...(TRAIT_GROUPS[group] as readonly string[]).map(traitKey)]) {
+      expect(en, key).toHaveProperty(key);
+      expect(fr, key).toHaveProperty(key);
+    }
+  }
+});
+
+test('no trait is the look of a medical condition', () => {
+  const texts = TRAIT_GROUP_NAMES.flatMap((group) =>
+    (TRAIT_GROUPS[group] as readonly string[]).flatMap((value) => CHARACTER_KINDS.map((kind) => characterPrompt('everyday', 'x', kind, { [group]: value }))),
+  );
+  for (const text of texts) expect(text).not.toMatch(/albin|vitiligo|syndrome|disease|disorder|dwarf|scar|deform|disab|burn|acne|wound|amput|wheelchair|prosthe|tumou?r|lesion/i);
+});
+
+test('a character keeps its traits; an unknown trait is refused', async () => {
+  const job = await portrait('c-portrait-traits');
+  const saved = await save({ name: 'Quartz', type: 'bold', traits: { skin: 'stone', extra: 'horns' }, description: 'a red coat', imageRef: job.outputImageRef });
+  expect(await saved.json()).toMatchObject({ name: 'Quartz', traits: { skin: 'stone', extra: 'horns' } });
+  const plain = (await (await save({ name: 'Plain', type: 'bold', traits: {}, description: 'a red coat', imageRef: job.outputImageRef })).json()) as CharacterSummary;
+  expect(plain.traits).toBeUndefined();
+  expect((await save({ name: 'X', type: 'bold', traits: { skin: 'glass' }, description: 'x', imageRef: job.outputImageRef })).status).toBe(400);
+  expect((await save({ name: 'X', type: 'bold', faceId: 'nobody', description: 'x', imageRef: job.outputImageRef })).status).toBe(400);
 });
 
 test('a character keeps its kind; a person when none is said, and an unknown kind is refused', async () => {

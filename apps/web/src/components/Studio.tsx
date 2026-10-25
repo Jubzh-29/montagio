@@ -21,6 +21,7 @@ import {
 import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
+import { FACE_KEY_PREFIX, faceById, facePhoto, faceScene, faceSubject, STARTING_FACES, type BankFace } from '@/lib/character-bank';
 import { entryAsHistoryItem, type CommunityEntry } from '@/lib/community';
 import { recipeUrlOf } from '@/lib/recipe-url';
 import { applyReprise, replayOn, reproducedRecipeUrl, reproducibleResult, type Replay } from '@/lib/reprise';
@@ -150,6 +151,9 @@ const SAMPLE_OF_TAB: Record<Tab, { file: string; scene: MessageKey; forTab?: 'ef
   avatar: { file: 'sample-portrait.png', scene: 'samplePortraitScene', forTab: 'avatar' },
   motion: { file: 'sample-character.png', scene: 'sampleCharacterScene', forTab: 'motion' },
 };
+
+/** The tabs whose start photo is a person or a character: they offer the starting faces. */
+const FACE_TABS: readonly Tab[] = ['effects', 'avatar', 'motion'];
 
 /** What the avatar of the sample portrait says in the GPU session's render (demo-assets/examples/avatar.mp4), in English. */
 const SAMPLE_SPEECH = 'Hello, this is a test of the Montagio avatar.';
@@ -445,12 +449,17 @@ export function Studio() {
     if (tab === 'motion' && !(motionVideo.status === 'ready' && !motionVideo.sample) && motionVideo.status !== 'uploading') {
       void loadSampleVideo();
     }
+    await copyStartPhoto(sample.forTab ? `/api/uploads/sample?for=${sample.forTab}` : '/api/uploads/sample', localUrl, token);
+  };
+
+  /** A start photo the server copies (a sample, a starting face), as the upload of this token. */
+  const copyStartPhoto = async (endpoint: string, localUrl: string, token: number) => {
     setUpload({ status: 'uploading', localUrl });
     const settle = (next: UploadState) => {
       if (token === uploadToken.current) setUpload(next);
     };
     try {
-      const res = await apiFetch(sample.forTab ? `/api/uploads/sample?for=${sample.forTab}` : '/api/uploads/sample', { method: 'POST' });
+      const res = await apiFetch(endpoint, { method: 'POST' });
       if (!res.ok) return settle({ status: 'error', message: t('errorGeneric') });
       const result = (await res.json()) as UploadResult;
       settle({ status: 'ready', localUrl, imageRef: result.imageRef, personal: result.personal });
@@ -458,6 +467,27 @@ export function Studio() {
       settle({ status: 'error', message: t('errorGeneric') });
     }
   };
+
+  /**
+   * A starting face, copied by the server like a sample: a fictional character, so nothing asks for
+   * consent. It comes described (what the photo shows, an effect's subject); the Motion tab gets the
+   * sample dance when it has no clip yet.
+   */
+  const loadFace = async (face: BankFace) => {
+    if (busyRef.current) return;
+    touched.current = true;
+    const token = ++uploadToken.current;
+    setJob({ status: 'idle' });
+    setPhotoPrompt(faceSubject(face));
+    if (sceneOfPhoto.current || !prompt.trim()) {
+      setPrompt(faceScene(face).slice(0, SCENE_MAX));
+      sceneOfPhoto.current = true;
+    }
+    if (tab === 'motion' && (motionVideo.status === 'idle' || motionVideo.status === 'error')) void loadSampleVideo();
+    await copyStartPhoto(`/api/uploads/face?id=${encodeURIComponent(face.id)}`, facePhoto(face.id), token);
+  };
+  // The face the start photo is, while it is one: its thumbnail shows as picked.
+  const pickedFace = upload.status === 'idle' ? null : (STARTING_FACES.find((face) => facePhoto(face.id) === upload.localUrl)?.id ?? null);
 
   /** Showcase: a sample photo stands in for an upload; nothing is sent anywhere. */
   // The button that opened the atelier (Text to image, Edit): the focus goes back to it when it closes.
@@ -696,6 +726,14 @@ export function Studio() {
     const applied = `${from}|${reproduce}`;
     if (!from || catalog !== 'ready' || busy || appliedFrom.current === applied) return;
     appliedFrom.current = applied;
+    // A starting face (a character made from one links here) is the start photo of the tab asked for.
+    if (from.startsWith(FACE_KEY_PREFIX)) {
+      const face = faceById(from.slice(FACE_KEY_PREFIX.length));
+      window.history.replaceState(null, '', tabHref(tab));
+      // After this render, like the lookups below.
+      if (face && STARTING_FACES.includes(face) && !IS_SHOWCASE) void Promise.resolve(face).then(loadFace);
+      return;
+    }
     // An entry of the community gallery comes from there, a creation of this machine from the history.
     const lookup = from.startsWith('community:')
       ? apiFetch(`/api/community/${encodeURIComponent(from.slice('community:'.length))}`)
@@ -1190,6 +1228,9 @@ export function Studio() {
                       onRefusedFile: () => setJob({ status: 'error', message: t('errorShowcaseUpload') }),
                     }
                   : undefined
+              }
+              faces={
+                !IS_SHOWCASE && FACE_TABS.includes(tab) ? { list: STARTING_FACES, selectedId: pickedFace, onPick: (face) => void loadFace(face) } : undefined
               }
             />
             {repriseNotice && upload.status === 'idle' && (

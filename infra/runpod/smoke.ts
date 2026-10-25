@@ -142,8 +142,8 @@ Extensions (instead of presets):
   --duration S       music: the length of the film it goes under (default 10)
 
 Text to image (instead of presets), the app's t2i model (Z-Image-Turbo):
-  --t2i NAME[@ASPECT]=TEXT   one image per --t2i (repeatable), 16:9 unless @9:16 or @1:1, at --resolution
-                             (720p by default), seeds from --seed; saved as clips/<date>__t2i-NAME__<model>__r1.png`);
+  --t2i NAME[@ASPECT][#SEED]=TEXT  one image per --t2i (repeatable), 16:9 unless @9:16 or @1:1, at --resolution
+                             (720p by default), seeds from --seed unless #SEED gives its own; saved as clips/<date>__t2i-NAME__<model>__r1.png`);
   process.exit(0);
 }
 
@@ -728,7 +728,7 @@ async function runImages(
   // Compile everything first: a text too long fails before any GPU second is spent.
   const jobs = prompts.map((prompt, index) => ({
     prompt,
-    ...compileImage(model, template, { prompt: prompt.text, seed: firstSeed + index, aspect: prompt.aspect, ...(resolution ? { resolution } : {}) }),
+    ...compileImage(model, template, { prompt: prompt.text, seed: prompt.seed ?? firstSeed + index, aspect: prompt.aspect, ...(resolution ? { resolution } : {}) }),
   }));
   await mkdir(join(outDir, 'workflows'), { recursive: true });
   await mkdir(join(outDir, 'clips'), { recursive: true });
