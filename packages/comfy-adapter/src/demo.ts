@@ -9,20 +9,24 @@ import { IDEMPOTENCY_WINDOW_MS, type BackendJob, type GenerationBackend, type Ou
  */
 export type DemoRender = (job: { presetId: string; output: OutputKind; files: NonNullable<SubmitJob['files']> }) => Promise<string | undefined>;
 
+type DemoDir = 'clipsDir' | 'imagesDir' | 'audioDir' | 'captionsDir';
+
 /** `rendered` is undefined while the render runs, null when it gave nothing. */
 type DemoJob = { presetId: string; output: OutputKind; startedAt: number; canceledAt?: number; rendered?: string | null };
 
 /** The pre-rendered file of each kind, and the one used when a job has none of its own. */
-const DEMO_FILES: Record<OutputKind, { dir: 'clipsDir' | 'imagesDir' | 'audioDir'; ext: string }> = {
+const DEMO_FILES: Record<OutputKind, { dir: DemoDir; ext: string }> = {
   video: { dir: 'clipsDir', ext: '.mp4' },
   image: { dir: 'imagesDir', ext: '.png' },
   audio: { dir: 'audioDir', ext: '.flac' },
+  file: { dir: 'captionsDir', ext: '.json' },
 };
 
 /**
  * Backend that needs no GPU: it simulates progress over `durationMs` and
  * returns what `render` made of the job's files, or else a pre-rendered file of the kind the
- * job delivers: a clip for the preset (or `_default.mp4`), an image (`_default.png`) or a sound (`_default.flac`).
+ * job delivers: a clip for the preset (or `_default.mp4`), an image (`_default.png`), a sound (`_default.flac`)
+ * or the words of a speech (`_default.json`).
  * Jobs live in memory, so a restarted server reports them as lost.
  */
 export class DemoBackend implements GenerationBackend {
@@ -32,14 +36,15 @@ export class DemoBackend implements GenerationBackend {
   private readonly submissions = new Map<string, { at: number; backendJobId: string }>();
   private readonly now: () => number;
 
-  private readonly dirs: Record<'clipsDir' | 'imagesDir' | 'audioDir', string>;
+  private readonly dirs: Record<DemoDir, string>;
 
-  /** `imagesDir` and `audioDir` default to the siblings of `clipsDir` (demo-assets/images, demo-assets/audio). */
+  /** `imagesDir`, `audioDir` and `captionsDir` default to the siblings of `clipsDir` (demo-assets/images, demo-assets/audio, demo-assets/captions). */
   constructor(
     private readonly opts: {
       clipsDir: string;
       imagesDir?: string;
       audioDir?: string;
+      captionsDir?: string;
       durationMs: number;
       now?: () => number;
       render?: DemoRender;
@@ -50,6 +55,7 @@ export class DemoBackend implements GenerationBackend {
       clipsDir: opts.clipsDir,
       imagesDir: opts.imagesDir ?? join(opts.clipsDir, '..', 'images'),
       audioDir: opts.audioDir ?? join(opts.clipsDir, '..', 'audio'),
+      captionsDir: opts.captionsDir ?? join(opts.clipsDir, '..', 'captions'),
     };
   }
 

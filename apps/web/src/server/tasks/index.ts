@@ -1,12 +1,15 @@
 import type { JobTask, TaskDef } from '../jobs';
 import { adTask } from './ad';
 import { avatarTask } from './avatar';
+import { captionsTask } from './captions';
 import { editTask } from './edit';
 import { effectTask } from './effect';
 import { hookTask } from './hook';
 import { imageUpscaleTask } from './image-upscale';
 import { motionTask } from './motion';
 import { musicTask } from './music';
+import { restyleTask } from './restyle';
+import { swapTask } from './swap';
 import { t2iTask } from './t2i';
 import { moodboardTask } from './moodboard';
 import { translateTask } from './translate';
@@ -24,8 +27,11 @@ export const TASKS: Partial<Record<JobTask, TaskDef>> = {
   upscale: upscaleTask,
   'image-upscale': imageUpscaleTask,
   motion: motionTask,
+  restyle: restyleTask,
+  swap: swapTask,
   ad: adTask,
   'voice-change': voiceChangeTask,
   moodboard: moodboardTask,
   translate: translateTask,
+  captions: captionsTask,
 };

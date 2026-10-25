@@ -7,11 +7,26 @@ import { ALLOWED_WEIGHT_LICENSES, EXTENSION_IDS, gpuDate, kebabId, type Extensio
  * not camera presets: their entries live in registry/extensions/, apart from registry/models/,
  * so nothing that lists preset models (the Studio, the showcase, compileJob) sees them.
  */
-export const EXTENSION_TASKS = ['t2a', 'v2v-upscale', 'i2i-upscale', 'i2i-edit', 'tts', 'a2a-vc', 'a2a-translate', 'ia2v-talk', 'i2v-effect', 'flf2v', 'motion-transfer'] as const;
+export const EXTENSION_TASKS = [
+  't2a',
+  'v2v-upscale',
+  'i2i-upscale',
+  'i2i-edit',
+  'tts',
+  'a2a-vc',
+  'a2a-translate',
+  'a2t-words',
+  'ia2v-talk',
+  'i2v-effect',
+  'flf2v',
+  'motion-transfer',
+  'v2v-restyle',
+  'v2v-swap',
+] as const;
 export type ExtensionTask = (typeof EXTENSION_TASKS)[number];
 
-/** What a job delivers (the same three kinds as @montagio/comfy-adapter, which the registry does not depend on). */
-export const OUTPUT_KINDS = ['video', 'audio', 'image'] as const;
+/** What a job delivers (the same kinds as @montagio/comfy-adapter, which the registry does not depend on); a file is a JSON document. */
+export const OUTPUT_KINDS = ['video', 'audio', 'image', 'file'] as const;
 export type OutputKind = (typeof OUTPUT_KINDS)[number];
 
 export const EXTENSION_BINDING_KEYS = [
@@ -37,6 +52,8 @@ export const EXTENSION_BINDING_KEYS = [
   'motion_prompt',
   'mask',
   'voice',
+  'points',
+  'exclude_points',
 ] as const;
 export type ExtensionBindingKey = (typeof EXTENSION_BINDING_KEYS)[number];
 
@@ -48,10 +65,16 @@ export const REQUIRED_EXTENSION_BINDINGS: Record<ExtensionTask, ExtensionBinding
   tts: ['text', 'language', 'seed', 'cfg'],
   'a2a-vc': ['audio', 'voice'],
   'a2a-translate': ['audio', 'prompt', 'language', 'cfg', 'seed'],
+  // the words of a speech with their moments (Whisper): language "auto" or an imposed one
+  'a2t-words': ['audio', 'language'],
   'ia2v-talk': ['image', 'audio', 'prompt', 'seed', 'width', 'height', 'frames'],
   'i2v-effect': ['image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames', 'lora', 'lora_strength'],
   flf2v: ['image', 'end_image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames'],
   'motion-transfer': ['image', 'video', 'prompt', 'motion_prompt', 'negative', 'seed', 'width', 'height', 'frames'],
+  // `image` is the optional reference: the compiler removes its nodes when a job has none
+  'v2v-restyle': ['video', 'image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames'],
+  // `image` (the new object) is optional as well; `exclude_points` is set only when a job has some
+  'v2v-swap': ['video', 'image', 'prompt', 'negative', 'seed', 'width', 'height', 'frames', 'points'],
 };
 
 export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
@@ -62,10 +85,13 @@ export const TASK_OUTPUT: Record<ExtensionTask, OutputKind> = {
   tts: 'audio',
   'a2a-vc': 'audio',
   'a2a-translate': 'audio',
+  'a2t-words': 'file',
   'ia2v-talk': 'video',
   'i2v-effect': 'video',
   flf2v: 'video',
   'motion-transfer': 'video',
+  'v2v-restyle': 'video',
+  'v2v-swap': 'video',
 };
 
 const binding = z.object({ node: z.string().min(1), field: z.string().min(1) }).strict();

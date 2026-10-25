@@ -12,6 +12,8 @@ import { POST as postEdits } from '@/app/api/edits/route';
 import { POST as postHooks } from '@/app/api/hooks/route';
 import { POST as postImages } from '@/app/api/images/route';
 import { POST as postMotion } from '@/app/api/motion/route';
+import { POST as postRestyle } from '@/app/api/restyle/route';
+import { POST as postSwap } from '@/app/api/swap/route';
 import { GET as getJob } from '@/app/api/jobs/[id]/route';
 import { GET as getRecipe } from '@/app/api/recipes/[source]/[id]/route';
 import { POST as postSequence } from '@/app/api/sequences/route';
@@ -223,6 +225,24 @@ describe('the recipe of the other results', () => {
     expectNothingLocal(recipe, imageRef);
     expect(JSON.stringify(recipe)).not.toContain(videoRef);
     expect(recipe.request?.files.map((file) => file.field)).toEqual(['imageRef', 'videoRef']);
+  }, 60_000);
+
+  test("a restyle and an object swap: their text, the swap's points, the clip and the image, never the rights", async () => {
+    const imageRef = await sampleRef();
+    const { videoRef } = (await (await postSampleVideo()).json()) as { videoRef: string };
+    const restyle = await settledJob(await postRestyle(jsonRequest('/api/restyle', { videoRef, imageRef, prompt: 'a watercolor painting', rights: true }, 'rc-restyle')));
+    const restyled = await recipeOf('job', restyle);
+    expect(restyled.request).toMatchObject({ route: '/api/restyle', body: { prompt: 'a watercolor painting', seed: restyled.seed } });
+    expect(restyled.request?.body).not.toHaveProperty('rights');
+    expect(restyled.request?.files.map((file) => file.field)).toEqual(['imageRef', 'videoRef']);
+    expectNothingLocal(restyled, imageRef);
+    const points = [{ x: 0.5, y: 0.4 }];
+    const swap = await settledJob(await postSwap(jsonRequest('/api/swap', { videoRef, prompt: 'a red motorbike', points, rights: true }, 'rc-swap')));
+    const swapped = await recipeOf('job', swap);
+    expect(swapped.request).toMatchObject({ route: '/api/swap', body: { prompt: 'a red motorbike', points, seed: swapped.seed } });
+    expect(swapped.request?.body).not.toHaveProperty('rights');
+    expect(swapped.request?.files.map((file) => file.field)).toEqual(['videoRef']);
+    expect(JSON.stringify(swapped)).not.toContain(videoRef);
   }, 60_000);
 
   test('an avatar: its text, its language and its seed', async () => {

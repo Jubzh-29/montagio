@@ -280,6 +280,119 @@ weights:
     license: Apache-2.0
     source: https://huggingface.co/google/gemma-4-E4B-it
     extension: avatar
+  # Captions (extension "avatar", 2026-10-25): Whisper large-v3 turbo, the Hugging Face folder the
+  # Montagio Transcribe Words node loads with transformers. The weights' sha256 is the LFS oid; the
+  # ten configuration and tokenizer files are kept out of LFS: their sha256 was computed on the files
+  # downloaded at this revision on 2026-10-25, and their git blob ids match the ones Hugging Face publishes.
+  - id: whisper-turbo-model
+    file: model.safetensors
+    url: https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/model.safetensors
+    sha256: 542566a422ae4f3fd23f1ba11add198fca01bbf82e66e6a2857b3f608b1eb9d1
+    size: 1617824864
+    license: MIT
+    source: https://huggingface.co/openai/whisper-large-v3-turbo
+    extension: avatar
+    folder: whisper/whisper-large-v3-turbo
+  - id: whisper-turbo-config
+    file: config.json
+    url: https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/config.json
+    sha256: c5b526b3e3cd64cd8940dabb45e8ba726629e22d8ed389c29b552f9140daf04a
+    git_sha1: ad2f44ff1ed66e12765b2392dc041469db91a462
+    size: 1256
+    license: MIT
+    source: https://huggingface.co/openai/whisper-large-v3-turbo
+    extension: avatar
+    folder: whisper/whisper-large-v3-turbo
+  - id: whisper-turbo-generation-config
+    file: generation_config.json
+    url: https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/generation_config.json
+    sha256: cce11bfe3aaa6ae9e072ea2637caaec8795e68d9b67e655a5af16ee509681a4c
+    git_sha1: cbe752958dc3e4671b0e0220aa1c545423a6d5f5
+    size: 3772
+    license: MIT
+    source: https://huggingface.co/openai/whisper-large-v3-turbo
+    extension: avatar
+    folder: whisper/whisper-large-v3-turbo
+  - id: whisper-turbo-preprocessor-config
+    file: preprocessor_config.json
+    url: https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/preprocessor_config.json
+    sha256: 7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711
+    git_sha1: 931c77a740890c46365c7ae0c9d350ba3cca908f
+    size: 340
+    license: MIT
+    source: https://huggingface.co/openai/whisper-large-v3-turbo
+    extension: avatar
+    folder: whisper/whisper-large-v3-turbo
+  - id: whisper-turbo-tokenizer
+    file: tokenizer.json
+    url: https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/tokenizer.json
+    sha256: 297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd
+    git_sha1: 17456db595adc78a973f97d69d8cb50bc87c0b1c
+    size: 2710337
+    license: MIT
+    source: https://huggingface.co/openai/whisper-large-v3-turbo
+    extension: avatar
+    folder: whisper/whisper-large-v3-turbo
+  - id: whisper-turbo-tokenizer-config
+    file: tokenizer_config.json
+    url: https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/tokenizer_config.json
+    sha256: 844b642c73a91359722f47b35705f7174686df33d252695d8572cf9ac03a6389
+    git_sha1: 06ffdc8308eae6bb7bd1fdd81e94b0a881a539ab
+    size: 282843
+    license: MIT
+    source: https://huggingface.co/openai/whisper-large-v3-turbo
+    extension: avatar
+    folder: whisper/whisper-large-v3-turbo
+  - id: whisper-turbo-vocab
+    file: vocab.json
+    url: https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/vocab.json
+    sha256: e2aa043ef015641d363d8288e7c241c85e36a5c761fb303598e0710233344387
+    git_sha1: 0f3456460629e21d559c6daa23ab6ce3644e8271
+    size: 1036558
+    license: MIT
+    source: https://huggingface.co/openai/whisper-large-v3-turbo
+    extension: avatar
+    folder: whisper/whisper-large-v3-turbo
+  - id: whisper-turbo-merges
+    file: merges.txt
+    url: https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/merges.txt
+    sha256: 2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6
+    git_sha1: 6038932a2a1f09a66991b1c2adae0d14066fa29e
+    size: 493869
+    license: MIT
+    source: https://huggingface.co/openai/whisper-large-v3-turbo
+    extension: avatar
+    folder: whisper/whisper-large-v3-turbo
+  - id: whisper-turbo-added-tokens
+    file: added_tokens.json
+    url: https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/added_tokens.json
+    sha256: 3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0
+    git_sha1: 1b33526d33aaa60d79f78ae8651dae50b730185a
+    size: 34648
+    license: MIT
+    source: https://huggingface.co/openai/whisper-large-v3-turbo
+    extension: avatar
+    folder: whisper/whisper-large-v3-turbo
+  - id: whisper-turbo-special-tokens-map
+    file: special_tokens_map.json
+    url: https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/special_tokens_map.json
+    sha256: baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74
+    git_sha1: 312bc106291bb51bf2cc1648df070bef963a0639
+    size: 2186
+    license: MIT
+    source: https://huggingface.co/openai/whisper-large-v3-turbo
+    extension: avatar
+    folder: whisper/whisper-large-v3-turbo
+  - id: whisper-turbo-normalizer
+    file: normalizer.json
+    url: https://huggingface.co/openai/whisper-large-v3-turbo/resolve/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/normalizer.json
+    sha256: bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd
+    git_sha1: dd6ae819ad738ac1a546e9f9282ef325c33b9ea0
+    size: 52666
+    license: MIT
+    source: https://huggingface.co/openai/whisper-large-v3-turbo
+    extension: avatar
+    folder: whisper/whisper-large-v3-turbo
   - id: wan22-s2v-14b-fp8
     file: wan2.2_s2v_14B_fp8_scaled.safetensors
     url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_s2v_14B_fp8_scaled.safetensors
@@ -447,3 +560,52 @@ weights:
     license: MIT
     source: https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K
     extension: motion
+  # Restyle (2026-10-24): Wan 2.1 VACE 14B rebuilds the scene of a clip around its depth. Comfy-Org
+  # publishes it in fp16 only; the workflow casts it to fp8 as it loads (UNETLoader weight_dtype), so
+  # it fits a 24 GB card. Apache-2.0 at the source, with LICENSE.txt and Wan's user-conduct paragraph.
+  - id: wan21-vace-14b-fp16
+    file: wan2.1_vace_14B_fp16.safetensors
+    url: https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/diffusion_models/wan2.1_vace_14B_fp16.safetensors
+    sha256: f202a5c59b8a91ada1862c46a038214f1f7f216c61ec8350d25f69b919da4307
+    size: 34675323640
+    license: Apache-2.0
+    source: https://huggingface.co/Wan-AI/Wan2.1-VACE-14B
+    extension: restyle
+  # The original lightx2v 4-step LoRA of Wan 2.1 T2V 14B, the base VACE 14B was built on (Apache-2.0
+  # with LICENSE.txt), in place of the CausVid LoRA of Kijai the official VACE template fetches.
+  - id: lightx2v-wan21-t2v-4step
+    file: Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors
+    url: https://huggingface.co/lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v/resolve/main/loras/Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors
+    sha256: 1c918df9eaa102766d8f99104209ce55fe7a892278a667a63d721c5d1c18efb1
+    size: 631344264
+    license: Apache-2.0
+    source: https://huggingface.co/lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v
+    extension: restyle
+  # The depth of each frame (the control VACE follows): Depth Anything 3 Small, converted for the core
+  # DA3 nodes by Comfy-Org. Apache-2.0 at the source (card and README, no LICENSE file); the Large and
+  # Giant variants are under a non-commercial license and are not used.
+  - id: depth-anything-3-small
+    file: depth_anything_3_small.safetensors
+    url: https://huggingface.co/Comfy-Org/Depth-Anything-3/resolve/main/geometry_estimation/depth_anything_3_small.safetensors
+    sha256: 9c0a53d157c5b315d4c82908a43d93eeaa3a9ac3de9d15c2b4242ef46b5508ad
+    size: 137254980
+    license: Apache-2.0
+    source: https://huggingface.co/depth-anything/DA3-SMALL
+    extension: restyle
+  # Object swap (2026-10-24): SAM 2.1 base+ follows the object a few points mark on the first frame,
+  # through the whole clip; the swap's VACE weights are the restyle's (the extension requires it).
+  # Kijai's fp16 safetensors of Meta's checkpoint (Apache-2.0 at both ends): its 615 tensors are those
+  # of sam2.1_hiera_base_plus.pt cast to fp16, bit for bit (checked on 2026-10-24). In fp16 the node
+  # loads this "-fp16" file for the model the workflow names sam2.1_hiera_base_plus.safetensors; fp16
+  # it must be: on an Ampere or newer GPU SAM 2's attention allows Flash only, which has no fp32 kernel
+  # ("No available kernel" on an L4, 2026-10-25). Never fetched by the node itself: Hugging Face is
+  # offline once ComfyUI runs.
+  - id: sam21-hiera-base-plus
+    file: sam2.1_hiera_base_plus-fp16.safetensors
+    url: https://huggingface.co/Kijai/sam2-safetensors/resolve/main/sam2.1_hiera_base_plus-fp16.safetensors
+    sha256: a2693628452963a5f17e73a70a90b5faa112109307c828dec36e5fb407061005
+    size: 161773292
+    license: Apache-2.0
+    source: https://huggingface.co/facebook/sam2.1-hiera-base-plus
+    extension: swap
+    folder: sam2

@@ -20,6 +20,8 @@ const FUNCTION_TITLES: Record<StackFunction, MessageKey> = {
   music: 'stackMusic',
   hd: 'stackHd',
   motion: 'stackMotion',
+  restyle: 'stackRestyle',
+  swap: 'stackSwap',
 };
 
 function subscribeToHash(onChange: () => void): () => void {

@@ -9,7 +9,7 @@ import { stackHref } from '@/lib/open-stack';
 import styles from './studio.module.css';
 
 /** The captions that name a model: each holds `{model}` and `{license}`; the HD one also `{hd}` and `{hdLicense}`. */
-type CaptionText = 'aiCaption' | 'demoCaption' | 'showcaseCaption' | 'showcaseHdCaption' | 'hookEndFrame';
+type CaptionText = 'aiCaption' | 'demoCaption' | 'showcaseCaption' | 'showcaseHdCaption' | 'hookEndFrame' | 'restyleFirstFrame';
 
 type CaptionModel = { id?: string; name: string; license: string };
 

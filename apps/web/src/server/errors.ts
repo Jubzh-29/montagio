@@ -4,7 +4,10 @@ export type JobErrorCode = 'extension-disabled' | 'invalid-input' | 'consent-req
   | 'speech-too-long'
   | 'speech-too-short'
   // A motion transfer without the user's word that they hold the rights on the video and the photo.
-  | 'rights-required';
+  | 'rights-required'
+  // Captions: a language they are not made in (server/tasks/captions.ts), a clip without a voice.
+  | 'language-unsupported'
+  | 'no-speech';
 
 export class JobError extends Error {
   constructor(readonly code: JobErrorCode) {

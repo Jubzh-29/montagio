@@ -8,20 +8,31 @@ import styles from './studio.module.css';
 
 /** One reference of a composed start photo: a photo of this machine, imported or made here. */
 export type ComposeSlot = { imageRef: string; url: string; personal: boolean };
-export type ComposeRole = 'character' | 'location' | 'product';
+export type ComposeRole = 'character' | 'location' | 'outfit' | 'product';
 export type ComposeState = { on: boolean } & Partial<Record<ComposeRole, ComposeSlot>>;
 
 export const COMPOSE_OFF: ComposeState = { on: false };
 const ROLES: [ComposeRole, MessageKey, MessageKey][] = [
   ['character', 'composeCharacter', 'composeCharacterHint'],
   ['location', 'composeLocation', 'composeLocationHint'],
+  ['outfit', 'composeOutfit', 'composeOutfitHint'],
   ['product', 'composeProduct', 'composeProductHint'],
 ];
 
+/** An effect's scene: a character, a place, a product. */
+export const EFFECT_COMPOSE_ROLES: readonly ComposeRole[] = ['character', 'location', 'product'];
+/** The Motion tab's character, or a restyle's look: a character, its outfit, a product in hand. */
+export const MOTION_COMPOSE_ROLES: readonly ComposeRole[] = ['character', 'outfit', 'product'];
+
+/** The words of one use of the slots: its toggle, its lead line and its ready line. */
+export type ComposeTexts = { toggle: MessageKey; lead: MessageKey; ready: MessageKey; needs: MessageKey };
+const EFFECT_TEXTS: ComposeTexts = { toggle: 'composeToggle', lead: 'composeLead', ready: 'composeReadyHint', needs: 'composeNeedsTwo' };
+
 const filled = (state: ComposeState) => ROLES.map(([role]) => state[role]).filter((slot): slot is ComposeSlot => Boolean(slot));
 
-/** A composition renders once two of the three slots hold a photo. */
-export const composeReady = (state: ComposeState) => state.on && filled(state).length >= 2;
+/** A composition renders once two of the slots hold a photo (and its `required` role one of them). */
+export const composeReady = (state: ComposeState, required?: ComposeRole) =>
+  state.on && filled(state).length >= 2 && (!required || Boolean(state[required]));
 /** Any photo someone imported asks for consent, as for a one-photo effect. */
 export const composePersonal = (state: ComposeState) => filled(state).some((slot) => slot.personal);
 /** What POST /api/effects takes as `compose`. */
@@ -123,10 +134,25 @@ function Slot({
 }
 
 /**
- * An effect's start photo composed from a character, a place and a product: two at least. The edit
- * puts them together first (the place gives the frame), then the effect animates that photo.
+ * A photo composed from two or three references: an effect's start photo from a character, a place
+ * and a product (the place gives the frame), or the Motion tab's character from a character, its
+ * outfit and a product (`roles`, `required`, `texts`). The edit puts them together first.
  */
-export function ComposeSlots({ value, onChange, disabled }: { value: ComposeState; onChange: Dispatch<SetStateAction<ComposeState>>; disabled: boolean }) {
+export function ComposeSlots({
+  value,
+  onChange,
+  disabled,
+  roles = EFFECT_COMPOSE_ROLES,
+  required,
+  texts = EFFECT_TEXTS,
+}: {
+  value: ComposeState;
+  onChange: Dispatch<SetStateAction<ComposeState>>;
+  disabled: boolean;
+  roles?: readonly ComposeRole[];
+  required?: ComposeRole;
+  texts?: ComposeTexts;
+}) {
   const { t } = useI18n();
   const [characters, setCharacters] = useState<CharacterSummary[]>([]);
   useEffect(() => {
@@ -148,13 +174,13 @@ export function ComposeSlots({ value, onChange, disabled }: { value: ComposeStat
           {t('composeLabel')}
         </span>
         <button type="button" className={styles.chip} aria-pressed={value.on} disabled={disabled} onClick={() => onChange((current) => ({ ...current, on: !current.on }))}>
-          {t('composeToggle')}
+          {t(texts.toggle)}
         </button>
       </div>
       {value.on && (
         <>
-          <p className={styles.hint}>{t('composeLead')}</p>
-          {ROLES.map(([role, label, hint]) => (
+          <p className={styles.hint}>{t(texts.lead)}</p>
+          {ROLES.filter(([role]) => roles.includes(role)).map(([role, label, hint]) => (
             <Slot
               key={role}
               role={role}
@@ -167,7 +193,7 @@ export function ComposeSlots({ value, onChange, disabled }: { value: ComposeStat
             />
           ))}
           <p className={styles.hint} role="status">
-            {count >= 2 ? t('composeReadyHint', { n: count }) : t('composeNeedsTwo')}
+            {composeReady(value, required) ? t(texts.ready, { n: count }) : t(texts.needs)}
           </p>
         </>
       )}

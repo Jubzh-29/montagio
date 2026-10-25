@@ -383,3 +383,79 @@ Nodes expérimentaux, VRAM juste, qualité non mesurée, et un cadrage photo/vid
 - **Textes EN et FR** : `ext.motion.*`. Le libellé dit ce qui sort (« Vidéo générée par IA ») et que le son de la vidéo de référence n'est pas repris.
 - **e2e** : un parcours en mode démo (un MP4 pré-rendu), et un test de la case : sans elle, le bouton reste désactivé.
 
+
+## 10. Restyle, ou remix vidéo (8e extension, 24/10)
+
+Demandé par l'utilisateur le 24/10 : un mode vidéo vers vidéo qui reconstruit toute la scène d'un court clip en gardant son mouvement, son mouvement de caméra et son rythme. Spike d'abord, avec un go/no-go, puis câblage sur un go (accordé le 24/10 : « câble Restyle comme tu le proposes : mode Restyle dans l'onglet Mouvement, contrôle par profondeur, référence facultative »). Hors périmètre : remplacer un seul objet dans un clip (il faudrait des masques par image ; SAM 3.1 est sous licence Meta, refusée).
+
+### Le nœud retenu : Wan 2.1 VACE 14B, nodes du cœur
+
+- `WanVaceToVideo` (cœur de ComfyUI v0.41.0) prend une vidéo de contrôle, des masques par image et une image de référence. Le template officiel `video_wan_vace_14B_v2v` y met des contours Canny et la LoRA CausVid de Kijai (dépôt refusé) ; le template communautaire « Video Restyle » passe par WanVideoWrapper, KJNodes, VHS, DepthAnythingV2 et controlnet_aux : inutilisable ici.
+- Contrôle retenu : la **profondeur** de chaque image, par Depth Anything 3 Small et les nodes DA3 du cœur (`LoadDA3Model`, `DA3Inference` en `mono`, `DA3Render` en `v2_style`). Canny a aussi bien marché dans le spike, mais il recopie les contours fins (les fleurs, le relief) ; la profondeur laisse changer matière, lumière et saison.
+- Accélération : la LoRA 4 étapes de lightx2v pour Wan 2.1 T2V 14B, la base de VACE 14B, prise dans le dépôt de l'auteur (4 étapes, cfg 1, euler, shift 5).
+- Wan 2.2 Fun VACE A14B (alibaba-pai, Apache-2.0, fp8_scaled chez Comfy-Org) est une alternative non essayée : deux experts de 17 Go à charger tour à tour.
+
+### Licences et poids
+
+| Poids | Fichier, taille | Source | Licence |
+|---|---|---|---|
+| `wan21-vace-14b-fp16` | `wan2.1_vace_14B_fp16.safetensors`, 34,7 Go, miroir Comfy-Org/Wan_2.1_ComfyUI_repackaged | Wan-AI/Wan2.1-VACE-14B (`539c162b`) | Apache-2.0 : fiche, LICENSE.txt, et le paragraphe d'usage de Wan |
+| `lightx2v-wan21-t2v-4step` | `Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors`, 631 Mo | lightx2v/Wan2.1-T2V-14B-StepDistill-CfgDistill-Lightx2v (`f6831058`) | Apache-2.0 : fiche, LICENSE.txt |
+| `depth-anything-3-small` | `depth_anything_3_small.safetensors`, 137 Mo, miroir Comfy-Org/Depth-Anything-3 (converti par `convert_da3.py`) | depth-anything/DA3-SMALL (`e08cab65`) | Apache-2.0 : fiche et tableau du README, sans LICENSE. DA3-Large et DA3-Giant sont en CC BY-NC 4.0 : jamais au lock |
+
+Comfy-Org ne publie VACE 14B qu'en fp16 : le workflow le charge avec `weight_dtype: fp8_e4m3fn` (≈ 17 Go sur la carte). L'encodeur UMT5 et la VAE Wan 2.1 sont ceux du lock. `check-open-stack` : 14 modèles, 51 poids (38 Apache-2.0, 13 MIT).
+
+### Le workflow et le contrat
+
+- `workflows/wan21-vace-restyle.api.json`, détaillé dans `workflows/README.md`. Trois chemins, choisis par `compileRestyle` (`@montagio/presets`) :
+  - **texte seul** : la profondeur pilote toutes les images ;
+  - **une image dont suivre le style** (`look`) : l'entrée `reference_image` de VACE, la profondeur pilote toutes les images ;
+  - **la 1re image du clip restylisée** (`first-frame`) : gardée telle quelle comme 1re image (masque 0), la profondeur pilote les autres (masque 1), et l'image sert aussi de référence.
+- 4n+1 images couvrant le clip, 81 au plus (5 s à 16 fps) ; le clip est préparé comme celui du transfert de mouvement (`prepareMotionClip` : 5 s, 16 fps, sans son). Un clip de moins de 1 s ou de plus de 5 s est refusé.
+- `restyleInstruction(texte)` : la consigne d'édition qui restylise la 1re image (« Change the look of this image: … Keep the framing, the camera angle, and the position and pose of every person and object exactly the same. »).
+- Registre : extension `restyle`, priorité 8, tâche `v2v-restyle`, sans prérequis : sans l'édition, un job suit son texte seul.
+- Serveur : `POST /api/restyle` (`videoRef`, `prompt`, `imageRef?`, `rights: true`). Sans image et avec l'édition affichée, deux étapes : la 1re image du clip (extraite une fois à côté du clip) retouchée par Qwen-Image-Edit-2511, puis VACE en `first-frame` ; sinon une étape. Codes : `extension-disabled`, `rights-required`, `invalid-input`, `unknown-image`, `blocked-name`.
+- Studio : l'onglet Mouvement gagne un sélecteur « Animer un personnage / Restyliser le clip » (seulement si les deux extensions sont visibles ; `?mode=restyle` ouvre le second, comme la carte d'Explore). Le mode Restyle a son propre emplacement d'image : la photo de départ partagée par les autres onglets n'est jamais prise. Même case de droits que le transfert de mouvement.
+- Smoke : `--extension restyle --motion <clip>` (texte seul, ou `--input` comme style à suivre), `--extension restyle-edit,restyle` (1re image restylisée puis gardée), `--text restyle=…`. MCP : `restyle_video`.
+
+### VRAM et temps
+
+Spike du 24/10 sur une L4 de 24 Go (détails dans la partie 16 de `docs/S2_RESULTATS.md`) : 187 à 247 s pour un clip de 5 s, chargement de VACE compris, pic de 20,4 à 22,2 Go ; l'édition de la 1re image ajoute 72 à 82 s à froid. Une RTX 4090 va environ deux fois plus vite : `estimate_s` à 120.
+
+### Verdict : go
+
+Sur 3 clips très différents (un Crash Push de voiture, un Rise & Push de port, une danse filmée en poussée), le mouvement, la caméra et le rythme suivent la source image par image, sans scintillement. Les limites vues : un style de personnage peu marqué dans la référence (la pâte à modeler) ne tient pas, la personne redevient réaliste ; le texte seul reconstruit la scène dans un rendu réaliste (l'aquarelle demandée n'est pas rendue). Le chemin câblé est passé sur une L4 le 24/10 (partie 16 de `docs/S2_RESULTATS.md`) : `gpu_validated: 2026-10-24`. Une image de style sans rapport avec le clip (un personnage cartoon sur une danse) a donné le résultat le plus frappant.
+
+## 11. Mouvement jusqu'à 30 s, personnage composé, bibliothèque Motion et remplacement d'objet (24–25/10)
+
+Demandé par l'utilisateur le 24/10 (« fais-le en version maximale »), en lots dans cet ordre : Restyle (partie 10), le transfert de mouvement jusqu'à 30 s, plusieurs références composées puis animées, le remplacement d'un objet, une bibliothèque de mouvements faits par Montagio. Chaque lot a sa branche ; un lot non validé sur GPU reste codé, testé et masqué par la règle de coupe, noté « prochaine étape » dans la feuille de route du README.
+
+### Transfert de mouvement jusqu'à 30 s (`feat/motion-30s`)
+
+- Le template officiel `video_wan_animate2_distilled` a déjà son interrupteur de fenêtres de contexte : `ContextWindowsManual` (cœur de ComfyUI v0.41.0, `nodes_context_windows.py`), 21 images latentes par fenêtre, 8 de recouvrement, `freenoise`, la 1re image latente gardée dans chaque fenêtre. Branché sur le modèle (node 610), il échantillonne tout le clip en une passe. Aucun nouveau poids, aucune nouvelle licence.
+- `motionWindows(images)` (`@montagio/presets`) compte les fenêtres : 1 jusqu'à 81 images, puis `ceil(((images − 1)/4 + 1 − 21)/13) + 1`, soit 9 pour 30 s (481 images). L'estimation du Studio et du MCP est celle d'une fenêtre fois ce nombre. `compileMotion` contourne le node 610 pour une seule fenêtre : le graphe d'un clip de 5 s est celui d'avant.
+- La vidéo de référence est préparée jusqu'à 30 s (`prepareMotionClip`, 16 i/s, sans son) ; Restyle et le remplacement d'objet n'en prennent que les 5 premières secondes, ce que le Studio dit sous le clip.
+- **Verdict : validé** le 24/10 sur une L4 (partie 17 de `docs/S2_RESULTATS.md`) : 30 s, le même personnage du début à la fin, les poses de la référence suivies jusqu'à la dernière image.
+
+### Personnage composé de plusieurs photos, puis animé (`feat/motion-compose`)
+
+- La composition de l'extension d'édition (Qwen-Image-Edit-2511, 3 images au plus, partie 12 de `docs/S2_RESULTATS.md`) gagne un rôle `outfit` : le personnage (image 1) porte la tenue (image 2) et tient éventuellement un produit (image 3), en pied, sans lieu. Le Studio l'offre dans l'onglet Mouvement (le personnage animé) et dans Restyle (le style à suivre) ; le personnage est requis.
+- Consigne : « Show the character from image 1 wearing the outfit from image 2, holding in one hand the very object of image 3, seen full body from head to feet… Keep the character's face and hair, the outfit's cut, colors and fabric and the object's exact shape and colors. »
+- **Verdict : validé** (24 et 25/10). Personnage et tenue tiennent, puis l'animation (425 s, 22,6 Go). À côté d'une tenue, le produit en image 3 devenait un autre objet : une petite voiture rendue en bouteille, puis, consigne corrigée, en téléphone. Passé en image 2, avant la tenue (l'ordre des images seul, pas celui des emplacements du Studio), il reste lui-même : la petite voiture rouge tenue dans la main, la tenue et le visage gardés (82 s, 22,2 Go, le 25/10).
+
+### Bibliothèque Motion (`feat/motion-library`)
+
+- Sept mouvements de référence faits par Montagio lui-même, sans aucune vidéo tierce ni personne réelle : des personnages fictifs dessinés par Z-Image-Turbo à partir d'un texte, puis animés par Wan 2.1 I2V 480p 14B (caméra fixe, 16 i/s, sans son) : hip-hop, hip-hop long (30 s, six clips enchaînés sur leur dernière image), salut et bravo, jumping jacks, pirouette de ballet, boxe dans le vide, danse robot. Générateur : `infra/modal/motion_library.py` ; liste : `presets/motions/library.yaml`, clips et affiches dans `presets/motions/previews/` (4,5 Mo).
+- Dans le Studio, une grille sous l'emplacement du clip (Mouvement, Restyle, remplacement d'objet) ; `GET /api/motions`, `POST /api/uploads/video/library` prépare le clip comme un clip envoyé. MCP : `list_motion_library`, puis `libraryMotion` dans `motion_transfer`, `restyle_video` et `swap_object`. Aucun droit à déclarer sur ces clips, mais la case de droits reste pour la photo.
+
+### Remplacement d'objet (`feat/object-swap`, 9e extension `swap`)
+
+- **Le suivi.** ComfyUI v0.41.0 n'a aucun node qui suit un objet dans une vidéo. SAM 3.1 est sous licence Meta (refusée) ; **SAM 2.1** est sous Apache-2.0 (fiche de `facebook/sam2.1-hiera-base-plus`, LICENSE de `facebookresearch/sam2`). Le pack qui l'expose, `kijai/ComfyUI-segment-anything-2`, est sous Apache-2.0 et embarque le code SAM 2 de Meta. Épinglé au commit `0c35fff5` sans correctif : lu fichier par fichier, il n'ouvre aucune route HTTP et ne lance aucun processus ; il n'importe que PyYAML, torch et numpy au chargement (OpenCV, decord et pycocotools ne sont importés que dans des fonctions que le remplacement n'appelle pas) ; son seul accès réseau télécharge un poids manquant, ce qui n'arrive jamais : le lock le pose dans `models/sam2` et Hugging Face est hors ligne pendant que ComfyUI tourne. Trois nodes servent : `DownloadAndLoadSAM2Model`, `Sam2VideoSegmentationAddPoints`, `Sam2VideoSegmentation`.
+- **Le poids.** `sam2.1_hiera_base_plus-fp16.safetensors` de `Kijai/sam2-safetensors` (162 Mo, Apache-2.0) : ses 615 tenseurs sont ceux de `sam2.1_hiera_base_plus.pt` de Meta convertis en fp16, bit pour bit (vérifié le 24/10, comme son fichier fp32). En fp16, le node charge ce fichier « -fp16 » pour le modèle que le workflow appelle `sam2.1_hiera_base_plus.safetensors` ; `check-open-stack` connaît ce nom (`loadedFile`). Le fp16 est obligatoire : sur un GPU Ampere ou plus récent, l'attention de SAM 2 n'autorise que Flash, qui n'a pas de noyau fp32 (« No available kernel » sur la L4 le 25/10, avec le fichier fp32 d'abord retenu). `check-open-stack` : 15 modèles, 52 poids.
+- **Le workflow** (`workflows/wan21-vace-swap.api.json`) : les points de la 1re image → SAM 2.1 suit l'objet sur les 81 images → masque élargi de 12 px (`GrowMask`) → l'objet peint en gris (`ImageCompositeMasked`) → VACE 14B, avec ce clip et ce masque comme contrôle, redessine l'intérieur du masque d'après le texte et, s'il y en a une, la photo du nouvel objet posée sur fond blanc (`ResizeAndPadImage`). Le reste du clip est gardé. Mêmes poids VACE que Restyle : l'extension `swap` requiert `restyle`, et le registre accepte désormais qu'une extension charge les poids d'une extension qu'elle requiert.
+- **Le contrat.** `compileSwap` reçoit les points en fractions de la 1re image et les convertit en pixels de l'image recadrée par ComfyUI (`framePoint`, même arrondi que `common_upscale` ; une image 1280×720 perd 16 px de chaque côté en 832×480) ; un point coupé par le recadrage est écarté, et s'il n'en reste aucun le job est refusé. 1 à 8 points sur l'objet, 0 à 8 en dehors. `POST /api/swap` (`videoRef`, `prompt`, `points`, `exclude?`, `imageRef?`, `rights: true`). Studio : troisième mode de l'onglet Mouvement, « Remplacer un objet » ; on peint l'objet sur la 1re image du clip (le pinceau de l'inpaint) et le Studio en tire jusqu'à 3 points par tache, au plus profond de ce qui est peint, pour qu'un trait qui déborde sur le fond ne le désigne pas. MCP : `swap_object` (points en fractions). Smoke : `--extension swap --motion <clip> --points "x,y x,y" [--exclude …] [--input photo]`.
+- **Garde-fous.** Case de droits (le clip, la photo, et l'accord des personnes filmées), avertissement visible au-dessus du clip (ne jamais remplacer une personne réelle sans son accord, ni faire passer le résultat pour une vidéo filmée), liste des noms bloqués sur le texte, mention « généré par IA » sous le résultat et dans ses métadonnées.
+- **Installation.** `infra/runpod/bootstrap.sh` (et donc l'image Modal) installe le pack au commit épinglé, comme le node de la voix ; l'installeur local laisse l'extension de côté pour l'instant, comme l'avatar.
+- **Vérifié sans GPU.** Les deux chemins compilés (photo, texte seul) acceptés par le ComfyUI v0.41.0 CPU avec le pack épinglé ; le suivi a tourné pour de bon sur ce CPU (17 images d'un clip de la bibliothèque, deux points sur des gants de boxe : les deux gants recouverts de gris à chaque image, pendant un quart de tour du corps, 314 s) ; le Studio dans un navigateur en mode démo (bureau et téléphone, sans débordement).
+- **Validé sur GPU** (25/10, partie 17 de `docs/S2_RESULTATS.md`). Le premier essai, en fp32, s'est arrêté sur « No available kernel » : sur la L4 (Ada), l'attention de SAM 2 n'autorise que Flash, sans noyau fp32 ; d'où le fp16. Puis, sur une L4 : les gants rouges d'un boxeur (« Boxe dans le vide ») deviennent jaunes d'après le texte seul, suivis dans les crochets et le pivot, 252 s chargement compris, 21,0 Go ; une danseuse générée devient le garçon cartoon de `sample-character.png`, poses et poussée de caméra suivies, décor gardé, 207 s, 22,5 Go.
+- **Verdict : validé**, `gpu_validated: 2026-10-25`. L'aperçu du Studio (`presets/extensions/previews/swap.mp4`) montre la danse avant et après.

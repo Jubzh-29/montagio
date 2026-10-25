@@ -1,0 +1,5 @@
+{
+  "1": {"class_type": "LoadAudio", "inputs": {"audio": "speech.flac"}},
+  "2": {"class_type": "MontagioTranscribeWords", "inputs": {"audio": ["1", 0], "model": "whisper-large-v3-turbo", "language": "auto"}},
+  "3": {"class_type": "SaveText", "inputs": {"text": ["2", 0], "filename_prefix": "montagio/captions", "format": "json"}}
+}

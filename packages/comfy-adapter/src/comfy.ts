@@ -30,6 +30,8 @@ const EXTENSIONS: Record<OutputKind, Set<string>> = {
   video: new Set(['.mp4', '.webm', '.mov', '.mkv', '.gif']),
   image: new Set(['.png', '.jpg', '.jpeg', '.webp']),
   audio: new Set(['.flac', '.mp3', '.wav', '.opus', '.ogg', '.m4a']),
+  // SaveText's JSON (a transcription's words): comfy-api-proxy types its "files" UI key "file".
+  file: new Set(['.json']),
 };
 /**
  * A clip is a few megabytes: a download still running after this is stuck (a tunnel

@@ -59,7 +59,7 @@ The app opens on **Explore**, the clips it makes and a door to every tool. The S
 
 The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan Right and Crane Up, plus five presets with two moves. Rise & Push, Drift Left Push and Pull Back & Tilt Up run both moves at once; Push & Settle and Breathing run one after the other. The core ComfyUI node takes a single move, so the two-move presets go through a node of the Montagio pack, Montagio Camera Embedding.
 
-### Seven extensions, validated on a 24 GB GPU
+### Nine extensions, validated on a 24 GB GPU
 
 | Extension | In the Studio | Model (license) |
 |---|---|---|
@@ -69,9 +69,11 @@ The 11 camera presets are Slow Push, Crash Push, Pull Back Reveal, Pan Left, Pan
 | **Talking avatar** | the Avatar tab: a photo and a text (English or French) give a talking clip, in the built-in voice or in a **voice sample** given with its speaker's consent | Wan 2.2 S2V (Apache-2.0), voice by Chatterbox Multilingual (MIT) |
 | **Music** | "Add music" under a finished film, mixed into the film and its 9:16 cut | ACE-Step 1.5 (MIT) |
 | **HD** | "HD 1080p" under a finished clip, with **smooth motion** ticked by default: RIFE puts a frame between each two, so a 16 fps clip comes out at 32 fps; "HD 2560 px" on a photo of the atelier or of a character | SeedVR2 3B (Apache-2.0), RIFE 4.26 (MIT) |
-| **Motion transfer** | the Motion tab: the character of a photo moves like a reference video of up to 5 s | Wan2.2-Animate-2, distilled (Apache-2.0) |
+| **Motion transfer** | the Motion tab: the character of a photo moves like a reference video of up to 30 s, or like a motion of the **Motion library**, seven dances and moves Montagio made from fictional characters. The character can also be **composed** first by the edit, from a photo of it, one of the outfit it wears and one of a product in its hand | Wan2.2-Animate-2, distilled, with the core context windows past 5 s (Apache-2.0) |
+| **Restyle** | the Motion tab's second mode: a clip of up to 5 s and a few words rebuild its whole scene, its motion, camera move and timing kept. An optional image gives a look to follow; without one, the edit restyles the clip's first frame first | Wan 2.1 VACE 14B with a 4-step lightx2v LoRA, guided by the depth of each frame from Depth Anything 3 Small (Apache-2.0) |
+| **Object swap** | the Motion tab's third mode: paint an object on a clip's first frame and say what replaces it, with a photo of the new object if you have one; Montagio follows the object through the clip and redraws it, the rest of the clip untouched | SAM 2.1 base+ (Apache-2.0) follows it, Wan 2.1 VACE 14B redraws it |
 
-The seven were validated in GPU session S2 on 2026-10-21. Relight, inpaint, the HD photo, the photodump, the voice sample, the composition, the ad, the drawing and the voice change came after, on these same models, and each was rendered on the L4 on 2026-10-22; smooth motion on 2026-10-24. An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
+The first seven were validated in GPU session S2 on 2026-10-21; Restyle, motion transfer up to 30 s and the composed character on 2026-10-24; the object swap, and a composed character holding a product, on 2026-10-25. Relight, inpaint, the HD photo, the photodump, the voice sample, the composition, the ad, the drawing and the voice change came after, on these same models, and each was rendered on the L4 on 2026-10-22; smooth motion on 2026-10-24. An extension appears in the Studio only when a GPU session has validated it and its weights are installed. The order of priority, the cut rule and the reasoning behind every model choice are in [docs/EXTENSIONS_ANALYSE.md](docs/EXTENSIONS_ANALYSE.md) (in French).
 
 ## The Montagio node pack for ComfyUI
 
@@ -112,6 +114,10 @@ Measured on the L4 (an RTX 4090 is about twice as fast, going by the official te
 | HD with smooth motion, 81 frames at 16 fps to 161 at 32 fps in 1080p (SeedVR2 3B, then RIFE 4.26) | 410 s, of which RIFE 4.8 s | 8.6 GB |
 | HD photo, to 1440×2560 (SeedVR2 3B) | 14 s | 19.9 GB |
 | Motion transfer, 5 s (Animate-2 distilled) | 391–415 s | 20.1–22.2 GB |
+| Motion transfer, 30 s (Animate-2 distilled, 9 context windows) | 3,425 s | 22.6 GB |
+| Composed character (edit, two or three photos), then its motion transfer, 5 s | 82–84 s + 425 s | 22.2 GB, 22.6 GB |
+| Restyle, 5 s at 480p (VACE 14B, 4 steps), after the edit of its first frame (73 s) | 186–239 s | 22.2–22.5 GB |
+| Object swap, 5 s at 480p (SAM 2.1, then VACE 14B, 4 steps), from a text or a photo | 207–252 s | 21.0–22.5 GB |
 
 Every measure, with its date, cold and warm, and the ad, drawing, character and relight runs: [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md#measured-on-a-gpu).
 
@@ -119,7 +125,7 @@ What the session taught, and changed:
 
 - **The photo's description is required.** Without a text saying what the photo shows, Fun Camera invents and the clip turns ghostly: the diagnosis changed one variable per clip, and the description alone fixed it. The Studio now asks for it, and fills it in whenever the photo's text is known.
 - **HD goes through the upscale.** 480p followed by SeedVR2 gives 1080p about three times faster than rendering 720p natively.
-- **Honest limits.** Fun Camera handles push-ins, pull-backs and side moves well, and vertical moves and rotation poorly: Tilt Up became Crane Up, Tilt Down and a Dutch angle were dropped. Two hooks stay hidden: Iris Dive until it gets an intermediate keyframe, Figurine because its change is barely visible. The avatar's built-in voice is male, whatever the face: a consented voice sample replaces it. Motion transfer needs a photo framed like the reference video.
+- **Honest limits.** Fun Camera handles push-ins, pull-backs and side moves well, and vertical moves and rotation poorly: Tilt Up became Crane Up, Tilt Down and a Dutch angle were dropped. Two hooks stay hidden: Iris Dive until it gets an intermediate keyframe, Figurine because its change is barely visible. The avatar's built-in voice is male, whatever the face: a consented voice sample replaces it. Motion transfer needs a photo framed like the reference video. Restyle from a text alone rebuilds the scene but keeps a realistic look: an asked style holds once the edit has restyled the first frame, or with an image to follow. A composed character keeps its face, its outfit and the product in its hand once the product comes before the outfit in the edit's images; after it, a toy car became a bottle, then a phone.
 
 ## How it works
 
@@ -135,7 +141,7 @@ flowchart LR
 
 - A preset is a YAML file. The compiler fills a ComfyUI workflow converted from the official [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates); every change from a template is listed in [workflows/README.md](workflows/README.md).
 - The app talks to ComfyUI only through the Comfy SDK and comfy-api-proxy: `workflows.fromJson`, `assets.fromFile`, `submit`, then `jobs.get` until the output is ready. The base URL is explicit and local, the SDK's `fetch` refuses any other origin, and no Comfy API key ever reaches it.
-- Everything is core ComfyUI nodes, apart from the Montagio node pack and one pinned, patched third-party node for the voice.
+- Everything is core ComfyUI nodes, apart from the Montagio node pack and two pinned third-party node packs: the voice node, patched, and the object swap's SAM 2 tracker.
 
 The path of a request, the workflows behind each feature, every measure and the design choices: [docs/BUILD_NOTES.md](docs/BUILD_NOTES.md).
 
@@ -184,7 +190,7 @@ What gets downloaded:
 | `--extensions none` | the camera presets alone | about 90 GB |
 | `--app-only` | none: the app alone, in demo mode or rendering on a remote GPU with `--proxy-url` | — |
 
-Add `--dry-run` to see every step without changing anything. A stopped download resumes when you run the same command again. The local installer leaves the talking avatar and the voice change out for now: their voice runs on a custom node that only the GPU-session tooling installs.
+Add `--dry-run` to see every step without changing anything. A stopped download resumes when you run the same command again. The local installer leaves the talking avatar, the voice change and the object swap out for now: they run on custom nodes that only the GPU-session tooling installs.
 
 Everything else, from everyday commands to troubleshooting and uninstalling: [docs/INSTALL.md](docs/INSTALL.md).
 
@@ -202,7 +208,8 @@ The next steps follow the same rule as everything above: an open model enters th
 | Camera moves | orbits and bullet time from keyframes: Edit-2511 viewpoints, then Wan 2.2 FLF2V |
 | Photo edit | more looks and finer relights as Apache-2.0 LoRAs on Edit-2511 |
 | Music | songs with lyrics on ACE-Step 1.5 |
-| Install | the avatar and the voice change in the local installer; a container image |
+| Install | the avatar, the voice change and the object swap in the local installer; a container image |
+| Restyle and object swap | longer clips over several VACE windows, several objects swapped at once, on the weights already here |
 | ComfyUI | the node pack published on the Comfy Registry, the workflows on the Comfy Hub (both prepared) |
 | Provenance | C2PA manifests on every output (c2pa-python, Apache-2.0) |
 
@@ -210,7 +217,6 @@ The next steps follow the same rule as everything above: an open model enters th
 
 | Area | Next step, with the open model planned |
 |---|---|
-| Restyle | restyle or swap what a clip shows while its motion stays: VACE 14B (Apache-2.0), validated on a GPU on 2026-10-24, not merged yet |
 | Image | posters with legible text: Qwen-Image-2512 (Apache-2.0) |
 | Voice | a more natural voice in more languages: Qwen3-TTS (Apache-2.0) |
 | Talking avatar | longer takes: LongCat-Video-Avatar (MIT) |
@@ -238,8 +244,8 @@ Never on the roadmap:
 
 Do not make videos of real people without their consent, nothing illegal and nothing not safe for work.
 
-- Before an edit, an effect, a hook or an avatar on an uploaded photo, the Studio asks you to confirm that you are the person in it or have their consent. Motion transfer asks you to confirm that you hold the rights on the photo and the video. A voice sample, for the avatar or the voice change, needs its speaker's agreement.
-- A [list of well-known names](registry/blocked-names.txt) is refused in text-to-image prompts, edit instructions, effect subjects, avatar texts and motion-transfer descriptions. It is a good-faith guardrail, not a complete filter.
+- Before an edit, an effect, a hook or an avatar on an uploaded photo, the Studio asks you to confirm that you are the person in it or have their consent. Motion transfer, Restyle and the object swap ask you to confirm that you hold the rights on the video and the images; the object swap also that the people filmed agree, and it warns never to replace a real person without their consent nor to pass the result off as filmed. The Motion library's reference motions show fictional characters made by Montagio: no rights to clear. A voice sample, for the avatar or the voice change, needs its speaker's agreement.
+- A [list of well-known names](registry/blocked-names.txt) is refused in text-to-image prompts, edit instructions, effect subjects, avatar texts, motion-transfer descriptions, restyle texts and object-swap texts. It is a good-faith guardrail, not a complete filter.
 - Every clip, image and sound is tagged "AI-generated" in its metadata, beside its recipe, and the Studio shows the mention under each result with the model and its license. A recipe never gives the consent or the rights.
 - No content filter is imposed on your own machine: what you render locally is your responsibility.
 
@@ -260,7 +266,8 @@ Security issues: [SECURITY.md](SECURITY.md).
 - Tongyi-MAI (Z-Image-Turbo) and Qwen (Qwen-Image-Edit-2511, Qwen-Image, Qwen2.5-VL, Qwen3 encoders), Apache-2.0;
 - ByteDance-Seed (SeedVR2), Google (umt5-xxl), Black Forest Labs (FLUX.1-schnell autoencoder), Apache-2.0;
 - ACE-Step (ACE-Step 1.5), Resemble AI (Chatterbox), LAION (CLIP ViT-H-14) and hzwer (RIFE 4.26), MIT;
-- lightx2v (Lightning LoRAs), Remade-AI (effect LoRAs), systms and fal (edit looks), and the wav2vec2 authors, Apache-2.0.
+- lightx2v (Lightning LoRAs), Remade-AI (effect LoRAs), systms and fal (edit looks), and the wav2vec2 authors, Apache-2.0;
+- Meta (SAM 2.1, in Kijai's safetensors, checked tensor for tensor against Meta's checkpoint), Apache-2.0.
 
 Every file, with its source, revision and sha256, is in [registry/models.lock.yaml](registry/models.lock.yaml).
 
@@ -269,6 +276,7 @@ Every file, with its source, revision and sha256, is in [registry/models.lock.ya
 - the [Comfy SDK](https://github.com/Comfy-Org/comfy-typescript-sdk) (`@comfyorg/sdk`) and [comfy-api-proxy](https://github.com/Comfy-Org/comfy-api-proxy), MIT;
 - the [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) at commit `59a3b48b`, MIT, which every Montagio workflow but the voice's is converted from ([license text](workflows/LICENSE.workflow_templates));
 - [wildminder/ComfyUI-Chatterbox](https://github.com/wildminder/ComfyUI-Chatterbox) at commit `4597af8f` (Apache-2.0), the voice node, pinned and patched to remove its HTTP routes ([patch](infra/runpod/patches/comfyui-chatterbox-no-routes.patch));
+- [kijai/ComfyUI-segment-anything-2](https://github.com/kijai/ComfyUI-segment-anything-2) at commit `0c35fff5` (Apache-2.0), the object swap's tracking nodes, pinned and unchanged: they open no HTTP route and need no Python package ComfyUI lacks;
 - [ffmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) in the showcase, whose license texts ship beside it.
 
 ## Contributing

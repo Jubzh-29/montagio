@@ -15,4 +15,5 @@ export {
   type JobInputs,
 } from './compile';
 export type { Library } from './library';
+export { motionFrames, motionWindows } from './motion-windows';
 export { validatePreset, type PresetValidation } from './validate';

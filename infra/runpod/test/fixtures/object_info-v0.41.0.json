@@ -1415,7 +1415,8 @@
       "squish_18.safetensors",
       "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
       "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
-      "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors"
+      "wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise.safetensors",
+      "Wan21_T2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors"
      ]
     ],
     "strength_model": [
@@ -3031,7 +3032,8 @@
       "wan2.2_s2v_14B_fp8_scaled.safetensors",
       "wan2.2_ti2v_5B_fp16.safetensors",
       "z_image_turbo_bf16.safetensors",
-      "wan_animate_2_distill_int8_convrot.safetensors"
+      "wan_animate_2_distill_int8_convrot.safetensors",
+      "wan2.1_vace_14B_fp16.safetensors"
      ]
     ],
     "weight_dtype": [
@@ -5178,6 +5180,1134 @@
   "essentials_category": null,
   "has_intermediate_output": false
  },
+ "WanVaceToVideo": {
+  "input": {
+   "required": {
+    "positive": [
+     "CONDITIONING",
+     {}
+    ],
+    "negative": [
+     "CONDITIONING",
+     {}
+    ],
+    "vae": [
+     "VAE",
+     {}
+    ],
+    "width": [
+     "INT",
+     {
+      "default": 832,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "height": [
+     "INT",
+     {
+      "default": 480,
+      "min": 16,
+      "max": 16384,
+      "step": 16
+     }
+    ],
+    "length": [
+     "INT",
+     {
+      "default": 81,
+      "min": 1,
+      "max": 16384,
+      "step": 4
+     }
+    ],
+    "batch_size": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1,
+      "max": 4096
+     }
+    ],
+    "strength": [
+     "FLOAT",
+     {
+      "default": 1.0,
+      "min": 0.0,
+      "max": 1000.0,
+      "step": 0.01
+     }
+    ]
+   },
+   "optional": {
+    "control_video": [
+     "IMAGE",
+     {}
+    ],
+    "control_masks": [
+     "MASK",
+     {}
+    ],
+    "reference_image": [
+     "IMAGE",
+     {}
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "positive",
+    "negative",
+    "vae",
+    "width",
+    "height",
+    "length",
+    "batch_size",
+    "strength"
+   ],
+   "optional": [
+    "control_video",
+    "control_masks",
+    "reference_image"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "CONDITIONING",
+   "CONDITIONING",
+   "LATENT",
+   "INT"
+  ],
+  "output_is_list": [
+   false,
+   false,
+   false,
+   false
+  ],
+  "output_name": [
+   "positive",
+   "negative",
+   "latent",
+   "trim_latent"
+  ],
+  "output_tooltips": [
+   null,
+   null,
+   null,
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "WanVaceToVideo",
+  "display_name": null,
+  "description": "",
+  "python_module": "comfy_extras.nodes_wan",
+  "category": "model/conditioning/wan/vace",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": [
+   "video conditioning",
+   "video control"
+  ],
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "LoadDA3Model": {
+  "input": {
+   "required": {
+    "model_name": [
+     "COMBO",
+     {
+      "multiselect": false,
+      "options": [
+       "depth_anything_3_small.safetensors"
+      ]
+     }
+    ],
+    "weight_dtype": [
+     "COMBO",
+     {
+      "default": "default",
+      "multiselect": false,
+      "options": [
+       "default",
+       "fp16",
+       "bf16",
+       "fp32"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model_name",
+    "weight_dtype"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "DA3_MODEL"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "DA3_MODEL"
+  ],
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "LoadDA3Model",
+  "display_name": "Load Depth Anything 3",
+  "description": "",
+  "python_module": "comfy_extras.nodes_depth_anything_3",
+  "category": "model/loaders",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "DA3Inference": {
+  "input": {
+   "required": {
+    "da3_model": [
+     "DA3_MODEL",
+     {}
+    ],
+    "image": [
+     "IMAGE",
+     {}
+    ],
+    "resolution": [
+     "INT",
+     {
+      "default": 504,
+      "min": 140,
+      "max": 2520,
+      "step": 14
+     }
+    ],
+    "resize_method": [
+     "COMBO",
+     {
+      "default": "upper_bound_resize",
+      "multiselect": false,
+      "options": [
+       "upper_bound_resize",
+       "lower_bound_resize"
+      ]
+     }
+    ],
+    "mode": [
+     "COMFY_DYNAMICCOMBO_V3",
+     {
+      "options": [
+       {
+        "key": "mono",
+        "inputs": {
+         "required": {}
+        }
+       },
+       {
+        "key": "multiview",
+        "inputs": {
+         "required": {
+          "ref_view_strategy": [
+           "COMBO",
+           {
+            "default": "saddle_balanced",
+            "multiselect": false,
+            "options": [
+             "saddle_balanced",
+             "saddle_sim_range",
+             "first",
+             "middle"
+            ]
+           }
+          ],
+          "pose_method": [
+           "COMBO",
+           {
+            "default": "cam_dec",
+            "multiselect": false,
+            "options": [
+             "cam_dec",
+             "ray_pose"
+            ]
+           }
+          ]
+         }
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "da3_model",
+    "image",
+    "resolution",
+    "resize_method",
+    "mode"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "DA3_GEOMETRY"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "da3_geometry"
+  ],
+  "output_tooltips": [
+   "Dictionary of non-normalized tensors.\nAlways has the keys: depth, image, mode.\nOptional keys: sky (for Mono/Metric), confidence (for Small/Base), extrinsics + intrinsics (for multi-view)."
+  ],
+  "output_matchtypes": null,
+  "name": "DA3Inference",
+  "display_name": "Run Depth Anything 3",
+  "description": "Run Depth Anything 3 on an image. In multi-view mode each image is treated as a separate view of the same scene.",
+  "python_module": "comfy_extras.nodes_depth_anything_3",
+  "category": "image/geometry estimation",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": [
+   "depth",
+   "geometry",
+   "da3",
+   "depth anything",
+   "monocular",
+   "pointmap",
+   "sky",
+   "3d",
+   "metric depth",
+   "disparity"
+  ],
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "DA3Render": {
+  "input": {
+   "required": {
+    "da3_geometry": [
+     "DA3_GEOMETRY",
+     {}
+    ],
+    "output": [
+     "COMFY_DYNAMICCOMBO_V3",
+     {
+      "options": [
+       {
+        "key": "depth",
+        "inputs": {
+         "required": {
+          "normalization": [
+           "COMBO",
+           {
+            "default": "v2_style",
+            "multiselect": false,
+            "options": [
+             "v2_style",
+             "min_max",
+             "raw"
+            ]
+           }
+          ],
+          "apply_sky_clip": [
+           "BOOLEAN",
+           {
+            "default": false
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "depth_colored",
+        "inputs": {
+         "required": {
+          "normalization": [
+           "COMBO",
+           {
+            "default": "v2_style",
+            "multiselect": false,
+            "options": [
+             "v2_style",
+             "min_max",
+             "raw"
+            ]
+           }
+          ],
+          "apply_sky_clip": [
+           "BOOLEAN",
+           {
+            "default": false
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "sky_mask",
+        "inputs": {
+         "required": {
+          "colored": [
+           "BOOLEAN",
+           {
+            "default": false
+           }
+          ]
+         }
+        }
+       },
+       {
+        "key": "confidence",
+        "inputs": {
+         "required": {
+          "colored": [
+           "BOOLEAN",
+           {
+            "default": false
+           }
+          ]
+         }
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "da3_geometry",
+    "output"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "IMAGE"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "DA3Render",
+  "display_name": "Render Depth Anything 3",
+  "description": "Render a depth map, confidence map, or sky mask from Depth Anything 3 geometry data.",
+  "python_module": "comfy_extras.nodes_depth_anything_3",
+  "category": "image/geometry estimation",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "ImageScale": {
+  "input": {
+   "required": {
+    "image": [
+     "IMAGE"
+    ],
+    "upscale_method": [
+     [
+      "nearest-exact",
+      "bilinear",
+      "area",
+      "bicubic",
+      "lanczos"
+     ]
+    ],
+    "width": [
+     "INT",
+     {
+      "default": 512,
+      "min": 0,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "height": [
+     "INT",
+     {
+      "default": 512,
+      "min": 0,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "crop": [
+     [
+      "disabled",
+      "center"
+     ]
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "image",
+    "upscale_method",
+    "width",
+    "height",
+    "crop"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "IMAGE"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "name": "ImageScale",
+  "display_name": "Upscale Image",
+  "description": "",
+  "python_module": "nodes",
+  "category": "image/upscaling",
+  "output_node": false,
+  "has_intermediate_output": false,
+  "search_aliases": [
+   "resize",
+   "resize image",
+   "scale image",
+   "image resize",
+   "zoom",
+   "zoom in",
+   "change size"
+  ],
+  "essentials_category": "Image Tools"
+ },
+ "ImageBatch": {
+  "input": {
+   "required": {
+    "image1": [
+     "IMAGE"
+    ],
+    "image2": [
+     "IMAGE"
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "image1",
+    "image2"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "IMAGE"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "name": "ImageBatch",
+  "display_name": "Batch Images (DEPRECATED)",
+  "description": "",
+  "python_module": "nodes",
+  "category": "image/batch",
+  "output_node": false,
+  "has_intermediate_output": false,
+  "deprecated": true,
+  "search_aliases": [
+   "combine images",
+   "merge images",
+   "stack images"
+  ]
+ },
+ "EmptyImage": {
+  "input": {
+   "required": {
+    "width": [
+     "INT",
+     {
+      "default": 512,
+      "min": 1,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "height": [
+     "INT",
+     {
+      "default": 512,
+      "min": 1,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "batch_size": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1,
+      "max": 4096
+     }
+    ],
+    "color": [
+     "INT",
+     {
+      "default": 0,
+      "min": 0,
+      "max": 16777215,
+      "step": 1,
+      "display": "color"
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "width",
+    "height",
+    "batch_size",
+    "color"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "IMAGE"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "name": "EmptyImage",
+  "display_name": "Empty Image",
+  "description": "",
+  "python_module": "nodes",
+  "category": "image",
+  "output_node": false,
+  "has_intermediate_output": false,
+  "search_aliases": []
+ },
+ "ContextWindowsManual": {
+  "input": {
+   "required": {
+    "model": [
+     "MODEL",
+     {}
+    ],
+    "context_length": [
+     "INT",
+     {
+      "default": 16,
+      "min": 1
+     }
+    ],
+    "context_overlap": [
+     "INT",
+     {
+      "default": 4,
+      "min": 0
+     }
+    ],
+    "context_schedule": [
+     "COMBO",
+     {
+      "default": "standard_static",
+      "multiselect": false,
+      "options": [
+       "standard_static",
+       "standard_uniform",
+       "looped_uniform",
+       "batched"
+      ]
+     }
+    ],
+    "context_stride": [
+     "INT",
+     {
+      "default": 1,
+      "min": 1
+     }
+    ],
+    "closed_loop": [
+     "BOOLEAN",
+     {
+      "default": false
+     }
+    ],
+    "fuse_method": [
+     "COMBO",
+     {
+      "default": "pyramid",
+      "multiselect": false,
+      "options": [
+       "pyramid",
+       "relative",
+       "flat",
+       "overlap-linear"
+      ]
+     }
+    ],
+    "dim": [
+     "INT",
+     {
+      "default": 0,
+      "min": 0,
+      "max": 5
+     }
+    ],
+    "freenoise": [
+     "BOOLEAN",
+     {
+      "default": false
+     }
+    ],
+    "cond_retain_index_list": [
+     "STRING",
+     {
+      "default": "",
+      "multiline": false
+     }
+    ],
+    "split_conds_to_windows": [
+     "BOOLEAN",
+     {
+      "default": false
+     }
+    ],
+    "latent_retain_index_list": [
+     "STRING",
+     {
+      "default": "",
+      "multiline": false
+     }
+    ],
+    "causal_window_fix": [
+     "BOOLEAN",
+     {
+      "default": true
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model",
+    "context_length",
+    "context_overlap",
+    "context_schedule",
+    "context_stride",
+    "closed_loop",
+    "fuse_method",
+    "dim",
+    "freenoise",
+    "cond_retain_index_list",
+    "split_conds_to_windows",
+    "latent_retain_index_list",
+    "causal_window_fix"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "MODEL"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "MODEL"
+  ],
+  "output_tooltips": [
+   "The model with context windows applied during sampling."
+  ],
+  "output_matchtypes": null,
+  "name": "ContextWindowsManual",
+  "display_name": "Context Windows (Manual)",
+  "description": "Manually set context windows.",
+  "python_module": "comfy_extras.nodes_context_windows",
+  "category": "model/patch",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": true,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "GrowMask": {
+  "input": {
+   "required": {
+    "mask": [
+     "MASK",
+     {}
+    ],
+    "expand": [
+     "INT",
+     {
+      "default": 0,
+      "min": -16384,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "tapered_corners": [
+     "BOOLEAN",
+     {
+      "advanced": true,
+      "default": true
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "mask",
+    "expand",
+    "tapered_corners"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "MASK"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "MASK"
+  ],
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "GrowMask",
+  "display_name": "Grow Mask",
+  "description": "",
+  "python_module": "comfy_extras.nodes_mask",
+  "category": "image/mask",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": [
+   "expand mask",
+   "shrink mask"
+  ],
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "ResizeAndPadImage": {
+  "input": {
+   "required": {
+    "image": [
+     "IMAGE",
+     {}
+    ],
+    "target_width": [
+     "INT",
+     {
+      "default": 512,
+      "min": 1,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "target_height": [
+     "INT",
+     {
+      "default": 512,
+      "min": 1,
+      "max": 16384,
+      "step": 1
+     }
+    ],
+    "padding_color": [
+     "COMBO",
+     {
+      "advanced": true,
+      "multiselect": false,
+      "options": [
+       "white",
+       "black"
+      ]
+     }
+    ],
+    "interpolation": [
+     "COMBO",
+     {
+      "advanced": true,
+      "multiselect": false,
+      "options": [
+       "area",
+       "bicubic",
+       "nearest-exact",
+       "bilinear",
+       "lanczos"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "image",
+    "target_width",
+    "target_height",
+    "padding_color",
+    "interpolation"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "IMAGE"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "IMAGE"
+  ],
+  "output_tooltips": [
+   null
+  ],
+  "output_matchtypes": null,
+  "name": "ResizeAndPadImage",
+  "display_name": "Resize And Pad Image",
+  "description": "",
+  "python_module": "comfy_extras.nodes_images",
+  "category": "image/transform",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": [
+   "fit to size"
+  ],
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "DownloadAndLoadSAM2Model": {
+  "input": {
+   "required": {
+    "model": [
+     [
+      "sam2_hiera_base_plus.safetensors",
+      "sam2_hiera_large.safetensors",
+      "sam2_hiera_small.safetensors",
+      "sam2_hiera_tiny.safetensors",
+      "sam2.1_hiera_base_plus.safetensors",
+      "sam2.1_hiera_large.safetensors",
+      "sam2.1_hiera_small.safetensors",
+      "sam2.1_hiera_tiny.safetensors"
+     ]
+    ],
+    "segmentor": [
+     [
+      "single_image",
+      "video",
+      "automaskgenerator"
+     ]
+    ],
+    "device": [
+     [
+      "cuda",
+      "cpu",
+      "mps"
+     ]
+    ],
+    "precision": [
+     [
+      "fp16",
+      "bf16",
+      "fp32"
+     ],
+     {
+      "default": "fp16"
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "model",
+    "segmentor",
+    "device",
+    "precision"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "SAM2MODEL"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "sam2_model"
+  ],
+  "name": "DownloadAndLoadSAM2Model",
+  "display_name": "(Down)Load SAM2Model",
+  "description": "",
+  "python_module": "custom_nodes.ComfyUI-segment-anything-2",
+  "category": "SAM2",
+  "output_node": false,
+  "has_intermediate_output": false,
+  "search_aliases": []
+ },
+ "Sam2VideoSegmentationAddPoints": {
+  "input": {
+   "required": {
+    "sam2_model": [
+     "SAM2MODEL"
+    ],
+    "coordinates_positive": [
+     "STRING",
+     {
+      "forceInput": true
+     }
+    ],
+    "frame_index": [
+     "INT",
+     {
+      "default": 0
+     }
+    ],
+    "object_index": [
+     "INT",
+     {
+      "default": 0
+     }
+    ]
+   },
+   "optional": {
+    "image": [
+     "IMAGE"
+    ],
+    "coordinates_negative": [
+     "STRING",
+     {
+      "forceInput": true
+     }
+    ],
+    "prev_inference_state": [
+     "SAM2INFERENCESTATE"
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "sam2_model",
+    "coordinates_positive",
+    "frame_index",
+    "object_index"
+   ],
+   "optional": [
+    "image",
+    "coordinates_negative",
+    "prev_inference_state"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "SAM2MODEL",
+   "SAM2INFERENCESTATE"
+  ],
+  "output_is_list": [
+   false,
+   false
+  ],
+  "output_name": [
+   "sam2_model",
+   "inference_state"
+  ],
+  "name": "Sam2VideoSegmentationAddPoints",
+  "display_name": "Sam2VideoSegmentationAddPoints",
+  "description": "",
+  "python_module": "custom_nodes.ComfyUI-segment-anything-2",
+  "category": "SAM2",
+  "output_node": false,
+  "has_intermediate_output": false,
+  "search_aliases": []
+ },
+ "Sam2VideoSegmentation": {
+  "input": {
+   "required": {
+    "sam2_model": [
+     "SAM2MODEL"
+    ],
+    "inference_state": [
+     "SAM2INFERENCESTATE"
+    ],
+    "keep_model_loaded": [
+     "BOOLEAN",
+     {
+      "default": true
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "sam2_model",
+    "inference_state",
+    "keep_model_loaded"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "MASK"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "mask"
+  ],
+  "name": "Sam2VideoSegmentation",
+  "display_name": "Sam2VideoSegmentation",
+  "description": "",
+  "python_module": "custom_nodes.ComfyUI-segment-anything-2",
+  "category": "SAM2",
+  "output_node": false,
+  "has_intermediate_output": false,
+  "search_aliases": []
+ },
  "TextGenerate": {
   "input": {
    "required": {
@@ -5401,5 +6531,248 @@
    "STRING"
   ],
   "python_module": "comfy_extras.nodes_string"
+ },
+ "MontagioTranscribeWords": {
+  "input": {
+   "required": {
+    "audio": [
+     "AUDIO",
+     {}
+    ],
+    "model": [
+     "COMBO",
+     {
+      "default": "whisper-large-v3-turbo",
+      "multiselect": false,
+      "options": [
+       "whisper-large-v3-turbo"
+      ]
+     }
+    ],
+    "language": [
+     "COMBO",
+     {
+      "default": "auto",
+      "multiselect": false,
+      "options": [
+       "auto",
+       "af",
+       "am",
+       "ar",
+       "as",
+       "az",
+       "ba",
+       "be",
+       "bg",
+       "bn",
+       "bo",
+       "br",
+       "bs",
+       "ca",
+       "cs",
+       "cy",
+       "da",
+       "de",
+       "el",
+       "en",
+       "es",
+       "et",
+       "eu",
+       "fa",
+       "fi",
+       "fo",
+       "fr",
+       "gl",
+       "gu",
+       "haw",
+       "ha",
+       "he",
+       "hi",
+       "hr",
+       "ht",
+       "hu",
+       "hy",
+       "id",
+       "is",
+       "it",
+       "ja",
+       "jw",
+       "ka",
+       "kk",
+       "km",
+       "kn",
+       "ko",
+       "la",
+       "lb",
+       "ln",
+       "lo",
+       "lt",
+       "lv",
+       "mg",
+       "mi",
+       "mk",
+       "ml",
+       "mn",
+       "mr",
+       "ms",
+       "mt",
+       "my",
+       "ne",
+       "nl",
+       "nn",
+       "no",
+       "oc",
+       "pa",
+       "pl",
+       "ps",
+       "pt",
+       "ro",
+       "ru",
+       "sa",
+       "sd",
+       "si",
+       "sk",
+       "sl",
+       "sn",
+       "so",
+       "sq",
+       "sr",
+       "su",
+       "sv",
+       "sw",
+       "ta",
+       "te",
+       "tg",
+       "th",
+       "tk",
+       "tl",
+       "tr",
+       "tt",
+       "uk",
+       "ur",
+       "uz",
+       "vi",
+       "yi",
+       "yo",
+       "yue",
+       "zh"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "audio",
+    "model",
+    "language"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "STRING"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "words_json"
+  ],
+  "output_matchtypes": null,
+  "name": "MontagioTranscribeWords",
+  "display_name": "Montagio Transcribe Words",
+  "description": "Whisper's transcription of a speech, each word with its start and end in seconds (JSON).",
+  "python_module": "custom_nodes.montagio",
+  "category": "Montagio",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "SaveText": {
+  "input": {
+   "required": {
+    "text": [
+     "STRING",
+     {
+      "forceInput": true,
+      "multiline": false
+     }
+    ],
+    "filename_prefix": [
+     "STRING",
+     {
+      "default": "ComfyUI",
+      "multiline": false
+     }
+    ],
+    "format": [
+     "COMBO",
+     {
+      "default": "txt",
+      "multiselect": false,
+      "options": [
+       "txt",
+       "csv",
+       "md",
+       "json"
+      ]
+     }
+    ]
+   },
+   "hidden": {
+    "prompt": [
+     "PROMPT"
+    ],
+    "extra_pnginfo": [
+     "EXTRA_PNGINFO"
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "text",
+    "filename_prefix",
+    "format"
+   ],
+   "hidden": [
+    "prompt",
+    "extra_pnginfo"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "STRING"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "text"
+  ],
+  "output_matchtypes": null,
+  "name": "SaveText",
+  "display_name": "Save Text",
+  "description": "Save text content to a file in the output directory.",
+  "python_module": "comfy_extras.nodes_text",
+  "category": "text",
+  "output_node": true,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": [
+   "save text",
+   "write text",
+   "export text"
+  ],
+  "essentials_category": null,
+  "has_intermediate_output": false
  }
 }

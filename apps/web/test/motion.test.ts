@@ -13,6 +13,7 @@ import type { JobSummary } from '@/lib/api-types';
 import { mediaFileFor } from '@/server/generations';
 import { listHistory } from '@/server/history';
 import { readJobWorkflow } from '@/server/jobs';
+import { getEnv } from '@/server/env';
 import { getServices } from '@/server/services';
 import { videoPath } from '@/server/tasks/files';
 import { MAX_VIDEO_FORM_BYTES } from '@/server/uploads';
@@ -71,13 +72,13 @@ async function poll(id: string): Promise<JobSummary> {
 const sampleRef = async () => ((await (await postSampleUpload()).json()) as { imageRef: string }).imageRef;
 const videoRef = async () => ((await (await upload(clip(3, 'ref.mp4'))).json()) as { videoRef: string }).videoRef;
 
-test('a reference video is kept for 5 s at 16 fps, silent, with its aspect', async () => {
-  const res = await upload(clip(8, 'long.mp4'));
+test('a reference video is kept for 30 s at 16 fps, silent, with its aspect', async () => {
+  const res = await upload(clip(32, 'long.mp4'));
   expect(res.status).toBe(201);
   const meta = (await res.json()) as { videoRef: string; duration_s: number; sourceDuration_s: number; aspect: string; width: number; url: string };
   expect(meta).toMatchObject({ videoRef: expect.stringMatching(/^videos\/[0-9a-f-]{36}\.mp4$/), aspect: '16:9', width: 832 });
-  expect(meta.duration_s).toBeCloseTo(5, 0);
-  expect(meta.sourceDuration_s).toBeCloseTo(8, 0);
+  expect(meta.duration_s).toBeCloseTo(30, 0);
+  expect(meta.sourceDuration_s).toBeCloseTo(32, 0);
   const file = mediaFileFor(meta.url)!;
   expect(await probeAudio(file)).toBeNull();
   expect((await probe(file)).fps).toBe(16);
@@ -145,7 +146,8 @@ test('the sample dance is copied as a prepared clip of origin "sample"', async (
   const meta = (await res.json()) as { videoRef: string; url: string; duration_s: number; origin: string };
   expect(meta).toMatchObject({ duration_s: 5, aspect: '9:16', origin: 'sample', url: `/media/data/uploads/${meta.videoRef}` });
   expect(readFileSync(videoPath(meta.videoRef))).toEqual(readFileSync(join(repoRoot, 'demo-assets', 'videos', 'sample-dance.mp4')));
-});
+  // the first test of the file loads the library cold
+}, 30_000);
 
 test('the sample dance on a photo nobody imported needs no rights; on an imported photo, or with an imported clip, it does', async () => {
   const sampleVideo = async () => ((await (await postSampleVideo()).json()) as { videoRef: string }).videoRef;
@@ -181,4 +183,25 @@ test('a motion clip comes back on the motion tab', async () => {
   const again = (await listHistory()).find((entry) => entry.key === `job:${id}`);
   expect(again?.reprise).toMatchObject({ tab: 'motion', prompt: 'a knight', motion: 'waves' });
   expect(again?.reprise.videoRef).toBeUndefined();
+}, 60_000);
+
+test('a composed character: the edit puts it together full body first, then the motion animates what it made', async () => {
+  const character = await sampleRef();
+  const outfit = await sampleRef();
+  const res = await post({ compose: { character, outfit }, videoRef: await videoRef(), rights: true }, 'mo5');
+  expect(res.status).toBe(201);
+  const { id } = (await res.json()) as JobSummary;
+  expect((await poll(id)).state).toBe('succeeded');
+  const { record } = (await readJobWorkflow(id))!;
+  expect(record.steps.map((step) => step.name)).toEqual(['compose', 'motion']);
+  const composeWorkflow = JSON.parse(readFileSync(join(getEnv().data, 'jobs', id, 'step0.workflow.json'), 'utf8')) as Record<string, { inputs: Record<string, unknown> }>;
+  expect(String(composeWorkflow['151']!.inputs.prompt)).toMatch(/^Show the character from image 1 wearing the outfit from image 2, seen full body from head to feet/);
+}, 60_000);
+
+test('a composition without its character, or with a place, is refused', async () => {
+  const ref = await videoRef();
+  const outfit = await sampleRef();
+  const product = await sampleRef();
+  expect(await (await post({ compose: { outfit, product }, videoRef: ref, rights: true }, 'mo6')).json()).toEqual({ error: 'invalid-input' });
+  expect(await (await post({ compose: { character: outfit, location: product }, videoRef: ref, rights: true }, 'mo7')).json()).toEqual({ error: 'invalid-input' });
 }, 60_000);

@@ -104,3 +104,31 @@ nodes:
   - { class_type: TextGenerate, source: comfyui-core, license: GPL-3.0 }
   # The translation's second pass: the core comfy_extras/nodes_string.py joins the instruction and the transcription.
   - { class_type: StringConcatenate, source: comfyui-core, license: GPL-3.0 }
+  # Captions (2026-10-25): the pack's own transcription node (Whisper large-v3 turbo through transformers,
+  # which the core already needs), and the core comfy_extras/nodes_text.py, which writes its words as JSON.
+  - { class_type: MontagioTranscribeWords, source: montagio-nodes, license: GPL-3.0 }
+  - { class_type: SaveText, source: comfyui-core, license: GPL-3.0 }
+  # Motion transfer up to 30 s (2026-10-24): comfy_extras/nodes_context_windows.py, the context windows
+  # the official template switches on for clips longer than one window.
+  - { class_type: ContextWindowsManual, source: comfyui-core, license: GPL-3.0 }
+  # Restyle (workflows/wan21-vace-restyle.api.json, Wan 2.1 VACE 14B), core of ComfyUI v0.41.0:
+  # comfy_extras/nodes_wan.py (WanVaceToVideo), nodes_depth_anything_3.py (LoadDA3Model, DA3Inference,
+  # DA3Render) and nodes.py (ImageScale, ImageBatch, EmptyImage: the first frame and its mask).
+  - { class_type: WanVaceToVideo, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: LoadDA3Model, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: DA3Inference, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: DA3Render, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ImageScale, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ImageBatch, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: EmptyImage, source: comfyui-core, license: GPL-3.0 }
+  # Object swap (workflows/wan21-vace-swap.api.json, 2026-10-24): the object's mask grown, painted grey over
+  # the frames (ImageCompositeMasked, above) and the new object's photo fitted on white, core of ComfyUI
+  # v0.41.0: comfy_extras/nodes_mask.py (GrowMask) and nodes_images.py (ResizeAndPadImage).
+  - { class_type: GrowMask, source: comfyui-core, license: GPL-3.0 }
+  - { class_type: ResizeAndPadImage, source: comfyui-core, license: GPL-3.0 }
+  # Its tracking: the three nodes it uses from kijai/ComfyUI-segment-anything-2 (Apache-2.0, Meta's SAM 2
+  # code vendored), pinned at commit 0c35fff5 by infra/runpod/bootstrap.sh; ComfyUI v0.41.0 has no node
+  # that follows an object through a video. The weights never come from the node's own download.
+  - { class_type: DownloadAndLoadSAM2Model, source: kijai/ComfyUI-segment-anything-2@0c35fff5, license: Apache-2.0 }
+  - { class_type: Sam2VideoSegmentationAddPoints, source: kijai/ComfyUI-segment-anything-2@0c35fff5, license: Apache-2.0 }
+  - { class_type: Sam2VideoSegmentation, source: kijai/ComfyUI-segment-anything-2@0c35fff5, license: Apache-2.0 }

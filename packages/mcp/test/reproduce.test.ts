@@ -58,6 +58,8 @@ function app(recipeHere: (path: string) => Recipe) {
     if (call.path === '/api/generations/g2') return reply({ id: 'g2', presetId: 'slow-push', modelId: 'm', state: 'succeeded', progress: 1, outputUrl: '/media/data/generations/g2/clip.mp4' });
     if (call.method === 'POST' && call.path === '/api/generations/g2/upscale') return reply({ id: 'j1', task: 'upscale', state: 'queued', progress: 0, label: {}, modelId: 'seedvr2-upscale' }, 201);
     if (call.path === '/api/jobs/j1') return reply({ id: 'j1', task: 'upscale', state: 'succeeded', progress: 1, label: {}, modelId: 'seedvr2-upscale', outputUrl: '/media/data/jobs/j1/output.mp4' });
+    if (call.method === 'POST' && call.path === '/api/jobs/g2/captions') return reply({ id: 'j2', task: 'captions', state: 'queued', progress: 0, label: {}, modelId: 'whisper-turbo-words' }, 201);
+    if (call.path === '/api/jobs/j2') return reply({ id: 'j2', task: 'captions', state: 'succeeded', progress: 1, label: {}, modelId: 'whisper-turbo-words', outputUrl: '/media/data/jobs/j2/exports/x/video.mp4' });
     if (call.path.startsWith('/api/recipes/')) return reply(recipeHere(call.path));
     return reply({ error: 'not-found' }, 404);
   });
@@ -101,6 +103,15 @@ test('the HD pass is asked for on the clip just made, smooth as in the recipe', 
   expect(calls.find((call) => call.path === '/api/generations/g2/upscale')?.json).toEqual({ smooth: true, seed: 5 });
   expect(result.render).toMatchObject({ kind: 'job', id: 'j1', task: 'upscale' });
   expect(calls.some((call) => call.path === '/api/recipes/job/j1')).toBe(true);
+});
+
+test('the captions of a clip follow it: the same corrected text, in the same style, burned in again', async () => {
+  const then = [{ route: '/api/jobs/:parent/captions', body: { language: 'en', export: { text: 'A harbour at dawn.', style: 'pop' } }, files: [] }];
+  const recipe = cameraRecipe(photoSha, then);
+  const { fetch, calls } = app(() => recipe);
+  const result = await reproduce(clientOf(fetch), { recipe, inputs: { imageRef: photo } });
+  expect(calls.find((call) => call.path === '/api/jobs/g2/captions')?.json).toEqual({ language: 'en', export: { text: 'A harbour at dawn.', style: 'pop' } });
+  expect(result.render).toMatchObject({ kind: 'job', id: 'j2', task: 'captions' });
 });
 
 test('a recipe without a request cannot be replayed here', async () => {

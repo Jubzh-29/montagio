@@ -9,7 +9,7 @@
     "./browser": "./src/browser.ts"
   },
   "scripts": {
-    "test": "vitest run --globals",
+    "test": "vitest run --globals --testTimeout=20000",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

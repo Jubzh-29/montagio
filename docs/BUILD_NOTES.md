@@ -70,8 +70,9 @@ Every workflow is converted from an official [Comfy-Org workflow template](https
 | HD photo | `seedvr2-image-upscale.api.json` | SeedVR2 3B (Apache-2.0) |
 | Motion transfer | `wan-animate2-motion.api.json` | Wan2.2-Animate-2, distilled (Apache-2.0) |
 | Ad studio | the edit (the scene), an effect, the music, then an FFmpeg overlay of the tagline | as above |
+| Captions 9:16 of a talking clip | `whisper-words.api.json` (`LoadAudio`, the pack's Montagio Transcribe Words, the core `SaveText`), then FFmpeg and libass burn the words in | Whisper large-v3 turbo (MIT) |
 
-13 models and 48 entries in the weight lock (47 distinct files: one encoder serves two extensions), each listed with its size and source on the app's Open Stack page.
+16 models and 60 entries in the weight lock, each listed with its size and source on the app's Open Stack page. One encoder serves two extensions; the 11 entries of Whisper are its weights and its configuration and tokenizer files.
 
 ## Measured on a GPU
 
@@ -139,6 +140,16 @@ How the times were taken: `smoke.ts` ([`infra/runpod`](../infra/runpod)) compile
 - **4 steps by default.** The edit, the effects, the hooks and the avatar run their distillation LoRAs (4 steps); each keeps its full-step path (`fast: false`), and the measures above give both where they were taken.
 - **The description of the photo is required.** S2 changed one variable per clip on the same photo and seed: the text of what the photo shows alone removed the ghosting. The Studio fills it in whenever the photo's text is known.
 - **Every result is reproducible.** A result carries its recipe, written when it is delivered, so a later preset, lock or Montagio version never changes what made it. Same recipe and same stack give the same result on the same setup, and a very close one elsewhere: diffusion is not always bit-exact from one graphics card to another.
+- **Captions burned in by FFmpeg, drawn as ASS.**
+  - Word-by-word captions are an ASS script that libass renders inside FFmpeg, on the server, into a 1080x1920 frame.
+  - The script holds five styles: karaoke `\kf` sweep, pop, one word, boxed, neon. Their sizes, colours, line breaks and transitions come from RushGlide, a subtitle engine by the same author.
+  - The same chain draws the Studio's preview frame, so the preview is the export.
+  - A browser renderer (Canvas and WebCodecs) would have kept the original drawing code. It would also tie the export to an open tab, and a recipe could not replay it.
+  - The fonts (OFL) are embedded and copied next to the script, so FFmpeg names no Windows path in its filter graph.
+- **Whisper inside ComfyUI, and optional.**
+  - The transcription is a ComfyUI job like the others, so its weights are in the lock and its recipe names them. Its node runs on `transformers`, which ComfyUI already needs.
+  - A ComfyUI without it hides the captions alone, never the avatar, the voice change or the translation.
+  - The text a user corrects keeps Whisper's moments: words are aligned like a diff (Levenshtein), and a merged word ("Shot Rate" to "Montagio") takes the time of both.
 - **Shown only when validated.** An extension, an effect or a hook appears in the Studio only once a GPU session has dated it (`gpu_validated`). Iris Dive and Figurine stay hidden.
 - **Guardrails without a filter.** A consent box before a person's photo is edited, animated or made to speak, a consented sample for any voice but the built-in one, a list of well-known names refused in texts, a character made only from pictures created in the app, and the "AI-generated" mention in every file. No content filter is imposed on the user's own machine.
 - **A pinned install.** One ComfyUI commit, one PyTorch build per CUDA version, every weight by sha256, every service on `127.0.0.1`. The installer does not use comfy-cli, which brings telemetry SDKs and ComfyUI-Manager.
@@ -153,12 +164,17 @@ How the times were taken: `smoke.ts` ([`infra/runpod`](../infra/runpod)) compile
 | Montagio node pack | GPL-3.0-only |
 | Presets | CC-BY-4.0 |
 | Workflows | converted from the Comfy-Org templates, MIT ([license text](../workflows/LICENSE.workflow_templates)) |
-| Model weights | Apache-2.0 (35 lock entries) or MIT (13), listed with their sources in [`registry/models.lock.yaml`](../registry/models.lock.yaml) |
+| Model weights | Apache-2.0 (36 lock entries) or MIT (24), listed with their sources in [`registry/models.lock.yaml`](../registry/models.lock.yaml) |
+| Caption fonts | Poppins, Anton, Bebas Neue, Montserrat: SIL OFL 1.1, embedded with their licences ([`apps/web/public/fonts/captions`](../apps/web/public/fonts/captions/README.md)) |
 | ComfyUI, the Comfy SDK, comfy-api-proxy | GPL-3.0, MIT, MIT: installed beside Montagio, never bundled |
 
 ## Known limits
 
 - Clips are 5 s at 16 fps and 480p before the HD pass; films chain two or three of them.
+- Captions:
+  - Whisper large-v3 turbo ran for real on a CPU ComfyUI only, on 2026-10-25. It transcribed the 2.9 s of the avatar example in 95.7 s, the model loading included, in fp32 on a laptop. No GPU session has run it.
+  - Captions are made in 22 languages written in the Latin alphabet. Japanese and Chinese would need CJK fonts and line breaks without spaces.
+  - Films and ads have no voice to caption: their music is instrumental.
 - Fun Camera renders push-ins, pull-backs and side moves well, vertical moves and rolls poorly.
 - Motion transfer needs a photo framed like the reference video.
 - The local installer leaves the talking avatar out: its voice node is installed by the GPU-session tooling only.

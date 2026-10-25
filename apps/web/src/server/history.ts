@@ -220,6 +220,39 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
         },
       };
     }
+    case 'restyle': {
+      // Reuse reopens the Motion tab in its restyle mode: the clip, the text, and the look image if any.
+      const videoRef = typeof record.inputs.videoRef === 'string' ? record.inputs.videoRef : '';
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'restyle',
+        reprise: {
+          tab: 'motion',
+          restyle: true,
+          ...(typeof record.inputs.imageRef === 'string' ? await photo(record.inputs.imageRef) : {}),
+          ...((await readVideoMeta(videoRef)) ? { videoRef } : {}),
+          prompt: String(record.inputs.prompt),
+        },
+      };
+    }
+    case 'swap': {
+      // Reuse reopens the Motion tab in its swap mode: the clip, the text, and the new object's photo if
+      // any. The object is marked again: the points belong to the frame as it was painted.
+      const videoRef = typeof record.inputs.videoRef === 'string' ? record.inputs.videoRef : '';
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'swap',
+        reprise: {
+          tab: 'motion',
+          swap: true,
+          ...(typeof record.inputs.imageRef === 'string' ? await photo(record.inputs.imageRef) : {}),
+          ...((await readVideoMeta(videoRef)) ? { videoRef } : {}),
+          prompt: String(record.inputs.prompt),
+        },
+      };
+    }
     case 'translate':
       // A clip said in another language: Reuse goes back to the Avatar tab.
       return { ...base, kind: 'clip', task: 'translate', reprise: { tab: 'avatar' } };
@@ -229,6 +262,19 @@ async function fromJob(lib: Library, record: JobRecord): Promise<HistoryItem | n
     case 'ad':
       // A ready-to-post ad: Reuse goes back to the Effects wall with its effect chosen.
       return { ...base, kind: 'clip', task: 'ad', reprise: { tab: 'effects', effectId: String(record.inputs.effectId) } };
+    case 'captions': {
+      // A transcription alone is not a result; its 9:16 export is a clip of its own, made from the talking clip.
+      if (!record.outputUrl?.endsWith('.mp4')) return null;
+      const parent = await parentItem(lib, record.parent);
+      return {
+        ...base,
+        kind: 'clip',
+        task: 'captions',
+        name: parent ? `${parent.name} · 9:16 captions` : base.name,
+        reprise: parent?.reprise ?? { tab: 'avatar' },
+        ...(parent?.recipeUrl ? { reproduces: parent.recipeUrl } : {}),
+      };
+    }
     case 'upscale': {
       // An HD clip is a clip of its own; Reuse reopens the setup of the clip it was made from.
       const parent = await parentItem(lib, record.parent);

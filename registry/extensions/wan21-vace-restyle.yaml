@@ -1,0 +1,46 @@
+# Restyle (extension "restyle"): a short clip's scene rebuilt from a text, and from a reference image
+# when there is one, keeping the clip's motion, camera move and timing; 480p, 16 fps, silent. The clip
+# is prepared first (prepareMotionClip of @montagio/sequence: 5 s at most, 16 fps, no sound). Depth
+# Anything 3 Small reads each frame's depth, the control Wan 2.1 VACE 14B follows (cast to fp8 as it
+# loads, 4 steps with the lightx2v T2V LoRA). A reference that is the clip's first frame restyled (the
+# edit makes it) is kept as the first frame, masked out of the control; any other image is a look to
+# follow (VACE's reference input); without one, the text alone says what the scene becomes.
+# Core nodes only; tested in the spike of 2026-10-24 (infra/modal/spike_restyle.py, docs/S2_RESULTATS.md).
+schema: montagio/extension-model@0.1
+id: wan21-vace-restyle
+name: Wan 2.1 VACE 14B (restyle)
+extension: restyle
+task: v2v-restyle
+license: Apache-2.0
+weights: [wan21-vace-14b-fp16, lightx2v-wan21-t2v-4step, depth-anything-3-small, umt5-xxl-fp8, wan21-vae]
+workflow: workflows/wan21-vace-restyle.api.json
+bindings:
+  video: { node: "1", field: file }
+  # the reference image (optional): removed with its nodes when a job has none
+  image: { node: "20", field: image }
+  prompt: { node: "14", field: text }
+  negative: { node: "15", field: text }
+  seed: { node: "31", field: seed }
+  # the clip's size: its frames, the reference, the first frame's mask and VACE's output
+  width:
+    - { node: "3", field: width }
+    - { node: "21", field: width }
+    - { node: "24", field: width }
+    - { node: "25", field: width }
+    - { node: "30", field: width }
+  height:
+    - { node: "3", field: height }
+    - { node: "21", field: height }
+    - { node: "24", field: height }
+    - { node: "25", field: height }
+    - { node: "30", field: height }
+  # the frames kept from the clip (its first 5 s at most), and VACE's length
+  frames:
+    - { node: "7", field: length }
+    - { node: "30", field: length }
+output: { node: "35", kind: video }
+# a clip of up to 30 s (the motion transfer's): its first 5 s are rebuilt, one VACE window
+limits: { min_duration_s: 1, max_duration_s: 30, max_chars: 500 }
+# GPU seconds for 5 s on an RTX 4090 (4 steps, the depth pass included). Spike of 2026-10-24 on an L4
+# (about half as fast): 187 to 247 s a clip, the loading of VACE included; peak 20.4 to 22.2 GB.
+estimate_s: 120

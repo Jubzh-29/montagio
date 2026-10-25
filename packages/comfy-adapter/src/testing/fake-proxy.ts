@@ -72,12 +72,13 @@ function send(res: ServerResponse, status: number, body?: unknown, contentType =
  * GET of a job moves it one step: queued → running at 0.5 → succeeded, with one output
  * from the workflow's `Save*` node: audio for `SaveAudio*` (a FLAC, announced as
  * application/octet-stream as a pod without a FLAC MIME type does), image/png for
- * `SaveImage*`, else video/mp4 typed "image", as comfy-api-proxy 0.1.6 types SaveVideo's
- * output. Its bytes are those of `autoRun.audio` / `autoRun.image`
+ * `SaveImage*`, application/json typed "file" for `SaveText` (comfy-api-proxy 0.1.6 types the
+ * "files" UI key so), else video/mp4 typed "image", as comfy-api-proxy 0.1.6 types SaveVideo's
+ * output. Its bytes are those of `autoRun.audio` / `autoRun.image` / `autoRun.words`
  * when given, else of `autoRun.clip`.
  */
 export async function startFakeProxy(
-  opts: { autoRun?: { clip: string; image?: string; audio?: string }; port?: number } = {},
+  opts: { autoRun?: { clip: string; image?: string; audio?: string; words?: string }; port?: number } = {},
 ): Promise<FakeProxy> {
   const jobs = new Map<string, FakeJobState>();
   const assets = new Map<string, FakeAsset>();
@@ -86,6 +87,7 @@ export async function startFakeProxy(
   const clip = opts.autoRun ? readFileSync(opts.autoRun.clip) : null;
   const image = opts.autoRun?.image ? readFileSync(opts.autoRun.image) : clip;
   const audio = opts.autoRun?.audio ? readFileSync(opts.autoRun.audio) : clip;
+  const words = opts.autoRun?.words ? readFileSync(opts.autoRun.words) : clip;
   let rejection: { status: number; code: string } | null = null;
   let forcedId: string | null = null;
   let redirect: { status: number; origin: string; pathPrefix: string } | null = null;
@@ -147,8 +149,10 @@ export async function startFakeProxy(
         ? { type: 'audio', name: 'music_00001.flac', contentType: 'application/octet-stream', bytes: audio! }
         : save?.class_type.startsWith('SaveImage')
           ? { type: 'image', name: 'Montagio_00001_.png', contentType: 'image/png', bytes: image! }
-          : // comfy-api-proxy 0.1.6 types SaveVideo's MP4 "image": ComfyUI files it under the "images" UI key
-            { type: 'image', name: CLIP_NAME, contentType: 'video/mp4', bytes: clip };
+          : save?.class_type === 'SaveText'
+            ? { type: 'file', name: 'captions_00001_.json', contentType: 'application/json', bytes: words! }
+            : // comfy-api-proxy 0.1.6 types SaveVideo's MP4 "image": ComfyUI files it under the "images" UI key
+              { type: 'image', name: CLIP_NAME, contentType: 'video/mp4', bytes: clip };
       assets.set(assetId, { bytes: saved.bytes, contentType: saved.contentType, filePath: saved.name });
       job.status = 'succeeded';
       job.progress = { value: 1, nodes_done: 2, nodes_total: 2 };

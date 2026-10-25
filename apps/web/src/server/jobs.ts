@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { access, copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   IDEMPOTENCY_WINDOW_MS,
@@ -27,7 +27,7 @@ import { saveUploadFromFile, type Provenance } from './uploads';
 
 export { JobError } from './errors';
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'ad' | 'voice-change' | 'moodboard' | 'translate';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'restyle' | 'swap' | 'ad' | 'voice-change' | 'moodboard' | 'translate' | 'captions';
 
 export type StepRecord = {
   name: string;
@@ -91,6 +91,8 @@ export type StepPlan = {
   presetId: string;
   extension: ExtensionId | null;
   compile: (record: JobRecord) => Promise<CompiledStep>;
+  /** What hides the step's feature when ComfyUI refuses its workflow, besides its extension (the captions within the avatar's). */
+  onRejected?: (reason: string) => void;
 };
 
 export type Prepared = {
@@ -235,8 +237,10 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
       step.state = 'queued';
       record.current = index;
     } catch (error) {
-      if (isBackendError(error) && error.code === 'workflow-rejected' && plan.extension) {
-        markRejected(plan.extension, `ComfyUI refused the ${plan.name} workflow (${error.message})`);
+      if (isBackendError(error) && error.code === 'workflow-rejected') {
+        const reason = `ComfyUI refused the ${plan.name} workflow (${error.message})`;
+        if (plan.extension) markRejected(plan.extension, reason);
+        plan.onRejected?.(reason);
       }
       throw error;
     }
@@ -277,9 +281,14 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
         record.outputImageRef = upload.imageRef;
         record.personal = provenance.personal;
         record.outputUrl = mediaUrlFor(join(getEnv().data, ...upload.imageRef.split('/')));
-      } else {
+      } else if (step.output === 'audio') {
         const out = join(dir, 'output.flac');
         await access(out).catch(() => tagAudio(outputPath, out));
+        record.outputUrl = mediaUrlFor(out);
+      } else {
+        // A JSON document (a transcription): data, not media, so no mention to write in it.
+        const out = join(dir, 'output.json');
+        await access(out).catch(() => copyFile(outputPath, out));
         record.outputUrl = mediaUrlFor(out);
       }
     } catch (error) {
@@ -450,6 +459,20 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
 /** The engine of the app, on its task table. */
 export const jobs = createJobEngine(TASKS);
 
+/**
+ * Change a finished job's record outside the engine (a captions export points its result to the new
+ * clip), under the job's lock so a poll does not write over it. Null for an unknown job.
+ */
+export function updateJob(id: string, change: (record: JobRecord) => void): Promise<JobRecord | null> {
+  return withLock(id, async () => {
+    const record = await readJob(id);
+    if (!record) return null;
+    change(record);
+    await saveJob(record);
+    return record;
+  });
+}
+
 const STATUS: Record<JobError['code'], number> = {
   'extension-disabled': 404,
   'invalid-input': 400,
@@ -460,6 +483,8 @@ const STATUS: Record<JobError['code'], number> = {
   'speech-too-long': 400,
   'speech-too-short': 400,
   'rights-required': 400,
+  'language-unsupported': 400,
+  'no-speech': 400,
 };
 
 /** The HTTP answer for a known failure of a job route, or null for an unexpected error. */

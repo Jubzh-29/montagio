@@ -8,7 +8,7 @@ const MESSAGES: Record<string, string> = {
   'consent-required':
     'This photo was imported, so it may show a real person. Ask the user to confirm that they are the person in the photo, or that this person has agreed, then call again with consent: true. Never set it on their behalf.',
   'rights-required':
-    'A motion transfer needs the user\'s word that they hold the rights on the photo and the video. Ask them, then call again with rights: true. Never set it on their behalf.',
+    'A motion transfer, a restyle or an object swap needs the user\'s word that they hold the rights on its video and its image (and, for a swap, that the people filmed agree). Ask them, then call again with rights: true. Never set it on their behalf.',
   'blocked-name': 'The text names a well-known person. Montagio does not make images of real people without their consent.',
   'extension-disabled': 'This feature, effect or hook is not available on this installation. list_effects_and_hooks shows what is.',
   'invalid-input': 'This request cannot be rendered. Check the text (its length too) and the options, then try again.',
@@ -43,7 +43,7 @@ const MESSAGES: Record<string, string> = {
   // Reproducing a recipe.
   'invalid-recipe': 'This is not a Montagio recipe (montagio/recipe@1): give its JSON file, or the MP4 or PNG Montagio exported, which carries it.',
   'not-replayable':
-    'This recipe holds no request the app can send again (a voice change, or a recipe cut short in a file\'s tags). Its workflow can still be loaded in ComfyUI.',
+    'This recipe holds no request the app can send again: a voice change or a translation (their speech file and its consent come from the user, never from a recipe), captions made on one of them, or a recipe cut short in a file\'s tags. Its workflow can still be loaded in ComfyUI.',
   'inputs-required': 'The recipe needs its input files: give the photo (and the other files it names) to render it again.',
   'recipe-unavailable': 'The app could not make this recipe. Its log says why.',
   aborted: 'The call was canceled before the render ended. The render goes on in the app; get_job follows it.',

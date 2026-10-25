@@ -65,4 +65,6 @@ test('motion shows its tab once its screen is built', () => {
   const info = { ...none, extensions: ['effects', 'avatar', 'motion'] as const, effects: [effect] };
   expect(visibleTabs({ ...info, extensions: [...info.extensions] })).toEqual(['effects', 'camera', 'film', 'avatar', 'motion']);
   expect(visibleTabs({ ...none, extensions: ['effects'], effects: [effect] })).not.toContain('motion');
+  // The restyle is the tab's other use of its clip: alone, it shows the tab too.
+  expect(visibleTabs({ ...none, extensions: ['restyle'] })).toEqual(['camera', 'film', 'motion']);
 });

@@ -46,7 +46,10 @@ export type UploadResult = {
   personal: boolean;
 };
 
-/** POST /api/uploads/video: the reference clip of a motion transfer, cut to 5 s at most. */
+/** A reference motion of the library (GET /api/motions): made by Montagio from a fictional character. */
+export type LibraryMotion = { id: string; name: string; description: string; duration_s: number; previewUrl: string; posterUrl?: string };
+
+/** POST /api/uploads/video: the reference clip of a motion transfer, or the clip of a restyle, cut to 30 s at most. */
 export type VideoUploadResult = {
   videoRef: string;
   duration_s: number;
@@ -126,12 +129,14 @@ export type ExtensionsInfo = {
   extensions: string[];
   effects: { id: string; name: string; description: string; previewUrl?: string; estimate_s: number; subjectMax: number; modelName: string; license: string }[];
   hooks: { id: string; name: string; description: string; previewUrl?: string; estimate_s: number; references: 1 | 2; modelName: string; license: string }[];
-  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; motion?: number };
+  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; motion?: number; restyle?: number; swap?: number };
   editModel?: Named;
   avatarModel?: Named;
   musicModel?: Named;
   upscaleModel?: Named & { maxFrames: number };
   motionModel?: Named;
+  restyleModel?: Named;
+  swapModel?: Named;
 };
 
 /** GET /api/history: one finished creation, newest first. */
@@ -335,6 +340,7 @@ export class MontagioClient {
   models = () => this.get<ModelSummary[]>('/api/models');
   extensions = () => this.get<ExtensionsInfo>('/api/extensions');
   history = () => this.get<HistoryItem[]>('/api/history');
+  motions = () => this.get<LibraryMotion[]>('/api/motions');
 
   /** A local photo sent to the app (field "image"): an upload is personal, its edits ask for consent. */
   async uploadPhoto(path: string): Promise<UploadResult> {
@@ -358,6 +364,12 @@ export class MontagioClient {
     return { ...value, ...(value.url ? { url: this.absolute(value.url) } : {}) };
   }
 
+  /** A motion of the library taken as the clip, as if it had been sent. */
+  async pickLibraryMotion(id: string): Promise<VideoUploadResult> {
+    const { value } = await this.call<VideoUploadResult>('POST', '/api/uploads/video/library', { json: { id } });
+    return { ...value, ...(value.url ? { url: this.absolute(value.url) } : {}) };
+  }
+
   /** A voice sample for an avatar (field "audio"): the app keeps 20 s of it at most, as a mono FLAC. */
   async uploadVoice(path: string): Promise<{ voiceRef: string; duration_s: number }> {
     const file = await readLocalFile(path, VOICE_TYPES, MAX_VOICE_BYTES, 'a WAV, MP3, M4A, FLAC, OGG or WebM sound');
@@ -366,7 +378,7 @@ export class MontagioClient {
     return (await this.call<{ voiceRef: string; duration_s: number }>('POST', '/api/uploads/voice', { form })).value;
   }
 
-  /** Start a job (/api/images, /api/edits, /api/effects, /api/hooks, /api/avatars, /api/motion). */
+  /** Start a job (/api/images, /api/edits, /api/effects, /api/hooks, /api/avatars, /api/motion, /api/restyle, /api/swap). */
   async startJob(route: string, body: Record<string, unknown>): Promise<RenderStatus> {
     return this.fromJob((await this.call<JobSummary>('POST', route, { json: body }, true)).value);
   }

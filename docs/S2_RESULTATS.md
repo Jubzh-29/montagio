@@ -286,7 +286,69 @@ Une L4 calcule à peu près comme une RTX 4070 de 12 Go : les temps du profil so
 
 **Coût des parties 14 et 15** : environ 31 min de L4 pour le Turbo, 12 min pour le profil 12 Go et 10 min de CPU pour les poids manquants (les deux LoRA, une LoRA d'effet, le 5B et sa VAE), soit environ 0,90 $ (estimation ; le chiffre du tableau de bord n'est pas lu).
 
-## 16. Banque de visages de départ (25/10)
+## 16. Restyle : spike VACE 14B (24/10)
+
+Avec l'accord de l'utilisateur (≈ 1,20 $ annoncés, plafond 1,50 $), sur le compte Modal montagio-2 : les poids téléchargés par un conteneur sans GPU (≈ 0,05 $), puis deux conteneurs L4 en parallèle qui ont lancé `infra/modal/spike_restyle.py` (0,25 $ et 0,18 $ au relevé ; 15,18 $ sur le mois avant le spike). Rien n'était câblé : le script fait l'image de référence avec l'extension d'édition (smoke `--extension edit`), puis envoie à ComfyUI des graphes du cœur. Résultats dans `s3/restyle-spike/`, hors dépôt (clips, planches, `results.jsonl`, vidéos côte à côte).
+
+| Job | Clip source | Contrôle | Référence | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|---|---|---|
+| Édition de la 1re image (Qwen-Image-Edit-2511, 4 pas) | — | — | — | 72 à 82 s, à froid | 22,3 Go | ✅ voiture : soir d'hiver enneigé, cadrage gardé ; danse : décor de studio, figurine à peine en pâte à modeler |
+| car-canny-ref | Crash Push de la voiture, 832×480, 81 images | Canny | style à suivre | 239 s, chargement de VACE compris | 20,9 Go | ✅ neige, crépuscule bleu, poussée de caméra identique |
+| car-depth-ref | idem | profondeur | style à suivre | 198 s | 20,4 Go | ✅ idem, moins de fleurs au premier plan |
+| car-depth-first | idem | profondeur | 1re image | 201 s | 20,4 Go | ✅ la 1re image est la référence, puis la scène suit ; petit saut après la 1re image |
+| dance-depth-first | danse du 5B (S2), 480×832, 77 images | profondeur | 1re image | 247 s, chargement compris | 20,9 Go | ✅ poses et poussée exactes, décor repris ; ❌ la pâte à modeler ne tient pas |
+| port-canny-prompt | Rise & Push du port, 832×480, 81 images | Canny | texte seul (« aquarelle ») | 187 s | 22,2 Go | ✅ peinture illustrée, mouvement suivi |
+
+- **Réglages** : VACE 14B fp16 converti en fp8 au chargement, LoRA lightx2v T2V, 4 pas, cfg 1, euler, shift 5, `WanVaceToVideo` à force 1, négatif par défaut des templates Wan.
+- **Scintillement** (écart moyen de luminance d'une image à la suivante, `tblend` + `signalstats`) : voiture 3,5 à 3,6 contre 2,6 pour la source ; port 5,5 contre 2,7 (la texture peinte bouge un peu) ; danse 14 comme la source.
+- **Verdict : go.** Le câblage a retenu la profondeur (Depth Anything 3 Small, Apache-2.0) et les trois chemins (texte seul, style à suivre, 1re image restylisée).
+
+### Validation du chemin câblé (24/10, 19:29)
+
+Avec l'accord de l'utilisateur (≈ 0,30 $) : une `series` de trois runs du vrai smoke dans un conteneur L4, les workflows compilés par `compileRestyle` (profondeur dans les trois cas). 0,32 $ au relevé ; Restyle a coûté 0,80 $ en tout, spike compris (16,13 $ sur le mois). Résultats dans `s3/restyle-validation/`, hors dépôt ; le résultat est le fichier `…__r1-1.mp4` (81 images), `…__r1.mp4` étant le clip d'entrée préparé (80 images). La session locale s'est arrêtée pendant la série, qui a continué sur Modal (`--detach`).
+
+| Job du smoke | Clip source | Chemin | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|---|---|
+| `restyle-edit` (« a snowy winter evening ») | Crash Push de la voiture | 1re image du clip | 73 s, à froid | 22,2 Go | ✅ |
+| `restyle:first-frame` | idem | 1re image restylisée | 239 s, chargement de VACE compris | 22,5 Go | ✅ soir d'hiver enneigé, phares allumés, poussée suivie image par image |
+| `restyle` (« a watercolor painting of a small fishing harbour ») | Rise & Push du port | texte seul | 186 s | 22,3 Go | ⚠️ scène reconstruite et mouvement suivi, mais rendu réaliste : l'aquarelle n'est pas rendue |
+| `restyle:look` (personnage cartoon de `sample-character.png`, « a cartoon character dancing in a colorful room ») | danse du 5B | style à suivre, image sans rapport avec le clip | 196 s | 22,2 Go | ✅ la danseuse devient le personnage (veste verte, écharpe rouge) dans une chambre colorée, poses et poussée exactes |
+
+- **Daté** : `gpu_validated: 2026-10-24`. Le texte seul ne sert que sans l'extension d'édition ; un style demandé tient avec la 1re image restylisée (le chemin par défaut) ou une image à suivre.
+- Les définitions `/object_info` du GPU (`object_info-extensions.json`) couvrent les classes du workflow.
+
+## 17. Mouvement 30 s, personnage composé, bibliothèque Motion (24/10), remplacement d'objet (25/10)
+
+Sur le compte Modal montagio-2, avec l'accord de l'utilisateur (« Oui, utilise montagio-2 »), lot par lot. Relevé : les 8 apps lancées de 19:40 à 22:04 (heure de Paris) ont coûté 5,15 $, dont 1,70 $ pour la série du transfert de 30 s ; au-delà des ≈ 2 $ visés, ce qui a été dit à l'utilisateur. Le compte affichait 21,13 $ sur le mois le 24/10 au soir. Résultats hors dépôt, sur le volume `montagio-results` (`runs/20261024-…`).
+
+| Job | Entrées | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|---|
+| Bibliothèque Motion, un clip de 5 s (Wan 2.1 I2V 480p 14B, depuis une photo Z-Image) | 7 personnages fictifs | 154 s par clip | — | ✅ sept mouvements, dont une danse de 30 s en six clips enchaînés |
+| `compose:3refs` personnage + tenue + produit (Qwen-Image-Edit-2511, 4 pas) | garçon cartoon, une tenue, une petite voiture en jouet | — | — | ✅ visage, coiffure et tenue gardés, en pied ; ❌ la voiture devient une bouteille |
+| `motion` du personnage composé, 5 s | la danse hip-hop | 425 s | 22,6 Go | ✅ |
+| `compose:3refs`, consigne corrigée (« the very object of image 3 ») | les mêmes | 84 s | 21,9 Go | ❌ la voiture devient un téléphone |
+| `motion` 30 s (481 images, 9 fenêtres de contexte) | garçon cartoon, hip-hop long de la bibliothèque | 3 425 s | 22,6 Go | ✅ même personnage du début à la fin, poses de la référence suivies image par image jusqu'au bras levé final |
+
+- Comme pour Restyle, le smoke enregistre deux vidéos par job de mouvement : `…__r1.mp4` est le clip d'entrée que le node `LoadVideo` renvoie aussi, `…__r1-1.mp4` le résultat (le nœud de sortie du modèle, celui que l'app prend).
+- 30 s prennent 1,86 fois 9 fois le temps d'une fenêtre sur une RTX 4090 (`estimate_s` 205) : l'estimation du Studio et du MCP (une fenêtre fois `motionWindows`) tient.
+- **Daté** : le transfert de mouvement l'était déjà (21/10) ; ses 30 s et le personnage composé sont validés le 24/10. Le produit à côté d'une tenue reste une limite écrite.
+
+### Remplacement d'objet : vérifié sur CPU, puis validé sur GPU (25/10)
+
+Sur le ComfyUI v0.41.0 CPU (`../comfyui-cpu-v0.41.0`), le pack `kijai/ComfyUI-segment-anything-2` au commit `0c35fff5`, installé depuis l'archive de ce commit, s'est chargé en 0,9 s sans rien ajouter au venv ; les définitions `/object_info` de ses trois nodes et de `GrowMask` et `ResizeAndPadImage` sont celles du fixture des tests. Les workflows compilés (photo du nouvel objet, texte seul) passent `/prompt`. La partie suivi a tourné pour de bon : 17 images de « Boxe dans le vide », deux points sur les gants, SAM 2.1 base+ en fp32 sur le CPU, 314 s ; les deux gants sont couverts de gris, marge comprise, sur toutes les images, pendant que le boxeur pivote. Coût prévu sur GPU : la reconstruction de l'image Modal (le script d'amorçage a changé) puis deux rendus de 5 s (photo, texte seul), de l'ordre de 0,40 $.
+
+Sur GPU le 25/10, avec l'accord de l'utilisateur (« Oui, lance (≈ 0,45 $) »). Coût réel : 0,27 $ pour les quatre apps (deux téléchargements de poids, dont la reconstruction de l'image Modal : 231 s pour la couche GPU, `bootstrap.sh` ayant changé ; deux séries). Le relevé du mois est à 22,05 $, dont une app `montagio-s2` d'une autre session, lancée à 02:49 et toujours en cours au relevé (0,46 $). Résultats sur le volume `montagio-results` (`runs/20261025-015859-lot4-swap`, `runs/20261025-020707-lot4-swap-fp16`) ; le résultat d'un job est le fichier `…__r1-1.mp4`.
+
+| Job | Entrées | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|---|
+| `compose:3refs`, le produit en image 2 avant la tenue | garçon cartoon, tenue, petite voiture rouge | 82 s | 22,2 Go | ✅ la petite voiture rouge tenue dans la main, tenue et visage gardés |
+| `swap:text`, en fp32 (1er essai) | — | — | — | ❌ « No available kernel » sur `Sam2VideoSegmentationAddPoints` : sur Ada, l'attention de SAM 2 n'autorise que Flash, sans noyau fp32. Corrigé en fp16 (fichier `-fp16` du lock) |
+| `swap:text` (« bright yellow boxing gloves »), 2 points | « Boxe dans le vide » de la bibliothèque, 480×832, 81 images | 252 s, chargement de VACE compris | 21,0 Go | ✅ les deux gants jaunes sur toutes les images, crochets et pivot compris ; boxeur, tenue, fond et poses inchangés |
+| `swap:photo`, 3 points, photo `sample-character.png` | la danse du 5B (S2), 480×832, 80 images | 207 s | 22,5 Go | ✅ la danseuse devient le garçon cartoon (veste verte, écharpe rouge), poses et poussée de caméra suivies, décor gardé |
+
+- **Daté** : `gpu_validated: 2026-10-25`. L'aperçu `presets/extensions/previews/swap.mp4` (avant et après, côte à côte, 373 Ko) vient du second rendu.
+
+## 18. Banque de visages de départ (25/10)
 
 Un conteneur L4 du compte « montagio-2 » (fonction `series`), le 25/10 à 15 h 13 (heure de Paris), puis une reprise de 5 visages à 15 h 22, avec l'accord de l'utilisateur (environ 0,13 $ annoncés, plafond 0,20 $).
 

@@ -66,10 +66,13 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 | `chatterbox-mtl-voice.api.json` | none (no official template: ComfyUI has no local text-to-speech node) | Chatterbox Multilingual V3 | node 3, FLAC |
 | `chatterbox-vc.api.json` | none (no official template: ComfyUI has no local voice conversion node) | Chatterbox VC (S3Gen) | node 3, FLAC |
 | `translate-speech.api.json` | none (written for Montagio from the core TextGenerate node) | Gemma 4 E4B int8, then Chatterbox Multilingual V3 | node 5, FLAC |
+| `whisper-words.api.json` | none (written for Montagio: the pack's transcription node and the core Save Text) | Whisper large-v3 turbo | node 3, JSON |
 | `wan22-s2v-avatar.api.json` | `templates/video_wan2_2_14B_s2v.json` | Wan 2.2 S2V 14B fp8 | node 113, MP4 with the speech |
 | `wan21-i2v-effect.api.json` | `templates/image_to_video_wan.json` | Wan 2.1 I2V 14B 480p fp8, an effect LoRA | node 56, MP4 |
 | `wan22-flf2v-transition.api.json` | `templates/video_wan2_2_14B_flf2v.json` | Wan 2.2 I2V A14B fp8 (high and low noise) | node 61, MP4 |
 | `wan-animate2-motion.api.json` | `templates/video_wan_animate2_distilled.json` | Wan2.2-Animate-2 distilled, int8 | node 246, MP4 |
+| `wan21-vace-restyle.api.json` | `templates/video_wan_vace_14B_v2v.json`, its control made a depth pass | Wan 2.1 VACE 14B (fp16, cast to fp8), Depth Anything 3 Small | node 35, MP4 |
+| `wan21-vace-swap.api.json` | `templates/video_wan_vace_14B_v2v.json`, its control made the clip with the object painted grey | Wan 2.1 VACE 14B (fp16, cast to fp8), SAM 2.1 base+ | node 35, MP4 |
 
 ### ace-step15-music
 
@@ -115,6 +118,12 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 - `cfg_weight` is 0, the Chatterbox card's advice when the reference voice speaks another language than the text. The app then animates the face again on that speech (Wan 2.2 S2V): the lips follow the new words.
 - Gemma 4 hears 30 s of audio at most; the app keeps 15 s, what the avatar animates.
 
+### whisper-words
+
+- Written for Montagio: `LoadAudio` (node 1, the speech as mono FLAC at 16 kHz), `MontagioTranscribeWords` from the Montagio node pack (node 2: Whisper large-v3 turbo through transformers, which ComfyUI already needs; `language` `auto` or a code), and the core `SaveText` (node 3, format `json`, `montagio/captions`), whose file comes back as a JSON output.
+- The JSON is `montagio/words@1`: the language, whether Whisper detected it, the duration, the text, and Whisper's pieces of words with their start and end in seconds. The app joins the pieces into words, aligns the text the user corrects on them, and burns the captions into a 9:16 export with FFmpeg and libass.
+- The model folder is `models/whisper/whisper-large-v3-turbo` (the Hugging Face files of `openai/whisper-large-v3-turbo`, MIT, 1.6 GB). Ran for real on the CPU ComfyUI on 2026-10-25: 2.9 s of the avatar example in 95.7 s, the model loading included, in fp32 on a laptop CPU.
+
 ### wan22-s2v-avatar
 
 - The template's active "4 steps" path, flattened: its two "Video S2V Extend" subgraphs become nodes `79076`–`79078` and `85076`–`85078` (numeric ids for the template's `79:76`…), its bypassed third extension and its 20-step group are gone.
@@ -136,10 +145,23 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 
 ### wan-animate2-motion
 
-- The template's active subgraph, flattened with its inner ids (`672:587` becomes `587`), as one 81-frame window; its bypassed copy for chaining windows is left out (the v0.1 clip lasts 5 s at most, prepared at 16 fps by `prepareMotionClip`).
+- The template's active subgraph, flattened with its inner ids (`672:587` becomes `587`); its bypassed copy for chaining windows is left out. Past one 81-frame window, the template's own switch is on: `ContextWindowsManual` (610) samples the whole clip in one pass, 21 latent frames per window overlapping by 8, up to 30 s (481 frames, 9 windows). `compileMotion` bypasses it for a clip of 81 frames or fewer.
 - The raw frames of the clip feed `WanAnimate2ToVideo.pose_video` (no pose extractor, no mask, no LoRA): 10 steps, cfg 1, lcm, shift 5, as the template.
 - `VAELoader` (584) loads the lock's `wan_2.1_vae` instead of the template's `Wan2_1_VAE_bf16` (a copy of Kijai's file); `WanAnimate2Cache` (594) runs on the CPU instead of the GPU, as the template's note advises against VRAM spikes; `CreateVideo` (245) writes 16 fps without the reference clip's sound.
 - The size follows the clip's aspect at 480p (bound on the clip's `ResizeImageMaskNode`, 600); the photo is cropped to it through `GetImageSize` (596).
+
+### wan21-vace-restyle
+
+- The template's control video was Canny edges and its LoRA the CausVid LoRA of Kijai (a refused repository). Here the control is the depth of each frame: `LoadDA3Model` (5) loads Depth Anything 3 Small, `DA3Inference` (6) runs on every frame in `mono` mode at 504 px, `DA3Render` (4) draws the depth normalised frame by frame (`v2_style`). Depth follows shapes without copying textures, so a scene can change material, light and season. The LoRA is lightx2v's own Wan 2.1 T2V 4-step LoRA (11): 4 steps, cfg 1, euler, shift 5.
+- `UNETLoader` (10) loads the fp16 file Comfy-Org publishes with `weight_dtype: fp8_e4m3fn`: about 17 GB on the card, a peak of 20.4 to 22.2 GB on an L4 in the spike of 2026-10-24.
+- The reference image (20, scaled by 21) has two uses. A look to follow goes to `WanVaceToVideo.reference_image`. The clip's first frame restyled by the edit is also put before the depth of the other frames (`ImageFromBatch` 22, `ImageBatch` 23), under a mask that is 0 on it and 1 elsewhere (`EmptyImage` 24 and 25, `ImageBatch` 26, `ImageToMask` 27): VACE keeps that frame and rebuilds the others along the depth. `compileRestyle` removes nodes 22 to 27 for a look, and 20 to 27 for a text alone.
+- `TrimVideoLatent` (32) drops the reference's latent frame before decoding; `CreateVideo` (34) writes 16 fps without the clip's sound, `SaveVideo` (35) `montagio/restyle`.
+
+### wan21-vace-swap
+
+- The restyle's VACE pass (nodes 10 to 16 and 30 to 35, same weights, 4 steps), with a different control. `DownloadAndLoadSAM2Model` (40) loads SAM 2.1 base+ in fp16 from `models/sam2`: for the model named `sam2.1_hiera_base_plus.safetensors` it reads the lock's `sam2.1_hiera_base_plus-fp16.safetensors` (check-open-stack knows that name). fp16 it must be: on an Ampere or newer GPU, SAM 2's attention allows Flash only, which has no fp32 kernel ("No available kernel" on an L4). `Sam2VideoSegmentationAddPoints` (41) takes the points on the object of frame 0, in pixels of the scaled frames (and points on what is not it, `coordinates_negative`, only when there are some: the node reads an empty list as one point), and `Sam2VideoSegmentation` (42) follows it through every frame. These three nodes come from kijai/ComfyUI-segment-anything-2, pinned at `0c35fff5` by `infra/runpod/bootstrap.sh`.
+- `GrowMask` (43) widens the mask by 12 px so that the object's edge goes too; `ImageCompositeMasked` (45) paints it grey (`EmptyImage` 44, 0x808080, VACE's "nothing here") over the frames, and that clip with the mask is VACE's control: what is outside the mask is kept, what is inside is redrawn.
+- The photo of the new object (20) is fitted on white by `ResizeAndPadImage` (21), so that a square product photo is not cropped, and goes to `reference_image`; `compileSwap` removes both nodes for a text alone. `SaveVideo` (35) `montagio/swap`.
 
 ## Bindings
 
@@ -160,7 +182,10 @@ Extension models (a binding with several inputs gets the same value in each):
 | `chatterbox-mtl-voice` | text 2.text; language 2.language; seed 2.seed; cfg 2.cfg_weight | 3 (audio) |
 | `chatterbox-vc` | audio 1.audio; voice 4.audio | 3 (audio) |
 | `gemma4-translate` | audio 1.audio; prompt 3.prompt; language 4.language; cfg 4.cfg_weight; seed 4.seed | 5 (audio) |
+| `whisper-turbo-words` | audio 1.audio; language 2.language | 3 (file) |
 | `wan22-s2v-avatar` | image 52.image; audio 58.audio; prompt 6.text; seed 3.seed (+1, +2 on the extension samplers); width / height 93.width / 93.height; frames 96.length | 113 (video) |
 | `wan21-i2v-effects` | image 52.image; prompt 6.text; negative 7.text; seed 3.seed; width / height / frames 50.width / height / length; lora 200.lora_name; lora_strength 200.strength_model | 56 (video) |
 | `wan22-flf2v-transition` | image 68.image; end_image 62.image; prompt 6.text; negative 7.text; seed 57.noise_seed; width / height / frames 67.width / height / length | 61 (video) |
 | `wan-animate2-motion` | image 189.image; video 240.file; prompt 582.text; motion_prompt 585.text; negative 581.text; seed 597.noise_seed; width / height 600.resize_type.width / height; frames 587.length | 246 (video) |
+| `wan21-vace-restyle` | video 1.file; image 20.image; prompt 14.text; negative 15.text; seed 31.seed; width / height 3, 21, 24, 25 and 30; frames 30.length | 35 (video) |
+| `wan21-vace-swap` | video 1.file; image 20.image; prompt 14.text; negative 15.text; seed 31.seed; points 41.coordinates_positive; exclude_points 41.coordinates_negative; width / height 3, 44, 30 and 21.target_width / target_height; frames 7.length, 30.length | 35 (video) |

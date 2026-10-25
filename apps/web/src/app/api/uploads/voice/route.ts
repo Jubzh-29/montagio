@@ -1,11 +1,12 @@
 import { ensureTools } from '@montagio/sequence';
-import { readFormBody } from '@/server/body';
+import { namesThisSite, readFormBody } from '@/server/body';
 import { JobError } from '@/server/errors';
 import { requireExtension } from '@/server/extensions';
 import { MAX_VOICE_FORM_BYTES, saveVoiceUpload, UploadError } from '@/server/uploads';
 
 /** A voice sample for the avatar: prepared once (20 s at most, mono FLAC), then its kept length. */
 export async function POST(request: Request) {
+  if (!namesThisSite(request)) return Response.json({ error: 'cross-site' }, { status: 403 });
   // Nothing is read, nor FFmpeg started, for an extension this server does not show.
   try {
     await requireExtension('avatar');

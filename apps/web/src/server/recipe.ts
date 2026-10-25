@@ -1,9 +1,11 @@
 import { mkdir, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { buildRecipe, compactRecipe, findLocalPath, readStack, sha256Hex, type ApiWorkflow, type InputSlot, type Recipe, type RecipeDraft, type RecipeRequest, type RecipeStack } from '@montagio/recipe';
+import { ASS_GENERATOR } from '@montagio/captions';
 import { RECIPE_TAG, type VideoTags } from '@montagio/sequence';
 import type { Reprise } from '@/lib/api-types';
 import type { RecipeSource } from '@/lib/recipe-url';
+import { captionFontsDigest } from './caption-fonts';
 import { getEnv } from './env';
 import { mediaFileFor } from './generations';
 import { historyItem } from './history';
@@ -187,25 +189,39 @@ function jobRequest(record: JobRecord, slots: readonly InputSlot[]): RecipeReque
   const text = (key: string) => (typeof inputs[key] === 'string' && inputs[key] !== '' ? { [key]: inputs[key] } : {});
   const files = (...fields: string[]) => fields.filter((field) => typeof inputs[field] === 'string').map((field) => ({ field, sha256: sha256From(slots, field) }));
   const seed = record.seed;
+  // A start photo composed from several, as an effect's, a motion's character or a restyle's look.
+  const composed = inputs.compose && typeof inputs.compose === 'object' ? Object.keys(inputs.compose) : [];
+  const composeFiles = () => composed.map((role) => ({ field: `compose.${role}`, sha256: sha256From(slots, `compose.${role}`) }));
   switch (record.task) {
     case 't2i':
       return { route: '/api/images', body: { ...text('prompt'), ...(inputs.style ? { style: inputs.style } : {}), ...(record.aspect ? { aspect: record.aspect } : {}), seed }, files: [] };
     case 'edit':
       return { route: '/api/edits', body: { ...text('instruction'), ...text('look'), ...text('scene'), seed }, files: files('imageRef', 'maskRef') };
-    case 'effect': {
-      const compose = inputs.compose && typeof inputs.compose === 'object' ? Object.keys(inputs.compose) : [];
+    case 'effect':
       return {
         route: '/api/effects',
         body: { ...text('effectId'), ...text('subject'), seed },
-        files: compose.length > 0 ? compose.map((role) => ({ field: `compose.${role}`, sha256: sha256From(slots, `compose.${role}`) })) : files('imageRef'),
+        files: composed.length > 0 ? composeFiles() : files('imageRef'),
       };
-    }
     case 'hook':
       return { route: '/api/hooks', body: { ...text('hookId'), seed }, files: files('imageRef', 'image2Ref') };
     case 'avatar':
       return { route: '/api/avatars', body: { ...text('text'), ...text('language'), seed }, files: files('imageRef', 'voiceRef') };
     case 'motion':
-      return { route: '/api/motion', body: { ...text('character'), ...text('motion'), seed }, files: files('imageRef', 'videoRef') };
+      return {
+        route: '/api/motion',
+        body: { ...text('character'), ...text('motion'), seed },
+        files: [...(composed.length > 0 ? composeFiles() : files('imageRef')), ...files('videoRef')],
+      };
+    case 'restyle':
+      // The rights are the user's word, never the recipe's: the request goes without them.
+      return { route: '/api/restyle', body: { ...text('prompt'), seed }, files: [...(composed.length > 0 ? composeFiles() : files('imageRef')), ...files('videoRef')] };
+    case 'swap':
+      return {
+        route: '/api/swap',
+        body: { ...text('prompt'), points: inputs.points, ...(inputs.exclude ? { exclude: inputs.exclude } : {}), seed },
+        files: files('videoRef', 'imageRef'),
+      };
     case 'ad':
       return { route: '/api/ads', body: { ...text('style'), ...text('effectId'), ...text('tagline'), seed }, files: files('productRef', 'characterRef', 'overlayRef') };
     case 'image-upscale':
@@ -222,6 +238,14 @@ function followUp(record: JobRecord): RecipeRequest | undefined {
     const base = record.parent.source === 'generation' ? 'generations' : 'jobs';
     return { route: `/api/${base}/:parent/upscale`, body: { smooth: record.inputs.smooth === true, seed: record.seed }, files: [] };
   }
+  if (record.task === 'captions' && record.parent) {
+    // The same words burned in again, in the same style: Whisper hears the clip made again, the corrected text goes on it.
+    return {
+      route: '/api/jobs/:parent/captions',
+      body: { language: record.inputs.language, ...(record.inputs.export ? { export: record.inputs.export } : {}) },
+      files: [],
+    };
+  }
   if (record.task === 'music') {
     return {
       route: '/api/sequences/:parent/music',
@@ -232,10 +256,17 @@ function followUp(record: JobRecord): RecipeRequest | undefined {
   return undefined;
 }
 
-async function jobDraft(id: string): Promise<RecipeDraft | null> {
+/** What a captions job did after ComfyUI: the transcription alone, or a 9:16 export in a style, with the writer and the fonts it drew with. */
+async function captionsPost(record: JobRecord): Promise<string[]> {
+  const exported = record.inputs.export as { style?: string } | undefined;
+  return exported?.style ? [`captions-9x16:${exported.style}:${ASS_GENERATOR}:fonts-${await captionFontsDigest()}`] : ['transcribe'];
+}
+
+/** `inputs` replace some of the record's (a captions export: its text, style and language), for the recipe of what they make. */
+async function jobDraft(id: string, inputs?: Record<string, unknown>): Promise<RecipeDraft | null> {
   const read = await readJobSteps(id);
   if (!read || read.steps.length === 0) return null;
-  const { record } = read;
+  const record = inputs ? { ...read.record, inputs: { ...read.record.inputs, ...inputs } } : read.record;
   const lib = await getServices().library;
   const names = fileNames(record);
   let steps = read.steps.map((step) => ({ name: step.name, workflow: step.workflow, inputs: step.inputs ?? guessedSlots(step.workflow, names) }));
@@ -260,7 +291,7 @@ async function jobDraft(id: string): Promise<RecipeDraft | null> {
     steps = [...parent.steps, ...steps.map((step) => ({ ...step, inputs: step.inputs.map((slot) => ({ ...slot, from: renumber(slot.from) })) }))];
     const then = followUp(record);
     request = parent.request && then ? { ...parent.request, then: [...(parent.request.then ?? []), then] } : undefined;
-    post = [...parent.post, ...(record.task === 'music' ? ['mix', 'vertical'] : ['tag'])];
+    post = [...parent.post, ...(record.task === 'music' ? ['mix', 'vertical'] : record.task === 'captions' ? await captionsPost(record) : ['tag'])];
     if (!preset.preset) preset = { ...(parent.preset ? { preset: parent.preset } : {}), ...(parent.presetYaml !== undefined ? { presetYaml: parent.presetYaml } : {}) };
     backend = parent.backend;
   }
@@ -289,16 +320,36 @@ async function draftOf(source: RecipeSource, id: string): Promise<RecipeDraft | 
   return jobDraft(id);
 }
 
-/** The recipe made from the record now: the stack, the presets and the lock of this checkout. */
-async function liveRecipe(source: RecipeSource, id: string): Promise<Recipe | null> {
-  const draft = source === 'generation' ? await generationDraft(id) : source === 'sequence' ? await sequenceDraft(id) : await jobDraft(id);
-  if (!draft) return null;
+/** The recipe of a draft, with the stack, the presets and the lock of this checkout. */
+async function recipeOfDraft(draft: RecipeDraft): Promise<Recipe> {
   const lib = await getServices().library;
   return buildRecipe(draft, {
     lock: lib.lock.values(),
     models: [...lib.models.values(), ...lib.extensionModels.values()],
     stack: await stackOf(getEnv().root),
   });
+}
+
+/** The recipe made from the record now. */
+async function liveRecipe(source: RecipeSource, id: string): Promise<Recipe | null> {
+  const draft = source === 'generation' ? await generationDraft(id) : source === 'sequence' ? await sequenceDraft(id) : await jobDraft(id);
+  return draft ? recipeOfDraft(draft) : null;
+}
+
+/**
+ * The recipe of a captions export: the clip's recipe, Whisper's step, then the same corrected text in the
+ * same style as what follows the clip made again. Null when the job is unknown.
+ */
+export async function captionsExportRecipe(jobId: string, exported: { text: string; style: string }): Promise<Recipe | null> {
+  // The transcription keeps the language it was asked for ("auto" included): replayed, Whisper runs the same workflow.
+  const draft = await jobDraft(jobId, { export: { text: exported.text, style: exported.style } });
+  return draft ? recipeOfDraft(draft) : null;
+}
+
+/** A captions export is a new result of its job: its recipe replaces the one beside the record. */
+export async function replaceJobRecipe(jobId: string, recipe: Recipe): Promise<void> {
+  await mkdir(join(getEnv().data, FOLDERS.job, jobId), { recursive: true });
+  await writeAtomic(snapshotFile('job', jobId), JSON.stringify(recipe, null, 2));
 }
 
 /**

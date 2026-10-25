@@ -12,7 +12,7 @@ const force = process.argv.includes('--force');
 const POSTER_WIDTH = 480;
 
 let made = 0;
-for (const folder of ['presets/previews', 'presets/effects/previews', 'presets/transitions/previews', 'presets/extensions/previews']) {
+for (const folder of ['presets/previews', 'presets/effects/previews', 'presets/transitions/previews', 'presets/extensions/previews', 'presets/motions/previews']) {
   const dir = join(root, folder);
   if (!existsSync(dir)) continue;
   for (const name of readdirSync(dir).filter((file) => file.endsWith('.mp4'))) {

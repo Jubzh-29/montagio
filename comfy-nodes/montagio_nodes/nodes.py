@@ -12,7 +12,8 @@ CLIPTextEncode, fps to CreateVideo. In camera_mode "combined" they go with camer
 combine to Montagio Camera Embedding instead, which takes the presets with two moves; "parametric"
 refuses those, since the core node would drop the second move without a word. "Load Montagio
 Preset" reads a preset file chosen in a menu; "Montagio Preset from YAML" reads the text written
-in the node.
+in the node. "Montagio Transcribe Words" gives the words of a speech with their moments (Whisper), for
+the app's word-by-word captions.
 
 Where the presets are: ComfyUI/models/montagio_presets (the user's folder, which comes first and
 wins on a name clash), any folder that extra_model_paths.yaml adds under the name
@@ -20,6 +21,7 @@ wins on a name clash), any folder that extra_model_paths.yaml adds under the nam
 """
 import hashlib
 import importlib
+import json
 import logging
 import os
 from dataclasses import astuple
@@ -32,6 +34,7 @@ from .catalog import BUNDLED_DIR, list_presets, resolve_preset
 from .params import ASPECTS, AUTO, CAMERA_MODES, DIMENSIONS, ParamsError, compute_params, resolve_aspect
 from .preset import PresetError, parse_preset
 from .wan import WAN_CAMERA_POSES
+from .whisper import DEFAULT_MODEL, LANGUAGES, SAMPLE_RATE, WHISPER_FOLDER, chunk_rows, language_from_token, model_names, to_mono_16k, words_document
 
 FOLDER_KEY = "montagio_presets"  # the name of the preset folders in folder_paths
 CATEGORY = "Montagio"
@@ -249,9 +252,106 @@ class MontagioCameraEmbedding(io.ComfyNode):
         return io.NodeOutput(wan_layout(plucker), width, height, length)
 
 
+# What Whisper large-v3 turbo takes on a GPU in fp16 (1.6 GB of weights), with room for a 30 s window.
+WHISPER_MEMORY = 3 * 1024**3
+
+
+def whisper_dirs():
+    """The Whisper model folders: ComfyUI/models/whisper first, then those extra_model_paths.yaml adds."""
+    default = os.path.join(folder_paths.models_dir, WHISPER_FOLDER)
+    if default not in folder_paths.folder_names_and_paths.get(WHISPER_FOLDER, ([], set()))[0]:
+        folder_paths.add_model_folder_path(WHISPER_FOLDER, default, is_default=True)
+    return folder_paths.get_folder_paths(WHISPER_FOLDER)
+
+
+def _run_whisper(model_dir, samples, *, language, device):
+    """Whisper on 16 kHz mono samples: (the pipeline's result with word timestamps, the language, whether it was detected).
+
+    The weights load from the folder alone (no download), in fp16 on CUDA and fp32 elsewhere. With
+    "auto", the language is detected on the first 30 s, then imposed on the whole transcription.
+    """
+    import torch
+    from transformers import WhisperForConditionalGeneration, WhisperProcessor, pipeline
+
+    device = torch.device(device)
+    dtype = torch.float16 if device.type == "cuda" else torch.float32
+    processor = WhisperProcessor.from_pretrained(model_dir, local_files_only=True)
+    # eager attention: the word timestamps are read from the cross-attention weights, which SDPA does not return
+    model = WhisperForConditionalGeneration.from_pretrained(
+        model_dir, torch_dtype=dtype, attn_implementation="eager", local_files_only=True,
+    ).to(device).eval()
+    try:
+        with torch.inference_mode():
+            detected = language == "auto"
+            if detected:
+                features = processor.feature_extractor(samples[: SAMPLE_RATE * 30], sampling_rate=SAMPLE_RATE, return_tensors="pt").input_features
+                language = language_from_token(processor.tokenizer.decode(model.detect_language(features.to(device, dtype))[0]))
+            recognize = pipeline(
+                "automatic-speech-recognition", model=model, tokenizer=processor.tokenizer,
+                feature_extractor=processor.feature_extractor, device=device, torch_dtype=dtype,
+            )
+            result = recognize(
+                {"raw": samples, "sampling_rate": SAMPLE_RATE},
+                return_timestamps="word", chunk_length_s=30, batch_size=1,
+                generate_kwargs={"language": language, "task": "transcribe"},
+            )
+        return result, language, detected
+    finally:
+        del model
+
+
+class MontagioTranscribeWords(io.ComfyNode):
+    """The words of a speech with the moment each one is said (Whisper), for word-by-word captions.
+
+    Returns a montagio/words@1 JSON string (see whisper.py): wire it to the core Save Text node, format
+    json, to get a file. The model is a Hugging Face Whisper folder in ComfyUI/models/whisper
+    (whisper-large-v3-turbo, MIT, for Montagio); it is loaded for the job and freed after it.
+    """
+
+    @classmethod
+    def define_schema(cls):
+        # No folder, no choice: ComfyUI then refuses the workflow ("not in list"), which hides the app's captions
+        # instead of letting every job fail once it runs.
+        names = model_names(whisper_dirs())
+        return io.Schema(
+            node_id="MontagioTranscribeWords",
+            display_name="Montagio Transcribe Words",
+            category=CATEGORY,
+            description="Whisper's transcription of a speech, each word with its start and end in seconds (JSON).",
+            inputs=[
+                io.Audio.Input("audio"),
+                io.Combo.Input("model", options=names, default=DEFAULT_MODEL if DEFAULT_MODEL in names else (names[0] if names else None)),
+                io.Combo.Input("language", options=list(LANGUAGES), default="auto"),
+            ],
+            outputs=[io.String.Output(display_name="words_json")],
+        )
+
+    @classmethod
+    def execute(cls, audio, model, language):
+        if language not in LANGUAGES:
+            raise ValueError(f"Montagio Transcribe Words: language {language!r} is not one of Whisper's")
+        folder = next((os.path.join(base, model) for base in whisper_dirs() if os.path.isfile(os.path.join(base, model, "config.json"))), None)
+        if folder is None:
+            raise ValueError(f"Montagio Transcribe Words: the Whisper model {model!r} is not in models/{WHISPER_FOLDER}")
+        samples = to_mono_16k(audio["waveform"][0].cpu().float().numpy(), int(audio["sample_rate"]))
+        from comfy import model_management
+
+        device = model_management.get_torch_device()
+        model_management.free_memory(WHISPER_MEMORY, device)
+        try:
+            result, spoken, detected = _run_whisper(folder, samples, language=language, device=device)
+        finally:
+            model_management.soft_empty_cache()
+        document = words_document(
+            chunk_rows(result.get("chunks") or []),
+            model=model, language=spoken, detected=detected, duration_s=samples.size / SAMPLE_RATE, text=str(result.get("text", "")),
+        )
+        return io.NodeOutput(json.dumps(document, ensure_ascii=False))
+
+
 class MontagioExtension(ComfyExtension):
     async def get_node_list(self):
-        return [MontagioLoadPreset, MontagioPresetFromYAML, MontagioCameraEmbedding]
+        return [MontagioLoadPreset, MontagioPresetFromYAML, MontagioCameraEmbedding, MontagioTranscribeWords]
 
 
 async def comfy_entrypoint() -> MontagioExtension:

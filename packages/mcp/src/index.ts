@@ -16,7 +16,7 @@ const INSTRUCTIONS = [
   'apply_effect and apply_hook take ids from list_effects_and_hooks.',
   'get_recipe gives a render\'s recipe (workflow, weights, seed, versions); reproduce renders a recipe again with the same seed, on the photo the user gives.',
   'Renders block until done (minutes on a GPU) and return the clip URL and its id; past the timeout, follow the render with get_job.',
-  'Consent: edit_photo, apply_effect, apply_hook and talking_avatar on an imported photo need consent: true, and motion_transfer needs rights: true.',
+  'Consent: edit_photo, apply_effect, apply_hook and talking_avatar on an imported photo need consent: true, and motion_transfer, restyle_video and swap_object need rights: true.',
   'Set them only when the user has confirmed it (the person in the photo is them, or has agreed; they hold the rights); never on their behalf.',
 ].join(' ');
 

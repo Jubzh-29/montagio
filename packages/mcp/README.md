@@ -41,6 +41,7 @@ It talks to a running Montagio app over the app's HTTP API, the same one the Stu
 |---|---|
 | `list_camera_presets` | the camera presets and the video models that render them, with time estimates |
 | `list_effects_and_hooks` | the effects, the hooks, the extensions switched on, and their time estimates |
+| `list_motion_library` | the reference motions Montagio made from fictional characters, to pass as `libraryMotion` |
 | `upload_photo` | a local PNG, JPEG or WebP file (10 MB at most) to an `imageRef` |
 | `use_sample_photo` | the bundled sample photo's `imageRef`, to try everything without a photo |
 | `text_to_image` | a start photo from a text; its `outputImageRef` feeds every other tool |
@@ -49,7 +50,9 @@ It talks to a running Montagio app over the app's HTTP API, the same one the Stu
 | `apply_effect` | a one-photo effect (Squish, Cake-ify, Explode…) |
 | `apply_hook` | a keyframe hook (Wardrobe Swap takes a second photo, an outfit) |
 | `talking_avatar` | a photo says a text, in English or French, for 1 to 15 s |
-| `motion_transfer` | the character of a photo moves like a reference video (its first 5 s) |
+| `motion_transfer` | the character of a photo moves like a reference video of up to 30 s, or a motion of the library |
+| `restyle_video` | the whole scene of a clip (its first 5 s) rebuilt from a text, its motion and camera move kept; an optional image gives a look to follow |
+| `swap_object` | one object of a clip (its first 5 s), marked by points on its first frame, replaced from a text and an optional photo of the new object; the rest stays as filmed |
 | `upscale_to_1080p` | an HD 1080p copy of a finished clip |
 | `get_job` | a render's state by id; `wait: true` follows it to its end |
 | `list_history` | what this Montagio has made, newest first |
@@ -70,7 +73,7 @@ A refusal or a failed render comes back as a tool result with `isError: true`, t
 Montagio does not make videos of real people without their consent, and the MCP server keeps the Studio's rule:
 
 - `edit_photo`, `apply_effect`, `apply_hook` and `talking_avatar` take `consent`, which means "the person in the photo is you, or has agreed". It defaults to `false`. The app refuses an imported photo without it (`consent-required`), and the tool passes that refusal on; the sample photo and generated images do not need it.
-- `motion_transfer` takes `rights` the same way: the user holds the rights on the photo and the video. Without it, nothing is uploaded.
+- `motion_transfer`, `restyle_video` and `swap_object` take `rights` the same way: the user holds the rights on the photo and the video, and for `swap_object` the people filmed agree. Without it, nothing is uploaded. Never replace a real person in a real video without their consent.
 - A client must set either one only when the user has said so. The server never sets it on anyone's behalf.
 
 Texts naming a well-known person are refused by the app, as in the Studio.

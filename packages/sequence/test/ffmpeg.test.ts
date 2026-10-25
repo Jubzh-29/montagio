@@ -79,6 +79,12 @@ test('extractLastFrame writes a PNG of the clip size', async () => {
   expect(await probe(png)).toMatchObject({ width: 832, height: 480 });
 }, FFMPEG_TEST_TIMEOUT_MS);
 
+test('extractFirstFrame writes a PNG of the clip size', async () => {
+  const png = join(dir, 'first.png');
+  await extractFirstFrame(clipA, png);
+  expect(await probe(png)).toMatchObject({ width: 832, height: 480 });
+}, FFMPEG_TEST_TIMEOUT_MS);
+
 test('concat of three 2 s clips lasts about 6 s', async () => {
   const film = join(dir, 'film.mp4');
   await concatClips([clipA, clipB, clipA], film, { width: 832, height: 480 }, 16);

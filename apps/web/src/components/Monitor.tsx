@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type RefObject } from 'react';
-import { useI18n } from '@/i18n';
+import { useI18n, type MessageKey } from '@/i18n';
 import type { JobState, SampleSummary } from '@/lib/api-types';
 import { photoTarget } from '@/lib/move-glyph';
 import { refusalMessageKey } from '@/lib/refusals';
@@ -38,6 +38,7 @@ export function Monitor({
   autoPlayResult = true,
   example,
   examplePaused = false,
+  empty = { title: 'monitorEmpty', hint: 'monitorEmptyHint' },
   showcase,
 }: {
   upload: UploadState;
@@ -61,6 +62,8 @@ export function Monitor({
   example?: { previewUrl: string; posterUrl?: string };
   /** The previews are paused (the toggle, or reduced motion): the example too. */
   examplePaused?: boolean;
+  /** What the empty monitor says: where the photo goes, or (a restyle) what will show. */
+  empty?: { title: MessageKey; hint: MessageKey };
   /**
    * The showcase: sample photos replace the drop zone. Unless it takes uploads (its
    * `uploads` capability, off in the static showcase), a dropped file is answered
@@ -169,8 +172,8 @@ export function Monitor({
           ) : (
             // One place to add a photo, the composer's: the monitor says where it is (a drop here still works).
             <div className={styles.monitorEmpty}>
-              <p className={styles.monitorEmptyTitle}>{t('monitorEmpty')}</p>
-              <p className={styles.monitorEmptyHint}>{t('monitorEmptyHint')}</p>
+              <p className={styles.monitorEmptyTitle}>{t(empty.title)}</p>
+              <p className={styles.monitorEmptyHint}>{t(empty.hint)}</p>
             </div>
           )}
           {example && <p className={styles.exampleCaption}>{t('exampleCaption')}</p>}

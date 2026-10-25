@@ -71,16 +71,16 @@ test('unset flag: nothing dated, nothing shown', async () => {
   expect(await info()).toEqual({ extensions: [], effects: [], hooks: [], experimental: [], estimates: { t2i: 5 }, demo: true });
 });
 
-test('unset flag: the dates of GPU sessions S2 and S3 show the seven extensions, the six effects, Wardrobe Swap and Ignite', async () => {
-  expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion']);
+test('unset flag: the dates of the GPU sessions show the nine extensions, the six effects, Wardrobe Swap and Ignite', async () => {
+  expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
   expect(await visibleEffects()).toHaveLength(6);
   // Iris Dive failed its transition in S2, Figurine barely changed the photo in S3: undated, so hidden.
   expect((await visibleHooks()).map((hook) => hook.id)).toEqual(['wardrobe-swap', 'ignite']);
 });
 
-test('all shows the seven extensions, every effect and every hook', async () => {
+test('all shows the nine extensions, every effect and every hook', async () => {
   process.env.MONTAGIO_EXTENSIONS = 'all';
-  expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion']);
+  expect(await visibleExtensions()).toEqual(['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
   expect(await visibleEffects()).toHaveLength(6);
   expect(await visibleHooks()).toHaveLength(4);
 });
@@ -118,8 +118,11 @@ test('a rejected extension disappears until the process restarts, and so does on
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   process.env.MONTAGIO_EXTENSIONS = 'all';
   markRejected('edit', 'ComfyUI rejected the workflow');
-  expect(await visibleExtensions()).toEqual(['effects', 'avatar', 'music', 'upscale', 'motion']);
+  expect(await visibleExtensions()).toEqual(['effects', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap']);
   expect(await visibleHooks()).toEqual([]);
+  // the object swap runs on the restyle's VACE: a rejected restyle takes it along
+  markRejected('restyle', 'ComfyUI rejected the workflow');
+  expect(await visibleExtensions()).toEqual(['effects', 'avatar', 'music', 'upscale', 'motion']);
   resetRejectedForTests();
   expect(await visibleExtensions()).toContain('transitions');
   warn.mockRestore();
@@ -154,7 +157,7 @@ test('GET /api/extensions describes the wall: effects first in their order, hook
   expect(body.hooks.find((hook) => hook.id === 'wardrobe-swap')?.references).toBe(2);
   // A hook's clip is captioned with the transition model, as an effect's with the effects model.
   expect(body.hooks[0]).toMatchObject({ modelId: 'wan22-flf2v-transition', modelName: expect.stringMatching(/Wan 2.2/), license: 'Apache-2.0' });
-  expect(body.estimates).toEqual({ t2i: 5, edit: 15, avatar: 255, music: 15, upscale: 215, imageUpscale: 10, voiceChange: 15, translate: 280, motion: 205 }); // avatar: voice 15 + avatar 240; translate: 40 + avatar 240
+  expect(body.estimates).toEqual({ t2i: 5, edit: 15, avatar: 255, music: 15, upscale: 215, imageUpscale: 10, voiceChange: 15, translate: 280, motion: 205, restyle: 120, swap: 120 }); // avatar: voice 15 + avatar 240; translate: 40 + avatar 240
   // The edit's caption names its model and license, which the preset catalogue does not hold.
   expect(body.editModel).toEqual({ id: 'qwen-image-edit-2511', name: expect.stringMatching(/^Qwen-Image-Edit-2511/), license: 'Apache-2.0' });
 });
