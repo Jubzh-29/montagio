@@ -1,11 +1,18 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { POST as postCaptionsExport } from '@/app/api/captions/[id]/export/route';
+import { POST as postCaptionsPreview } from '@/app/api/captions/[id]/preview/route';
 import { DELETE as deleteCharacter } from '@/app/api/characters/[id]/route';
 import { POST as postPhoto } from '@/app/api/characters/[id]/photos/route';
 import { POST as postCharacter } from '@/app/api/characters/route';
+import { DELETE as deleteCommunityEntry } from '@/app/api/community/[id]/route';
+import { POST as cancelGeneration } from '@/app/api/generations/[id]/cancel/route';
+import { POST as cancelJob } from '@/app/api/jobs/[id]/cancel/route';
+import { POST as cancelSequence } from '@/app/api/sequences/[id]/cancel/route';
 import { POST as postUpload } from '@/app/api/uploads/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import { POST as postSpeech } from '@/app/api/uploads/speech/route';
+import { POST as postLibraryVideo } from '@/app/api/uploads/video/library/route';
 import { POST as postVideo } from '@/app/api/uploads/video/route';
 import { POST as postSampleVideo } from '@/app/api/uploads/video/sample/route';
 import { POST as postVoice } from '@/app/api/uploads/voice/route';
@@ -74,4 +81,28 @@ test('the Characters page still reaches the routes: JSON from the same origin', 
   expect((await postCharacter(json({}, 'same-origin'))).status).toBe(400);
   expect((await postPhoto(json({ imageRef: 'generations/x/output.png', scene: 'a beach' }, 'same-origin'), params({ id: 'missing' }))).status).toBe(404);
   expect((await deleteCharacter(bare('DELETE', 'same-origin'), params({ id: 'missing' }))).status).toBe(404);
+});
+
+test('another site cannot burn captions, take a library motion, cancel a render nor remove a gallery entry', async () => {
+  const id = params({ id: 'missing' });
+  for (const route of [postCaptionsExport, postCaptionsPreview]) {
+    await refused(await route(text({ text: 'hello' }), id));
+    await refused(await route(json({ text: 'hello' }, 'cross-site'), id));
+  }
+  await refused(await postLibraryVideo(text({ id: 'missing' })));
+  await refused(await postLibraryVideo(json({ id: 'missing' }, 'same-site')));
+  // A body-less POST or a DELETE: only the name of the site the browser gives.
+  for (const route of [cancelGeneration, cancelJob, cancelSequence]) await refused(await route(bare('POST', 'cross-site'), id));
+  await refused(await deleteCommunityEntry(bare('DELETE', 'cross-site'), id));
+});
+
+test('the app, and a script that names no site, still reach them', async () => {
+  const id = params({ id: 'missing' });
+  for (const route of [postCaptionsExport, postCaptionsPreview]) expect((await route(json({ text: 'hello' }, 'same-origin'), id)).status).toBe(404);
+  expect((await postLibraryVideo(json({ id: 'missing' }, 'same-origin'))).status).toBe(404);
+  for (const route of [cancelGeneration, cancelJob, cancelSequence]) {
+    expect((await route(bare('POST', 'same-origin'), id)).status).toBe(404);
+    expect((await route(bare('POST'), id)).status).toBe(404);
+  }
+  expect((await deleteCommunityEntry(bare('DELETE', 'same-origin'), id)).status).toBe(404);
 });
