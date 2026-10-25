@@ -123,9 +123,13 @@ test('a swap marks its object with points, and replaces it from a photo of the n
 
 test('--points and --exclude read x,y pairs in fractions of the frame', () => {
   expect(parseSwapPoints(undefined, '--points')).toBeUndefined();
-  expect(parseSwapPoints('0.5,0.4; 0.52 ,0.6', '--points')).toEqual([{ x: 0.5, y: 0.4 }, { x: 0.52, y: 0.6 }]);
+  expect(parseSwapPoints('0.5,0.4;0.52,0.6', '--points')).toEqual([{ x: 0.5, y: 0.4 }, { x: 0.52, y: 0.6 }]);
+  // spaces too: a Modal series splits its jobs on ";"
+  expect(parseSwapPoints(' 0.5,0.4  0.52,0.6 ', '--points')).toEqual([{ x: 0.5, y: 0.4 }, { x: 0.52, y: 0.6 }]);
   expect(() => parseSwapPoints('412,300', '--points')).toThrow(/between 0 and 1/);
   expect(() => parseSwapPoints('0.5', '--exclude')).toThrow(/--exclude takes x,y pairs/);
+  expect(() => parseSwapPoints('0.5, 0.4', '--points')).toThrow(/x,y pairs/);
+  expect(() => parseSwapPoints('0.5,', '--points')).toThrow(/x,y pairs/);
   expect(() => parseSwapPoints('0.5,0.5,0.5', '--points')).toThrow(/x,y pairs/);
 });
 
@@ -145,8 +149,8 @@ test("a restyle follows its text alone, a look to follow, or the clip's first fr
 test("a composed character for a motion: the character, its outfit and a product, seen full body, no place", () => {
   const [compose] = extensionJobs(library, { ...base, jobs: ['compose'], input: '/data/place.png', input2: '/data/c.png', outfit: '/data/o.png', input3: '/data/p.png', composeFullBody: true });
   expect(compose!.tag).toBe('compose:3refs');
-  expect(compose!.files.map((file) => file.path)).toEqual(['/data/c.png', '/data/o.png', '/data/p.png']);
-  expect(compose!.params.instruction).toMatch(/^Show the character from image 1 wearing the outfit from image 2, holding in one hand the very object of image 3, seen full body from head to feet/);
+  expect(compose!.files.map((file) => file.path)).toEqual(['/data/c.png', '/data/p.png', '/data/o.png']);
+  expect(compose!.params.instruction).toMatch(/^Show the character from image 1 wearing the outfit from image 3, holding in one hand the very object of image 2, seen full body from head to feet/);
 });
 
 test('without a list, every effect of the pack runs, each with its own tag', () => {

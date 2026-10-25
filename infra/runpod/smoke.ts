@@ -136,9 +136,9 @@ Extensions (instead of presets):
   --smooth           upscale: RIFE frames in between, twice the clip's frame rate (16 to 32 fps for Wan)
   --motion PATH      the reference video of the motion transfer, or the clip to restyle or swap an object of (required by
                      motion, restyle and swap): its first 30 s are kept, at 16 fps, silent (restyle and swap use 5 s)
-  --points X,Y[;X,Y] swap: points on the object to replace, on the clip's first frame, in fractions of its width and
-                     height from the top left (0.5,0.5 is the centre)
-  --exclude X,Y[;..] swap: points on what is not the object, when the tracker takes too much
+  --points "X,Y X,Y" swap: points on the object to replace, on the clip's first frame, in fractions of its width and
+                     height from the top left (0.5,0.5 is the centre); the pairs apart by spaces (or ";")
+  --exclude "X,Y …"  swap: points on what is not the object, when the tracker takes too much
   --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output
   --voice PATH       voice: speak with this sample (a consented recording, mono FLAC) instead of the built-in voice
   --text [JOB=]TEXT  the edit instruction, the effects' subject, the words to say, the music description or the

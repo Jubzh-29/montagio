@@ -169,13 +169,18 @@ function fileInput(model: ExtensionModel, key: ExtensionBindingKey): { node: str
   return target;
 }
 
-/** "0.5,0.4;0.52,0.6": points in fractions of the frame (--points, --exclude); undefined without the flag. */
+/**
+ * "0.5,0.4 0.52,0.6": points in fractions of the frame (--points, --exclude), the pairs apart by spaces
+ * or ";" (a Modal series splits its jobs on ";": spaces there); undefined without the flag.
+ */
 export function parseSwapPoints(value: string | undefined, flag: string): SwapPoint[] | undefined {
   if (value === undefined) return undefined;
-  return value.split(';').map((pair) => {
-    const [x, y, extra] = pair.split(',').map((part) => Number(part.trim()));
-    if (extra !== undefined || !(x! >= 0 && x! <= 1 && y! >= 0 && y! <= 1)) {
-      throw new Error(`${flag} takes x,y pairs between 0 and 1 joined by ";", such as 0.5,0.4;0.52,0.6 (got "${pair}")`);
+  return value.trim().split(/[;\s]+/).map((pair) => {
+    const parts = pair.split(',');
+    // Number('') is 0: an empty half of a pair ("0.5,") is refused, not read as 0
+    const [x, y] = parts.map((part) => (part.trim() ? Number(part) : Number.NaN));
+    if (parts.length !== 2 || !(x! >= 0 && x! <= 1 && y! >= 0 && y! <= 1)) {
+      throw new Error(`${flag} takes x,y pairs between 0 and 1 apart by spaces, such as "0.5,0.4 0.52,0.6" (got "${pair}")`);
     }
     return { x: x!, y: y! };
   });
