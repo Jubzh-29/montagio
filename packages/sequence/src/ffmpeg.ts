@@ -23,9 +23,9 @@ const ffmpeg = (): Tool => ({ bin: process.env.MONTAGIO_FFMPEG ?? 'ffmpeg', envV
 const ffprobe = (): Tool => ({ bin: process.env.MONTAGIO_FFPROBE ?? 'ffprobe', envVar: 'MONTAGIO_FFPROBE' });
 
 /** Run a tool with an argument array (never a shell string) and return its stdout. */
-function run(tool: Tool, args: string[], opts: { failOnStderr?: boolean } = {}): Promise<string> {
+function run(tool: Tool, args: string[], opts: { failOnStderr?: boolean; cwd?: string } = {}): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(tool.bin, args, { maxBuffer: 16 * 1024 * 1024, windowsHide: true }, (error, stdout, stderr) => {
+    execFile(tool.bin, args, { maxBuffer: 16 * 1024 * 1024, windowsHide: true, ...(opts.cwd ? { cwd: opts.cwd } : {}) }, (error, stdout, stderr) => {
       if (!error && opts.failOnStderr && String(stderr).trim()) {
         const tail = String(stderr).trim().split('\n').slice(-3).join(' | ');
         return reject(new SequenceToolError(`${tool.bin} reported: ${tail}`));
@@ -225,6 +225,102 @@ export async function exportVertical(
   ]);
 }
 
+/** The frame rate of a vertical render: under 24 fps, a whole multiple of the clip's (16 → 32), so captions move smoothly and no frame is shown longer than another. */
+export function outputFps(fps: number): number {
+  return fps > 0 && fps < 24 ? fps * Math.ceil(24 / fps) : fps;
+}
+
+/**
+ * Burned-in captions: an ASS script and the folder of its fonts, both named relative to `dir`, where
+ * FFmpeg runs. Relative names keep the drive colon and the spaces of a Windows path out of the filter
+ * graph, where they would need escaping; libass then takes the fonts of that folder only by name.
+ */
+export type CaptionLayer = { dir: string; ass: string; fonts: string };
+
+const PLAIN_NAME = /^[A-Za-z0-9._-]+$/;
+
+function captionFilter(captions: CaptionLayer | undefined): string[] {
+  if (!captions) return [];
+  for (const name of [captions.ass, captions.fonts]) {
+    if (!PLAIN_NAME.test(name) || name === '.' || name === '..') throw new SequenceToolError(`"${name}" is not a plain file name in the captions folder`);
+  }
+  return [`ass=${captions.ass}:fontsdir=${captions.fonts}`];
+}
+
+/** The 9:16 picture: the whole frame centred over a blurred, cropped copy of itself, then the captions. */
+function verticalGraph(width: number, height: number, fps: number, captions: CaptionLayer | undefined, after: string[] = []): string {
+  const rate = outputFps(fps);
+  return [
+    '[0:v]split[bg][fg]',
+    `[bg]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=20:2[blurred]`,
+    `[fg]scale=${width}:-2[front]`,
+    `[blurred][front]${['overlay=(W-w)/2:(H-h)/2', 'setsar=1', ...(rate !== fps ? [`fps=${rate}`] : []), ...captionFilter(captions), ...after].join(',')}[out]`,
+  ].join(';');
+}
+
+/**
+ * A clip in 9:16 for TikTok, Reels and Shorts, at 1080x1920 by default, with captions burned in when
+ * given: the frame of `exportVertical`, a frame rate under 24 fps doubled (`outputFps`), the sound in
+ * AAC and the AI mention (`tags`). The Share button of a finished clip can call it with no captions.
+ */
+export async function renderVertical(input: string, out: string, opts: { width?: number; height?: number; captions?: CaptionLayer; tags?: VideoTags } = {}): Promise<void> {
+  const { width = 1080, height = 1920 } = opts;
+  captionFilter(opts.captions);
+  const { fps } = await probe(input);
+  await writeAtomically(
+    out,
+    (partial) => [
+      '-loglevel', 'error', '-y',
+      ...LOCAL_FILE_ONLY, '-i', input,
+      '-filter_complex', verticalGraph(width, height, fps, opts.captions, ['format=yuv420p']),
+      '-map', '[out]', '-map', '0:a?',
+      '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast', '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-b:a', '160k',
+      ...metadataArgs(opts.tags ?? AI_METADATA),
+      '-movflags', '+faststart',
+      '-f', 'mp4', partial,
+    ],
+    opts.captions ? { cwd: opts.captions.dir } : {},
+  );
+}
+
+/**
+ * One frame of `renderVertical` at `at_s`, as a PNG `width` pixels wide (540 by default): drawn at
+ * 1080x1920 then scaled, so it shows what the export will. The seek comes after the input, so the
+ * frame keeps its time in the clip and the captions theirs.
+ */
+export async function captionFrame(input: string, out: string, opts: { at_s: number; captions: CaptionLayer; width?: number }): Promise<void> {
+  captionFilter(opts.captions);
+  const { fps } = await probe(input);
+  await writeAtomically(
+    out,
+    (partial) => [
+      '-loglevel', 'error', '-y',
+      ...LOCAL_FILE_ONLY, '-i', input,
+      '-filter_complex', verticalGraph(1080, 1920, fps, opts.captions, [`scale=${opts.width ?? 540}:-2`]),
+      '-map', '[out]',
+      '-ss', String(Math.max(0, opts.at_s)),
+      '-frames:v', '1',
+      '-f', 'image2', '-c:v', 'png', partial,
+    ],
+    { cwd: opts.captions.dir },
+  );
+}
+
+/** The speech of a clip for Whisper: its sound alone as mono FLAC at 16 kHz, `max_s` seconds at most (60). A clip without sound fails before any encoding. */
+export async function extractSpeech(input: string, out: string, opts: { max_s?: number } = {}): Promise<{ duration_s: number }> {
+  if (!(await probeAudio(input))) throw new SequenceToolError(`no audio stream in ${input}`);
+  await writeAtomically(out, (partial) => [
+    '-loglevel', 'error', '-y',
+    ...LOCAL_FILE_ONLY, '-i', input,
+    '-map', '0:a:0', '-vn', '-map_metadata', '-1',
+    '-t', String(opts.max_s ?? 60),
+    '-ac', '1', '-ar', '16000',
+    '-c:a', 'flac', '-f', 'flac', partial,
+  ]);
+  return { duration_s: (await probeAudio(out))?.duration_s ?? 0 };
+}
+
 /**
  * The one encoding of every showcase clip, placeholder and 9:16 cut. Identical
  * settings give identical H.264 headers, so the browser can join clips with
@@ -290,10 +386,10 @@ export async function mixMusic(
 }
 
 /** Run FFmpeg into `<out>.part`, then rename: `out` is never half-written. */
-async function writeAtomically(out: string, args: (partial: string) => string[]): Promise<void> {
+async function writeAtomically(out: string, args: (partial: string) => string[], opts: { cwd?: string } = {}): Promise<void> {
   const partial = `${out}.part`;
   try {
-    await run(ffmpeg(), args(partial));
+    await run(ffmpeg(), args(partial), opts);
     await rename(partial, out);
   } finally {
     await rm(partial, { force: true });
