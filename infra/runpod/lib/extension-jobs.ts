@@ -15,6 +15,7 @@ import {
   compileRestyle,
   compileSpeech,
   compileSwap,
+  compileTranslate,
   compileImageUpscale,
   compileUpscale,
   compileVoiceChange,
@@ -25,6 +26,7 @@ import {
   type Library,
   type RestyleReference,
   type SwapPoint,
+  type TranslateLanguage,
 } from '@montagio/presets';
 import type { ExtensionBindingKey, ExtensionModel, ExtensionTask, OutputKind } from '@montagio/registry';
 
@@ -41,6 +43,7 @@ export const EXTENSION_JOBS = [
   'hook-edit',
   'transition',
   'voice',
+  'translate',
   'avatar',
   'music',
   'upscale',
@@ -60,6 +63,7 @@ const TASKS: Record<ExtensionJobName, ExtensionTask> = {
   'hook-edit': 'i2i-edit',
   transition: 'flf2v',
   voice: 'tts',
+  translate: 'a2a-translate',
   avatar: 'ia2v-talk',
   music: 't2a',
   upscale: 'v2v-upscale',
@@ -104,6 +108,8 @@ export type ExtensionJobOptions = {
   composeFullBody?: boolean;
   /** The edit's inpaint mask (white where the photo changes). */
   mask?: string;
+  /** A second image the edit reads: a palette's colors, a moodboard sheet. */
+  ref?: string;
   /** The end frame of a transition run on its own (a hook's edit output otherwise). */
   end?: string;
   /** The clip to upscale, with its aspect and frame count (the caller probes it): its own, never the photo's. */
@@ -134,6 +140,8 @@ export type ExtensionJobOptions = {
   /** The text of each job that reads one, read by that job only; a job given none keeps its default. */
   text?: Partial<Record<TextJobName, string>>;
   language: 'en' | 'fr';
+  /** Translate: the language the speech (--audio) is said again in. */
+  to?: TranslateLanguage;
   /** Music: the length of the film it goes under. */
   duration_s: number;
   seed: number;
@@ -232,13 +240,24 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
         const look = opts.look === undefined ? undefined : EDIT_LOOK_IDS.find((id) => id === opts.look);
         if (opts.look !== undefined && !look) throw new Error(`unknown look "${opts.look}" (known: ${EDIT_LOOK_IDS.join(', ')})`);
         const mask = opts.mask;
+        const ref = opts.ref;
+        if (mask && ref) throw new Error('--mask and --ref: an inpaint reads no second image');
         const job = compileEdit(
           model,
           template,
-          { imageRef: basename(photo), instruction: text('edit'), seed: opts.seed, fast, ...(look ? { look } : {}), ...(mask ? { maskRef: basename(mask) } : {}) },
+          {
+            imageRef: basename(photo),
+            instruction: text('edit'),
+            seed: opts.seed,
+            fast,
+            ...(look ? { look } : {}),
+            ...(mask ? { maskRef: basename(mask) } : {}),
+            ...(ref ? { image2Ref: basename(ref) } : {}),
+          },
           library.lock,
         );
-        return [{ name, tag: mask ? `${name}:inpaint` : name, model, ...job, files: [file('image', photo), ...(mask ? [file('mask', mask)] : [])] }];
+        const tag = mask ? `${name}:inpaint` : ref ? `${name}:ref` : name;
+        return [{ name, tag, model, ...job, files: [file('image', photo), ...(mask ? [file('mask', mask)] : []), ...(ref ? [file('image2', ref)] : [])] }];
       }
       case 'compose': {
         // The Studio's composed photo: a place, a character and a product (an effect's start photo), or a
@@ -366,6 +385,11 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
           smooth: opts.smooth ?? false,
         });
         return [{ name, tag: name, model, ...job, files: [file('video', clip)] }];
+      }
+      case 'translate': {
+        const speech = need(opts.audio, '--audio', name);
+        const job = compileTranslate(model, template, { audioRef: basename(speech), language: opts.to ?? 'fr', seed: opts.seed });
+        return [{ name, tag: `${name}:${opts.to ?? 'fr'}`, model, ...job, files: [file('audio', speech)] }];
       }
       case 'voice-change': {
         const speech = need(opts.audio, '--audio', name);

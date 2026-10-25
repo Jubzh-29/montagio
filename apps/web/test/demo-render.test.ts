@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { POST as postGenerations } from '@/app/api/generations/route';
 import { GET as getGeneration } from '@/app/api/generations/[id]/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
-import { demoKindOf, demoRender } from '@/server/demo-render';
+import { demoExampleModel, demoKindOf, demoRender } from '@/server/demo-render';
 import { mediaFileFor } from '@/server/generations';
 import { resetServicesForTests } from '@/server/services';
 import { saveUploadFromFile } from '@/server/uploads';
@@ -30,6 +30,8 @@ test('the sample photo of a preset the GPU session rendered gets that render', a
   const out = await render({ presetId: 'crash-push', output: 'video', files: files(photoFile(imageRef)) });
   expect(out).toBe(join(repoRoot, 'presets', 'previews', 'crash-push.mp4'));
   expect(demoKindOf(out)).toBe('example');
+  // a 20-step render, whatever model the preset now starts on
+  expect(demoExampleModel(out)).toBe('wan22-i2v-a14b-fun-camera');
 });
 
 test('any other photo is moved by FFmpeg along the preset, once, and says no model made it', async () => {
@@ -99,4 +101,6 @@ test('a camera move on the sample photo ends as the GPU render, tagged, with wha
   }
   expect(rec).toMatchObject({ state: 'succeeded', demo: 'example', outputUrl: `/media/data/generations/${id}/clip.mp4` });
   expect(await readTags(mediaFileFor(rec.outputUrl)!)).toMatchObject({ comment: 'AI-generated' });
+  // Crash Push starts on the Turbo; its example was rendered in 20 steps, the model its caption names.
+  expect(rec).toMatchObject({ modelId: 'wan22-i2v-a14b-fun-camera-turbo', demoModelId: 'wan22-i2v-a14b-fun-camera' });
 }, 30_000);

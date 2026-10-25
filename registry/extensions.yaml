@@ -17,6 +17,8 @@ extensions:
   - id: effects
     priority: 2
     gpu_validated: 2026-10-21
+    # Run on a GPU held to 12 GB: the 12 GB profile (MONTAGIO_VRAM_PROFILE=12gb) offers the extensions dated here.
+    low_vram_validated: 2026-10-25
   - id: transitions
     priority: 3
     requires: [edit]
@@ -36,14 +38,14 @@ extensions:
     gpu_validated: 2026-10-21
   # Restyle (2026-10-24): a clip's scene rebuilt around its motion with Wan 2.1 VACE 14B. It needs
   # no other extension: without the edit, a job has no restyled first frame and follows its text.
-  # Its three paths ran through the smoke on an L4 on 2026-10-24 (docs/S2_RESULTATS.md, part 14).
+  # Its three paths ran through the smoke on an L4 on 2026-10-24 (docs/S2_RESULTATS.md, part 16).
   - id: restyle
     priority: 8
     gpu_validated: 2026-10-24
   # Object swap (2026-10-24): an object marked on a clip's first frame, followed through the clip by
   # SAM 2.1 (a pinned third-party node pack, kijai/ComfyUI-segment-anything-2), then replaced by VACE
   # from a photo or a text. It runs on the restyle's weights, so it requires it. Both paths (a photo,
-  # the text alone) ran through the smoke on an L4 on 2026-10-25 (docs/S2_RESULTATS.md, part 15).
+  # the text alone) ran through the smoke on an L4 on 2026-10-25 (docs/S2_RESULTATS.md, part 17).
   - id: swap
     priority: 9
     requires: [restyle]

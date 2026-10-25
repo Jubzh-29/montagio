@@ -89,6 +89,8 @@ export function serviceSpecs(input: {
     Object.assign(appEnv, { MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: local(ports.proxy, '') });
     // The app shows only what this install can run: the extensions whose weights it fetched.
     if (state.extensions) appEnv.MONTAGIO_EXTENSIONS = state.extensions.length > 0 ? state.extensions.join(',') : 'none';
+    // The 12 GB profile: the app offers only the models and extensions a GPU held to 12 GB ran, with their times there.
+    if (state.vramProfile === '12gb') appEnv.MONTAGIO_VRAM_PROFILE = '12gb';
   }
   else if (state.proxyUrl) Object.assign(appEnv, { MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: state.proxyUrl });
   else appEnv.MONTAGIO_BACKEND = 'demo';

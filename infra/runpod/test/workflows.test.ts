@@ -95,9 +95,13 @@ test('a combined preset needs Montagio Camera Embedding, which a stock ComfyUI d
   expect(checkWorkflow(workflow, stock)).toEqual([expect.stringMatching(/class MontagioCameraEmbedding is not installed/)]);
 });
 
-test('the shipped workflows load no LoRA', () => {
-  for (const [path, workflow] of library.templates) {
-    expect({ path, loras: Object.values(workflow).filter((node) => /lora/i.test(node.class_type)) }).toEqual({ path, loras: [] });
+test('a preset workflow loads no LoRA but the lock weights its model declares (the Turbo 4-step LoRAs)', () => {
+  for (const model of library.models.values()) {
+    const workflow = library.templates.get(model.workflow)!;
+    const declared = model.weights.map((id) => library.lock.get(id)?.file);
+    const loras = Object.values(workflow).filter((node) => /lora/i.test(node.class_type)).map((node) => node.inputs.lora_name);
+    expect({ model: model.id, undeclared: loras.filter((file) => !declared.includes(file as string)) }).toEqual({ model: model.id, undeclared: [] });
+    expect({ model: model.id, loras: loras.length }).toEqual({ model: model.id, loras: model.tier === 'turbo' ? 2 : 0 });
   }
 });
 

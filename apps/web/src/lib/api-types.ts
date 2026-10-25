@@ -17,7 +17,7 @@ export type ModelSummary = {
   id: string;
   name: string;
   kind: 'video' | 'image';
-  tier: 'quality' | 'fast';
+  tier: 'quality' | 'turbo' | 'fast';
   license: string;
   estimate_s: { '480p': number; '720p'?: number };
 };
@@ -63,6 +63,8 @@ export type GenerationRecord = {
   /** Showcase: the model that restored the clip to 1080p (its HD pass), named in its caption. */
   hdModel?: HdModelSummary;
   demo?: DemoKind;
+  /** A demo example rendered by another model than the job's (a 20-step clip for a Turbo job): the one its caption names. */
+  demoModelId?: string;
 };
 
 /** The upscaler of a showcase clip's HD pass (SeedVR2). */
@@ -178,9 +180,11 @@ export type HookSummary = {
 /** What the Studio may show: the extensions the flag and the GPU dates allow, and the time estimates. */
 export type ExtensionsInfo = {
   extensions: ExtensionId[];
+  /** Features shown only with MONTAGIO_EXPERIMENTAL (not validated on a GPU yet). */
+  experimental?: ('moodboard' | 'palette-photo')[];
   effects: EffectSummary[];
   hooks: HookSummary[];
-  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; imageUpscale?: number; motion?: number; voiceChange?: number; restyle?: number; swap?: number };
+  estimates: { t2i: number; edit?: number; avatar?: number; music?: number; upscale?: number; imageUpscale?: number; motion?: number; voiceChange?: number; translate?: number; restyle?: number; swap?: number };
   /** The photo edit's model, for the caption under an edit (the preset catalogue does not hold it). */
   editModel?: { id: string; name: string; license: string };
   /** The avatar model, for the caption under a talking avatar. */
@@ -197,6 +201,8 @@ export type ExtensionsInfo = {
   swapModel?: { id: string; name: string; license: string };
   /** The demo backend answers (no GPU): a result is a stand-in clip, and its caption says no model ran. */
   demo?: boolean;
+  /** The install runs the 12 GB profile: the Studio says why Quality is not offered. */
+  vramProfile?: '12gb';
   /** A render of what Avatar and Motion make, looping in their card and on their empty monitor. */
   examples?: Partial<Record<'avatar' | 'motion' | 'restyle' | 'swap', { previewUrl: string; posterUrl?: string }>>;
 };
@@ -213,11 +219,11 @@ export type LibraryMotionSummary = {
   posterUrl?: string;
 };
 
-export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'restyle' | 'swap' | 'ad' | 'voice-change';
+export type JobTask = 't2i' | 'edit' | 'effect' | 'hook' | 'avatar' | 'music' | 'upscale' | 'image-upscale' | 'motion' | 'restyle' | 'swap' | 'ad' | 'voice-change' | 'moodboard' | 'translate';
 
-import type { CharacterType } from './characters';
+import type { CharacterKind, CharacterType } from './characters';
 
-export type { CharacterType };
+export type { CharacterKind, CharacterType };
 
 /** A picture of a character: its portrait's edit in a new scene (the photodump). */
 export type CharacterPhotoSummary = {
@@ -235,6 +241,8 @@ export type CharacterSummary = {
   id: string;
   name: string;
   type: CharacterType;
+  /** Who the character is; absent on the characters made before the kinds. */
+  kind?: CharacterKind;
   description: string;
   imageRef: string;
   imageUrl: string;
@@ -298,6 +306,10 @@ export type Reprise = {
   modelId?: string;
   /** A remixed clip: the remix editor reopens on that generation's preset text. */
   remixGenerationId?: string;
+  /** Where the remix editor reads the preset text from, when it is not a generation of this machine (a community entry). */
+  presetUrl?: string;
+  /** No photo of its own: the Studio starts from the tab's sample photo (a community share file or example). */
+  sample?: true;
   /** The seed it was rendered with: Reproduce sends it back, Reuse leaves it out. */
   seed?: number;
   shots?: { presetId: string; prompt?: string; seed?: number }[];
@@ -307,7 +319,8 @@ export type Reprise = {
 export type HistoryItem = {
   /** `${source}:${id}`, unique across the list. */
   key: string;
-  source: 'generation' | 'sequence' | 'job';
+  /** "community": an entry of the community gallery, brought back the same way. */
+  source: 'generation' | 'sequence' | 'job' | 'community';
   kind: 'photo' | 'clip' | 'film';
   task: 'camera' | 'film' | JobTask;
   name: string;

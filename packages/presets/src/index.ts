@@ -54,6 +54,7 @@ export {
   compileSpeech,
   compileImageUpscale,
   compileUpscale,
+  compileTranslate,
   compileVoiceChange,
   EDIT_LOOKS,
   IMAGE_UPSCALE_TARGETS,
@@ -65,6 +66,9 @@ export {
   type ExtensionCompiled,
   type MusicInputs,
   type SpeechInputs,
+  TRANSLATE_LANGUAGES,
+  translateInstruction,
+  type TranslateLanguage,
   type UpscaleInputs,
 } from './extensions';
 export { compileEffect, type EffectInputs } from './effects';

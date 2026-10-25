@@ -98,7 +98,8 @@ describe('the recipe of a camera clip', () => {
     const lib = await getServices().library;
     expect(recipe).toMatchObject({ schema: 'montagio/recipe@1', kind: 'clip', task: 'camera', name: 'Slow Push', seed, backend: 'demo' });
     expect(recipe.steps[0]!.workflowSha256).toBe(workflowSha256(normalizeWorkflow((await readWorkflow(id))!, (await readInputs(id))!)));
-    const camera = lib.models.get('wan22-i2v-a14b-fun-camera')!;
+    // Slow Push starts on the Turbo: its LoRAs are among the weights.
+    const camera = lib.models.get('wan22-i2v-a14b-fun-camera-turbo')!;
     for (const weightId of camera.weights) {
       expect(recipe.weights).toContainEqual(expect.objectContaining({ id: weightId, sha256: lib.lock.get(weightId)!.sha256, modelId: camera.id }));
     }
@@ -107,7 +108,7 @@ describe('the recipe of a camera clip', () => {
     expect(recipe.stack.comfyui.tag).toBe('v0.41.0');
     expect(recipe.request).toEqual({
       route: '/api/generations',
-      body: { presetId: 'slow-push', modelId: 'wan22-i2v-a14b-fun-camera', userPrompt: 'A harbour at dawn', seed },
+      body: { presetId: 'slow-push', modelId: 'wan22-i2v-a14b-fun-camera-turbo', userPrompt: 'A harbour at dawn', seed },
       files: [{ field: 'imageRef', sha256: sha(readFileSync(join(dataDir(), ...imageRef.split('/')))) }],
     });
     expect(recipe.reprise).toMatchObject({ tab: 'camera', presetId: 'slow-push', seed });

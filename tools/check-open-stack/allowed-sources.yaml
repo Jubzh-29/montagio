@@ -144,6 +144,18 @@ sources:
     revision: 5bb1f6ee58e50c3b8d408bc82a6d3740c2db6e18
     license_file: false
     note: also the download repository of the voice (no mirror)
+  # Translate (2026-10-24): Gemma 4 E4B, its card and its license link (ai.google.dev/gemma/docs/gemma_4_license)
+  # read on 2026-10-24: Apache 2.0, no LICENSE file in either repository.
+  - repo: google/gemma-4-E4B-it
+    license: Apache-2.0
+    role: source
+    revision: ee0ef6023621cff504d758262d4e04895a5af4a2
+    license_file: false
+  - repo: Comfy-Org/gemma-4
+    license: Apache-2.0
+    role: mirror
+    revision: 63d0f7c476756b88910170c1df75e2384ea1af31
+    license_file: false
 
   # Edit: the Lightning LoRA and the looks (each its own source and download repository).
   - repo: lightx2v/Qwen-Image-Edit-2511-Lightning

@@ -2,10 +2,10 @@ import { randomInt } from 'node:crypto';
 import { compileEdit, EDIT_LOOK_IDS, type EditLook, type Library } from '@montagio/presets';
 import type { ExtensionModel } from '@montagio/registry';
 import { JobError } from '../errors';
-import { requireExtension } from '../extensions';
+import { requireExperimental, requireExtension } from '../extensions';
 import { assertConsent, assertNoBlockedName } from '../guards';
 import type { TaskDef } from '../jobs';
-import { readUploadMeta } from '../uploads';
+import { readUploadMeta, type UploadMeta } from '../uploads';
 import { extensionFile, uploadPath } from './files';
 
 const INSTRUCTION_MAX = 500;
@@ -40,12 +40,32 @@ export const editTask: TaskDef = {
       if (mask.aspect !== photo.aspect) throw new JobError('invalid-input');
       maskRef = mask.imageRef;
     }
+    // A second photo the edit reads (Change palette: its colors), a known upload; not with an inpaint.
+    let second: UploadMeta | null = null;
+    if (body.image2Ref !== undefined && body.image2Ref !== null) {
+      // The edit copied the second photo's content, not only its colors (GPU, 2026-10-24): behind the flag.
+      requireExperimental('palette-photo');
+      second = typeof body.image2Ref === 'string' ? await readUploadMeta(body.image2Ref) : null;
+      if (!second) throw new JobError('unknown-image');
+      if (maskRef) throw new JobError('invalid-input');
+    }
     // What the result shows, when the caller knows it (a character's photodump): the Studio's description later.
     const scene = typeof body.scene === 'string' ? body.scene.trim().slice(0, SCENE_MAX) : '';
-    assertConsent(photo, body.consent);
+    for (const meta of second ? [photo, second] : [photo]) assertConsent(meta, body.consent);
     await assertNoBlockedName(instruction, scene);
+    const personal = photo.personal || second?.personal === true;
+    const fictional = photo.fictional === true && (!second || second.fictional === true);
     return {
-      inputs: { imageRef, instruction, look, personal: photo.personal, ...(photo.fictional ? { fictional: true } : {}), ...(scene ? { scene } : {}), ...(maskRef ? { maskRef } : {}) },
+      inputs: {
+        imageRef,
+        instruction,
+        look,
+        personal,
+        ...(fictional ? { fictional: true } : {}),
+        ...(scene ? { scene } : {}),
+        ...(maskRef ? { maskRef } : {}),
+        ...(second ? { image2Ref: second.imageRef } : {}),
+      },
       label: { ...(look ? { itemId: look } : {}), name: model.name },
       modelId: model.id,
       seed: randomInt(0, 2 ** 32),
@@ -65,13 +85,26 @@ export const editTask: TaskDef = {
         const imageRef = String(record.inputs.imageRef);
         const look = (record.inputs.look as EditLook | null) ?? undefined;
         const maskRef = typeof record.inputs.maskRef === 'string' ? record.inputs.maskRef : undefined;
+        const image2Ref = typeof record.inputs.image2Ref === 'string' ? record.inputs.image2Ref : undefined;
         const { workflow, output } = compileEdit(
           model,
           template,
-          { imageRef, instruction: String(record.inputs.instruction), seed: record.seed, fast: true, ...(look ? { look } : {}), ...(maskRef ? { maskRef } : {}) },
+          {
+            imageRef,
+            instruction: String(record.inputs.instruction),
+            seed: record.seed,
+            fast: true,
+            ...(look ? { look } : {}),
+            ...(maskRef ? { maskRef } : {}),
+            ...(image2Ref ? { image2Ref } : {}),
+          },
           lib.lock,
         );
-        const files = [extensionFile(model, 'image', uploadPath(imageRef)), ...(maskRef ? [extensionFile(model, 'mask', uploadPath(maskRef))] : [])];
+        const files = [
+          extensionFile(model, 'image', uploadPath(imageRef)),
+          ...(maskRef ? [extensionFile(model, 'mask', uploadPath(maskRef))] : []),
+          ...(image2Ref ? [extensionFile(model, 'image2', uploadPath(image2Ref))] : []),
+        ];
         return { workflow, output, files };
       },
     },

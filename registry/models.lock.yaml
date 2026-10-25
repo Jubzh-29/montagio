@@ -270,6 +270,16 @@ weights:
     source: https://huggingface.co/ResembleAI/chatterbox
     extension: avatar
     folder: tts/chatterbox/resembleai-mtl-v3
+  # Translate (extension "avatar"): Gemma 4 E4B, instruction-tuned, int8, in the single file ComfyUI's
+  # CLIPLoader reads (text and audio encoders, tokenizer); the TextGenerate node writes the translation.
+  - id: gemma4-e4b-it
+    file: gemma4_e4b_it_int8_convrot.safetensors
+    url: https://huggingface.co/Comfy-Org/gemma-4/resolve/63d0f7c476756b88910170c1df75e2384ea1af31/text_encoders/gemma4_e4b_it_int8_convrot.safetensors
+    sha256: 974d0c838ef4ac1a989b06ccb4e57691c21b6270dd8e345ffa7531f9388f117c
+    size: 8090965702
+    license: Apache-2.0
+    source: https://huggingface.co/google/gemma-4-E4B-it
+    extension: avatar
   - id: wan22-s2v-14b-fp8
     file: wan2.2_s2v_14B_fp8_scaled.safetensors
     url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_s2v_14B_fp8_scaled.safetensors
@@ -401,6 +411,7 @@ weights:
     source: https://huggingface.co/Wan-AI/Wan2.2-I2V-A14B
     extension: transitions
   # Byte-identical to lightx2v/Wan2.2-Lightning Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/{high,low}_noise_model.safetensors.
+  # No `extension:` since 2026-10-24: the camera presets' Turbo model loads them too (every install fetches them).
   - id: lightx2v-wan22-i2v-4step-high
     file: wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors
     url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors
@@ -408,7 +419,6 @@ weights:
     size: 1226977424
     license: Apache-2.0
     source: https://huggingface.co/lightx2v/Wan2.2-Lightning
-    extension: transitions
   - id: lightx2v-wan22-i2v-4step-low
     file: wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors
     url: https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors
@@ -416,7 +426,6 @@ weights:
     size: 1226977424
     license: Apache-2.0
     source: https://huggingface.co/lightx2v/Wan2.2-Lightning
-    extension: transitions
   # Motion transfer: Wan2.2-Animate-2 distilled (10 steps, no LoRA), quantized to int8 by Comfy-Org.
   # Apache-2.0 at the source (Wan-AI), with no added paragraph; the Comfy-Org repository also holds a
   # lightx2v LoRA and a VAE byte-identical to Kijai's files, which Montagio does not use.

@@ -1,10 +1,11 @@
 import type { EffectPreset, Library, TransitionPreset } from '@montagio/presets';
-import { enabledExtensions, type ExtensionId, type ExtensionModel } from '@montagio/registry';
+import { enabledExtensions, extensionEstimate, type ExtensionId, type ExtensionModel } from '@montagio/registry';
 import type { EffectSummary, ExtensionsInfo, HookSummary } from '@/lib/api-types';
 import { EFFECT_ORDER, HOOK_ORDER, wallOrder } from '@/lib/wall-order';
 import { getEnv } from './env';
 import { JobError } from './errors';
 import { presetPosterUrl, presetPreviewUrl } from './gallery';
+import { currentProfile, offeredModel } from './profile';
 import { getServices } from './services';
 
 /** The full path (no distillation LoRA, 20 steps) against the 4-step one: about 5 times longer (EXTENSIONS_ANALYSE.md §4). */
@@ -32,6 +33,20 @@ export function resetRejectedForTests(): void {
 
 const showsEverything = () => process.env.MONTAGIO_EXTENSIONS?.trim() === 'all';
 
+/** Features kept behind a flag until a GPU session validates them (MONTAGIO_EXPERIMENTAL, a comma list). */
+export const EXPERIMENTAL_FEATURES = ['moodboard', 'palette-photo'] as const;
+export type ExperimentalFeature = (typeof EXPERIMENTAL_FEATURES)[number];
+
+export function experimentalFeatures(): ExperimentalFeature[] {
+  const asked = (process.env.MONTAGIO_EXPERIMENTAL ?? '').split(',').map((entry) => entry.trim());
+  return EXPERIMENTAL_FEATURES.filter((feature) => asked.includes(feature));
+}
+
+/** A feature behind the flag answers as a hidden extension does while the flag leaves it out. */
+export function requireExperimental(feature: ExperimentalFeature): void {
+  if (!experimentalFeatures().includes(feature)) throw new JobError('extension-disabled');
+}
+
 /**
  * The extensions the Studio shows: what MONTAGIO_EXTENSIONS allows (the dated ones when
  * unset), minus those ComfyUI refused and those that require a hidden one. An invalid
@@ -41,7 +56,7 @@ export async function visibleExtensions(): Promise<ExtensionId[]> {
   const config = (await getServices().library).extensions ?? [];
   let enabled: ExtensionId[];
   try {
-    enabled = enabledExtensions(config, process.env.MONTAGIO_EXTENSIONS);
+    enabled = enabledExtensions(config, process.env.MONTAGIO_EXTENSIONS, currentProfile());
   } catch (error) {
     console.error(`[montagio] MONTAGIO_EXTENSIONS is invalid, no extension is shown: ${error instanceof Error ? error.message : error}`);
     return [];
@@ -66,8 +81,10 @@ export async function visibleHooks(): Promise<TransitionPreset[]> {
   return wallOrder([...(await getServices().library).hooks.values()].filter(dated), HOOK_ORDER);
 }
 
+/** The time of a job on `model` in this install's memory profile, at 4 steps or on the full path. */
 export function estimateFor(model: ExtensionModel, fast: boolean): number {
-  return fast ? model.estimate_s : model.estimate_s * QUALITY_FACTOR;
+  const estimate = extensionEstimate(model, currentProfile());
+  return fast ? estimate : estimate * QUALITY_FACTOR;
 }
 
 /** Refuse a request for a hidden extension with 404 extension-disabled. */
@@ -175,12 +192,13 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
       };
     }),
   );
-  const t2i = lib.models.get(T2I_MODEL)?.estimate_s['720p'] ?? T2I_FALLBACK_S;
+  const t2i = offeredModel(lib, T2I_MODEL)?.estimate_s['720p'] ?? T2I_FALLBACK_S;
   const avatar = extensions.includes('avatar') ? avatarModels(lib) : null;
   const music = extensions.includes('music') ? musicModel(lib) : null;
   const upscale = extensions.includes('upscale') ? upscaleModel(lib) : null;
   const imageUpscale = extensions.includes('upscale') ? imageUpscaleModel(lib) : null;
   const voiceChange = extensions.includes('avatar') ? [...lib.extensionModels.values()].find((entry) => entry.task === 'a2a-vc') : undefined;
+  const translate = extensions.includes('avatar') ? [...lib.extensionModels.values()].find((entry) => entry.task === 'a2a-translate') : undefined;
   const motion = extensions.includes('motion') ? motionModel(lib) : null;
   const restyle = extensions.includes('restyle') ? restyleModel(lib) : null;
   const swap = extensions.includes('swap') ? swapModel(lib) : null;
@@ -196,6 +214,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     extensions,
     effects,
     hooks,
+    experimental: experimentalFeatures(),
     estimates: {
       t2i,
       ...(extensions.includes('edit') && editModel ? { edit: estimateFor(editModel, true) } : {}),
@@ -204,6 +223,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
       ...(upscale ? { upscale: estimateFor(upscale, true) } : {}),
       ...(imageUpscale ? { imageUpscale: estimateFor(imageUpscale, true) } : {}),
       ...(voiceChange ? { voiceChange: estimateFor(voiceChange, true) } : {}),
+      ...(translate && avatar ? { translate: estimateFor(translate, true) + estimateFor(avatar.avatar, true) } : {}),
       ...(motion ? { motion: estimateFor(motion, true) } : {}),
       ...(restyle ? { restyle: estimateFor(restyle, true) } : {}),
       ...(swap ? { swap: estimateFor(swap, true) } : {}),
@@ -217,5 +237,6 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     ...(swap ? { swapModel: summaryOf(swap) } : {}),
     ...(Object.keys(examples).length > 0 ? { examples } : {}),
     ...((process.env.MONTAGIO_BACKEND ?? 'demo') === 'demo' ? { demo: true } : {}),
+    ...(currentProfile() === '12gb' ? { vramProfile: '12gb' as const } : {}),
   };
 }

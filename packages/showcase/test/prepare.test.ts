@@ -81,7 +81,7 @@ test('data.json lists presets with their YAML, the library, the samples and the 
   const crash = data.presets.find((preset) => preset.id === 'crash-push')!;
   expect(crash).toMatchObject({ name: 'Crash Push', poses: ['zoom_in'], speed: 1.5, defaultModel: 'wan22-i2v-a14b-fun-camera' });
   expect(crash.yaml).toBe(readFileSync(join(root, 'presets', 'crash-push.yaml'), 'utf8'));
-  expect(data.models.map((model) => model.id).sort()).toEqual(['wan22-i2v-a14b-fun-camera', 'wan22-ti2v-5b', 'z-image-turbo']);
+  expect(data.models.map((model) => model.id).sort()).toEqual(['wan22-i2v-a14b-fun-camera', 'wan22-i2v-a14b-fun-camera-turbo', 'wan22-ti2v-5b', 'z-image-turbo']);
   expect(new Map(data.library.models).get('wan22-i2v-a14b-fun-camera')?.workflow).toBe('workflows/wan22-fun-camera.api.json');
   expect(new Map(data.library.templates).has('workflows/wan22-fun-camera.api.json')).toBe(true);
   expect(data.library.lock.length).toBeGreaterThan(0);

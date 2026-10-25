@@ -32,7 +32,7 @@ export type ShowcaseData = {
   model: { id: string; name: string; license: string };
   /** `preview` is a light loop of the preset on the first sample, for the gallery tile; `poster` its first frame. */
   presets: { id: string; name: string; description: string; poses: string[]; speed: number; defaultModel: string; preview: string; poster?: string; yaml: string }[];
-  models: { id: string; name: string; kind: 'video' | 'image'; tier: 'quality' | 'fast'; license: string; estimate_s: { '480p': number; '720p'?: number } }[];
+  models: { id: string; name: string; kind: 'video' | 'image'; tier: 'quality' | 'turbo' | 'fast'; license: string; estimate_s: { '480p': number; '720p'?: number } }[];
   /** What validatePreset needs, as Map entries. */
   library: { models: [string, ModelEntry][]; templates: [string, ApiWorkflow][]; lock: [string, LockEntry][] };
   /** `prompt`: the text the photo was made from, offered by the showcase's Text to image. */

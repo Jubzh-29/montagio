@@ -5,6 +5,10 @@ import type { ModelSummary } from '@/lib/api-types';
 import { formatDuration } from '@/lib/duration';
 import styles from './studio.module.css';
 
+/** Each tier's name and what its time buys: every step, the same model in 4 steps, or a smaller model. */
+export const TIER_LABEL = { quality: 'tierQuality', turbo: 'tierTurbo', fast: 'tierFast' } as const;
+const TIER_HINT = { quality: 'tierQualityHint', turbo: 'tierTurboHint', fast: 'tierFastHint' } as const;
+
 export function ModelPicker({
   models,
   selectedId,
@@ -14,6 +18,7 @@ export function ModelPicker({
   compact = false,
   name = 'model',
   className,
+  note,
 }: {
   models: ModelSummary[];
   loading?: boolean;
@@ -26,6 +31,8 @@ export function ModelPicker({
   /** The radio group's name: two pickers on a page (one per screen size) must not share it. */
   name?: string;
   className?: string;
+  /** A line under the choice, such as why a model is not offered on this install. */
+  note?: string;
 }) {
   const { t } = useI18n();
   if (compact) {
@@ -46,13 +53,14 @@ export function ModelPicker({
                   disabled={localOnly}
                   onChange={() => onSelect(model.id)}
                 />
-                {model.tier === 'quality' ? t('tierQuality') : t('tierFast')} ·{' '}
+                {t(TIER_LABEL[model.tier])} ·{' '}
                 {localOnly ? t('showcaseLocalOnly') : onlyId === undefined ? `~${formatDuration(model.estimate_s['480p'])}` : model.name}
               </label>
             );
           })}
         </div>
-        {chosen && <p className={styles.modelHintLine}>{chosen.tier === 'quality' ? t('tierQualityHint') : t('tierFastHint')}</p>}
+        {chosen && <p className={styles.modelHintLine}>{t(TIER_HINT[chosen.tier])}</p>}
+        {note && <p className={styles.modelHintLine}>{note}</p>}
       </fieldset>
     );
   }
@@ -73,19 +81,20 @@ export function ModelPicker({
                 disabled={localOnly}
                 onChange={() => onSelect(model.id)}
               />
-              <span className={styles.modelTier}>{model.tier === 'quality' ? t('tierQuality') : t('tierFast')}</span>
+              <span className={styles.modelTier}>{t(TIER_LABEL[model.tier])}</span>
               <span className={styles.modelName}>{model.name}</span>
               <span className={styles.modelMeta}>
                 <span className={styles.license}>{model.license}</span>
                 {/* The showcase plays clips: no render time to announce. */}
                 {localOnly ? <span>{t('showcaseLocalOnly')}</span> : onlyId === undefined && <span>~{formatDuration(model.estimate_s['480p'])}</span>}
               </span>
-              {/* What the time buys: the quality model follows the poses, the fast one the move's text. */}
-              <span className={styles.modelHint}>{model.tier === 'quality' ? t('tierQualityHint') : t('tierFastHint')}</span>
+              {/* What the time buys: Quality and Turbo follow the poses (Turbo with a little less detail), Fast the move's text. */}
+              <span className={styles.modelHint}>{t(TIER_HINT[model.tier])}</span>
             </label>
           );
         })}
       </div>
+      {note && <p className={styles.modelHint}>{note}</p>}
     </fieldset>
   );
 }

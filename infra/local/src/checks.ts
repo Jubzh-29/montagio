@@ -4,20 +4,35 @@ import type { Os } from './platform.ts';
 import type { Gpu, MachineFacts, PythonInfo } from './probe.ts';
 
 export type Mode = 'full' | 'app-only';
+/** The memory profile of a full install: a 24 GB card, or the 12 GB profile (12 to 20 GB, what a GPU session ran within 12 GB). */
+export type VramProfile = 'standard' | '12gb';
 export type Ports = { comfy: number; proxy: number; app: number };
 
 export const DEFAULT_PORTS: Ports = { comfy: 8188, proxy: 8189, app: 3000 };
 /** 22 GiB: 24 GB cards report less (L4 and A10: 23028 MiB, RTX 4090: 24564 MiB), 20 GB cards stay out. */
 export const MIN_VRAM_MIB = 22 * 1024;
+/** 11 GiB: a 12 GB card reports 12288 MiB (RTX 3060, RTX 4070) or a little less; 8 and 10 GB cards stay out. */
+export const LOW_VRAM_MIN_MIB = 11 * 1024;
 export const MIN_NODE: [number, number] = [22, 18];
 export const PYTHON_RANGE = { min: [3, 10] as [number, number], max: [3, 13] as [number, number] };
 /** 30 GiB: a 32 GB machine reports about 31.8 GiB (the firmware and an integrated GPU keep some), 24 GB stays under. */
 export const RAM_WARN_BYTES = 30 * 1024 ** 3;
 
 export type CheckId = 'os' | 'node' | 'git' | 'python' | 'ffmpeg' | 'gpu' | 'driver' | 'disk' | 'ram' | 'ports';
-export type Check = { id: CheckId; severity: 'ok' | 'warn' | 'fail'; message: string; fix?: string };
+export type Check = {
+  id: CheckId;
+  severity: 'ok' | 'warn' | 'fail';
+  message: string;
+  fix?: string;
+  /** A GPU of 12 to 20 GB: the full install can go on in the 12 GB profile. */
+  offer?: 'low-vram';
+};
 
-export type Decision = { kind: 'proceed'; mode: Mode } | { kind: 'offer-app-only'; reason: string } | { kind: 'stop' };
+export type Decision =
+  | { kind: 'proceed'; mode: Mode }
+  | { kind: 'offer-low-vram'; reason: string }
+  | { kind: 'offer-app-only'; reason: string }
+  | { kind: 'stop' };
 
 /** Checks whose failure also stops the app alone: offering it would not help. */
 const BOTH_MODES: CheckId[] = ['os', 'node', 'ffmpeg'];
@@ -29,6 +44,7 @@ const PORT_OPTIONS: Record<keyof Ports, { option: string; label: string }> = {
 };
 
 const APP_ONLY_HINT = 'run again with --app-only to install the app alone (demo mode, or a remote GPU with --proxy-url)';
+const LOW_VRAM_HINT = 'run again with --low-vram to install the 12 GB profile (what was validated on a 12 GB card: slower renders, fewer models)';
 
 const gib = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
 const atLeast = (version: number[], min: number[]) => version[0]! > min[0]! || (version[0] === min[0] && version[1]! >= min[1]!);
@@ -60,7 +76,16 @@ const FIXES: Record<'node' | 'git' | 'python' | 'venv' | 'ffmpeg', Record<Os, st
   ffmpeg: { windows: 'winget install Gyan.FFmpeg, then open a new terminal', linux: 'sudo apt install ffmpeg' },
 };
 
-type Context = { mode: Mode; versions: Versions; ports: Ports; ownPorts: number[]; need: { installDir: number; repo: number }; ignoreVram: boolean };
+type Context = {
+  mode: Mode;
+  versions: Versions;
+  ports: Ports;
+  ownPorts: number[];
+  need: { installDir: number; repo: number };
+  ignoreVram: boolean;
+  /** The full install's memory profile (standard when absent). */
+  profile?: VramProfile;
+};
 
 export function evaluate(facts: MachineFacts, ctx: Context): Check[] {
   const os: Os = facts.os ?? 'linux';
@@ -112,14 +137,24 @@ export function evaluate(facts: MachineFacts, ctx: Context): Check[] {
       add({ id: 'gpu', severity: 'fail', message: 'no NVIDIA GPU found (nvidia-smi did not answer)', fix: APP_ONLY_HINT });
     } else {
       const label = `${gpu.name}, ${gib(gpu.vramMiB * 1024 ** 2)} of VRAM`;
-      if (gpu.vramMiB >= MIN_VRAM_MIB) add({ id: 'gpu', severity: 'ok', message: label });
+      const lowVram = ctx.profile === '12gb';
+      if (gpu.vramMiB >= MIN_VRAM_MIB) add({ id: 'gpu', severity: 'ok', message: lowVram ? `${label}, in the 12 GB profile (--low-vram)` : label });
+      else if (gpu.vramMiB >= LOW_VRAM_MIN_MIB && lowVram) add({ id: 'gpu', severity: 'ok', message: `${label}: the 12 GB profile` });
       else if (ctx.ignoreVram)
-        add({ id: 'gpu', severity: 'warn', message: `${label}: under 22 GiB, renders may run out of memory (--ignore-vram)` });
+        add({ id: 'gpu', severity: 'warn', message: `${label}: under ${lowVram ? 11 : 22} GiB, renders may run out of memory (--ignore-vram)` });
+      else if (gpu.vramMiB >= LOW_VRAM_MIN_MIB)
+        add({
+          id: 'gpu',
+          severity: 'fail',
+          message: `${label}: every model needs a 24 GB card, the 12 GB profile runs on this one`,
+          fix: `${LOW_VRAM_HINT}; or ${APP_ONLY_HINT}`,
+          offer: 'low-vram',
+        });
       else
         add({
           id: 'gpu',
           severity: 'fail',
-          message: `${label}: the video models need a 24 GB card`,
+          message: `${label}: the video models need a card of 12 GB at least`,
           fix: `${APP_ONLY_HINT}; or --ignore-vram to try anyway`,
         });
 
@@ -192,6 +227,8 @@ export function decide(checks: Check[], mode: Mode): Decision {
   const fails = checks.filter((check) => check.severity === 'fail');
   if (fails.length === 0) return { kind: 'proceed', mode };
   const gpu = fails.find((check) => check.id === 'gpu');
+  // A 12 to 20 GB card: the full install in the 12 GB profile, when nothing else fails.
+  if (mode === 'full' && gpu?.offer === 'low-vram' && fails.length === 1) return { kind: 'offer-low-vram', reason: gpu.message };
   // The app alone is re-checked on its own terms once accepted; only what it needs as well rules it out here.
   if (mode === 'full' && gpu && !fails.some((check) => BOTH_MODES.includes(check.id))) return { kind: 'offer-app-only', reason: gpu.message };
   return { kind: 'stop' };

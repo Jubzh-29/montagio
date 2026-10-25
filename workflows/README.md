@@ -7,6 +7,7 @@ They are converted from the official ComfyUI templates of [Comfy-Org/workflow_te
 | Workflow | Template | Model |
 |---|---|---|
 | `wan22-fun-camera.api.json` | `templates/video_wan2_2_14B_fun_camera.json` | Wan 2.2 Fun Camera 14B (high and low noise) |
+| `wan22-fun-camera-turbo.api.json` | `templates/video_wan2_2_14B_fun_camera.json`, its 4-step group | Wan 2.2 Fun Camera 14B with the 4-step LoRAs of lightx2v |
 | `wan22-ti2v-5b.api.json` | `templates/video_wan2_2_5B_ti2v.json` | Wan 2.2 TI2V 5B |
 | `z-image-turbo.api.json` | `templates/image_z_image_turbo.json` | Z-Image-Turbo |
 
@@ -33,7 +34,7 @@ All models:
 
 Wan 2.2 Fun Camera:
 - only the 20-step group is kept: two `KSamplerAdvanced`, 10 steps on the high-noise model then 10 on the low-noise model, cfg 3.5, euler/simple, and `ModelSamplingSD3` with shift 8 on both models;
-- the template's second group (4 steps, with the LightX2V LoRAs) is left out until GPU session S2 has checked that the camera move survives it (see `docs/S1_ANALYSE.md`). Its own note says these LoRAs lose some of the motion.
+- the template's second group (4 steps, with the LightX2V LoRAs) is the Turbo workflow, `wan22-fun-camera-turbo.api.json` (below). Its own note says these LoRAs lose some of the motion.
 - The template's negative prompt is the default Wan negative (Chinese text, node 99 of the template). The compiler replaces the negative with the preset's, so it is not kept here. GPU session S2 compares the two.
 
 Wan 2.2 5B:
@@ -43,6 +44,11 @@ Wan 2.2 5B:
 Z-Image-Turbo:
 - the negative is `ConditioningZeroOut` of the positive, as in the template. At cfg 1 there is no negative prompt, so the model has no `negative` binding;
 - `ModelSamplingAuraFlow` with shift 3, `KSampler` 8 steps, cfg 1, res_multistep/simple.
+
+Wan 2.2 Fun Camera Turbo (2026-10-24), the template's 4-step group:
+- `LoraLoaderModelOnly` 88 and 90 (the template's ids) put `wan2.2_i2v_lightx2v_4steps_lora_v1_{high,low}_noise` at strength 1 on the high- and low-noise models, before `ModelSamplingSD3` (shift 8 on both, as in the group);
+- two `KSamplerAdvanced`, 4 steps at cfg 1, euler/simple, split at step 2;
+- every other node keeps the id it has in `wan22-fun-camera.api.json` (the template's 20-step group), so both models share their bindings, and the changes listed above for the 20-step workflow apply as well. The template measures 536 s at 20 steps and 71 s warm at 4 steps on an RTX 4090D (640×640).
 
 ## Combined camera moves
 
@@ -59,6 +65,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 | `qwen-image-edit-2511.api.json` | `templates/image_qwen_image_edit_2511.json` | Qwen-Image-Edit-2511 fp8mixed | node 9, PNG |
 | `chatterbox-mtl-voice.api.json` | none (no official template: ComfyUI has no local text-to-speech node) | Chatterbox Multilingual V3 | node 3, FLAC |
 | `chatterbox-vc.api.json` | none (no official template: ComfyUI has no local voice conversion node) | Chatterbox VC (S3Gen) | node 3, FLAC |
+| `translate-speech.api.json` | none (written for Montagio from the core TextGenerate node) | Gemma 4 E4B int8, then Chatterbox Multilingual V3 | node 5, FLAC |
 | `wan22-s2v-avatar.api.json` | `templates/video_wan2_2_14B_s2v.json` | Wan 2.2 S2V 14B fp8 | node 113, MP4 with the speech |
 | `wan21-i2v-effect.api.json` | `templates/image_to_video_wan.json` | Wan 2.1 I2V 14B 480p fp8, an effect LoRA | node 56, MP4 |
 | `wan22-flf2v-transition.api.json` | `templates/video_wan2_2_14B_flf2v.json` | Wan 2.2 I2V A14B fp8 (high and low noise) | node 61, MP4 |
@@ -104,6 +111,12 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 - It reads the `resembleai-mtl-v3` pack folder. The node's classic loader builds the English TTS beside the converter, so the folder also holds `t3_cfg.safetensors` and `tokenizer.json` (2.1 GB, MIT, the same Resemble AI repository); the multilingual voice still picks its own T3 by name. It runs 10 flow steps with one refinement pass and cuts the speech into 30 s chunks at most (the app keeps 30 s). The watermark is off, as for the avatar's voice.
 - The app asks for the speaker's consent on the sample, and the rights on a video sent here; the clip comes back with the AI mention.
 
+### translate-speech
+
+- Written for Montagio: `LoadAudio` (node 1, the speech), the core `CLIPLoader` reading Gemma 4 E4B (int8, one file with its audio encoder and tokenizer), the core `TextGenerate` (node 3, greedy decoding, no thinking) asked for the translation alone, then `ChatterboxMTLTTS` (node 4) saying that text, its `text` input linked to node 3, with the speech as its voice reference (`audio_prompt`), and `SaveAudioAdvanced` in FLAC, `montagio/translation`.
+- `cfg_weight` is 0, the Chatterbox card's advice when the reference voice speaks another language than the text. The app then animates the face again on that speech (Wan 2.2 S2V): the lips follow the new words.
+- Gemma 4 hears 30 s of audio at most; the app keeps 15 s, what the avatar animates.
+
 ### wan22-s2v-avatar
 
 - The template's active "4 steps" path, flattened: its two "Video S2V Extend" subgraphs become nodes `79076`–`79078` and `85076`–`85078` (numeric ids for the template's `79:76`…), its bypassed third extension and its 20-step group are gone.
@@ -148,6 +161,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 | Model | image | prompt | negative | seed | width / height / frames | fps | camera_pose / camera_speed |
 |---|---|---|---|---|---|---|---|
 | `wan22-i2v-a14b-fun-camera` | 97.image | 107.text | 99.text | 102.noise_seed | 108.width / height / length | 105.fps | 108.camera_pose / speed |
+| `wan22-i2v-a14b-fun-camera-turbo` | 97.image | 107.text | 99.text | 102.noise_seed | 108.width / height / length | 105.fps | 108.camera_pose / speed |
 | `wan22-ti2v-5b` | 56.image | 6.text | 7.text | 3.seed | 55.width / height / length | 57.fps | (camera in the prompt) |
 | `z-image-turbo` | | 27.text | | 3.seed | 13.width / height | | |
 
@@ -160,6 +174,7 @@ Extension models (a binding with several inputs gets the same value in each):
 | `qwen-image-edit-2511` | image 41.image; image2 42.image; prompt 151.prompt; seed 169.seed | 9 (image) |
 | `chatterbox-mtl-voice` | text 2.text; language 2.language; seed 2.seed; cfg 2.cfg_weight | 3 (audio) |
 | `chatterbox-vc` | audio 1.audio; voice 4.audio | 3 (audio) |
+| `gemma4-translate` | audio 1.audio; prompt 3.prompt; language 4.language; cfg 4.cfg_weight; seed 4.seed | 5 (audio) |
 | `wan22-s2v-avatar` | image 52.image; audio 58.audio; prompt 6.text; seed 3.seed (+1, +2 on the extension samplers); width / height 93.width / 93.height; frames 96.length | 113 (video) |
 | `wan21-i2v-effects` | image 52.image; prompt 6.text; negative 7.text; seed 3.seed; width / height / frames 50.width / height / length; lora 200.lora_name; lora_strength 200.strength_model | 56 (video) |
 | `wan22-flf2v-transition` | image 68.image; end_image 62.image; prompt 6.text; negative 7.text; seed 57.noise_seed; width / height / frames 67.width / height / length | 61 (video) |

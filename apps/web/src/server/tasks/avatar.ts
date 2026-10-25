@@ -1,15 +1,47 @@
 import { randomInt } from 'node:crypto';
 import { basename } from 'node:path';
-import { compileAvatar, compileSpeech } from '@montagio/presets';
+import { compileAvatar, compileSpeech, type Library } from '@montagio/presets';
 import { probeAudio } from '@montagio/sequence';
 import { JobError } from '../errors';
 import { avatarModels, requireExtension } from '../extensions';
 import { assertConsent, assertNoBlockedName } from '../guards';
-import type { TaskDef } from '../jobs';
+import type { StepPlan, TaskDef } from '../jobs';
 import { readUploadMeta, readVoiceMeta } from '../uploads';
 import { extensionFile, uploadPath, voicePath } from './files';
 
 const TEXT_MAX = 300;
+
+/**
+ * The photo of the record (inputs.imageRef) animated by Wan 2.2 S2V for the length of the speech
+ * the first step made: the avatar's voice, or a translated speech. Past the model's 15 s, the job
+ * ends in speech-too-long.
+ */
+export function talkingStep(lib: Library): StepPlan {
+  const { avatar } = avatarModels(lib);
+  return {
+    name: 'avatar',
+    presetId: 'avatar',
+    extension: 'avatar',
+    compile: async (current) => {
+      const template = lib.extensionTemplates.get(avatar.workflow);
+      const speech = current.steps[0]?.outputPath;
+      if (!template || !speech) throw new Error(`avatar: no workflow for ${avatar.id}, or no voice`);
+      const audio_s = (await probeAudio(speech))?.duration_s ?? 0;
+      if (audio_s > (avatar.limits.max_duration_s ?? Infinity)) throw new JobError('speech-too-long');
+      // A voice that cannot be read counts as none: too short to animate.
+      if (audio_s < (avatar.limits.min_duration_s ?? 0) || audio_s === 0) throw new JobError('speech-too-short');
+      const imageRef = String(current.inputs.imageRef);
+      const { workflow, output } = compileAvatar(avatar, template, {
+        imageRef,
+        audioRef: basename(speech),
+        audio_s,
+        aspect: current.aspect ?? '16:9',
+        seed: current.seed,
+      });
+      return { workflow, output, files: [extensionFile(avatar, 'image', uploadPath(imageRef)), extensionFile(avatar, 'audio', speech)] };
+    },
+  };
+}
 const LANGUAGES = ['en', 'fr'] as const;
 
 /**
@@ -49,7 +81,7 @@ export const avatarTask: TaskDef = {
   },
 
   steps: (record, lib) => {
-    const { voice, avatar } = avatarModels(lib);
+    const { voice } = avatarModels(lib);
     return [
       {
         name: 'voice',
@@ -64,29 +96,7 @@ export const avatarTask: TaskDef = {
           return { workflow, output, files: voiceRef ? [extensionFile(voice, 'audio', voicePath(voiceRef))] : [] };
         },
       },
-      {
-        name: 'avatar',
-        presetId: 'avatar',
-        extension: 'avatar',
-        compile: async (current) => {
-          const template = lib.extensionTemplates.get(avatar.workflow);
-          const speech = current.steps[0]?.outputPath;
-          if (!template || !speech) throw new Error(`avatar: no workflow for ${avatar.id}, or no voice`);
-          const audio_s = (await probeAudio(speech))?.duration_s ?? 0;
-          if (audio_s > (avatar.limits.max_duration_s ?? Infinity)) throw new JobError('speech-too-long');
-          // A voice that cannot be read counts as none: too short to animate.
-          if (audio_s < (avatar.limits.min_duration_s ?? 0) || audio_s === 0) throw new JobError('speech-too-short');
-          const imageRef = String(current.inputs.imageRef);
-          const { workflow, output } = compileAvatar(avatar, template, {
-            imageRef,
-            audioRef: basename(speech),
-            audio_s,
-            aspect: current.aspect ?? '16:9',
-            seed: current.seed,
-          });
-          return { workflow, output, files: [extensionFile(avatar, 'image', uploadPath(imageRef)), extensionFile(avatar, 'audio', speech)] };
-        },
-      },
+      talkingStep(lib),
     ];
   },
 };

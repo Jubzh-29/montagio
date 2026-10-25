@@ -26,6 +26,7 @@ test('the empty state has the default ports and no stamp', () => {
     gpuIndex: null,
     proxyUrl: null,
     extensions: null,
+    vramProfile: null,
     stamps: {},
     weights: {},
   });

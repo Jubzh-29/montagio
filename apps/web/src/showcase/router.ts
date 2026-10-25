@@ -1,5 +1,6 @@
 import { validatePreset } from '@montagio/presets/browser';
 import type { ShowcaseData } from '@montagio/showcase/data';
+import type { CommunityEntry } from '@/lib/community';
 import { galleryOrder } from '@/lib/gallery-order';
 import { MAX_PRESET_YAML_BYTES } from '@/lib/limits';
 import { EFFECT_ORDER, HOOK_ORDER, wallOrder } from '@/lib/wall-order';
@@ -57,6 +58,46 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
   /** The sample an imageRef names ("samples/<id>"), or undefined. */
   const sampleOf = (imageRef: unknown) =>
     typeof imageRef === 'string' && imageRef.startsWith('samples/') ? samples.get(imageRef.slice('samples/'.length)) : undefined;
+
+  /**
+   * The community gallery of the showcase: the clips really rendered and the effects' examples,
+   * each remixed on its sample photo. Publishing and recipes need the app on a machine.
+   */
+  function communityExamples(): CommunityEntry[] {
+    const createdAt = data.builtAt;
+    const moves = data.clips
+      .filter((clip) => !clip.placeholder && presets.has(clip.preset) && samples.has(clip.sample))
+      .map((clip): CommunityEntry => ({
+        id: `clip-${clip.preset}-${clip.sample}`,
+        source: 'example',
+        title: presetName(clip.preset),
+        author: 'Montagio',
+        kind: 'clip',
+        task: 'camera',
+        name: samples.get(clip.sample)!.title.en,
+        previewUrl: showcaseUrl(clip.url),
+        createdAt,
+        reprise: { tab: 'camera', presetId: clip.preset, imageRef: `samples/${clip.sample}`, personal: false },
+      }));
+    const effects = effectItems.flatMap((item) =>
+      item.examples
+        .filter((example) => samples.has(example.sample))
+        .map((example): CommunityEntry => ({
+          id: `effect-${item.id}-${example.sample}`,
+          source: 'example',
+          title: item.name,
+          author: 'Montagio',
+          kind: 'clip',
+          task: 'effect',
+          name: samples.get(example.sample)!.title.en,
+          previewUrl: showcaseUrl(example.url),
+          ...(example.poster ? { posterUrl: showcaseUrl(example.poster) } : {}),
+          createdAt,
+          reprise: { tab: 'effects', effectId: item.id, imageRef: `samples/${example.sample}`, personal: false },
+        })),
+    );
+    return [...effects, ...moves];
+  }
 
   /** The clip of a shot, or the refusal the server would give. */
   function resolveShot(presetId: unknown, modelId: unknown, imageRef: unknown): { clip: Clip } | { refusal: string } {
@@ -370,6 +411,12 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       const record = id ? generations.get(id) : undefined;
       if (!record || (action !== undefined && action !== 'cancel')) return refuse('not-found', 404);
       if ((method === 'GET' && action === undefined) || (method === 'POST' && action === 'cancel')) return json(clone(record));
+    }
+    if (method === 'GET' && resource === 'community' && action === undefined) {
+      const entries = communityExamples();
+      if (!id) return json(entries);
+      const entry = entries.find((candidate) => candidate.id === id);
+      return entry ? json(entry) : refuse('not-found', 404);
     }
     if (resource === 'sequences') {
       if (method === 'POST' && !id) return createSequence(await body(init));

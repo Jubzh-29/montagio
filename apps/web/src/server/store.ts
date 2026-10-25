@@ -29,6 +29,8 @@ export type GenerationRecord = {
   frames?: number;
   /** A demo render: what it is, since no model made it. */
   demo?: DemoKind;
+  /** A demo example rendered by another model than the job's (a 20-step clip for a Turbo job): the one its caption names. */
+  demoModelId?: string;
   idempotencyKey: string;
   createdAt: string;
   updatedAt: string;

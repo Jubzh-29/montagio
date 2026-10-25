@@ -210,7 +210,83 @@ Un job sur une L4 du nouveau compte Modal, le 24/10 à 17:01 : la passe HD avec 
 - **Définitions des nodes** : celles du GPU (`object_info-extensions.json`) sont identiques, infobulles mises à part, à la fixture capturée sur le ComfyUI CPU.
 - La durée passe de 5,06 s à 5,03 s : 161 images à 32 i/s, contre 81 à 16. La dernière image source dure 1/32 s au lieu de 1/16.
 
-## 14. Restyle : spike VACE 14B (24/10)
+## 13. Fonctions finales : espèces, moodboard, palettes, traduction (24/10)
+
+Une série de 5 jobs dans un seul conteneur L4, le 24/10 à 21:40 : 692 s, plus 347 s sans GPU pour télécharger Gemma 4 E4B (8,1 Go, sha256 conforme), soit environ 0,25 $ en tout. La liste des jobs est dans `s3/validation/s6-jobs.txt`, les résultats dans `s3/validation/20261024-194016-s6-validation/`, hors dépôt.
+
+| Job | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|
+| 12 portraits d'espèces (Z-Image, 9:16) | 49 s pour le 1er (chargement compris), puis 9 s chacun | 21,1 à 22,3 Go | ✅ 11 sur 12 : chaque espèce reconnaissable, habillée, en pied. La personne montrait de la peau sous une veste ouverte : la vignette reprend le portrait du 22/10, et le prompt demande désormais une tenue sage |
+| Moodboard (restyle d'après une planche de 2 images) | 85 s, à froid | 22,4 Go | ❌ composition gardée, mais l'image devient une illustration à rayures sans les tons de la planche |
+| Palette prête « bleu-vert et orange » (le port) | 21 s | 22,6 Go | ✅ cadre et bateau intacts, couleurs cinéma |
+| Palette d'après une photo (le port, avec une photo néon) | 33 s | 22,6 Go | ❌ l'édition recopie le contenu de la 2e image au lieu de ses seules couleurs |
+| Traduction en espagnol (Gemma 4, puis Chatterbox) | 49 s, à froid | 20,2 Go | ❌ le texte dit est la transcription française, pas sa traduction |
+| Avatar sur la parole produite (S2V) | 284 s, à froid | 22,2 Go | ✅ l'avatar parle et les lèvres suivent la parole donnée |
+| Traduction en espagnol, deux passes (rattrapage du 25/10, 00:22) | 43 s, à froid | 11,0 Go | ✅ Whisper relit de l'espagnol (« Hola, aquí hay una prueba de… »), 4,7 s, F0 de 174 Hz contre 199 Hz pour la source |
+
+- **Traduction** : un Whisper local (faster-whisper, modèle tiny) relit la parole produite comme les mots français de la source prononcés à l'espagnole. Gemma, à qui l'on demandait de transcrire puis de traduire d'un coup, n'a rendu que la transcription. Le workflow procède maintenant en deux passes : transcription seule (node 3), puis traduction de ce texte (node 7), avec la consigne placée devant par le `StringConcatenate` du cœur (node 6). Validé sur ComfyUI CPU (`node_errors` vide), puis sur le GPU le 25/10 (168 s de conteneur, environ 0,06 $ ; il resterait environ 0,46 $).
+- **Moodboard et palette d'après une photo** : Qwen-Image-Edit-2511 ne fait pas un transfert de style fiable depuis une image de référence. Les deux fonctions restent derrière `MONTAGIO_EXPERIMENTAL` (absentes de l'atelier et refusées par l'API sans lui). Une piste pour plus tard : faire décrire le style de la planche en mots par Gemma 4 (qui voit les images), puis donner ces mots à Z-Image ou à l'édition. Cela demande de partager les poids de Gemma entre deux extensions, ce que le registre refuse aujourd'hui.
+- Toutes les entrées sont fictives : portraits Z-Image, port et voiture de la S3, voix intégrée de Chatterbox.
+
+## 14. Mode Turbo (25/10)
+
+Un conteneur L4 du compte Modal « montagio-2 » (`series`, 13 jobs), le 25/10 entre 2 h 53 et 3 h 24 (heure de Paris), avec l'accord de l'utilisateur. Le workflow `wan22-fun-camera-turbo.api.json` est le second groupe du template officiel : les deux LoRA 4 étapes de lightx2v (déjà au lock pour les transitions), 4 étapes à cfg 1, coupure à l'étape 2, shift 8. Pour comparer à l'identique, chaque job reprend la photo, la description, le négatif et la seed de la prise 20 étapes gardée pour la démo (S3, ou la refonte du 24/10). Résultats, planches et mesures : `s3/validation/perf/`, hors dépôt.
+
+**Temps** : 156 s à froid, puis 136 à 138 s par clip, contre 1 113 à 1 183 s en 20 étapes : **8,3 fois plus rapide**. Sur une RTX 4090, environ 70 s (`estimate_s` 75). Le pic de VRAM ne change pas : la VRAM dynamique de ComfyUI occupe la carte (22,4 Go).
+
+**Mouvement** : rapport entre le Turbo et la prise 20 étapes de l'écart moyen à la première image (niveaux de gris en 208 × 120, 8 i/s). C'est un indicateur d'amplitude, pas de qualité ; le verdict vient des planches.
+
+| Preset | Photo | Mouvement | Verdict |
+|---|---|---|---|
+| Crash Push | voiture | 1,19 | ✅ pousse un peu plus loin ; la dernière image déforme le pare-brise |
+| Crash Push | passante | 0,78 | ✅ avance un peu moins ; le visage est gardé |
+| Slow Push | voiture | 1,11 | ✅ |
+| Pull Back Reveal | voiture | 0,72 | ✅ recule un peu moins ; le sol se brouille en fin de plan |
+| Crane Up | voiture | 1,03 | ✅ presque la même prise |
+| Pull Back & Tilt Up | voiture | 0,64 | ✅ même trajectoire, un peu plus courte |
+| Push & Settle | voiture | 1,09 | ✅ la bascule à mi-clip est nette |
+| Breathing | voiture | 0,91 | ✅ |
+| Pan Left | voiture | 1,02 | ✅ |
+| Pan Left | passante | 0,82 | ❌ la personne se dédouble en fantôme sur les dernières images |
+| Pan Right | voiture | 0,64 | ✅ travelling propre (la prise 20 étapes changeait aussi la voiture) |
+| Drift Left Push | voiture | 0,96 | ✅ |
+| Rise & Push | voiture | 1,11 | ❌ la caméra monte et avance jusqu'à perdre la voiture |
+
+Contrairement à l'avertissement du template, le mouvement de caméra n'est pas perdu : c'est l'encodage de la trajectoire (Plücker) qui le pilote, et la LoRA ne fait que distiller le débruitage. Le Turbo perd un peu de détail fin (rochers, herbe) et déforme parfois la dernière image.
+
+**Décisions**
+- **Turbo par défaut** sur les 7 presets qui avancent, reculent ou montent : Crash Push, Slow Push, Pull Back Reveal, Crane Up, Pull Back & Tilt Up, Push & Settle, Breathing (`models.preferred` passe au modèle Turbo).
+- **Qualité par défaut, Turbo en option** sur Rise & Push (le sujet sort du cadre) et sur les trois mouvements latéraux : Pan Left (fantôme sur une personne), Pan Right et Drift Left Push (même composante latérale, non essayée sur une personne).
+- Le Studio montre trois pastilles : Qualité (~9 min), Turbo (~1 min, « les mêmes mouvements en 4 étapes : un peu moins de détail ») et Rapide (5B, ~2 min). Chaque preset part de son modèle par défaut, jusqu'à ce que le visiteur en choisisse un. La vitrine garde ses clips rendus en 20 étapes.
+
+## 15. Profil 12 Go (25/10)
+
+Un conteneur L4 du compte « montagio-2 » (fonction `lowvram`, 4 jobs), le 25/10 entre 2 h 51 et 3 h 02 (heure de Paris), en même temps que le lot Turbo, avec l'accord de l'utilisateur.
+
+**Méthode.** `infra/modal/vram_cap.py` prend la mémoire de la L4 avant le démarrage de ComfyUI : 10 622 Mio tenus, 11 776 Mio (11,5 Gio) laissés libres, soit une carte de 12 Go dont le bureau garde environ un demi-gigaoctet. La RAM du conteneur est plafonnée à 32 Gio, une limite stricte. ComfyUI v0.41.0 mesure la pression mémoire sur tout le GPU (NVML) : il traite la mémoire tenue comme celle d'une autre application, et une allocation au-delà échouerait comme sur la vraie carte.
+
+**Aucun nouveau poids.** Ce sont les fp8 du lock : ComfyUI annonce « DynamicVRAM support detected and enabled » et prépare chaque modèle « for dynamic VRAM loading » (Fun Camera : 14,6 Go mis en attente pour 11,5 Gio libres). La part d'un modèle qui ne tient pas passe entre deux étapes ; le calcul, lui, ne change pas.
+
+| Job | 12 Go, à froid | 24 Go, à froid | Pic de ComfyUI | Verdict |
+|---|---|---|---|---|
+| Turbo, Crash Push (voiture, seed 7) | 153,5 s | 156,2 s (partie 14, même job) | 11,46 Gio | ✅ même mouvement que la prise 20 étapes |
+| Effet Squish (voiture) | 174 s | 175 à 184 s (S2) | 11,29 Gio | ✅ |
+| Rapide (5B), Crash Push | 192,9 s | 190 s (S2) | 11,26 Gio | ✅ suit le texte, comme à 24 Go |
+| Z-Image, 1280 × 720 | 48 s | 45 s (S2) | 11,27 Gio | ✅ |
+
+Le pic de ComfyUI est le pic de `nvidia-smi` moins les 10 817 Mio que tenait `vram_cap.py`. Le conteneur est resté sous sa limite de 32 Gio de RAM (aucun arrêt). Le `VmRSS` de ComfyUI, 45 Gio, compte les fichiers de poids projetés en mémoire (un cache que le noyau peut libérer) : ce n'est pas un besoin. Moins de 32 Gio n'a pas été essayé.
+
+Une L4 calcule à peu près comme une RTX 4070 de 12 Go : les temps du profil sont gardés tels quels dans le registre (`low_vram`). Une RTX 3060 sera plus lente.
+
+**Décisions**
+- Le profil `12gb` (`MONTAGIO_VRAM_PROFILE=12gb`, posé par l'installeur) propose le Turbo, le 5B, le texte vers image et les effets (`low_vram_validated: 2026-10-25`), avec leurs temps mesurés ici.
+- Qualité (20 étapes) et les autres extensions restent masquées dans ce profil tant qu'aucun rendu à 12 Go ne les a validées (règle de coupe). Les mouvements latéraux et Rise & Push y partent donc en Turbo, avec ses défauts de la partie 14.
+- L'installeur propose ce profil sur une carte de 12 à 20 Go, au lieu de « l'app seule » ; `--low-vram` le demande directement.
+- **Pas de GGUF.** Les fp8 tiennent déjà dans 12 Go avec la VRAM dynamique, sans nouveau poids ni nouveau pack de nodes. Licences relues le 25/10 pour mémoire, si un jour il fallait réduire la RAM ou le disque : `QuantStack/Wan2.2-Fun-A14B-Control-Camera-GGUF` (apache-2.0, `base_model` alibaba-pai/Wan2.2-Fun-A14B-Control-Camera, révision `7d2c3e06`), `city96/Wan2.1-I2V-14B-480P-gguf` (apache-2.0, base Wan-AI/Wan2.1-I2V-14B-480P, révision `b4b6b3b3`), le loader `city96/ComfyUI-GGUF` (Apache-2.0 selon GitHub). Rien n'entre au lock, ni dans `allowed-sources.yaml` ou `allowed-nodes.yaml`.
+
+**Coût des parties 14 et 15** : environ 31 min de L4 pour le Turbo, 12 min pour le profil 12 Go et 10 min de CPU pour les poids manquants (les deux LoRA, une LoRA d'effet, le 5B et sa VAE), soit environ 0,90 $ (estimation ; le chiffre du tableau de bord n'est pas lu).
+
+## 16. Restyle : spike VACE 14B (24/10)
 
 Avec l'accord de l'utilisateur (≈ 1,20 $ annoncés, plafond 1,50 $), sur le compte Modal montagio-2 : les poids téléchargés par un conteneur sans GPU (≈ 0,05 $), puis deux conteneurs L4 en parallèle qui ont lancé `infra/modal/spike_restyle.py` (0,25 $ et 0,18 $ au relevé ; 15,18 $ sur le mois avant le spike). Rien n'était câblé : le script fait l'image de référence avec l'extension d'édition (smoke `--extension edit`), puis envoie à ComfyUI des graphes du cœur. Résultats dans `s3/restyle-spike/`, hors dépôt (clips, planches, `results.jsonl`, vidéos côte à côte).
 
@@ -241,7 +317,7 @@ Avec l'accord de l'utilisateur (≈ 0,30 $) : une `series` de trois runs du vrai
 - **Daté** : `gpu_validated: 2026-10-24`. Le texte seul ne sert que sans l'extension d'édition ; un style demandé tient avec la 1re image restylisée (le chemin par défaut) ou une image à suivre.
 - Les définitions `/object_info` du GPU (`object_info-extensions.json`) couvrent les classes du workflow.
 
-## 15. Mouvement 30 s, personnage composé, bibliothèque Motion (24/10), remplacement d'objet (25/10)
+## 17. Mouvement 30 s, personnage composé, bibliothèque Motion (24/10), remplacement d'objet (25/10)
 
 Sur le compte Modal montagio-2, avec l'accord de l'utilisateur (« Oui, utilise montagio-2 »), lot par lot. Relevé : les 8 apps lancées de 19:40 à 22:04 (heure de Paris) ont coûté 5,15 $, dont 1,70 $ pour la série du transfert de 30 s ; au-delà des ≈ 2 $ visés, ce qui a été dit à l'utilisateur. Le compte affichait 21,13 $ sur le mois le 24/10 au soir. Résultats hors dépôt, sur le volume `montagio-results` (`runs/20261024-…`).
 

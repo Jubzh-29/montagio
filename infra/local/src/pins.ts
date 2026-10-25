@@ -5,6 +5,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { VramProfile } from './checks.ts';
 
 export type TorchPin = { torch: string; torchvision: string; cuda: string; minDriverCuda: [number, number] };
 
@@ -131,8 +132,11 @@ export function parseLockWeights(text: string): LockWeight[] {
   });
 }
 
-/** One extension of registry/extensions.yaml: its id, priority, requirements, and the day a GPU session validated it. */
-export type ExtensionPin = { id: string; priority: number; requires: string[]; gpuValidated: string | null };
+/**
+ * One extension of registry/extensions.yaml: its id, priority, requirements, the day a GPU session validated it,
+ * and the day one held to 12 GB did (the 12 GB profile installs only those).
+ */
+export type ExtensionPin = { id: string; priority: number; requires: string[]; gpuValidated: string | null; lowVramValidated: string | null };
 
 /**
  * registry/extensions.yaml, kept in block style (`  - id: …` then `    key: value`)
@@ -166,6 +170,7 @@ export function parseExtensionsConfig(text: string): ExtensionPin[] {
         .map((required) => required.trim())
         .filter(Boolean),
       gpuValidated: !entry.gpu_validated || entry.gpu_validated === 'null' ? null : entry.gpu_validated,
+      lowVramValidated: !entry.low_vram_validated || entry.low_vram_validated === 'null' ? null : entry.low_vram_validated,
     };
   });
 }
@@ -185,13 +190,13 @@ export function readExtensions(repoRoot: string): ExtensionPin[] {
 /**
  * The extensions whose weights to install, by priority; the same rule as the app's
  * (enabledExtensions of @montagio/registry): unset, empty or "validated" keeps those a GPU
- * session validated, "all", "none", or a comma-separated list of ids.
+ * session validated (in the 12 GB profile: one held to 12 GB), "all", "none", or a comma-separated list of ids.
  */
-export function selectExtensions(config: ExtensionPin[], flag: string | null | undefined): string[] {
+export function selectExtensions(config: ExtensionPin[], flag: string | null | undefined, profile: VramProfile = 'standard'): string[] {
   const byPriority = [...config].sort((a, b) => a.priority - b.priority);
   const value = flag?.trim() ?? '';
   if (value === '' || value === 'validated') {
-    const kept = new Set(byPriority.filter((e) => e.gpuValidated !== null).map((e) => e.id));
+    const kept = new Set(byPriority.filter((e) => (profile === '12gb' ? e.lowVramValidated : e.gpuValidated) !== null).map((e) => e.id));
     for (let changed = true; changed; ) {
       changed = false;
       for (const e of byPriority) {
@@ -225,8 +230,8 @@ export function selectExtensions(config: ExtensionPin[], flag: string | null | u
  */
 export const INSTALL_DEFAULT_EXTENSIONS: readonly string[] = ['effects'];
 
-export function installDefaultExtensions(config: ExtensionPin[]): string[] {
-  return selectExtensions(config, 'validated').filter((id) => INSTALL_DEFAULT_EXTENSIONS.includes(id));
+export function installDefaultExtensions(config: ExtensionPin[], profile: VramProfile = 'standard'): string[] {
+  return selectExtensions(config, 'validated', profile).filter((id) => INSTALL_DEFAULT_EXTENSIONS.includes(id));
 }
 
 /** The weights of the camera presets, plus those of the extensions in `enabled`. */

@@ -36,6 +36,16 @@ export const REQUIRED_BINDINGS: Record<Capability, BindingKey[]> = {
 export const kebabId = z.string().max(64).regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'must be kebab-case (a-z, 0-9, -)');
 const resolution = z.enum(['480p', '720p']);
 const binding = z.object({ node: z.string().min(1), field: z.string().min(1) }).strict();
+/** A day a GPU session validated something, or null until one does. */
+export const gpuDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be a date (YYYY-MM-DD) or null').nullable();
+const estimates = z.object({ '480p': z.number().positive(), '720p': z.number().positive().optional() }).strict();
+
+/**
+ * The memory profiles of an install: `standard` for a 24 GB card, `12gb` for a 12 to 20 GB one, where the
+ * fp8 weights stream through ComfyUI's dynamic VRAM. A profile offers only what a GPU session ran within it.
+ */
+export const VRAM_PROFILES = ['standard', '12gb'] as const;
+export type VramProfile = (typeof VRAM_PROFILES)[number];
 
 export const ModelSchema = z
   .object({
@@ -43,7 +53,8 @@ export const ModelSchema = z
     id: kebabId,
     name: z.string().min(1).max(60),
     kind: z.enum(['video', 'image']),
-    tier: z.enum(['quality', 'fast']),
+    /** quality: every step; turbo: the same model in a few distilled steps; fast: a smaller model. */
+    tier: z.enum(['quality', 'turbo', 'fast']),
     capabilities: z.array(z.enum(CAPABILITIES)).min(1),
     license: z.enum(ALLOWED_WEIGHT_LICENSES),
     weights: z.array(kebabId).min(1),
@@ -56,9 +67,9 @@ export const ModelSchema = z
         max_duration_s: z.number().int().min(1).max(30),
       })
       .strict(),
-    estimate_s: z
-      .object({ '480p': z.number().positive(), '720p': z.number().positive().optional() })
-      .strict(),
+    estimate_s: estimates,
+    /** The 12 GB profile: the day a GPU held to 12 GB ran the model (null: not offered there) and its times there. */
+    low_vram: z.object({ gpu_validated: gpuDate, estimate_s: estimates }).strict().optional(),
   })
   .strict()
   .superRefine((model, ctx) => {

@@ -22,10 +22,11 @@ import {
 import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
+import { entryAsHistoryItem, type CommunityEntry } from '@/lib/community';
 import { recipeUrlOf } from '@/lib/recipe-url';
 import { applyReprise, replayOn, reproducedRecipeUrl, reproducibleResult, type Replay } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
-import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
+import { primaryLabelKey, showcaseArrival, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { motionFrames, motionWindows } from '@montagio/presets/browser';
 import { useMotionPaused } from '@/lib/use-motion';
 import { needsConsent } from '@/lib/consent';
@@ -57,7 +58,7 @@ import { EffectFields } from './EffectFields';
 import { OutfitSource } from './OutfitSource';
 import { EffectWall } from './EffectWall';
 import { Header } from './Header';
-import { ModelPicker } from './ModelPicker';
+import { ModelPicker, TIER_LABEL } from './ModelPicker';
 import { Monitor, type GenerationState, type TrackedJob, type UploadState } from './Monitor';
 import { DrawAtelier } from './DrawAtelier';
 import { PhotoAtelier, type AtelierPhoto } from './PhotoAtelier';
@@ -271,6 +272,12 @@ export function Studio() {
   // The showcase opens on a clip already playing: the first sample photo with the first preset, as if
   // "Show clip" had been pressed, unless the visitor picked something while the catalogue loaded.
   const touched = useRef(false);
+  // A model the visitor picked (or Reuse brought back) stays; until then each preset starts on its own default model.
+  const modelPicked = useRef(false);
+  const pickModel = (id: string) => {
+    modelPicked.current = true;
+    setModelId(id);
+  };
   const [arrivalId, setArrivalId] = useState<string | null>(null);
   const followJob = useRef(false);
   const statusRef = useRef<HTMLDivElement>(null);
@@ -495,7 +502,7 @@ export function Studio() {
   };
 
   /** The sample photo, copied by the server: its origin is known, so no effect on it asks for consent, and what it shows too. */
-  const loadSample = async () => {
+  const loadSample = async (keepScene = false) => {
     if (busyRef.current) return;
     touched.current = true;
     const token = ++uploadToken.current;
@@ -504,8 +511,8 @@ export function Studio() {
     const localUrl = `/media/demo-assets/images/${sample.file}`;
     setJob({ status: 'idle' });
     setPhotoPrompt(undefined);
-    // The sample comes described, unless the visitor typed a description before it: theirs stays.
-    if (sceneOfPhoto.current || !prompt.trim()) {
+    // The sample comes described, unless the visitor typed a description before it (or a recipe brought one): theirs stays.
+    if (!keepScene && (sceneOfPhoto.current || !prompt.trim())) {
       setPrompt(t(sample.scene));
       sceneOfPhoto.current = true;
     }
@@ -578,8 +585,12 @@ export function Studio() {
   };
 
   const onPreset = (id: string) => {
-    if (mode === 'single') setPresetId(id);
-    else setShots((current) => (current.length < MAX_SHOTS ? [...current, { presetId: id, prompt: '' }] : current));
+    if (mode === 'single') {
+      setPresetId(id);
+      // Turbo by default where a GPU session validated it for this move, the 20 steps elsewhere.
+      const preferred = presets.find((preset) => preset.id === id)?.defaultModel;
+      if (!modelPicked.current && preferred && models.some((model) => model.id === preferred)) setModelId(preferred);
+    } else setShots((current) => (current.length < MAX_SHOTS ? [...current, { presetId: id, prompt: '' }] : current));
   };
 
   const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
@@ -677,7 +688,8 @@ export function Studio() {
       : !rights
       ? 'motionNeedsRights'
       : null
-    : upload.status !== 'ready' && !motionComposing
+    // A composed start photo, or a composed character, needs no photo of its own: no hint asks for one then.
+    : upload.status !== 'ready' && !composing && !motionComposing
     ? 'generateHint'
     : busy
     ? null
@@ -769,7 +781,7 @@ export function Studio() {
     setSubjectFor(back.photoPrompt);
     setSubject(back.subject ?? defaultSubject(back.photoPrompt, 120));
     if (back.presetId) setPresetId(back.presetId);
-    if (back.modelId && models.some((model) => model.id === back.modelId)) setModelId(back.modelId);
+    if (back.modelId && models.some((model) => model.id === back.modelId)) pickModel(back.modelId);
     setPrompt(restoredScene(back));
     // A photo gone with the data: the description waits for the visitor to add it again.
     sceneOfPhoto.current = back.photo !== undefined;
@@ -809,7 +821,11 @@ export function Studio() {
     setCanvas({ view: 'gallery', before: 'gallery' });
     if (back.remixGenerationId && back.presetId) {
       void openRemix(back.presetId, `/api/generations/${encodeURIComponent(back.remixGenerationId)}/preset`, back.remixGenerationId);
+    } else if (back.remixPresetUrl && back.presetId) {
+      void openRemix(back.presetId, back.remixPresetUrl);
     }
+    // A community share file or example brings no photo of its own: the tab's sample photo stands in.
+    if (back.sample && !IS_SHOWCASE) void loadSample(Boolean(back.prompt));
     // The link did its work: the address keeps the tab only. A photo goes to the tab the link asked for.
     window.history.replaceState(null, '', tabHref(item.kind === 'photo' ? tab : back.tab));
   };
@@ -819,10 +835,16 @@ export function Studio() {
     const applied = `${from}|${reproduce}`;
     if (!from || catalog !== 'ready' || busy || appliedFrom.current === applied) return;
     appliedFrom.current = applied;
-    apiFetch('/api/history')
-      .then((res) => jsonOrThrow<HistoryItem[]>(res))
-      .then((items) => {
-        const item = items.find((entry) => entry.key === from);
+    // An entry of the community gallery comes from there, a creation of this machine from the history.
+    const lookup = from.startsWith('community:')
+      ? apiFetch(`/api/community/${encodeURIComponent(from.slice('community:'.length))}`)
+          .then((res) => jsonOrThrow<CommunityEntry>(res))
+          .then(entryAsHistoryItem)
+      : apiFetch('/api/history')
+          .then((res) => jsonOrThrow<HistoryItem[]>(res))
+          .then((items) => items.find((entry) => entry.key === from));
+    lookup
+      .then((item) => {
         if (item) restore(item, { reproduce });
       })
       .catch(() => undefined);
@@ -914,16 +936,15 @@ export function Studio() {
         setCatalog('ready');
         setPresetId((current) => current ?? presetList[0]?.id ?? null);
         setModelId((current) => current ?? presetList[0]?.defaultModel ?? null);
-        const sample = info?.samples[0];
+        // Effects first: the showcase opens on its first effect rendered on a sample photo, unless the URL asks for another tab.
+        const opening = info ? showcaseArrival(info.samples, shown?.effects, new URLSearchParams(window.location.search).get('tab')) : undefined;
         const first = presetList[0];
-        if (sample && first && !touched.current) {
+        if (opening && first && !touched.current) {
+          const { sample, effect } = opening;
           setUpload({ status: 'ready', localUrl: sample.url, imageRef: sample.imageRef, personal: false });
           setPrompt(sceneOf(sample.prompt));
           sceneOfPhoto.current = true;
           setCanvas({ view: 'result', before: 'gallery' });
-          // Effects first: the showcase opens on its first effect rendered on this photo, unless the URL asks for another tab.
-          const asked = new URLSearchParams(window.location.search).get('tab');
-          const effect = !asked || asked === 'effects' ? shown?.effects.find((entry) => entry.samples?.includes(sample.id)) : undefined;
           if (effect) setEffectId(effect.id);
           const arrival = effect
             ? submit('job', { imageRef: sample.imageRef, effectId: effect.id }, undefined, '/api/effects')
@@ -940,10 +961,26 @@ export function Studio() {
   }, []);
 
   const generate = () => {
-    if (submitting.current || !canGenerate || (tab !== 'motion' && upload.status !== 'ready')) return;
+    if (submitting.current || !canGenerate) return;
+    // A composed start photo needs no photo of its own: the composition is the start.
+    const composed = composing && selectedEffect !== undefined && !selectedHook ? selectedEffect : null;
+    // Nor do the Motion tab's uses: a clip, with its own images or a composed character.
+    if (!composed && tab !== 'motion' && upload.status !== 'ready') return;
     followJob.current = true;
     setTake({ expected_s: mode === 'sequence' && !remix ? filmEstimate : estimate });
     moveCanvas('generate');
+    if (composed) {
+      const body = {
+        compose: composeBody(compose),
+        effectId: composed.id,
+        subject: subject.trim(),
+        ...(askConsent ? { consent } : {}),
+        ...(replay?.seed !== undefined ? { seed: replay.seed } : {}),
+      };
+      void submit('job', body, undefined, '/api/effects');
+      return;
+    }
+    // The Motion tab's uses need no start photo (below); the other tabs check it after them.
     const userPrompt = prompt.trim() || undefined;
     // Reproduce sends the result's seed back: the same choices give the same workflow.
     const seed = replay?.seed !== undefined ? { seed: replay.seed } : {};
@@ -1002,8 +1039,7 @@ export function Studio() {
         return;
       }
       if (!selectedEffect) return;
-      const start = composing ? { compose: composeBody(compose) } : { imageRef: upload.imageRef };
-      const body = { ...start, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}), ...seed };
+      const body = { imageRef: upload.imageRef, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}), ...seed };
       void submit('job', body, undefined, '/api/effects');
       return;
     }
@@ -1087,6 +1123,8 @@ export function Studio() {
         : undefined;
 
   const selectedModel = models.find((model) => model.id === modelId);
+  // On a 12 GB card the 20-step model is not offered: say so where the models are chosen.
+  const profileNote = extensions?.vramProfile === '12gb' ? t('profile12Note') : undefined;
   const estimate =
     swapping
       ? (extensions?.estimates.swap ?? 0)
@@ -1209,7 +1247,7 @@ export function Studio() {
   const speechSeconds = estimateSpeech(speechText, speechLanguage);
   const slate = slateMove && [
     slateMove,
-    tab !== 'effects' && tab !== 'avatar' && tab !== 'motion' && selectedModel && t(selectedModel.tier === 'quality' ? 'tierQuality' : 'tierFast'),
+    tab !== 'effects' && tab !== 'avatar' && tab !== 'motion' && selectedModel && t(TIER_LABEL[selectedModel.tier]),
     tab === 'motion'
       ? motionVideo.status === 'ready' && motionVideo.duration_s !== undefined && t('slateSpec', { s: Math.round(Math.min(motionVideo.duration_s, restyling || swapping ? RESTYLE_SECONDS : Infinity) * 10) / 10 })
       : tab === 'avatar'
@@ -1235,7 +1273,7 @@ export function Studio() {
     : tracked?.kind === 'job' && tracked.record.task === 'swap'
       ? extensions?.swapModel
     : tracked?.kind === 'generation'
-      ? models.find((model) => model.id === tracked.record.modelId)
+      ? catalogModels.find((model) => model.id === (tracked.record.demoModelId ?? tracked.record.modelId))
       : tracked?.kind === 'sequence'
         ? (models.find((model) => model.id === tracked.record.shots[0]?.modelId) ?? selectedModel)
         : undefined;
@@ -1464,9 +1502,10 @@ export function Studio() {
                 models={models}
                 loading={catalog === 'loading'}
                 selectedId={modelId}
-                onSelect={setModelId}
+                onSelect={pickModel}
                 onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
                 className={styles.modelsInFields}
+                {...(profileNote ? { note: profileNote } : {})}
               />
             </>
             )
@@ -1492,9 +1531,10 @@ export function Studio() {
                     name="model-by-generate"
                     models={models}
                     selectedId={modelId}
-                    onSelect={setModelId}
+                    onSelect={pickModel}
                     onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
                     className={styles.modelsByGenerate}
+                    {...(profileNote ? { note: profileNote } : {})}
                   />
                 )}
                 {primaryLabel ? (
@@ -1557,6 +1597,7 @@ export function Studio() {
                   kind={kind}
                   photo={upload}
                   estimates={extensions?.estimates ?? { t2i: 12 }}
+                  experimental={extensions?.experimental ?? []}
                   onUse={(photo) => takePhoto(photo, kind)}
                   onClose={() => closeAtelier(kind)}
                   licenseOf={(id) =>
@@ -1736,6 +1777,11 @@ export function Studio() {
                   {!IS_SHOWCASE && tracked.record.task === 'avatar' && extensions?.estimates.voiceChange !== undefined && (
                     <a className={styles.buttonSecondary} href={`/voice?from=${encodeURIComponent(tracked.record.id)}`}>
                       {t('avatarChangeVoice')}
+                    </a>
+                  )}
+                  {!IS_SHOWCASE && tracked.record.task === 'avatar' && extensions?.estimates.translate !== undefined && (
+                    <a className={styles.buttonSecondary} href={`/translate?from=${encodeURIComponent(tracked.record.id)}`}>
+                      {t('avatarTranslate')}
                     </a>
                   )}
                 </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { useI18n, type MessageKey } from '@/i18n';
 import { apiFetch, jsonOrThrow } from '@/lib/api';
 import type { CharacterSummary, UploadResult } from '@/lib/api-types';
@@ -147,7 +147,7 @@ export function ComposeSlots({
   texts = EFFECT_TEXTS,
 }: {
   value: ComposeState;
-  onChange: (state: ComposeState) => void;
+  onChange: Dispatch<SetStateAction<ComposeState>>;
   disabled: boolean;
   roles?: readonly ComposeRole[];
   required?: ComposeRole;
@@ -173,7 +173,7 @@ export function ComposeSlots({
         <span className={styles.styleLabel} aria-hidden="true">
           {t('composeLabel')}
         </span>
-        <button type="button" className={styles.chip} aria-pressed={value.on} disabled={disabled} onClick={() => onChange({ ...value, on: !value.on })}>
+        <button type="button" className={styles.chip} aria-pressed={value.on} disabled={disabled} onClick={() => onChange((current) => ({ ...current, on: !current.on }))}>
           {t(texts.toggle)}
         </button>
       </div>
@@ -189,7 +189,7 @@ export function ComposeSlots({
               {...(value[role] ? { slot: value[role] } : {})}
               characters={characters}
               disabled={disabled}
-              onSlot={(slot) => onChange({ ...value, [role]: slot })}
+              onSlot={(slot) => onChange((current) => ({ ...current, [role]: slot }))}
             />
           ))}
           <p className={styles.hint} role="status">

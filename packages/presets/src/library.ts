@@ -16,6 +16,8 @@ import { effectLoraProblem } from './effects';
 import { parseEffectPreset, parsePreset, parseTransitionPreset } from './parse';
 import type { EffectPreset, Preset, TransitionPreset } from './schema';
 
+const TIER_ORDER: readonly ModelEntry['tier'][] = ['quality', 'turbo', 'fast'];
+
 export type Library = {
   presets: Map<string, Preset>;
   /** Repository-relative file of each preset, e.g. "presets/crash-push.yaml". */
@@ -183,6 +185,10 @@ export async function loadLibrary(root: string, opts: { presets?: boolean } = {}
       problems.push((error as Error).message);
     }
   }
+  // Every step, then the same model in a few steps, then the smaller models: the order of the Studio's pills.
+  const byTier = [...models.values()].sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier));
+  models.clear();
+  for (const model of byTier) models.set(model.id, model);
 
   const extensionsDir = join(root, 'registry', 'extensions');
   for (const name of await yamlFiles(extensionsDir)) {

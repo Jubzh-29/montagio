@@ -20,8 +20,16 @@ test('install options are read', () => {
       demo: false,
       ports: { comfy: 8288 },
       extensions: null,
+      lowVram: false,
     },
   });
+});
+
+test('--low-vram asks for the 12 GB profile of the full install', () => {
+  expect(parseArgs(['install', '--low-vram']).options.lowVram).toBe(true);
+  expect(parseArgs(['install']).options.lowVram).toBe(false);
+  expect(() => parseArgs(['install', '--low-vram', '--app-only'])).toThrow(/--low-vram is a profile of the full install/);
+  expect(() => parseArgs(['start', '--low-vram'])).toThrow(/--low-vram only goes with install/);
 });
 
 test('--extensions is read for install only, and left to MONTAGIO_EXTENSIONS or the default when absent', () => {

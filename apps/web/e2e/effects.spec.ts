@@ -36,6 +36,22 @@ test('an effect on an imported photo asks for consent', async ({ page }) => {
   await expect(generate).toBeEnabled();
 });
 
+test('an effect on a composed start photo needs no photo of its own', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Squish' }).click();
+  await page.getByRole('button', { name: 'Character · Location · Product' }).click();
+  await page.setInputFiles('#compose-character', sampleImage);
+  await page.setInputFiles('#compose-location', sampleImage);
+  await page.getByRole('checkbox', { name: /I am the person in this photo/ }).check();
+  await expect(page.getByText('Pick a photo to start.')).toHaveCount(0);
+  const request = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/api/effects'));
+  await page.getByRole('button', { name: /^Generate/ }).click();
+  const body = (await request).postDataJSON() as { effectId: string; compose?: unknown; imageRef?: string };
+  expect(body).toMatchObject({ effectId: 'squish', compose: expect.anything() });
+  expect(body.imageRef).toBeUndefined();
+  await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
+});
+
 test('the wall requests no preview that does not exist', async ({ page }) => {
   const missing: string[] = [];
   page.on('response', (response) => {

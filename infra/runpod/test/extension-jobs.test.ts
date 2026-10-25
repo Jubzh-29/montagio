@@ -25,6 +25,7 @@ test('one job per extension, in the order of the session, each accepted by Comfy
     ['hook-edit:wardrobe-swap', 'qwen-image-edit-2511'],
     ['transition:wardrobe-swap', 'wan22-flf2v-transition'],
     ['voice:cloned', 'chatterbox-mtl-voice'],
+    ['translate:fr', 'gemma4-translate'],
     ['avatar', 'wan22-s2v-avatar'],
     ['music', 'ace-step15-music'],
     ['upscale', 'seedvr2-upscale'],
@@ -47,6 +48,7 @@ test('each job uploads the files it reads and nothing else', () => {
   expect(uploads.music).toEqual([]);
   // with --voice, the voice speaks with the sample
   expect(uploads.voice).toEqual([{ node: '4', field: 'audio', path: '/data/voice.flac' }]);
+  expect(uploads.translate).toEqual([{ node: '1', field: 'audio', path: '/data/speech.flac' }]);
   expect(uploads['voice-change']).toEqual([
     { node: '1', field: 'audio', path: '/data/speech.flac' },
     { node: '4', field: 'audio', path: '/data/voice.flac' },
@@ -93,6 +95,7 @@ test('an extension record carries the sha256 of its photo', () => {
     'hook-edit': '/data/photo.png',
     transition: '/data/photo.png',
     voice: null,
+    translate: null,
     avatar: '/data/photo.png',
     music: null,
     upscale: null,
@@ -238,4 +241,15 @@ describe('jobTexts (smoke --text)', () => {
     expect(() => jobTexts(['edit=snow', 'edit=rain'], ['edit'])).toThrow(/two texts for the edit job/);
     expect(() => jobTexts(['snow'], ['upscale', 'transition'])).toThrow(/no job of this run reads a text/);
   });
+});
+
+test('the edit reads a second image with --ref (a palette, a moodboard sheet), never with a mask', () => {
+  const [edit] = extensionJobs(library, { ...base, jobs: ['edit'], input: '/p.png', ref: '/data/sheet.png', text: { edit: 'Restyle image 1 with the look of image 2.' } });
+  expect(edit!.tag).toBe('edit:ref');
+  expect(edit!.files).toEqual([
+    { node: '41', field: 'image', path: '/p.png' },
+    { node: '42', field: 'image', path: '/data/sheet.png' },
+  ]);
+  expect(checkWorkflow(edit!.workflow, info, { skip: ['41.image', '42.image'] })).toEqual([]);
+  expect(() => extensionJobs(library, { ...base, jobs: ['edit'], input: '/p.png', ref: '/r.png', mask: '/m.png' })).toThrow(/--mask and --ref/);
 });

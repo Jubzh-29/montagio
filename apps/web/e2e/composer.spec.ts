@@ -49,15 +49,24 @@ test.describe('on a 1440×900 screen', () => {
 
   test('once an image is made in the atelier, Use this photo is the accent button', async ({ page }) => {
     await page.goto('/?tab=camera');
+    // The accent as the page computes it (--rec): a button read mid-transition gives a colour in between.
+    const accent = await page.evaluate(() => {
+      const probe = document.body.appendChild(document.createElement('span'));
+      probe.style.backgroundColor = 'var(--rec)';
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    });
     await page.getByRole('button', { name: 'Text to image', exact: true }).click();
     await page.getByRole('textbox', { name: 'Describe the photo' }).fill('a red fox in the snow');
     const create = page.getByRole('button', { name: /^Create image/ });
-    const accent = await create.evaluate((element) => getComputedStyle(element).backgroundColor);
+    // toHaveCSS waits out the background's transition from disabled to enabled.
+    await expect(create).toHaveCSS('background-color', accent);
     await create.click();
     const use = page.getByRole('button', { name: 'Use this photo', exact: true });
     await expect(use).toBeVisible({ timeout: 15_000 });
-    expect(await use.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(accent);
-    expect(await create.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(accent);
+    await expect(use).toHaveCSS('background-color', accent);
+    await expect(create).not.toHaveCSS('background-color', accent);
   });
 });
 

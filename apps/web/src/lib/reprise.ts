@@ -26,6 +26,10 @@ export type StudioRestore = {
   modelId?: string;
   shots?: { presetId: string; prompt: string }[];
   remixGenerationId?: string;
+  /** The preset text to reopen in the remix editor (a community entry's). */
+  remixPresetUrl?: string;
+  /** Start from the tab's sample photo. */
+  sample?: true;
   notice?: 'photo-missing';
   /** Reproduce: the seed of the result, sent back with the next render (a film: one per shot). */
   seed?: number;
@@ -91,6 +95,8 @@ export function applyReprise(item: HistoryItem, opts: { reproduce?: boolean } = 
   if (reprise.presetId) restore.presetId = reprise.presetId;
   if (reprise.modelId) restore.modelId = reprise.modelId;
   if (reprise.remixGenerationId) restore.remixGenerationId = reprise.remixGenerationId;
+  if (reprise.presetUrl) restore.remixPresetUrl = reprise.presetUrl;
+  if (reprise.sample && !reprise.imageRef) restore.sample = true;
   if (reprise.shots) restore.shots = reprise.shots.map((shot) => ({ presetId: shot.presetId, prompt: shot.prompt ?? '' }));
   if (reprise.effectId) restore.effectId = reprise.effectId;
   if (reprise.hookId) restore.hookId = reprise.hookId;
