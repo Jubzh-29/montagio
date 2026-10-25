@@ -15,7 +15,7 @@ export type BackendJob = {
 export type BackendKind = 'demo' | 'local' | 'hosted';
 
 /** What a job delivers: a clip (camera presets, upscale, avatar), a soundtrack or speech, or a still. */
-export const OUTPUT_KINDS = ['video', 'audio', 'image'] as const;
+export const OUTPUT_KINDS = ['video', 'audio', 'image', 'file'] as const;
 export type OutputKind = (typeof OUTPUT_KINDS)[number];
 
 /** Which output of a finished job is its result: the first of `output` (default "video"), from `outputNode` first when given. */

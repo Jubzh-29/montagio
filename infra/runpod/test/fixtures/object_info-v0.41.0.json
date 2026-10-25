@@ -6531,5 +6531,248 @@
    "STRING"
   ],
   "python_module": "comfy_extras.nodes_string"
+ },
+ "MontagioTranscribeWords": {
+  "input": {
+   "required": {
+    "audio": [
+     "AUDIO",
+     {}
+    ],
+    "model": [
+     "COMBO",
+     {
+      "default": "whisper-large-v3-turbo",
+      "multiselect": false,
+      "options": [
+       "whisper-large-v3-turbo"
+      ]
+     }
+    ],
+    "language": [
+     "COMBO",
+     {
+      "default": "auto",
+      "multiselect": false,
+      "options": [
+       "auto",
+       "af",
+       "am",
+       "ar",
+       "as",
+       "az",
+       "ba",
+       "be",
+       "bg",
+       "bn",
+       "bo",
+       "br",
+       "bs",
+       "ca",
+       "cs",
+       "cy",
+       "da",
+       "de",
+       "el",
+       "en",
+       "es",
+       "et",
+       "eu",
+       "fa",
+       "fi",
+       "fo",
+       "fr",
+       "gl",
+       "gu",
+       "haw",
+       "ha",
+       "he",
+       "hi",
+       "hr",
+       "ht",
+       "hu",
+       "hy",
+       "id",
+       "is",
+       "it",
+       "ja",
+       "jw",
+       "ka",
+       "kk",
+       "km",
+       "kn",
+       "ko",
+       "la",
+       "lb",
+       "ln",
+       "lo",
+       "lt",
+       "lv",
+       "mg",
+       "mi",
+       "mk",
+       "ml",
+       "mn",
+       "mr",
+       "ms",
+       "mt",
+       "my",
+       "ne",
+       "nl",
+       "nn",
+       "no",
+       "oc",
+       "pa",
+       "pl",
+       "ps",
+       "pt",
+       "ro",
+       "ru",
+       "sa",
+       "sd",
+       "si",
+       "sk",
+       "sl",
+       "sn",
+       "so",
+       "sq",
+       "sr",
+       "su",
+       "sv",
+       "sw",
+       "ta",
+       "te",
+       "tg",
+       "th",
+       "tk",
+       "tl",
+       "tr",
+       "tt",
+       "uk",
+       "ur",
+       "uz",
+       "vi",
+       "yi",
+       "yo",
+       "yue",
+       "zh"
+      ]
+     }
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "audio",
+    "model",
+    "language"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "STRING"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "words_json"
+  ],
+  "output_matchtypes": null,
+  "name": "MontagioTranscribeWords",
+  "display_name": "Montagio Transcribe Words",
+  "description": "Whisper's transcription of a speech, each word with its start and end in seconds (JSON).",
+  "python_module": "custom_nodes.montagio",
+  "category": "Montagio",
+  "output_node": false,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": null,
+  "essentials_category": null,
+  "has_intermediate_output": false
+ },
+ "SaveText": {
+  "input": {
+   "required": {
+    "text": [
+     "STRING",
+     {
+      "forceInput": true,
+      "multiline": false
+     }
+    ],
+    "filename_prefix": [
+     "STRING",
+     {
+      "default": "ComfyUI",
+      "multiline": false
+     }
+    ],
+    "format": [
+     "COMBO",
+     {
+      "default": "txt",
+      "multiselect": false,
+      "options": [
+       "txt",
+       "csv",
+       "md",
+       "json"
+      ]
+     }
+    ]
+   },
+   "hidden": {
+    "prompt": [
+     "PROMPT"
+    ],
+    "extra_pnginfo": [
+     "EXTRA_PNGINFO"
+    ]
+   }
+  },
+  "input_order": {
+   "required": [
+    "text",
+    "filename_prefix",
+    "format"
+   ],
+   "hidden": [
+    "prompt",
+    "extra_pnginfo"
+   ]
+  },
+  "is_input_list": false,
+  "output": [
+   "STRING"
+  ],
+  "output_is_list": [
+   false
+  ],
+  "output_name": [
+   "text"
+  ],
+  "output_matchtypes": null,
+  "name": "SaveText",
+  "display_name": "Save Text",
+  "description": "Save text content to a file in the output directory.",
+  "python_module": "comfy_extras.nodes_text",
+  "category": "text",
+  "output_node": true,
+  "deprecated": false,
+  "experimental": false,
+  "dev_only": false,
+  "api_node": false,
+  "price_badge": null,
+  "search_aliases": [
+   "save text",
+   "write text",
+   "export text"
+  ],
+  "essentials_category": null,
+  "has_intermediate_output": false
  }
 }

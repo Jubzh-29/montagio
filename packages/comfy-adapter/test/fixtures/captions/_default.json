@@ -1,0 +1,1 @@
+{"schema":"montagio/words@1","model":"whisper-large-v3-turbo","language":"en","detected":true,"duration_s":1,"text":" Hello.","chunks":[{"text":" Hello.","start":0,"end":0.5}]}

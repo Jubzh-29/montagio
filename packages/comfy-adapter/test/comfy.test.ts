@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -539,4 +539,32 @@ test('the fake proxy types a SaveVideo output image, as comfy-api-proxy 0.1.6 do
   for (let i = 0; i < 3; i++) await b.get(id);
   expect(fake.jobs.get(id)!.outputs).toEqual([expect.objectContaining({ node_id: '83', type: 'image', content_type: 'video/mp4' })]);
   expect(readdirSync(outputsDir)).toEqual([`${id}.mp4`]);
+});
+
+test('a file job downloads its JSON output (SaveText: comfy-api-proxy types it "file")', async () => {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(outputJob('file', '3'));
+  const json = Buffer.from('{"schema":"montagio/words@1"}');
+  fake.setJob(id, { status: 'succeeded', outputs: [outputOf('3', 'captions_00001_.json', 'file', 'application/json', json)] });
+  const done = await b.get(id);
+  expect(done.outputPath).toBe(join(outputsDir, `${id}.json`));
+  expect(readFileSync(done.outputPath!).equals(json)).toBe(true);
+});
+
+test('the fake proxy gives a SaveText workflow a file output with the words it was given (autoRun)', async () => {
+  await fake.close();
+  const words = join(mkdtempSync(join(tmpdir(), 'montagio-words-')), 'words.json');
+  writeFileSync(words, '{"schema":"montagio/words@1"}');
+  fake = await startFakeProxy({ autoRun: { clip, words } });
+  const b = backend();
+  const submitted: SubmitJob = {
+    workflow: { '3': { class_type: 'SaveText', inputs: { filename_prefix: 'montagio/captions', format: 'json' } } },
+    presetId: 'captions',
+    idempotencyKey: randomUUID(),
+    output: 'file',
+  };
+  const { backendJobId: id } = await b.submit(submitted);
+  for (let i = 0; i < 3; i++) await b.get(id);
+  expect(fake.jobs.get(id)!.outputs).toEqual([expect.objectContaining({ node_id: '3', type: 'file', content_type: 'application/json' })]);
+  expect(readFileSync(join(outputsDir, `${id}.json`), 'utf8')).toBe('{"schema":"montagio/words@1"}');
 });

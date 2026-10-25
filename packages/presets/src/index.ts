@@ -55,6 +55,7 @@ export {
   compileImageUpscale,
   compileUpscale,
   compileTranslate,
+  compileTranscribe,
   compileVoiceChange,
   EDIT_LOOKS,
   IMAGE_UPSCALE_TARGETS,

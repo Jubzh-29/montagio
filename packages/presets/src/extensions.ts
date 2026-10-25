@@ -414,6 +414,23 @@ export function compileVoiceChange(
   return { workflow, output: { ...model.output }, params: { ...inputs } };
 }
 
+/**
+ * The words of a speech (Whisper large-v3 turbo in the Montagio Transcribe Words node): the speech as
+ * the app prepares it (mono FLAC, 16 kHz), and "auto" for Whisper to detect the language, or the code
+ * of a language to impose. Which languages captions are made in is the app's rule, not the compiler's.
+ */
+export function compileTranscribe(
+  model: ExtensionModel,
+  template: ApiWorkflow,
+  inputs: { audioRef: string; language: string },
+): ExtensionCompiled<{ language: string }> {
+  expectTask(model, 'a2t-words');
+  if (!inputs.audioRef) throw new CompileError('a transcription needs the speech');
+  if (inputs.language !== 'auto' && !/^[a-z]{2,3}$/.test(inputs.language)) throw new CompileError(`language "${inputs.language}" is not a language code`);
+  const workflow = bindExtension(model, template, { audio: inputs.audioRef, language: inputs.language });
+  return { workflow, output: { ...model.output }, params: { language: inputs.language } };
+}
+
 export type SpeechInputs = {
   /** What the avatar says. */
   text: string;

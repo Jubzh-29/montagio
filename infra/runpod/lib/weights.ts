@@ -49,7 +49,7 @@ const LOADER_FOLDERS: Record<string, Record<string, string>> = {
   DownloadAndLoadSAM2Model: { model: 'sam2' },
 };
 
-/** ComfyUI models/ folders a weight may go to (the same set as infra/local/src/pins.ts); `tts` holds the voice packs, `sam2` the object swap's tracker. */
+/** ComfyUI models/ folders a weight may go to (the same set as infra/local/src/pins.ts); `tts` holds the voice packs, `whisper` the captions' Whisper, `sam2` the object swap's tracker. */
 const COMFY_FOLDERS = new Set([
   'checkpoints',
   'diffusion_models',
@@ -64,6 +64,8 @@ const COMFY_FOLDERS = new Set([
   'geometry_estimation',
   'sam2',
   'tts',
+  // the Hugging Face folders of the captions' Whisper (Montagio Transcribe Words)
+  'whisper',
 ]);
 
 export function weightFolders(workflows: ApiWorkflow[]): Map<string, string> {

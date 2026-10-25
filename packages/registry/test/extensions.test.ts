@@ -126,3 +126,24 @@ test('a lock entry may pin the git blob id of a small file Hugging Face keeps ou
   expect(parseLock(`${lock}    git_sha1: ${sha1}\n`, 'l.yaml')[0]?.git_sha1).toBe(sha1);
   expect(() => parseLock(`${lock}    git_sha1: d27fb3f2\n`, 'l.yaml')).toThrow(/git_sha1/);
 });
+
+const WORDS_MODEL = `schema: montagio/extension-model@0.1
+id: whisper-turbo-words
+name: Whisper large-v3 turbo (captions)
+extension: avatar
+task: a2t-words
+license: MIT
+weights: [whisper-turbo-model]
+workflow: workflows/whisper-words.api.json
+bindings:
+  audio: { node: "1", field: audio }
+  language: { node: "2", field: language }
+output: { node: "3", kind: file }
+estimate_s: 8
+`;
+
+test('a2t-words: the words of a speech, as a JSON file, need the audio and the language', () => {
+  expect(parseExtensionModel(WORDS_MODEL, 'w.yaml')).toMatchObject({ task: 'a2t-words', output: { node: '3', kind: 'file' } });
+  expect(() => parseExtensionModel(replaceOnce(WORDS_MODEL, /  language: .*\n/, ''), 'w.yaml')).toThrow(/binding "language" is required by task "a2t-words"/);
+  expect(() => parseExtensionModel(replaceOnce(WORDS_MODEL, 'kind: file', 'kind: audio'), 'w.yaml')).toThrow(/output\.kind.*a2t-words.*file/);
+});

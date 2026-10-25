@@ -30,6 +30,8 @@
  * pinned commit 0c35fff5 (DownloadAndLoadSAM2Model, Sam2VideoSegmentationAddPoints,
  * Sam2VideoSegmentation: the object swap) come from the same CPU ComfyUI on 2026-10-24, the pack
  * installed as bootstrap.sh installs it, and loaded with nothing added to the venv (tooltips removed).
+ * MontagioTranscribeWords (the captions, from the Montagio pack) and SaveText come from the same CPU ComfyUI on
+ * 2026-10-25, its whisper folder holding the lock's whisper-large-v3-turbo (tooltips removed).
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -258,7 +260,7 @@ test.each(['16:9', '9:16', '1:1'] as Aspect[])('the restyle job is accepted with
 test('every class of the fixture comes from the core of ComfyUI, the Montagio pack or a pinned pack', () => {
   for (const [name, spec] of Object.entries(info)) {
     const origin =
-      name === 'MontagioCameraEmbedding'
+      name.startsWith('Montagio')
         ? 'custom_nodes.montagio'
         : name.startsWith('Chatterbox')
           ? 'custom_nodes.ComfyUI-Chatterbox'

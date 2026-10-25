@@ -46,6 +46,7 @@ import { Composer } from './Composer';
 import { ConsentCheck } from './ConsentCheck';
 import { AvatarFields, BUILT_IN_VOICE, type VoiceChoice } from './AvatarFields';
 import { COMPOSE_OFF, composeBody, composePersonal, composeReady, ComposeSlots, MOTION_COMPOSE_ROLES, type ComposeState } from './ComposeSlots';
+import { CaptionsPanel } from './CaptionsPanel';
 import { HdPanel } from './HdPanel';
 import { MotionFields, type MotionVideo } from './MotionFields';
 import { MotionLibrary } from './MotionLibrary';
@@ -1798,6 +1799,16 @@ export function Studio() {
                     model={extensions.upscaleModel}
                   />
                 )}
+              {!IS_SHOWCASE && tracked?.kind === 'job' && tracked.record.state === 'succeeded' && tracked.record.task === 'avatar' && extensions?.captions && (
+                <CaptionsPanel
+                  key={`captions-${tracked.record.id}`}
+                  parentJobId={tracked.record.id}
+                  parentTask="avatar"
+                  estimate_s={extensions.captions.estimate_s}
+                  model={extensions.captions.model}
+                  {...(extensions.avatarModel ? { clip: { model: extensions.avatarModel, ...(tracked.record.demo ? { demoKind: tracked.record.demo } : {}) } } : {})}
+                />
+              )}
               {tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && (
                 <div className={styles.actions} ref={actionsRef}>
                   {tracked.record.outputUrl && (

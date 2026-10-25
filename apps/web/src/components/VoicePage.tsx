@@ -10,6 +10,7 @@ import { refusalMessageKey } from '@/lib/refusals';
 import { TRANSLATE_CHOICES, type TranslateChoice } from '@/lib/translate';
 import { useExtensions } from '@/lib/use-extensions';
 import { useJob } from '@/lib/use-job';
+import { CaptionsPanel } from './CaptionsPanel';
 import { ConsentCheck } from './ConsentCheck';
 import { Header } from './Header';
 import { ShowcaseFooter } from './ShowcaseFooter';
@@ -270,6 +271,7 @@ export function VoicePage({ mode = 'change' }: { mode?: 'change' | 'translate' }
                     {t('voiceChangeDownload')}
                   </a>
                   <p className={studio.hint}>{t('adCaption')}</p>
+                  {!IS_SHOWCASE && info?.captions && <CaptionsPanel key={done.id} parentJobId={done.id} parentTask={translating ? 'translate' : 'voice-change'} estimate_s={info.captions.estimate_s} model={info.captions.model} />}
                 </>
               ) : (
                 !busy && <p className={styles.empty}>{t(translating ? 'translateEmpty' : 'voiceChangeEmpty')}</p>

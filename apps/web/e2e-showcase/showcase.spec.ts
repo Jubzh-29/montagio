@@ -177,8 +177,8 @@ test('the open stack page loads directly', async ({ page }) => {
   const problems = watchRequests(page);
   await page.goto('/open-stack/');
   const rows = page.locator('[data-testid=model-row]');
-  // Every model of the stack, the effects and hooks included, not only the camera's (15 with the camera's Turbo).
-  await expect(rows).toHaveCount(15);
+  // Every model of the stack, the effects and hooks included, not only the camera's (16 with the camera's Turbo and Whisper).
+  await expect(rows).toHaveCount(16);
   for (const row of await rows.all()) await expect(row).toContainText(/Apache-2\.0|MIT/);
   await expect(page.locator('#model-wan21-i2v-effects')).toBeVisible();
   // Back to the studio by the header link: a client navigation, no failed prefetch.

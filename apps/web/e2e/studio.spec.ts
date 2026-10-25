@@ -85,10 +85,10 @@ test('the open stack page lists every model by what it makes, each Apache-2.0 or
   for (const name of [/^Camera/, /^Effects$/, /^Transitions and hooks$/, /^Photo/, /^Avatar$/, /^Music$/, /^HD/, /^Motion/]) {
     await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
   }
-  // 17 models: the photo HD, the voice change and the translation joined the 11 of the session S2, then the camera's Turbo,
-  // the restyle and the object swap.
+  // 18 models: the photo HD, the voice change and the translation joined the 11 of the session S2, then the camera's Turbo,
+  // Whisper (captions), the restyle and the object swap.
   const rows = page.locator('[data-testid=model-row]');
-  await expect(rows).toHaveCount(17);
+  await expect(rows).toHaveCount(18);
   for (const row of await rows.all()) await expect(row).toContainText(/Apache-2\.0|MIT/);
 });
 

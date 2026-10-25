@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { AD_STYLES, adInstruction, AVATAR_DEFAULT_PROMPT, compileAvatar, compileCompose, compileEdit, composeInstruction, compileImageUpscale, compileMusic, compileSpeech, compileTranslate, compileUpscale, compileVoiceChange, CompileError, EDIT_LOOKS, loadLibrary, SMOOTH_MULTIPLIER, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
+import { AD_STYLES, adInstruction, AVATAR_DEFAULT_PROMPT, compileAvatar, compileCompose, compileEdit, composeInstruction, compileImageUpscale, compileMusic, compileSpeech, compileTranscribe, compileTranslate, compileUpscale, compileVoiceChange, CompileError, EDIT_LOOKS, loadLibrary, SMOOTH_MULTIPLIER, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '../src/index';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -511,5 +511,29 @@ describe('compileAvatar (Wan 2.2 S2V)', () => {
 
   test('the output is node 113, video', () => {
     expect(compile().output).toEqual({ node: '113', kind: 'video' });
+  });
+});
+
+describe('compileTranscribe (Whisper large-v3 turbo)', () => {
+  const words = () => extension('whisper-turbo-words');
+
+  test('the speech goes to the loader, the language to the node, the words come out of Save Text as a file', () => {
+    const { workflow, output, params } = compileTranscribe(words().model, words().template, { audioRef: 'speech.flac', language: 'auto' });
+    expect(workflow['1']).toMatchObject({ class_type: 'LoadAudio', inputs: { audio: 'speech.flac' } });
+    expect(workflow['2']).toMatchObject({ class_type: 'MontagioTranscribeWords', inputs: { audio: ['1', 0], model: 'whisper-large-v3-turbo', language: 'auto' } });
+    expect(workflow['3']).toMatchObject({ class_type: 'SaveText', inputs: { text: ['2', 0], format: 'json' } });
+    expect(output).toEqual({ node: '3', kind: 'file' });
+    expect(params).toEqual({ language: 'auto' });
+    expect(compileTranscribe(words().model, words().template, { audioRef: 'speech.flac', language: 'fr' }).workflow['2']!.inputs.language).toBe('fr');
+  });
+
+  test('without the speech, or with a language that is not a code, it is a CompileError', () => {
+    expect(() => compileTranscribe(words().model, words().template, { audioRef: '', language: 'auto' })).toThrow(CompileError);
+    expect(() => compileTranscribe(words().model, words().template, { audioRef: 'speech.flac', language: 'French' })).toThrow(CompileError);
+  });
+
+  test('a model of another task is refused', () => {
+    const vc = extension('chatterbox-vc');
+    expect(() => compileTranscribe(vc.model, vc.template, { audioRef: 'a.flac', language: 'auto' })).toThrow(CompileError);
   });
 });

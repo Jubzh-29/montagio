@@ -29,6 +29,27 @@ export function markRejected(extension: ExtensionId, reason: string): void {
 
 export function resetRejectedForTests(): void {
   rejected.clear();
+  captionsRefusal.reason = null;
+}
+
+// The captions run in the extension "avatar" but are optional in it: a ComfyUI without the transcription
+// node or its model hides them alone, until the app restarts (the avatar, voice change and translation stay).
+const captionsHolder = globalThis as typeof globalThis & { __montagioCaptionsRefusal?: { reason: string | null } };
+const captionsRefusal = (captionsHolder.__montagioCaptionsRefusal ??= { reason: null });
+
+export function markCaptionsRejected(reason: string): void {
+  if (captionsRefusal.reason === null) console.warn(`[montagio] captions are hidden until the app restarts: ${reason}`);
+  captionsRefusal.reason = reason;
+}
+
+export const captionsRejected = () => captionsRefusal.reason !== null;
+
+/**
+ * The captions are offered with the extension "avatar" (validated for real on a CPU ComfyUI and in the
+ * browser on 2026-10-25), unless ComfyUI refused their workflow.
+ */
+export async function captionsOffered(): Promise<boolean> {
+  return !captionsRejected() && (await visibleExtensions()).includes('avatar');
 }
 
 const showsEverything = () => process.env.MONTAGIO_EXTENSIONS?.trim() === 'all';
@@ -130,6 +151,11 @@ export function swapModel(lib: Library): ExtensionModel {
   return model;
 }
 
+/** The transcription model of the captions (extension "avatar"), if the registry has one. */
+export function transcribeModel(lib: Library): ExtensionModel | undefined {
+  return [...lib.extensionModels.values()].find((entry) => entry.task === 'a2t-words');
+}
+
 /** The 1080p model of the extension "upscale". */
 export function upscaleModel(lib: Library): ExtensionModel {
   const model = [...lib.extensionModels.values()].find((entry) => entry.task === 'v2v-upscale');
@@ -202,6 +228,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
   const motion = extensions.includes('motion') ? motionModel(lib) : null;
   const restyle = extensions.includes('restyle') ? restyleModel(lib) : null;
   const swap = extensions.includes('swap') ? swapModel(lib) : null;
+  const words = extensions.includes('avatar') && !captionsRejected() ? transcribeModel(lib) : undefined;
   // A tab without a wall shows what it makes: a render of the GPU session, looping (presets/extensions/previews).
   const examples: NonNullable<ExtensionsInfo['examples']> = {};
   for (const id of ['avatar', 'motion', 'restyle', 'swap'] as const) {
@@ -235,6 +262,7 @@ export async function extensionsInfo(): Promise<ExtensionsInfo> {
     ...(motion ? { motionModel: summaryOf(motion) } : {}),
     ...(restyle ? { restyleModel: summaryOf(restyle) } : {}),
     ...(swap ? { swapModel: summaryOf(swap) } : {}),
+    ...(words ? { captions: { estimate_s: estimateFor(words, true), model: summaryOf(words) } } : {}),
     ...(Object.keys(examples).length > 0 ? { examples } : {}),
     ...((process.env.MONTAGIO_BACKEND ?? 'demo') === 'demo' ? { demo: true } : {}),
     ...(currentProfile() === '12gb' ? { vramProfile: '12gb' as const } : {}),

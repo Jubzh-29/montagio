@@ -75,7 +75,7 @@ async function fileSha256(path: string): Promise<string | null> {
 // A recipe is a file from anywhere: it may name only the app's creation routes, its own input files, and never the user's word.
 /** The creation routes a recipe's request may name, and what may follow on what it made. */
 const ROUTES = new Set(['/api/generations', '/api/sequences', '/api/images', '/api/images/upscale', '/api/edits', '/api/effects', '/api/hooks', '/api/avatars', '/api/motion', '/api/restyle', '/api/swap', '/api/ads']);
-const FOLLOW_UPS = new Set(['/api/generations/:parent/upscale', '/api/jobs/:parent/upscale', '/api/sequences/:parent/music']);
+const FOLLOW_UPS = new Set(['/api/generations/:parent/upscale', '/api/jobs/:parent/upscale', '/api/sequences/:parent/music', '/api/jobs/:parent/captions']);
 /** Only the user says that the person agreed, or that they hold the rights: never a recipe. */
 const USER_ONLY = new Set(['consent', 'rights', 'voiceConsent']);
 /** A file field: a name, or a composed photo's role ("compose.place"). */
