@@ -30,7 +30,7 @@ Spectacular, immediate, precise. The camera moves sell themselves, the way they 
 - The raw node editor: the density of a ComfyUI graph. Montagio stays one click; the hood opens only when asked.
 - Neon cyberpunk: glows, glitches, saturated colours everywhere.
 
-The project spec also forbids the commercial competitor's name, logo, texts, outputs and preset names anywhere in the product (the README alone names it).
+The project spec also forbids the commercial competitor's name, logo, texts, outputs and preset names anywhere in the product (only the README, the repository's description and topics and the Space card's description name it, for search).
 
 ## Design Principles
 

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 for (const { tab, kind, file } of [
   { tab: 'avatar', kind: 'Talking photo · up to 15 s', file: 'avatar' },
-  { tab: 'motion', kind: 'Reference video · up to 5 s', file: 'motion' },
+  { tab: 'motion', kind: 'Reference video · up to 30 s', file: 'motion' },
 ]) {
   test(`${tab}: a looping example on the empty monitor, once, and the choice row says what it makes`, async ({ page }) => {
     await page.goto(`/?tab=${tab}`);

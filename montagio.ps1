@@ -22,7 +22,7 @@ if ($major -lt 22 -or ($major -eq 22 -and $minor -lt 18)) {
 }
 
 # The arguments go over as JSON: PowerShell 5.1 would split one that starts
-# with "-" and holds a space (--dir="D:\Shot Rig") on its way to node.
+# with "-" and holds a space (--dir="D:\Montagio Data") on its way to node.
 $env:MONTAGIO_ARGV = ConvertTo-Json -Compress -InputObject @($args)
 & node (Join-Path $PSScriptRoot 'infra\local\src\cli.ts')
 $code = $LASTEXITCODE
