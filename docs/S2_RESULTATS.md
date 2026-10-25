@@ -240,3 +240,30 @@ Contrairement à l'avertissement du template, le mouvement de caméra n'est pas 
 - **Turbo par défaut** sur les 7 presets qui avancent, reculent ou montent : Crash Push, Slow Push, Pull Back Reveal, Crane Up, Pull Back & Tilt Up, Push & Settle, Breathing (`models.preferred` passe au modèle Turbo).
 - **Qualité par défaut, Turbo en option** sur Rise & Push (le sujet sort du cadre) et sur les trois mouvements latéraux : Pan Left (fantôme sur une personne), Pan Right et Drift Left Push (même composante latérale, non essayée sur une personne).
 - Le Studio montre trois pastilles : Qualité (~9 min), Turbo (~1 min, « les mêmes mouvements en 4 étapes : un peu moins de détail ») et Rapide (5B, ~2 min). Chaque preset part de son modèle par défaut, jusqu'à ce que le visiteur en choisisse un. La vitrine garde ses clips rendus en 20 étapes.
+
+## 15. Profil 12 Go (25/10)
+
+Un conteneur L4 du compte « montagio-2 » (fonction `lowvram`, 4 jobs), le 25/10 entre 2 h 51 et 3 h 02 (heure de Paris), en même temps que le lot Turbo, avec l'accord de l'utilisateur.
+
+**Méthode.** `infra/modal/vram_cap.py` prend la mémoire de la L4 avant le démarrage de ComfyUI : 10 622 Mio tenus, 11 776 Mio (11,5 Gio) laissés libres, soit une carte de 12 Go dont le bureau garde environ un demi-gigaoctet. La RAM du conteneur est plafonnée à 32 Gio, une limite stricte. ComfyUI v0.41.0 mesure la pression mémoire sur tout le GPU (NVML) : il traite la mémoire tenue comme celle d'une autre application, et une allocation au-delà échouerait comme sur la vraie carte.
+
+**Aucun nouveau poids.** Ce sont les fp8 du lock : ComfyUI annonce « DynamicVRAM support detected and enabled » et prépare chaque modèle « for dynamic VRAM loading » (Fun Camera : 14,6 Go mis en attente pour 11,5 Gio libres). La part d'un modèle qui ne tient pas passe entre deux étapes ; le calcul, lui, ne change pas.
+
+| Job | 12 Go, à froid | 24 Go, à froid | Pic de ComfyUI | Verdict |
+|---|---|---|---|---|
+| Turbo, Crash Push (voiture, seed 7) | 153,5 s | 156,2 s (partie 14, même job) | 11,46 Gio | ✅ même mouvement que la prise 20 étapes |
+| Effet Squish (voiture) | 174 s | 175 à 184 s (S2) | 11,29 Gio | ✅ |
+| Rapide (5B), Crash Push | 192,9 s | 190 s (S2) | 11,26 Gio | ✅ suit le texte, comme à 24 Go |
+| Z-Image, 1280 × 720 | 48 s | 45 s (S2) | 11,27 Gio | ✅ |
+
+Le pic de ComfyUI est le pic de `nvidia-smi` moins les 10 817 Mio que tenait `vram_cap.py`. Le conteneur est resté sous sa limite de 32 Gio de RAM (aucun arrêt). Le `VmRSS` de ComfyUI, 45 Gio, compte les fichiers de poids projetés en mémoire (un cache que le noyau peut libérer) : ce n'est pas un besoin. Moins de 32 Gio n'a pas été essayé.
+
+Une L4 calcule à peu près comme une RTX 4070 de 12 Go : les temps du profil sont gardés tels quels dans le registre (`low_vram`). Une RTX 3060 sera plus lente.
+
+**Décisions**
+- Le profil `12gb` (`MONTAGIO_VRAM_PROFILE=12gb`, posé par l'installeur) propose le Turbo, le 5B, le texte vers image et les effets (`low_vram_validated: 2026-10-25`), avec leurs temps mesurés ici.
+- Qualité (20 étapes) et les autres extensions restent masquées dans ce profil tant qu'aucun rendu à 12 Go ne les a validées (règle de coupe). Les mouvements latéraux et Rise & Push y partent donc en Turbo, avec ses défauts de la partie 14.
+- L'installeur propose ce profil sur une carte de 12 à 20 Go, au lieu de « l'app seule » ; `--low-vram` le demande directement.
+- **Pas de GGUF.** Les fp8 tiennent déjà dans 12 Go avec la VRAM dynamique, sans nouveau poids ni nouveau pack de nodes. Licences relues le 25/10 pour mémoire, si un jour il fallait réduire la RAM ou le disque : `QuantStack/Wan2.2-Fun-A14B-Control-Camera-GGUF` (apache-2.0, `base_model` alibaba-pai/Wan2.2-Fun-A14B-Control-Camera, révision `7d2c3e06`), `city96/Wan2.1-I2V-14B-480P-gguf` (apache-2.0, base Wan-AI/Wan2.1-I2V-14B-480P, révision `b4b6b3b3`), le loader `city96/ComfyUI-GGUF` (Apache-2.0 selon GitHub). Rien n'entre au lock, ni dans `allowed-sources.yaml` ou `allowed-nodes.yaml`.
+
+**Coût des parties 14 et 15** : environ 31 min de L4 pour le Turbo, 12 min pour le profil 12 Go et 10 min de CPU pour les poids manquants (les deux LoRA, une LoRA d'effet, le 5B et sa VAE), soit environ 0,90 $ (estimation ; le chiffre du tableau de bord n'est pas lu).
