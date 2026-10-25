@@ -208,7 +208,8 @@ export async function prepareShowcase(
         description: preset.description,
         poses: [...preset.camera.poses],
         speed: preset.camera.speed,
-        defaultModel: preset.models.preferred,
+        // Every clip here was rendered with the manifest's model, whatever a preset starts on locally (the Turbo).
+        defaultModel: manifest.model,
         preview: previewFile(preset.id),
         poster: posterOf(previewFile(preset.id)),
         yaml: await readFile(join(root, ...(library.presetFiles.get(preset.id) ?? `presets/${preset.id}.yaml`).split('/')), 'utf8'),

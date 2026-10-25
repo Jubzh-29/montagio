@@ -226,6 +226,12 @@ export function Studio() {
   // The showcase opens on a clip already playing: the first sample photo with the first preset, as if
   // "Show clip" had been pressed, unless the visitor picked something while the catalogue loaded.
   const touched = useRef(false);
+  // A model the visitor picked (or Reuse brought back) stays; until then each preset starts on its own default model.
+  const modelPicked = useRef(false);
+  const pickModel = (id: string) => {
+    modelPicked.current = true;
+    setModelId(id);
+  };
   const [arrivalId, setArrivalId] = useState<string | null>(null);
   const followJob = useRef(false);
   const statusRef = useRef<HTMLDivElement>(null);
@@ -460,8 +466,12 @@ export function Studio() {
   };
 
   const onPreset = (id: string) => {
-    if (mode === 'single') setPresetId(id);
-    else setShots((current) => (current.length < MAX_SHOTS ? [...current, { presetId: id, prompt: '' }] : current));
+    if (mode === 'single') {
+      setPresetId(id);
+      // Turbo by default where a GPU session validated it for this move, the 20 steps elsewhere.
+      const preferred = presets.find((preset) => preset.id === id)?.defaultModel;
+      if (!modelPicked.current && preferred && models.some((model) => model.id === preferred)) setModelId(preferred);
+    } else setShots((current) => (current.length < MAX_SHOTS ? [...current, { presetId: id, prompt: '' }] : current));
   };
 
   const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
@@ -590,7 +600,7 @@ export function Studio() {
     setSubjectFor(back.photoPrompt);
     setSubject(back.subject ?? defaultSubject(back.photoPrompt, 120));
     if (back.presetId) setPresetId(back.presetId);
-    if (back.modelId && models.some((model) => model.id === back.modelId)) setModelId(back.modelId);
+    if (back.modelId && models.some((model) => model.id === back.modelId)) pickModel(back.modelId);
     setPrompt(restoredScene(back));
     // A photo gone with the data: the description waits for the visitor to add it again.
     sceneOfPhoto.current = back.photo !== undefined;
@@ -1148,7 +1158,7 @@ export function Studio() {
                 models={models}
                 loading={catalog === 'loading'}
                 selectedId={modelId}
-                onSelect={setModelId}
+                onSelect={pickModel}
                 onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
                 className={styles.modelsInFields}
               />
@@ -1172,7 +1182,7 @@ export function Studio() {
                     name="model-by-generate"
                     models={models}
                     selectedId={modelId}
-                    onSelect={setModelId}
+                    onSelect={pickModel}
                     onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
                     className={styles.modelsByGenerate}
                   />

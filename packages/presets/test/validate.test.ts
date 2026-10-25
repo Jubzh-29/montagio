@@ -25,7 +25,7 @@ test('schema problems are listed one per field', () => {
 });
 
 test('unknown preferred model is named', () => {
-  expect(validatePreset(yaml.replace('preferred: wan22-i2v-a14b-fun-camera', 'preferred: nope'), 'x.yaml', lib)).toEqual({
+  expect(validatePreset(yaml.replace('preferred: wan22-i2v-a14b-fun-camera-turbo', 'preferred: nope'), 'x.yaml', lib)).toEqual({
     ok: false,
     problems: [expect.stringMatching(/^models\.preferred: unknown model "nope"/)],
   });
@@ -41,7 +41,8 @@ test('a LoRA outside the lock is reported, and refused by the compiler', () => {
   const r = validatePreset(`${yaml}loras:\n  - { file: style.safetensors, strength: 1 }\n`, 'x.yaml', lib);
   if (r.ok) throw new Error('expected problems');
   expect(r.problems).toContainEqual('loras[0].file: style.safetensors is not in registry/models.lock.yaml');
-  expect(r.problems).toContainEqual(expect.stringMatching(/^model wan22-i2v-a14b-fun-camera: .*LoRA/i));
+  // Crash Push starts on the Turbo since 2026-10-25
+  expect(r.problems).toContainEqual(expect.stringMatching(/^model wan22-i2v-a14b-fun-camera-turbo: .*LoRA/i));
 });
 
 test('a LoRA whose lock entry has a restrictive license is reported', () => {

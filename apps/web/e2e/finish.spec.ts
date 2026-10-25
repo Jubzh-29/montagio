@@ -25,7 +25,7 @@ test('in demo mode, a result says that no model ran', async ({ page }) => {
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId('ai-caption')).toHaveText(/^Demo render: no model ran here\. With a GPU, Wan 2\.2 Fun Camera \(Apache-2\.0\) makes it\.$/);
+  await expect(page.getByTestId('ai-caption')).toHaveText(/^Demo render: no model ran here\. With a GPU, Wan 2\.2 Fun Camera Turbo \(Apache-2\.0\) makes it\.$/);
 });
 
 test('the sample photo fits the tab: a subject for an effect, a face for an avatar, a character for a motion', async ({ page }) => {
@@ -71,7 +71,8 @@ test.describe('on a 1440×900 screen', () => {
     // "2 min" holds a no-break space: \s matches it.
     await expect(block.locator('label').filter({ hasText: /^Fast · ~2\smin/ })).toBeInViewport();
     await expect(block.locator('label').filter({ hasText: /^Turbo · ~1\smin/ })).toBeInViewport();
-    await expect(block.getByRole('radio', { name: /^Quality · ~9 min/ })).toBeChecked();
+    await expect(block.getByRole('radio', { name: /^Turbo · ~1 min/ })).toBeChecked();
+    await expect(block.getByRole('radio', { name: /^Quality · ~9 min/ })).toBeAttached();
     await block.getByRole('radio', { name: /^Fast/ }).check({ force: true });
     await expect(page.getByRole('button', { name: /^Generate/ })).toHaveText('Generate (~2 min)');
     // Turbo says what its minute costs.

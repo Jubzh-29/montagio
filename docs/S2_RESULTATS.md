@@ -209,3 +209,34 @@ Un job sur une L4 du nouveau compte Modal, le 24/10 à 17:01 : la passe HD avec 
 - **Le coût de RIFE est négligeable** : 410 s pour l'ensemble, contre 428 s pour la seule passe HD en S2. Le clip n'est encodé qu'une fois, après RIFE.
 - **Définitions des nodes** : celles du GPU (`object_info-extensions.json`) sont identiques, infobulles mises à part, à la fixture capturée sur le ComfyUI CPU.
 - La durée passe de 5,06 s à 5,03 s : 161 images à 32 i/s, contre 81 à 16. La dernière image source dure 1/32 s au lieu de 1/16.
+
+## 14. Mode Turbo (25/10)
+
+Un conteneur L4 du compte Modal « montagio-2 » (`series`, 13 jobs), le 25/10 entre 2 h 53 et 3 h 24 (heure de Paris), avec l'accord de l'utilisateur. Le workflow `wan22-fun-camera-turbo.api.json` est le second groupe du template officiel : les deux LoRA 4 étapes de lightx2v (déjà au lock pour les transitions), 4 étapes à cfg 1, coupure à l'étape 2, shift 8. Pour comparer à l'identique, chaque job reprend la photo, la description, le négatif et la seed de la prise 20 étapes gardée pour la démo (S3, ou la refonte du 24/10). Résultats, planches et mesures : `s3/validation/perf/`, hors dépôt.
+
+**Temps** : 156 s à froid, puis 136 à 138 s par clip, contre 1 113 à 1 183 s en 20 étapes : **8,3 fois plus rapide**. Sur une RTX 4090, environ 70 s (`estimate_s` 75). Le pic de VRAM ne change pas : la VRAM dynamique de ComfyUI occupe la carte (22,4 Go).
+
+**Mouvement** : rapport entre le Turbo et la prise 20 étapes de l'écart moyen à la première image (niveaux de gris en 208 × 120, 8 i/s). C'est un indicateur d'amplitude, pas de qualité ; le verdict vient des planches.
+
+| Preset | Photo | Mouvement | Verdict |
+|---|---|---|---|
+| Crash Push | voiture | 1,19 | ✅ pousse un peu plus loin ; la dernière image déforme le pare-brise |
+| Crash Push | passante | 0,78 | ✅ avance un peu moins ; le visage est gardé |
+| Slow Push | voiture | 1,11 | ✅ |
+| Pull Back Reveal | voiture | 0,72 | ✅ recule un peu moins ; le sol se brouille en fin de plan |
+| Crane Up | voiture | 1,03 | ✅ presque la même prise |
+| Pull Back & Tilt Up | voiture | 0,64 | ✅ même trajectoire, un peu plus courte |
+| Push & Settle | voiture | 1,09 | ✅ la bascule à mi-clip est nette |
+| Breathing | voiture | 0,91 | ✅ |
+| Pan Left | voiture | 1,02 | ✅ |
+| Pan Left | passante | 0,82 | ❌ la personne se dédouble en fantôme sur les dernières images |
+| Pan Right | voiture | 0,64 | ✅ travelling propre (la prise 20 étapes changeait aussi la voiture) |
+| Drift Left Push | voiture | 0,96 | ✅ |
+| Rise & Push | voiture | 1,11 | ❌ la caméra monte et avance jusqu'à perdre la voiture |
+
+Contrairement à l'avertissement du template, le mouvement de caméra n'est pas perdu : c'est l'encodage de la trajectoire (Plücker) qui le pilote, et la LoRA ne fait que distiller le débruitage. Le Turbo perd un peu de détail fin (rochers, herbe) et déforme parfois la dernière image.
+
+**Décisions**
+- **Turbo par défaut** sur les 7 presets qui avancent, reculent ou montent : Crash Push, Slow Push, Pull Back Reveal, Crane Up, Pull Back & Tilt Up, Push & Settle, Breathing (`models.preferred` passe au modèle Turbo).
+- **Qualité par défaut, Turbo en option** sur Rise & Push (le sujet sort du cadre) et sur les trois mouvements latéraux : Pan Left (fantôme sur une personne), Pan Right et Drift Left Push (même composante latérale, non essayée sur une personne).
+- Le Studio montre trois pastilles : Qualité (~9 min), Turbo (~1 min, « les mêmes mouvements en 4 étapes : un peu moins de détail ») et Rapide (5B, ~2 min). Chaque preset part de son modèle par défaut, jusqu'à ce que le visiteur en choisisse un. La vitrine garde ses clips rendus en 20 étapes.
