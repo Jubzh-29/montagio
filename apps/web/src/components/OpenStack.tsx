@@ -61,6 +61,11 @@ export function OpenStack() {
 
   const locale = lang === 'fr' ? 'fr-FR' : 'en-US';
   const gigabytes = (bytes: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(bytes / 1e9);
+  // Under 0.1 GB a file reads in MB: "0.0 GB" would look like an empty file on the proof page.
+  const weightSize = (bytes: number) =>
+    bytes >= 1e8
+      ? t('sizeGb', { size: gigabytes(bytes) })
+      : t('sizeMb', { size: new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(bytes / 1e6) });
   const weights = report?.models.flatMap((model) => model.weights) ?? [];
   const files = new Map(weights.map((weight) => [weight.id, weight]));
   const totalBytes = [...files.values()].reduce((sum, weight) => sum + (weight.bytes ?? 0), 0);
@@ -72,6 +77,11 @@ export function OpenStack() {
       <main id="content" tabIndex={-1} className={styles.page}>
         <h1 className={styles.title}>{t('openStackTitle')}</h1>
         <p className={styles.intro}>{t('openStackIntro')}</p>
+        {/* What the render path is built on, under the intro: the Comfy SDK run locally, and the node pack. */}
+        <ul className={styles.platform} data-testid="open-stack-platform">
+          <li>{t('openStackSdk')}</li>
+          <li>{t('openStackNodePack')}</li>
+        </ul>
         {report ? (
           <>
             <p className={styles.checked} data-state={report.ok ? 'ok' : 'failed'}>
@@ -136,7 +146,7 @@ export function OpenStack() {
                                   <span className={styles.weightId}>{weight.id}</span>
                                 )}
                                 <span className={styles.weightMeta}>
-                                  <span>{weight.bytes !== undefined ? t('sizeGb', { size: gigabytes(weight.bytes) }) : ''}</span>
+                                  <span>{weight.bytes !== undefined ? weightSize(weight.bytes) : ''}</span>
                                   <span>{weight.license}</span>
                                 </span>
                               </li>

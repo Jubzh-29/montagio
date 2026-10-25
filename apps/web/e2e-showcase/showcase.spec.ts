@@ -54,6 +54,25 @@ test('the showcase opens on a clip, then plays the pre-generated clip of another
   expect(foreign()).toEqual([]);
 });
 
+test('a pre-generated clip shows its recipe, and Reproduce at home leads to the install guide', async ({ page }) => {
+  const foreign = watchRequests(page);
+  await page.goto('/');
+  await arrival(page);
+  const panel = page.getByTestId('recipe-panel');
+  await panel.getByText('Recipe', { exact: true }).click();
+  await expect(panel.getByText('Seed', { exact: true })).toBeVisible();
+  await expect(panel).toContainText('SeedVR2 1080p');
+  await expect(panel).toContainText('identical result on the same setup, very close elsewhere');
+  await expect(panel.getByTestId('recipe-home')).toHaveAttribute('href', 'https://example.invalid/montagio/blob/main/docs/INSTALL.md#reproduce-a-recipe');
+  await expect(panel.getByTestId('recipe-reproduce')).toHaveCount(0);
+  const [download] = await Promise.all([page.waitForEvent('download'), panel.getByTestId('recipe-download').click()]);
+  const recipe = JSON.parse(readFileSync((await download.path())!, 'utf8')) as { schema: string; steps: { name: string }[]; request?: unknown };
+  expect(recipe.schema).toBe('montagio/recipe@1');
+  expect(recipe.steps.map((step) => step.name)).toEqual(['camera', 'upscale']);
+  expect(recipe.request).toBeDefined();
+  expect(foreign()).toEqual([]);
+});
+
 test('a dropped photo is explained, never uploaded', async ({ page }) => {
   await page.goto('/');
   await arrival(page);

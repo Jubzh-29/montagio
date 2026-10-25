@@ -20,5 +20,6 @@ defaults:
   resolution: 480p
   fps: 16
 models:
-  preferred: wan22-i2v-a14b-fun-camera
+  preferred: wan22-i2v-a14b-fun-camera-turbo
   fallback: wan22-ti2v-5b
+# Turbo (4 steps) by default: GPU session of 2026-10-25 kept this move in 4 steps (docs/S2_RESULTATS.md part 14); Quality stays one click away.

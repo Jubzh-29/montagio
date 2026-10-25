@@ -5,9 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
 import { apiFetch, IS_SHOWCASE, jsonOrThrow } from '@/lib/api';
 import type { HistoryItem } from '@/lib/api-types';
-import { historyFilter, historyName, historySubject, repriseHref, type HistoryFilter } from '@/lib/reprise';
+import { canReproduce, historyFilter, historyName, historySubject, repriseHref, type HistoryFilter } from '@/lib/reprise';
 import { useMotionPaused } from '@/lib/use-motion';
 import { Header } from './Header';
+import { RecipePanel } from './RecipePanel';
 import { ShowcaseFooter } from './ShowcaseFooter';
 import styles from './history.module.css';
 
@@ -65,6 +66,12 @@ export function HistoryCard({ item, paused }: { item: HistoryItem; paused: boole
           <time dateTime={item.createdAt}>{date}</time>
         </p>
       </div>
+      {item.recipeUrl && (
+        <div className={styles.cardRecipe}>
+          {/* Reproduce sits with Reuse in the card's actions. */}
+          <RecipePanel url={item.recipeUrl} />
+        </div>
+      )}
       <div className={styles.cardActions}>
         <a className={styles.action} href={item.downloadUrl} download={`montagio-${item.key.replace(':', '-')}.${extension}`}>
           {t('historyDownload')}
@@ -72,6 +79,11 @@ export function HistoryCard({ item, paused }: { item: HistoryItem; paused: boole
         <Link className={styles.action} href={repriseHref(item)}>
           {t('historyReuse')}
         </Link>
+        {canReproduce(item) && (
+          <Link className={styles.action} href={repriseHref(item, { reproduce: true })} data-testid="history-reproduce">
+            {t('recipeReproduce')}
+          </Link>
+        )}
       </div>
     </li>
   );

@@ -21,7 +21,8 @@ import {
 import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { hidesExtension, refusalMessageKey } from '@/lib/refusals';
 import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
-import { applyReprise } from '@/lib/reprise';
+import { recipeUrlOf } from '@/lib/recipe-url';
+import { applyReprise, replayOn, reproducedRecipeUrl, reproducibleResult, type Replay } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
 import { useMotionPaused } from '@/lib/use-motion';
@@ -45,6 +46,7 @@ import { COMPOSE_OFF, composeBody, composePersonal, composeReady, ComposeSlots, 
 import { HdPanel } from './HdPanel';
 import { MotionFields, type MotionVideo } from './MotionFields';
 import { MusicPanel } from './MusicPanel';
+import { RecipePanel } from './RecipePanel';
 import { ShowcaseTextAtelier } from './ShowcaseTextAtelier';
 import { EffectFields } from './EffectFields';
 import { OutfitSource } from './OutfitSource';
@@ -148,6 +150,9 @@ const SAMPLE_OF_TAB: Record<Tab, { file: string; scene: MessageKey; forTab?: 'ef
   motion: { file: 'sample-character.png', scene: 'sampleCharacterScene', forTab: 'motion' },
 };
 
+/** What the avatar of the sample portrait says in the GPU session's render (demo-assets/examples/avatar.mp4), in English. */
+const SAMPLE_SPEECH = 'Hello, this is a test of the Montagio avatar.';
+
 /** Under the promise: what each tab makes, in one line. */
 const TAB_LEDES: Record<Tab, MessageKey> = {
   effects: 'ledeEffects',
@@ -195,7 +200,13 @@ export function Studio() {
   // History: the latest creations under the result, and the item a "Reuse" link brings back (?from=).
   const [recent, setRecent] = useState<HistoryItem[]>([]);
   const [from, setFrom] = useState<string | null>(null);
+  const [reproduce, setReproduce] = useState(false);
   const appliedFrom = useRef<string | null>(null);
+  /** Reproduce: the seed sent with the next renders, and the recipe of the result it reproduces. */
+  const [replayed, setReplay] = useState<Replay | null>(null);
+  const replay = replayOn(replayed, tab);
+  /** The recipe the result on screen is compared with: set by the render Reproduce started. */
+  const [compareWith, setCompareWith] = useState<string | undefined>(undefined);
   const [repriseNotice, setRepriseNotice] = useState(false);
   const moveCanvas = (event: CanvasEvent) => setCanvas((current) => nextView(event, current));
   const [presets, setPresets] = useState<PresetSummary[]>([]);
@@ -226,6 +237,12 @@ export function Studio() {
   // The showcase opens on a clip already playing: the first sample photo with the first preset, as if
   // "Show clip" had been pressed, unless the visitor picked something while the catalogue loaded.
   const touched = useRef(false);
+  // A model the visitor picked (or Reuse brought back) stays; until then each preset starts on its own default model.
+  const modelPicked = useRef(false);
+  const pickModel = (id: string) => {
+    modelPicked.current = true;
+    setModelId(id);
+  };
   const [arrivalId, setArrivalId] = useState<string | null>(null);
   const followJob = useRef(false);
   const statusRef = useRef<HTMLDivElement>(null);
@@ -374,6 +391,24 @@ export function Studio() {
     if (token === motionToken.current) setMotionVideo(next);
   };
 
+  /** The sample dance, copied by the server as a prepared clip: with the sample character, the Motion tab's whole example. */
+  const loadSampleVideo = async () => {
+    const token = ++motionToken.current;
+    setMotionVideo({ status: 'uploading' });
+    let next: MotionVideo;
+    try {
+      const res = await apiFetch('/api/uploads/video/sample', { method: 'POST' });
+      if (!res.ok) next = { status: 'error', message: t('errorGeneric') };
+      else {
+        const meta = (await res.json()) as { videoRef: string; url: string; duration_s: number; sourceDuration_s: number };
+        next = { status: 'ready', videoRef: meta.videoRef, url: meta.url, duration_s: meta.duration_s, sourceDuration_s: meta.sourceDuration_s, sample: true };
+      }
+    } catch {
+      next = { status: 'error', message: t('errorGeneric') };
+    }
+    if (token === motionToken.current) setMotionVideo(next);
+  };
+
   /** The outfit of a two-reference hook: a second upload, which the start photo does not replace. */
   const outfitToken = useRef(0);
   const onOutfit = async (file: File) => {
@@ -399,6 +434,15 @@ export function Studio() {
     if (sceneOfPhoto.current || !prompt.trim()) {
       setPrompt(t(sample.scene));
       sceneOfPhoto.current = true;
+    }
+    // The whole example, not half of it: the line the sample portrait says, the dance the sample character
+    // performs. A text or a clip of the visitor's own stays.
+    if (tab === 'avatar' && (!speechText.trim() || speechText === SAMPLE_SPEECH)) {
+      setSpeechText(SAMPLE_SPEECH);
+      setSpeechLanguage('en');
+    }
+    if (tab === 'motion' && !(motionVideo.status === 'ready' && !motionVideo.sample) && motionVideo.status !== 'uploading') {
+      void loadSampleVideo();
     }
     setUpload({ status: 'uploading', localUrl });
     const settle = (next: UploadState) => {
@@ -460,8 +504,12 @@ export function Studio() {
   };
 
   const onPreset = (id: string) => {
-    if (mode === 'single') setPresetId(id);
-    else setShots((current) => (current.length < MAX_SHOTS ? [...current, { presetId: id, prompt: '' }] : current));
+    if (mode === 'single') {
+      setPresetId(id);
+      // Turbo by default where a GPU session validated it for this move, the 20 steps elsewhere.
+      const preferred = presets.find((preset) => preset.id === id)?.defaultModel;
+      if (!modelPicked.current && preferred && models.some((model) => model.id === preferred)) setModelId(preferred);
+    } else setShots((current) => (current.length < MAX_SHOTS ? [...current, { presetId: id, prompt: '' }] : current));
   };
 
   const selectedSample = upload.status === 'ready' && upload.imageRef.startsWith('samples/') ? upload.imageRef.slice('samples/'.length) : null;
@@ -520,8 +568,28 @@ export function Studio() {
   const askScene = needsScene(tab, IS_SHOWCASE);
   const missingScene = sceneMissing(tab, IS_SHOWCASE, prompt);
   const ready = upload.status === 'ready' && modelId !== null && !busy && !missingScene;
+  // The sample dance on a photo nobody imported: Montagio's own files, no rights to confirm (the server agrees).
+  const rightsAsked = !(motionVideo.status === 'ready' && motionVideo.sample && upload.status === 'ready' && !upload.personal);
+  // What a disabled Generate waits for, said under it: the first thing missing, in the order of the composer.
+  const waitingFor: MessageKey | null = upload.status !== 'ready'
+    ? 'generateHint'
+    : busy
+    ? null
+    : missingScene
+    ? 'sceneNeeded'
+    : tab === 'effects' && needsOutfit && outfit.status !== 'ready'
+    ? 'hookNeedsOutfit'
+    : tab === 'motion' && motionVideo.status !== 'ready'
+    ? 'motionNeedsVideo'
+    : tab === 'motion' && rightsAsked && !rights
+    ? 'motionNeedsRights'
+    : tab === 'avatar' && !speechText.trim()
+    ? 'avatarNeedsText'
+    : (tab === 'effects' || tab === 'avatar') && askConsent && !consent
+    ? 'needsConsent'
+    : null;
   const canGenerate = tab === 'motion'
-    ? upload.status === 'ready' && motionVideo.status === 'ready' && rights && !busy
+    ? upload.status === 'ready' && motionVideo.status === 'ready' && (rights || !rightsAsked) && !busy
     : tab === 'avatar'
     ? upload.status === 'ready' && !busy && speechText.trim().length > 0 && (!askConsent || consent) && (!voice.mine || (voice.voiceRef !== null && voice.consent))
     : composing
@@ -574,8 +642,9 @@ export function Studio() {
   };
 
   /** A history item's "Reuse": its tab, photo, choice and texts come back, ready to render again. */
-  const restore = (item: HistoryItem) => {
-    const back = applyReprise(item);
+  const restore = (item: HistoryItem, opts: { reproduce?: boolean } = {}) => {
+    const back = applyReprise(item, opts);
+    setReplay(back.seed !== undefined || back.shotSeeds ? { tab: back.tab, seed: back.seed, shotSeeds: back.shotSeeds, recipeUrl: reproducedRecipeUrl(item) } : null);
     touched.current = true;
     ++uploadToken.current;
     setJob({ status: 'idle' });
@@ -590,7 +659,7 @@ export function Studio() {
     setSubjectFor(back.photoPrompt);
     setSubject(back.subject ?? defaultSubject(back.photoPrompt, 120));
     if (back.presetId) setPresetId(back.presetId);
-    if (back.modelId && models.some((model) => model.id === back.modelId)) setModelId(back.modelId);
+    if (back.modelId && models.some((model) => model.id === back.modelId)) pickModel(back.modelId);
     setPrompt(restoredScene(back));
     // A photo gone with the data: the description waits for the visitor to add it again.
     sceneOfPhoto.current = back.photo !== undefined;
@@ -618,18 +687,19 @@ export function Studio() {
 
   useEffect(() => {
     // A Reuse that comes during a render waits for its end: replacing the Studio now would orphan that render.
-    if (!from || catalog !== 'ready' || busy || appliedFrom.current === from) return;
-    appliedFrom.current = from;
+    const applied = `${from}|${reproduce}`;
+    if (!from || catalog !== 'ready' || busy || appliedFrom.current === applied) return;
+    appliedFrom.current = applied;
     apiFetch('/api/history')
       .then((res) => jsonOrThrow<HistoryItem[]>(res))
       .then((items) => {
         const item = items.find((entry) => entry.key === from);
-        if (item) restore(item);
+        if (item) restore(item, { reproduce });
       })
       .catch(() => undefined);
     // restore reads the catalogue, which is ready here; the item to bring back is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, catalog, busy]);
+  }, [from, reproduce, catalog, busy]);
 
   const checkRemix = async () => {
     if (!remix) return;
@@ -746,10 +816,13 @@ export function Studio() {
     setTake({ expected_s: mode === 'sequence' && !remix ? filmEstimate : estimate });
     moveCanvas('generate');
     const userPrompt = prompt.trim() || undefined;
+    // Reproduce sends the result's seed back: the same choices give the same workflow.
+    const seed = replay?.seed !== undefined ? { seed: replay.seed } : {};
+    setCompareWith(replay?.recipeUrl);
     if (tab === 'motion') {
       if (motionVideo.status !== 'ready') return;
       const texts = { ...(motionCharacter.trim() ? { character: motionCharacter.trim() } : {}), ...(motionAction.trim() ? { motion: motionAction.trim() } : {}) };
-      void submit('job', { imageRef: upload.imageRef, videoRef: motionVideo.videoRef, ...texts, rights: true }, undefined, '/api/motion');
+      void submit('job', { imageRef: upload.imageRef, videoRef: motionVideo.videoRef, ...texts, ...(rightsAsked ? { rights: true } : {}), ...seed }, undefined, '/api/motion');
       return;
     }
     if (tab === 'avatar') {
@@ -759,6 +832,7 @@ export function Studio() {
         language: speechLanguage,
         ...(askConsent ? { consent } : {}),
         ...(voice.mine && voice.voiceRef ? { voiceRef: voice.voiceRef, voiceConsent: voice.consent } : {}),
+        ...seed,
       };
       void submit('job', body, undefined, '/api/avatars');
       return;
@@ -766,19 +840,19 @@ export function Studio() {
     if (tab === 'effects') {
       if (selectedHook) {
         const image2 = needsOutfit && outfit.status === 'ready' ? { image2Ref: outfit.imageRef } : {};
-        void submit('job', { imageRef: upload.imageRef, hookId: selectedHook.id, ...image2, ...(askConsent ? { consent } : {}) }, undefined, '/api/hooks');
+        void submit('job', { imageRef: upload.imageRef, hookId: selectedHook.id, ...image2, ...(askConsent ? { consent } : {}), ...seed }, undefined, '/api/hooks');
         return;
       }
       if (!selectedEffect) return;
       const start = composing ? { compose: composeBody(compose) } : { imageRef: upload.imageRef };
-      const body = { ...start, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}) };
+      const body = { ...start, effectId: selectedEffect.id, subject: subject.trim(), ...(askConsent ? { consent } : {}), ...seed };
       void submit('job', body, undefined, '/api/effects');
       return;
     }
     if (remix) {
       const { text, baseId } = remix;
       const model = modelId;
-      void submit('generation', { presetYaml: text, modelId: model, imageRef: upload.imageRef, userPrompt }, (status, refusal) => {
+      void submit('generation', { presetYaml: text, modelId: model, imageRef: upload.imageRef, userPrompt, ...seed }, (status, refusal) => {
         if (status === 413) {
           setRemixCheck(text, model, { kind: 'too-large' });
         } else if (status === 400 && refusal?.error === 'invalid-preset') {
@@ -795,14 +869,15 @@ export function Studio() {
         if (record) setRemix((current) => (current?.baseId === baseId ? { ...current, generationId: record.id } : current));
       });
     } else if (mode === 'single') {
-      void submit('generation', { presetId, modelId, imageRef: upload.imageRef, userPrompt });
+      void submit('generation', { presetId, modelId, imageRef: upload.imageRef, userPrompt, ...seed });
     } else {
       void submit('sequence', {
         imageRef: upload.imageRef,
-        shots: shots.map((shot) => ({
+        shots: shots.map((shot, index) => ({
           presetId: shot.presetId,
           modelId,
           userPrompt: [userPrompt, shot.prompt.trim()].filter(Boolean).join(', ') || undefined,
+          ...(replay?.shotSeeds?.[index] !== undefined ? { seed: replay.shotSeeds[index] } : {}),
         })),
       });
     }
@@ -867,6 +942,14 @@ export function Studio() {
   const filmEstimate = estimate * Math.max(shots.length, 2) + ASSEMBLY_ESTIMATE_S;
   const primaryLabel = primaryLabelKey(mode, remix !== null, { showcase: IS_SHOWCASE, remixRender: capabilities.remixRender });
   const succeeded = tracked && tracked.record.state === 'succeeded' ? tracked.record : undefined;
+  // The recipe of the result: the showcase names its file; a placeholder has none.
+  const resultRecipeUrl =
+    tracked && succeeded && !succeeded.placeholder ? (succeeded.recipeUrl ?? (IS_SHOWCASE ? undefined : recipeUrlOf(tracked.kind, succeeded.id))) : undefined;
+  // Reproduce the result on screen: History brings it back with its seed (not in the showcase, whose clips are made).
+  const resultReproduceHref =
+    tracked && succeeded && resultRecipeUrl && !IS_SHOWCASE && reproducibleResult(tab, tracked.kind === 'job' ? tracked.record.task : undefined)
+      ? `/?tab=${tab}&from=${encodeURIComponent(`${tracked.kind}:${succeeded.id}`)}&reproduce=1`
+      : undefined;
   // A result on the monitor is the screen's subject: its Download is the lime button, Generate steps back.
   const resultShown = succeeded !== undefined && canvas.view === 'result';
   const elapsed_s = clock && clock.take === take ? clock.ms / 1000 : 0;
@@ -950,7 +1033,7 @@ export function Studio() {
       ? motionVideo.status === 'ready' && motionVideo.duration_s !== undefined && t('slateSpec', { s: Math.round(motionVideo.duration_s * 10) / 10 })
       : tab === 'avatar'
       ? speechSeconds > 0 && t('slateSpec', { s: speechSeconds })
-      : t('slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
+      : t(IS_SHOWCASE && showcase?.hd ? 'slateSpecHd' : 'slateSpec', { s: mode === 'sequence' && !remix ? CLIP_SECONDS * shots.length : CLIP_SECONDS }),
     ...(busy && take
       ? [
           t('slateRec', { t: formatClock(elapsed_s) }),
@@ -967,7 +1050,7 @@ export function Studio() {
     : tracked?.kind === 'job' && tracked.record.task === 'motion'
       ? extensions?.motionModel
     : tracked?.kind === 'generation'
-      ? models.find((model) => model.id === tracked.record.modelId)
+      ? catalogModels.find((model) => model.id === (tracked.record.demoModelId ?? tracked.record.modelId))
       : tracked?.kind === 'sequence'
         ? (models.find((model) => model.id === tracked.record.shots[0]?.modelId) ?? selectedModel)
         : undefined;
@@ -980,7 +1063,10 @@ export function Studio() {
             if (value !== null) touched.current = true;
             setRequestedTab(value);
           }}
-          onFrom={setFrom}
+          onFrom={(key, again) => {
+            setFrom(key);
+            setReproduce(again);
+          }}
         />
       </Suspense>
       <Header recording={busy} current={tab} />
@@ -1003,8 +1089,6 @@ export function Studio() {
                     ? t('motionKind', { s: Math.round(motionVideo.duration_s * 10) / 10 })
                     : t('motionKindEmpty')
                 }
-                previewUrl={extensions?.examples?.motion?.previewUrl}
-                posterUrl={extensions?.examples?.motion?.posterUrl}
                 icon="motion"
                 paused={motionPaused}
               />
@@ -1012,8 +1096,6 @@ export function Studio() {
               <ChoiceCard
                 name={t('tabAvatar')}
                 kindLabel={speechSeconds > 0 ? t('avatarKind', { s: speechSeconds }) : t('avatarKindEmpty')}
-                previewUrl={extensions?.examples?.avatar?.previewUrl}
-                posterUrl={extensions?.examples?.avatar?.posterUrl}
                 icon="avatar"
                 paused={motionPaused}
               />
@@ -1150,7 +1232,7 @@ export function Studio() {
                 models={models}
                 loading={catalog === 'loading'}
                 selectedId={modelId}
-                onSelect={setModelId}
+                onSelect={pickModel}
                 onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
                 className={styles.modelsInFields}
                 {...(profileNote ? { note: profileNote } : {})}
@@ -1160,7 +1242,7 @@ export function Studio() {
           }
           consent={
             tab === 'motion' ? (
-              <ConsentCheck id="motion-rights" label="motionRights" checked={rights} onChange={setRights} />
+              rightsAsked && <ConsentCheck id="motion-rights" label="motionRights" checked={rights} onChange={setRights} />
             ) : askConsent ? (
               <ConsentCheck id="effect-consent" checked={consent} onChange={setConsent} />
             ) : undefined
@@ -1175,7 +1257,7 @@ export function Studio() {
                     name="model-by-generate"
                     models={models}
                     selectedId={modelId}
-                    onSelect={setModelId}
+                    onSelect={pickModel}
                     onlyId={IS_SHOWCASE ? (showcase?.model.id ?? modelId ?? '') : undefined}
                     className={styles.modelsByGenerate}
                     {...(profileNote ? { note: profileNote } : {})}
@@ -1186,6 +1268,7 @@ export function Studio() {
                     type="button"
                     className={resultShown || canvas.view === 'atelier' ? styles.buttonSecondary : styles.buttonPrimary}
                     disabled={!canGenerate}
+                    aria-describedby={waitingFor ? 'generate-reason' : undefined}
                     onClick={generate}
                   >
                     {t(primaryLabel, { d: formatDuration(mode === 'sequence' && !remix ? filmEstimate : estimate) })}
@@ -1200,10 +1283,19 @@ export function Studio() {
                     )}
                   </div>
                 )}
-                {upload.status !== 'ready' && primaryLabel && <p className={styles.hint}>{t('generateHint')}</p>}
-                {upload.status === 'ready' && missingScene && <p className={styles.hint}>{t('sceneNeeded')}</p>}
-                {tab === 'effects' && upload.status === 'ready' && needsOutfit && outfit.status !== 'ready' && <p className={styles.hint}>{t('hookNeedsOutfit')}</p>}
-                {tab === 'motion' && upload.status === 'ready' && motionVideo.status !== 'ready' && <p className={styles.hint}>{t('motionNeedsVideo')}</p>}
+                {waitingFor && primaryLabel && (
+                  <p id="generate-reason" className={styles.hint}>
+                    {t(waitingFor)}
+                  </p>
+                )}
+                {replay && (
+                  <p className={styles.hint} data-testid="replay-seed">
+                    {t('recipeSeedChip', { seed: replay.seed ?? replay.shotSeeds?.join(' · ') ?? '' })}{' '}
+                    <button type="button" className={styles.buttonLink} onClick={() => setReplay(null)}>
+                      {t('recipeNewSeed')}
+                    </button>
+                  </p>
+                )}
               </div>
               {/* Outside the sticky block: on a phone that block stays one button high over the gallery. */}
               {!IS_SHOWCASE && <p className={styles.note}>{t('localNote')}</p>}
@@ -1334,9 +1426,17 @@ export function Studio() {
                 </p>
               )}
               {IS_SHOWCASE && succeeded && !succeeded.placeholder && (resultModel ?? showcase?.model) && (
-                <AiCaption text="showcaseCaption" testId="result-caption" model={(resultModel ?? showcase?.model)!} />
+                // A clip restored to 1080p also names its HD pass's model.
+                <AiCaption
+                  text={succeeded.hdModel ? 'showcaseHdCaption' : 'showcaseCaption'}
+                  testId="result-caption"
+                  model={(resultModel ?? showcase?.model)!}
+                  hd={succeeded.hdModel}
+                />
               )}
-              {!IS_SHOWCASE && succeeded && resultModel && <AiCaption model={resultModel} />}
+              {!IS_SHOWCASE && succeeded && resultModel && (
+                <AiCaption model={resultModel} demoKind={tracked?.kind === 'sequence' ? undefined : tracked?.record.demo} />
+              )}
               {succeeded && tracked?.kind === 'job' && tracked.record.task === 'motion' && (
                 <p className={styles.caption} data-testid="motion-no-sound">
                   {t('motionNoSound')}
@@ -1421,6 +1521,15 @@ export function Studio() {
                   {...(extensions.musicModel ? { model: extensions.musicModel } : {})}
                 />
               )}
+              {resultRecipeUrl && (
+                <RecipePanel
+                  key={resultRecipeUrl}
+                  url={resultRecipeUrl}
+                  {...(resultReproduceHref ? { reproduceHref: resultReproduceHref } : {})}
+                  {...(IS_SHOWCASE && repoUrl ? { homeHref: `${repoUrl}/blob/main/docs/INSTALL.md#reproduce-a-recipe` } : {})}
+                  {...(compareWith && compareWith !== resultRecipeUrl ? { compareUrl: compareWith } : {})}
+                />
+              )}
               {/* What the showcase is, in sight whatever the monitor shows. */}
               {showcaseNote && <p className={styles.stageNote}>{showcaseNote}</p>}
             </>
@@ -1433,18 +1542,19 @@ export function Studio() {
 }
 
 /** Reads ?tab= in its own Suspense boundary: the rest of the Studio prerenders without the URL. */
-function TabParam({ onTab, onFrom }: { onTab: (tab: string | null) => void; onFrom: (key: string | null) => void }) {
+function TabParam({ onTab, onFrom }: { onTab: (tab: string | null) => void; onFrom: (key: string | null, reproduce: boolean) => void }) {
   const params = useSearchParams();
   const tab = params.get('tab');
   const from = params.get('from');
+  const reproduce = params.get('reproduce') === '1';
   useEffect(() => {
     onTab(tab);
     // onTab is a new function on every render of the Studio; the URL's tab is what matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
   useEffect(() => {
-    onFrom(from);
+    onFrom(from, reproduce);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from]);
+  }, [from, reproduce]);
   return null;
 }

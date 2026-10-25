@@ -1,15 +1,15 @@
 import { join } from 'node:path';
 import type { GenerationBackend } from './backend';
 import { ComfyBackend } from './comfy';
-import { DemoBackend } from './demo';
+import { DemoBackend, type DemoRender } from './demo';
 import { assertLocalBaseUrl } from './target';
 
 /**
  * Build the backend selected by MONTAGIO_BACKEND (default "demo").
  * "local" runs the open-weights workflows on a ComfyUI behind comfy-api-proxy, at the
- * explicit COMFY_BASE_URL; "hosted" comes with the demo link.
+ * explicit COMFY_BASE_URL; "hosted" comes with the demo link. `demoRender` makes the demo's files from the jobs' photos.
  */
-export function createBackend(env: Record<string, string | undefined>): GenerationBackend {
+export function createBackend(env: Record<string, string | undefined>, opts: { demoRender?: DemoRender } = {}): GenerationBackend {
   const kind = env.MONTAGIO_BACKEND ?? 'demo';
   const root = env.MONTAGIO_ROOT ?? process.cwd();
   switch (kind) {
@@ -19,6 +19,7 @@ export function createBackend(env: Record<string, string | undefined>): Generati
         imagesDir: env.MONTAGIO_DEMO_IMAGES ?? join(root, 'demo-assets', 'images'),
         audioDir: env.MONTAGIO_DEMO_AUDIO ?? join(root, 'demo-assets', 'audio'),
         durationMs: Number(env.MONTAGIO_DEMO_DURATION_MS ?? 6000),
+        ...(opts.demoRender ? { render: opts.demoRender } : {}),
       });
     case 'local': {
       const baseUrl = env.COMFY_BASE_URL?.trim();

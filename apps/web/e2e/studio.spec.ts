@@ -18,8 +18,10 @@ test('studio happy path in demo mode', async ({ page }) => {
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.getByRole('progressbar')).toBeVisible();
   await expect(page.locator('video[data-testid=result]')).toHaveAttribute('src', /\/media\//, { timeout: 15_000 });
-  // The demo backend: the caption says no model ran, and names the one that would.
-  await expect(page.getByTestId('ai-caption')).toHaveText(/^Demo render: no model ran here\. With a GPU, .+ [(]Apache-2.0[)] makes it\.$/);
+  // The demo backend: the sample photo, imported, gets the GPU render of it; the caption says no model ran here.
+  await expect(page.getByTestId('ai-caption')).toHaveText(
+    /^Demo render: no model ran here\. On a GPU, .+ [(]Apache-2.0[)] made this clip of the same sample photo · AI-generated$/,
+  );
   const download = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Open in ComfyUI' }).click();
   expect((await download).suggestedFilename()).toMatch(/\.json$/);
@@ -94,9 +96,9 @@ test('the caption under a clip links to its model on the open stack page', async
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
-  await page.getByTestId('ai-caption').getByRole('link', { name: 'Wan 2.2 Fun Camera' }).click();
-  await expect(page).toHaveURL(/\/open-stack\/?#model-wan22-i2v-a14b-fun-camera$/);
-  const row = page.locator('#model-wan22-i2v-a14b-fun-camera');
+  await page.getByTestId('ai-caption').getByRole('link', { name: 'Wan 2.2 Fun Camera Turbo' }).click();
+  await expect(page).toHaveURL(/\/open-stack\/?#model-wan22-i2v-a14b-fun-camera-turbo$/);
+  const row = page.locator('#model-wan22-i2v-a14b-fun-camera-turbo');
   await expect(row).toHaveAttribute('data-target', 'true');
   await expect(row).toBeInViewport();
 });

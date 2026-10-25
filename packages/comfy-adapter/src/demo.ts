@@ -3,7 +3,14 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { IDEMPOTENCY_WINDOW_MS, type BackendJob, type GenerationBackend, type OutputKind, type OutputWanted, type SubmitJob } from './backend';
 
-type DemoJob = { presetId: string; output: OutputKind; startedAt: number; canceledAt?: number };
+/**
+ * Makes the file of a job from what it was given (the web layer: a render of the sample photo
+ * made on a GPU, or the photo moved by FFmpeg); undefined keeps the pre-rendered file.
+ */
+export type DemoRender = (job: { presetId: string; output: OutputKind; files: NonNullable<SubmitJob['files']> }) => Promise<string | undefined>;
+
+/** `rendered` is undefined while the render runs, null when it gave nothing. */
+type DemoJob = { presetId: string; output: OutputKind; startedAt: number; canceledAt?: number; rendered?: string | null };
 
 /** The pre-rendered file of each kind, and the one used when a job has none of its own. */
 const DEMO_FILES: Record<OutputKind, { dir: 'clipsDir' | 'imagesDir' | 'audioDir'; ext: string }> = {
@@ -14,8 +21,8 @@ const DEMO_FILES: Record<OutputKind, { dir: 'clipsDir' | 'imagesDir' | 'audioDir
 
 /**
  * Backend that needs no GPU: it simulates progress over `durationMs` and
- * returns a pre-rendered file of the kind the job delivers: a clip for the preset
- * (or `_default.mp4`), an image (`_default.png`) or a sound (`_default.flac`).
+ * returns what `render` made of the job's files, or else a pre-rendered file of the kind the
+ * job delivers: a clip for the preset (or `_default.mp4`), an image (`_default.png`) or a sound (`_default.flac`).
  * Jobs live in memory, so a restarted server reports them as lost.
  */
 export class DemoBackend implements GenerationBackend {
@@ -29,7 +36,14 @@ export class DemoBackend implements GenerationBackend {
 
   /** `imagesDir` and `audioDir` default to the siblings of `clipsDir` (demo-assets/images, demo-assets/audio). */
   constructor(
-    private readonly opts: { clipsDir: string; imagesDir?: string; audioDir?: string; durationMs: number; now?: () => number },
+    private readonly opts: {
+      clipsDir: string;
+      imagesDir?: string;
+      audioDir?: string;
+      durationMs: number;
+      now?: () => number;
+      render?: DemoRender;
+    },
   ) {
     this.now = opts.now ?? Date.now;
     this.dirs = {
@@ -39,7 +53,7 @@ export class DemoBackend implements GenerationBackend {
     };
   }
 
-  /** `files` is ignored: the demo renders nothing. */
+  /** `files` only reach `render`, which starts at once: no model runs. */
   async submit(job: SubmitJob): Promise<{ backendJobId: string }> {
     const now = this.now();
     // Past the window the web layer treats a reused key as a new request: so does the backend.
@@ -50,7 +64,21 @@ export class DemoBackend implements GenerationBackend {
     if (known) return { backendJobId: known.backendJobId };
     // The start time is part of the id: a key reused after the window does not reopen its old job.
     const backendJobId = `demo-${createHash('sha256').update(`${job.idempotencyKey}@${now}`).digest('hex').slice(0, 12)}`;
-    this.jobs.set(backendJobId, { presetId: job.presetId, output: job.output ?? 'video', startedAt: now });
+    const demoJob: DemoJob = { presetId: job.presetId, output: job.output ?? 'video', startedAt: now };
+    const { render } = this.opts;
+    if (render && job.files?.length) {
+      demoJob.rendered = undefined;
+      render({ presetId: job.presetId, output: demoJob.output, files: job.files }).then(
+        (path) => (demoJob.rendered = path ?? null),
+        (error: unknown) => {
+          console.warn(`[montagio] demo job ${backendJobId}: no render of its photo, the pre-rendered file instead`, error);
+          demoJob.rendered = null;
+        },
+      );
+    } else {
+      demoJob.rendered = null;
+    }
+    this.jobs.set(backendJobId, demoJob);
     this.submissions.set(job.idempotencyKey, { at: now, backendJobId });
     return { backendJobId };
   }
@@ -64,8 +92,12 @@ export class DemoBackend implements GenerationBackend {
       return { id: backendJobId, state: 'canceled', progress: this.progressAt(job, job.canceledAt) };
     }
     const now = this.now();
+    const output = want?.output ?? job.output;
+    // The render of the job's own output may outlast the simulated time: the job waits for it at 99 %.
+    const own = output === job.output ? job.rendered : null;
+    if (now >= finishedAt && own === undefined) return { id: backendJobId, state: 'running', progress: 0.99 };
     if (now >= finishedAt) {
-      return { id: backendJobId, state: 'succeeded', progress: 1, outputPath: this.fileFor(job.presetId, want?.output ?? job.output) };
+      return { id: backendJobId, state: 'succeeded', progress: 1, outputPath: own ?? this.fileFor(job.presetId, output) };
     }
     return { id: backendJobId, state: 'running', progress: this.progressAt(job, now) };
   }

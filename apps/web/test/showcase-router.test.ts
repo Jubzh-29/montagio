@@ -34,6 +34,7 @@ function showcaseData(): ShowcaseData {
     url: `clips/${presetId}--landscape-a.mp4`,
     verticalUrl: `clips/${presetId}--landscape-a.9x16.mp4`,
     workflowUrl: `workflows/${presetId}--landscape-a.json`,
+    ...(placeholder ? {} : { recipeUrl: `recipes/${presetId}--landscape-a.json` }),
     placeholder,
   });
   return {
@@ -127,6 +128,7 @@ test('describes the showcase: samples, model and what it cannot do', async () =>
     model: { id: 'wan22-i2v-a14b-fun-camera', name: 'Wan 2.2 Fun Camera', license: 'Apache-2.0' },
     capabilities: { uploads: false, remixRender: false },
     placeholders: true,
+    hd: false,
     repoUrl: 'https://example.org/montagio',
   });
 });
@@ -172,6 +174,16 @@ test("refuses another model, an unknown pair, an upload and a remix render with 
   expect(await generate({ presetYaml: 'id: x', imageRef: 'samples/landscape-a' })).toMatchObject({ status: 403, json: { error: 'showcase-remix' } });
   expect(await call(router, 'POST', '/api/uploads')).toMatchObject({ status: 403, json: { error: 'showcase-upload' } });
   expect(await call(router, 'GET', '/api/nowhere')).toMatchObject({ status: 404, json: { error: 'not-found' } });
+});
+
+test('a rendered clip comes with its recipe, in the Studio and in the visit history; a placeholder has none', async () => {
+  const router = createShowcaseRouter(showcaseData(), { montage: controllableMontage().montage, base: '' });
+  const rendered = await call(router, 'POST', '/api/generations', { presetId: 'crash-push', imageRef: 'samples/landscape-a' });
+  expect(rendered.json.recipeUrl).toBe('/showcase/recipes/crash-push--landscape-a.json');
+  const placeholder = await call(router, 'POST', '/api/generations', { presetId: 'pan-left', imageRef: 'samples/landscape-a' });
+  expect(placeholder.json).not.toHaveProperty('recipeUrl');
+  const visit = (await call(router, 'GET', '/api/history')).json as unknown as HistoryItem[];
+  expect(visit.map((item) => item.recipeUrl)).toEqual([undefined, '/showcase/recipes/crash-push--landscape-a.json']);
 });
 
 test('validates a preset in the page: valid, invalid lines, too large', async () => {
@@ -382,6 +394,28 @@ test('an effect with an example answers a finished job, kept for the visit histo
     ['hook', { tab: 'effects', imageRef: 'samples/landscape-a', personal: false, hookId: 'iris-dive' }],
     ['effect', { tab: 'effects', imageRef: 'samples/landscape-a', personal: false, effectId: 'squish' }],
   ]);
+});
+
+test('a clip, an example and a film restored to 1080p name the model of their HD pass', async () => {
+  const seedvr2 = { id: 'seedvr2-upscale', name: 'SeedVR2 3B (1080p upscale)', license: 'Apache-2.0' };
+  const data = withExamples();
+  data.clips = data.clips.map((clip) => ({ ...clip, placeholder: false, hd: seedvr2 }));
+  data.effects[0]!.examples[0]!.hd = seedvr2;
+  const fake = controllableMontage();
+  const router = createShowcaseRouter(data, { montage: fake.montage, base: '' });
+  expect((await call(router, 'POST', '/api/generations', { presetId: 'crash-push', imageRef: 'samples/landscape-a' })).json).toMatchObject({ hdModel: seedvr2 });
+  expect((await call(router, 'POST', '/api/effects', { imageRef: 'samples/landscape-a', effectId: 'squish' })).json).toMatchObject({ hdModel: seedvr2 });
+  expect((await call(router, 'POST', '/api/sequences', film)).json).toMatchObject({ hdModel: seedvr2 });
+  // Every clip in 1080p: the slate says so.
+  expect((await call(router, 'GET', '/api/showcase')).json).toMatchObject({ hd: true });
+
+  // A 480p clip, or a film with one 480p shot, names no HD pass.
+  delete data.clips[1]!.hd;
+  const mixed = createShowcaseRouter(data, { montage: controllableMontage().montage, base: '' });
+  expect((await call(mixed, 'GET', '/api/showcase')).json).toMatchObject({ hd: false });
+  expect((await call(mixed, 'POST', '/api/generations', { presetId: 'pan-left', imageRef: 'samples/landscape-a' })).json).not.toHaveProperty('hdModel');
+  expect((await call(mixed, 'POST', '/api/sequences', film)).json).not.toHaveProperty('hdModel');
+  expect((await call(mixed, 'POST', '/api/hooks', { imageRef: 'samples/landscape-a', hookId: 'iris-dive' })).json).not.toHaveProperty('hdModel');
 });
 
 test('an effect without an example for this photo: 404 not-in-showcase', async () => {

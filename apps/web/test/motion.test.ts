@@ -5,8 +5,10 @@ import { join } from 'node:path';
 import { probe, probeAudio, readTags } from '@montagio/sequence';
 import { GET as getJob } from '@/app/api/jobs/[id]/route';
 import { POST as postMotion } from '@/app/api/motion/route';
+import { POST as postUpload } from '@/app/api/uploads/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import { POST as postVideo } from '@/app/api/uploads/video/route';
+import { POST as postSampleVideo } from '@/app/api/uploads/video/sample/route';
 import type { JobSummary } from '@/lib/api-types';
 import { mediaFileFor } from '@/server/generations';
 import { listHistory } from '@/server/history';
@@ -14,7 +16,7 @@ import { readJobWorkflow } from '@/server/jobs';
 import { getServices } from '@/server/services';
 import { videoPath } from '@/server/tasks/files';
 import { MAX_VIDEO_FORM_BYTES } from '@/server/uploads';
-import { params, setupTempData } from './helpers';
+import { params, pngFile, repoRoot, setupTempData, uploadRequest } from './helpers';
 
 setupTempData();
 let flag: string | undefined;
@@ -136,6 +138,28 @@ test("with rights: a tagged clip on the video's aspect", async () => {
   expect(done.state).toBe('succeeded');
   expect((await readTags(mediaFileFor(done.outputUrl)!)).comment).toBe('AI-generated');
 }, 60_000);
+
+test('the sample dance is copied as a prepared clip of origin "sample"', async () => {
+  const res = await postSampleVideo();
+  expect(res.status).toBe(201);
+  const meta = (await res.json()) as { videoRef: string; url: string; duration_s: number; origin: string };
+  expect(meta).toMatchObject({ duration_s: 5, aspect: '9:16', origin: 'sample', url: `/media/data/uploads/${meta.videoRef}` });
+  expect(readFileSync(videoPath(meta.videoRef))).toEqual(readFileSync(join(repoRoot, 'demo-assets', 'videos', 'sample-dance.mp4')));
+});
+
+test('the sample dance on a photo nobody imported needs no rights; on an imported photo, or with an imported clip, it does', async () => {
+  const sampleVideo = async () => ((await (await postSampleVideo()).json()) as { videoRef: string }).videoRef;
+  expect((await post({ imageRef: await sampleRef(), videoRef: await sampleVideo() }, 'mo-own')).status).toBe(201);
+  const imported = await postUpload(uploadRequest(pngFile(832, 480)));
+  const { imageRef } = (await imported.json()) as { imageRef: string };
+  expect(await (await post({ imageRef, videoRef: await sampleVideo() }, 'mo-imported')).json()).toEqual({ error: 'rights-required' });
+  expect(await (await post({ imageRef: await sampleRef(), videoRef: await videoRef() }, 'mo-clip')).json()).toEqual({ error: 'rights-required' });
+}, 60_000);
+
+test('motion hidden: no sample dance either', async () => {
+  process.env.MONTAGIO_EXTENSIONS = 'edit';
+  expect((await postSampleVideo()).status).toBe(404);
+});
 
 test('motion hidden: 404 extension-disabled', async () => {
   const ref = await videoRef();

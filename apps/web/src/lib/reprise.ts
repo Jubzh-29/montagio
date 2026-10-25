@@ -1,6 +1,6 @@
 import type { Lang } from '@/i18n';
 import { CATALOG_FR } from '@/i18n/catalog-fr';
-import type { HistoryItem } from './api-types';
+import type { HistoryItem, Reprise } from './api-types';
 
 /** What the Studio sets back from a history item. */
 export type StudioRestore = {
@@ -23,14 +23,45 @@ export type StudioRestore = {
   shots?: { presetId: string; prompt: string }[];
   remixGenerationId?: string;
   notice?: 'photo-missing';
+  /** Reproduce: the seed of the result, sent back with the next render (a film: one per shot). */
+  seed?: number;
+  shotSeeds?: number[];
 };
 
-/** The Studio, on the item's tab, told which item to bring back. */
-export function repriseHref(item: HistoryItem): string {
-  return `/?tab=${item.reprise.tab}&from=${encodeURIComponent(item.key)}`;
+/** The tabs the Studio reopens whole: a photo, an ad, a voice change or a film's music stay with their recipe only. */
+export const REPRODUCIBLE_TABS: ReadonlySet<Reprise['tab']> = new Set(['camera', 'film', 'effects', 'avatar', 'motion']);
+const NOT_REPRODUCIBLE = new Set<HistoryItem['task']>(['ad', 'voice-change', 'music']);
+
+/** The recipe a reproduction of the item is compared with: its own, or its parent's (an HD clip reopens its clip). */
+export const reproducedRecipeUrl = (item: HistoryItem): string | undefined => item.reproduces ?? item.recipeUrl;
+
+/** What Reproduce brought back: the seed to send again, on the tab it came from. */
+export type Replay = { tab: Reprise['tab']; seed?: number; shotSeeds?: number[]; recipeUrl?: string };
+
+/** The replay that holds on `tab`: on another tab the choices are other ones, and so is the seed. */
+export function replayOn<T extends Pick<Replay, 'tab'>>(replay: T | null, tab: string): T | null {
+  return replay && replay.tab === tab ? replay : null;
 }
 
-export function applyReprise(item: HistoryItem): StudioRestore {
+/** A result on screen the Studio can reproduce: its tab is reopened whole, and its task is not an ad. */
+export function reproducibleResult(tab: string, jobTask?: string): boolean {
+  return REPRODUCIBLE_TABS.has(tab as Reprise['tab']) && (jobTask === undefined || !NOT_REPRODUCIBLE.has(jobTask as HistoryItem['task']));
+}
+
+/** Reproduce can reopen the item with its seed: a clip or a film the Studio reopens whole, whose seed is known. */
+export function canReproduce(item: HistoryItem): boolean {
+  if (!item.recipeUrl || item.kind === 'photo' || NOT_REPRODUCIBLE.has(item.task) || !REPRODUCIBLE_TABS.has(item.reprise.tab)) return false;
+  if (item.kind === 'film') return (item.reprise.shots?.length ?? 0) > 0 && item.reprise.shots!.every((shot) => shot.seed !== undefined);
+  return item.reprise.seed !== undefined;
+}
+
+/** The Studio, on the item's tab, told which item to bring back; to reproduce it, with its seed. */
+export function repriseHref(item: HistoryItem, opts: { reproduce?: boolean } = {}): string {
+  return `/?tab=${item.reprise.tab}&from=${encodeURIComponent(item.key)}${opts.reproduce ? '&reproduce=1' : ''}`;
+}
+
+/** Reuse reopens the choices (a new seed comes with the next render); Reproduce reopens the seed too. */
+export function applyReprise(item: HistoryItem, opts: { reproduce?: boolean } = {}): StudioRestore {
   const { reprise } = item;
   const restore: StudioRestore = { tab: reprise.tab };
   if (reprise.imageRef) restore.photo = { imageRef: reprise.imageRef, personal: reprise.personal ?? true };
@@ -51,6 +82,10 @@ export function applyReprise(item: HistoryItem): StudioRestore {
   }
   if (reprise.tab === 'motion') {
     restore.motion = { ...(reprise.videoRef ? { videoRef: reprise.videoRef } : {}), character: reprise.prompt ?? '', action: reprise.motion ?? '' };
+  }
+  if (opts.reproduce) {
+    if (reprise.seed !== undefined) restore.seed = reprise.seed;
+    if (reprise.shots?.length && reprise.shots.every((shot) => shot.seed !== undefined)) restore.shotSeeds = reprise.shots.map((shot) => shot.seed!);
   }
   return restore;
 }

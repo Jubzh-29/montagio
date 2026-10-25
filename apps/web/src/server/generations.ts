@@ -3,15 +3,18 @@ import { access } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { IDEMPOTENCY_WINDOW_MS, isBackendError, type BackendErrorCode } from '@montagio/comfy-adapter';
 import { compileJob, CompileError, validatePreset, type Preset } from '@montagio/presets';
-import { ensureTools, probe, tagClip } from '@montagio/sequence';
+import { DEMO_MOVE_METADATA, ensureTools, probe, tagClip } from '@montagio/sequence';
 import { MAX_PRESET_YAML_BYTES, MAX_REQUEST_BYTES } from '@/lib/limits';
+import { demoExampleModel, demoKindOf } from './demo-render';
 import { getEnv } from './env';
+import { slotsOf } from './inputs';
 import { offeredModel, presetModel } from './profile';
 import { getServices } from './services';
 import {
   lookupKey,
   readRecord,
   rememberKey,
+  saveInputs,
   savePresetText,
   saveRecord,
   saveWorkflow,
@@ -61,6 +64,8 @@ export type CreateGenerationInput = {
   modelId?: string;
   imageRef: string;
   userPrompt?: string;
+  /** The negative prompt in place of the preset's: a showcase clip's own, given again by its recipe. */
+  negative?: string;
   seed?: number;
   idempotencyKey: string;
 };
@@ -105,6 +110,11 @@ async function resolveJob(input: Omit<CreateGenerationInput, 'idempotencyKey'>, 
       seed,
       aspect: upload.aspect,
     });
+    if (input.negative !== undefined) {
+      const binding = model.bindings.negative;
+      if (!binding) throw new GenerationError('model-incompatible');
+      compiled.workflow[binding.node]!.inputs[binding.field] = input.negative;
+    }
     return { preset, model, upload, compiled };
   } catch (error) {
     if (error instanceof CompileError) throw new GenerationError('model-incompatible');
@@ -140,12 +150,16 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
   if (input.presetYaml !== undefined) await savePresetText(id, input.presetYaml);
   // The start image travels as a file: the backend uploads it and binds it to the loader node.
   const imageBinding = model.bindings.image;
+  const imagePath = join(getEnv().data, ...input.imageRef.split('/'));
+  if (imageBinding) {
+    await saveInputs(id, await slotsOf([{ ...imageBinding, path: imagePath }], [{ from: 'imageRef', path: imagePath }]));
+  }
   const { backendJobId } = await backend.submit({
     workflow: compiled.workflow,
     presetId: preset.id,
     idempotencyKey: input.idempotencyKey,
     ...(imageBinding
-      ? { files: [{ node: imageBinding.node, field: imageBinding.field, path: join(getEnv().data, ...input.imageRef.split('/')) }] }
+      ? { files: [{ node: imageBinding.node, field: imageBinding.field, path: imagePath }] }
       : {}),
   });
   const now = new Date().toISOString();
@@ -155,6 +169,7 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
     modelId: model.id,
     imageRef: input.imageRef,
     ...(input.userPrompt ? { userPrompt: input.userPrompt } : {}),
+    ...(input.negative !== undefined ? { negative: input.negative } : {}),
     ...(input.presetYaml !== undefined ? { remix: true as const } : {}),
     seed,
     aspect: upload.aspect,
@@ -235,7 +250,12 @@ export async function getGeneration(id: string): Promise<GenerationRecord | null
     updatedAt: new Date().toISOString(),
   };
   if (job.state === 'succeeded' && job.outputPath) {
-    const url = await deliverClip(record.id, job.outputPath);
+    const demo = demoKindOf(job.outputPath);
+    if (demo) updated.demo = demo;
+    // A camera example was rendered in 20 steps: the caption names that model, not the Turbo the job asked for.
+    const madeBy = demo === 'example' ? demoExampleModel(job.outputPath) : undefined;
+    if (madeBy && madeBy !== record.modelId) updated.demoModelId = madeBy;
+    const url = await deliverClip(record.id, job.outputPath, demo === 'moved');
     if (url) {
       updated.outputUrl = url;
       const frames = await frameCount(mediaFileFor(url));
@@ -262,15 +282,19 @@ async function frameCount(file: string | null): Promise<number | undefined> {
  * URL of the clip the user gets: a copy of the backend's output that carries the
  * AI-generated mention, under data/generations/<id>/clip.mp4. If FFmpeg cannot
  * write it, the render is not lost: the raw output is delivered untagged and the
- * error goes to the server log.
+ * error goes to the server log. A clip FFmpeg moved (`moved`, demo) keeps its own mention: no model made it.
  */
-function deliverClip(id: string, outputPath: string): Promise<string | undefined> {
+function deliverClip(id: string, outputPath: string, moved = false): Promise<string | undefined> {
   const clip = join(getEnv().data, 'generations', id, 'clip.mp4');
   let delivery = taggedClips.get(clip);
   if (!delivery) {
     delivery = (async () => {
       try {
-        await access(clip).catch(() => tagClip(outputPath, clip));
+        // recipe.ts reads this module: imported when needed, not at load. A clip FFmpeg moved (demo)
+        // keeps its own mention, and carries its recipe as any other.
+        await access(clip).catch(async () =>
+          tagClip(outputPath, clip, { ...(moved ? DEMO_MOVE_METADATA : {}), ...(await (await import('./recipe')).recipeTags('generation', id, 'video')) }),
+        );
         return mediaUrlFor(clip);
       } catch (error) {
         console.error(`[montagio] generation ${id}: the AI-generated mention could not be written, clip delivered untagged`, error);

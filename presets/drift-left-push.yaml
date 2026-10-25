@@ -21,3 +21,4 @@ defaults:
 models:
   preferred: wan22-i2v-a14b-fun-camera
   fallback: wan22-ti2v-5b
+# Quality (20 steps) by default: a sideways move, like Pan Left whose 4 steps double a person into a ghost (GPU session of 2026-10-25).
