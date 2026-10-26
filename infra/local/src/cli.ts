@@ -44,11 +44,11 @@ Options:
   --no-browser       install, start: do not open the browser
   --extensions LIST  install: the extensions whose weights to fetch besides the camera presets': all (every one,
                      the node packs of the avatar and the object swap included), validated (those a GPU session
-                     validated), none, or a list such as music,edit. Default: the effects pack (about 21 GB), once a
-                     GPU session validated it
+                     validated), none, a list such as music,edit, or default (forget the kept choice): the effects
+                     pack (about 21 GB), once a GPU session validated it. The choice is kept for the next runs
 
 Environment:
-  MONTAGIO_EXTENSIONS     install: the default of --extensions (the app reads it too)
+  MONTAGIO_EXTENSIONS     install: the default of --extensions, kept the same way (the app reads it too)
   MONTAGIO_COMFYUI_ARGS   extra ComfyUI arguments, for example "--reserve-vram 1"
   HF_TOKEN               Hugging Face token, only if a download is refused
   MONTAGIO_FFMPEG, MONTAGIO_FFPROBE   FFmpeg binaries outside the PATH
@@ -67,7 +67,7 @@ export type CliOptions = {
   proxyUrl: string | null;
   demo: boolean;
   ports: Partial<Ports>;
-  /** --extensions; null leaves it to MONTAGIO_EXTENSIONS, then the effects pack if a GPU session validated it. */
+  /** --extensions; null leaves it to MONTAGIO_EXTENSIONS, then to the last install's choice, then to the effects pack if a GPU session validated it. */
   extensions: string | null;
   /** --low-vram: the 12 GB profile. */
   lowVram: boolean;

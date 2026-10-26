@@ -24,6 +24,11 @@ export type InstallState = {
    * recorded them, or for the app alone, which keeps the user's variable.
    */
   extensions: string[] | null;
+  /**
+   * What --extensions (or MONTAGIO_EXTENSIONS) asked for, as given ("all", "music,edit"), kept for the next runs
+   * until another value or "default"; null for the default.
+   */
+  extensionsAsked: string | null;
   /** Full install: its memory profile, passed to the app as MONTAGIO_VRAM_PROFILE; null before one, or for the app alone. */
   vramProfile: VramProfile | null;
   stamps: Partial<Record<StampId, string>>;
@@ -34,7 +39,7 @@ export type InstallState = {
 const SCHEMA = 'montagio/install@0.1';
 
 export function emptyState(): InstallState {
-  return { schema: SCHEMA, mode: null, ports: { ...DEFAULT_PORTS }, gpuIndex: null, proxyUrl: null, extensions: null, vramProfile: null, stamps: {}, weights: {} };
+  return { schema: SCHEMA, mode: null, ports: { ...DEFAULT_PORTS }, gpuIndex: null, proxyUrl: null, extensions: null, extensionsAsked: null, vramProfile: null, stamps: {}, weights: {} };
 }
 
 /** An absent, unreadable or foreign file gives an empty state: every step runs again, which is always safe. */

@@ -230,7 +230,7 @@ export function selectExtensions(config: ExtensionPin[], flag: string | null | u
   const known = byPriority.map((e) => e.id);
   const unknown = asked.filter((id) => !known.includes(id));
   if (unknown.length > 0) {
-    throw new Error(`--extensions: unknown extension ${unknown.map((id) => JSON.stringify(id)).join(', ')} (expected validated, all, none or a list of ${known.join(', ')})`);
+    throw new Error(`--extensions: unknown extension ${unknown.map((id) => JSON.stringify(id)).join(', ')} (expected default, validated, all, none or a list of ${known.join(', ')})`);
   }
   for (const e of byPriority.filter((entry) => asked.includes(entry.id))) {
     const missing = e.requires.filter((id) => !asked.includes(id));
@@ -248,6 +248,19 @@ export const INSTALL_DEFAULT_EXTENSIONS: readonly string[] = ['effects'];
 
 export function installDefaultExtensions(config: ExtensionPin[], profile: VramProfile = 'standard'): string[] {
   return selectExtensions(config, 'validated', profile).filter((id) => INSTALL_DEFAULT_EXTENSIONS.includes(id));
+}
+
+/** Where the extensions of a run come from, as its report says. */
+export type ExtensionsSource = '--extensions' | 'MONTAGIO_EXTENSIONS' | 'kept' | 'default';
+
+/**
+ * What a run asks for: --extensions, else MONTAGIO_EXTENSIONS (its default), else what the last install was
+ * asked for. "default", or nothing anywhere, is the default (`asked` null), and forgets the kept choice.
+ */
+export function askedExtensions(option: string | null | undefined, variable: string | undefined, kept: string | null): { asked: string | null; source: ExtensionsSource } {
+  const given = option?.trim() ? { value: option.trim(), source: '--extensions' as const } : variable?.trim() ? { value: variable.trim(), source: 'MONTAGIO_EXTENSIONS' as const } : null;
+  if (given) return given.value === 'default' ? { asked: null, source: 'default' } : { asked: given.value, source: given.source };
+  return kept ? { asked: kept, source: 'kept' } : { asked: null, source: 'default' };
 }
 
 /** The weights of the camera presets, plus those of the extensions in `enabled`. */
