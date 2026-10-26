@@ -335,5 +335,5 @@ npm run showcase -- ingest --feature motion-pip --kind motion <run du rendu> --p
 
 Chacun est passé en 1080p par SeedVR2, avec RIFE (32 i/s). Les sous-titres n'existent qu'en alphabet latin (pas de police CJK) : la traduction chinoise n'a donc pas de sous-titres.
 
-**Le poids.** Les onze exemples et leurs fichiers de départ font 39 Mo dans le dépôt (`demo-assets/showcase` passe de 205 à 243 Mo), et la vitrine construite environ 330 Mo : sous la limite d'environ 1 Go d'un Space, avec la place d'un second envoi complet.
+**Le poids.** Les dix exemples et leurs fichiers de départ font 39 Mo dans le dépôt (`demo-assets/showcase` passe de 205 à 243 Mo), et la vitrine construite environ 330 Mo : sous la limite d'environ 1 Go d'un Space, avec la place d'un second envoi complet.
 
