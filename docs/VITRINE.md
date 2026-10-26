@@ -52,7 +52,7 @@ La commande enchaîne cinq étapes :
    - le script refuse de démarrer si `.next` contient un build de production (`next build` normal, servi par `next start`, comme celui de l'installeur local). Il faut alors construire la vitrine depuis un autre checkout, ou supprimer `apps/web/.next` puis refaire `next build` avant `next start`.
 5. **La fiche du Space** (`apps/web/showcase-space/README.md`) est copiée dans `out/README.md`.
 
-Résultat : `apps/web/out/`, environ 290 Mo, dont 254 Mo pour `showcase/`. Les clips 1080p pèsent environ 5 Mo chacun, leurs variantes 9:16 (720×1280) environ 1,5 Mo, et ffmpeg.wasm 31 Mo. C'est sous la limite d'environ 1 Go d'un Space (partie 7, « Le poids »).
+Résultat : `apps/web/out/`, environ 330 Mo, dont 293 Mo pour `showcase/` (le 27/10, avec les exemples des fonctions de la partie 10). Les clips 1080p pèsent environ 5 Mo chacun, leurs variantes 9:16 (720×1280) environ 1,5 Mo, et ffmpeg.wasm 31 Mo. C'est sous la limite d'environ 1 Go d'un Space (partie 7, « Le poids »).
 
 **Build de publication**, avant le dépôt final :
 
@@ -334,4 +334,6 @@ npm run showcase -- ingest --feature motion-pip --kind motion <run du rendu> --p
 | `captions-en`, `captions-es` | Sous-titres karaoké 9:16 | l'avatar et sa traduction espagnole | Whisper large-v3 turbo, puis l'export de l'app |
 
 Chacun est passé en 1080p par SeedVR2, avec RIFE (32 i/s). Les sous-titres n'existent qu'en alphabet latin (pas de police CJK) : la traduction chinoise n'a donc pas de sous-titres.
+
+**Le poids.** Les onze exemples et leurs fichiers de départ font 39 Mo dans le dépôt (`demo-assets/showcase` passe de 205 à 243 Mo), et la vitrine construite environ 330 Mo : sous la limite d'environ 1 Go d'un Space, avec la place d'un second envoi complet.
 
