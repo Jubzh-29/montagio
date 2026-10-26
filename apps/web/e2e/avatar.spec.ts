@@ -50,7 +50,10 @@ test('without the avatar extension, no Avatar tab', async ({ page }) => {
     const info = (await response.json()) as { extensions: string[] };
     return route.fulfill({ response, json: { ...info, extensions: info.extensions.filter((id) => id !== 'avatar') } });
   });
+  // The tabs follow the server's answer: without it, no tab is missing yet, and the routed fetch could outlive the test.
+  const answered = page.waitForResponse('**/api/extensions');
   await page.goto(AVATAR);
+  await answered;
   await expect(page.getByRole('link', { name: 'Camera', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Avatar', exact: true })).toHaveCount(0);
 });

@@ -63,13 +63,17 @@ test('without the rights box, Generate stays disabled', async ({ page }) => {
   await expect(page.getByRole('button', { name: /^Generate/ })).toBeEnabled();
 });
 
-test('without the motion extension, no Motion tab', async ({ page }) => {
+test('without the motion transfer and the restyle, no Motion tab', async ({ page }) => {
+  // The tab holds the reference clip of both (lib/tabs.ts): either one keeps it.
   await page.route('**/api/extensions', async (route) => {
     const response = await route.fetch();
     const info = (await response.json()) as { extensions: string[] };
-    return route.fulfill({ response, json: { ...info, extensions: info.extensions.filter((id) => id !== 'motion') } });
+    return route.fulfill({ response, json: { ...info, extensions: info.extensions.filter((id) => id !== 'motion' && id !== 'restyle') } });
   });
+  // The tabs follow the server's answer: without it, no tab is missing yet, and the routed fetch could outlive the test.
+  const answered = page.waitForResponse('**/api/extensions');
   await page.goto(MOTION);
+  await answered;
   await expect(page.getByRole('link', { name: 'Camera', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Motion', exact: true })).toHaveCount(0);
 });
