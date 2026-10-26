@@ -49,18 +49,33 @@ const LOCAL_FILE_ONLY = ['-protocol_whitelist', 'file'];
  * The demuxers allowed for a file someone sent: real media containers only. An ffconcat list or a
  * playlist named .mp4 would make FFmpeg read the other local files it names into the result.
  */
-const SENT_VIDEO = ['-format_whitelist', 'mov,mp4,m4a,3gp,3g2,mj2,matroska,webm'];
-const SENT_AUDIO = ['-format_whitelist', 'wav,mp3,flac,ogg,aac,mov,mp4,m4a,3gp,3g2,mj2,matroska,webm'];
+/**
+ * The decoders allowed for a file someone sent: what phones, browsers and the platforms of a trend write
+ * (H.264, HEVC, VP8, VP9, AV1, MPEG-4, Motion JPEG; AAC, MP3, Opus, Vorbis, FLAC, ALAC, PCM) and a sound's
+ * cover. FFmpeg's rarer decoders keep turning up memory flaws (MagicYUV, CVE-2026-8461): a stream that needs
+ * one is never decoded, whatever FFmpeg the machine has, and a file whose kept stream needs one is refused.
+ */
+const SENT_DECODERS = [
+  'h264', 'hevc', 'vp8', 'vp9', 'av1', 'libdav1d', 'mpeg4', 'mjpeg', 'png',
+  'aac', 'aac_fixed', 'mp3float', 'mp3', 'opus', 'libopus', 'vorbis', 'libvorbis', 'flac', 'alac',
+  'pcm_s16le', 'pcm_s16be', 'pcm_s24le', 'pcm_s24be', 'pcm_s32le', 'pcm_f32le', 'pcm_f64le', 'pcm_u8',
+];
+const SENT_VIDEO = ['-format_whitelist', 'mov,mp4,m4a,3gp,3g2,mj2,matroska,webm', '-codec_whitelist', SENT_DECODERS.join(',')];
+const SENT_AUDIO = ['-format_whitelist', 'wav,mp3,flac,ogg,aac,mov,mp4,m4a,3gp,3g2,mj2,matroska,webm', '-codec_whitelist', SENT_DECODERS.join(',')];
+/** What probe and probeAudio read a file someone sent with: the containers and decoders above. */
+const SENT: Record<'video' | 'audio', string[]> = { video: SENT_VIDEO, audio: SENT_AUDIO };
 
+/** The first video stream of a file; `sent` when someone sent it: read with the containers and decoders allowed then. */
 export async function probe(
   media: string,
+  opts: { sent?: 'video' | 'audio' } = {},
 ): Promise<{ width: number; height: number; duration_s: number; fps: number; codec: string; pixFmt: string }> {
   const out = await run(ffprobe(), [
     '-v', 'error',
     '-select_streams', 'v:0',
     '-show_entries', 'stream=width,height,r_frame_rate,codec_name,pix_fmt:format=duration',
     '-of', 'json',
-    ...LOCAL_FILE_ONLY, media,
+    ...LOCAL_FILE_ONLY, ...(opts.sent ? SENT[opts.sent] : []), media,
   ]);
   const json = JSON.parse(out) as {
     streams?: { width?: number; height?: number; r_frame_rate?: string; codec_name?: string; pix_fmt?: string }[];
@@ -80,16 +95,17 @@ export async function probe(
   };
 }
 
-/** The first audio stream of a file, or null when it has none (every Wan clip is silent). */
+/** The first audio stream of a file, or null when it has none (every Wan clip is silent); `sent` as for probe. */
 export async function probeAudio(
   media: string,
+  opts: { sent?: 'video' | 'audio' } = {},
 ): Promise<{ codec: string; sampleRate: number; channels: number; duration_s: number } | null> {
   const out = await run(ffprobe(), [
     '-v', 'error',
     '-select_streams', 'a:0',
     '-show_entries', 'stream=codec_name,sample_rate,channels,duration:format=duration',
     '-of', 'json',
-    ...LOCAL_FILE_ONLY, media,
+    ...LOCAL_FILE_ONLY, ...(opts.sent ? SENT[opts.sent] : []), media,
   ]);
   const json = JSON.parse(out) as {
     streams?: { codec_name?: string; sample_rate?: string; channels?: number; duration?: string }[];
@@ -428,7 +444,7 @@ export async function prepareMotionClip(
   opts: { max_s?: number; fps?: number } = {},
 ): Promise<{ duration_s: number; frames: number; width: number; height: number }> {
   const { max_s = 5, fps = 16 } = opts;
-  await probe(input);
+  await probe(input, { sent: 'video' });
   await writeAtomically(out, (partial) => [
     '-loglevel', 'error', '-y',
     ...LOCAL_FILE_ONLY, ...SENT_VIDEO, '-i', input,
@@ -450,7 +466,7 @@ export async function prepareMotionClip(
  */
 export async function prepareVoiceSample(input: string, out: string, opts: { max_s?: number } = {}): Promise<{ duration_s: number }> {
   const { max_s = 20 } = opts;
-  if (!(await probeAudio(input))) throw new SequenceToolError(`no audio stream in ${input}`);
+  if (!(await probeAudio(input, { sent: 'audio' }))) throw new SequenceToolError(`no audio stream in ${input}`);
   await writeAtomically(out, (partial) => [
     '-loglevel', 'error', '-y',
     ...LOCAL_FILE_ONLY, ...SENT_AUDIO, '-i', input,
@@ -522,7 +538,7 @@ export async function prepareSpeechVideo(
   opts: { max_s?: number } = {},
 ): Promise<{ duration_s: number; width: number; height: number }> {
   const { max_s = 30 } = opts;
-  if (!(await probeAudio(input))) throw new SequenceToolError(`no audio stream in ${input}`);
+  if (!(await probeAudio(input, { sent: 'video' }))) throw new SequenceToolError(`no audio stream in ${input}`);
   await writeAtomically(outVideo, (partial) => [
     '-loglevel', 'error', '-y',
     ...LOCAL_FILE_ONLY, ...SENT_VIDEO, '-i', input,
@@ -706,9 +722,9 @@ export async function prepareRemixSource(
   opts: { max_s?: number } = {},
 ): Promise<{ duration_s: number; fps: number; frames: number; width: number; height: number; audio: boolean }> {
   const { max_s = 60 } = opts;
-  const source = await probe(input);
+  const source = await probe(input, { sent: 'video' });
   const fps = remixFps(source.fps);
-  const audio = (await probeAudio(input)) !== null;
+  const audio = (await probeAudio(input, { sent: 'video' })) !== null;
   await writeAtomically(out, (partial) => [
     '-loglevel', 'error', '-y',
     ...LOCAL_FILE_ONLY, ...SENT_VIDEO, '-i', input,

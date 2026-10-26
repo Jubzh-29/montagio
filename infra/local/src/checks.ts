@@ -14,7 +14,13 @@ export const MIN_VRAM_MIB = 22 * 1024;
 /** 11 GiB: a 12 GB card reports 12288 MiB (RTX 3060, RTX 4070) or a little less; 8 and 10 GB cards stay out. */
 export const LOW_VRAM_MIN_MIB = 11 * 1024;
 export const MIN_NODE: [number, number] = [22, 18];
-export const PYTHON_RANGE = { min: [3, 10] as [number, number], max: [3, 13] as [number, number] };
+/**
+ * The first release of each supported Node.js line with the security fixes of 2026-10-20 (22 and 24) and
+ * 2026-10-21 (26): Brotli, DNS and TLS. A line not listed below 26 (23, 25) no longer gets security releases.
+ */
+export const SECURE_NODE: Record<number, [number, number, number]> = { 22: [22, 23, 4], 24: [24, 22, 1], 26: [26, 12, 1] };
+/** 3.11 at least: 3.10 is out of support since 2026-10-01, and the Pillow that fixes LoadImage's known flaws (13) left it. */
+export const PYTHON_RANGE = { min: [3, 11] as [number, number], max: [3, 13] as [number, number] };
 /** 30 GiB: a 32 GB machine reports about 31.8 GiB (the firmware and an integrated GPU keep some), 24 GB stays under. */
 export const RAM_WARN_BYTES = 30 * 1024 ** 3;
 
@@ -47,14 +53,29 @@ const APP_ONLY_HINT = 'run again with --app-only to install the app alone (demo 
 const LOW_VRAM_HINT = 'run again with --low-vram to install the 12 GB profile (what was validated on a 12 GB card: slower renders, fewer models)';
 
 const gib = (bytes: number) => `${(bytes / 1024 ** 3).toFixed(1)} GiB`;
-const atLeast = (version: number[], min: number[]) => version[0]! > min[0]! || (version[0] === min[0] && version[1]! >= min[1]!);
+/** Whether `version` is `min` or newer, compared part by part over the parts `min` gives. */
+const atLeast = (version: number[], min: number[]) => {
+  for (let i = 0; i < min.length; i++) {
+    if ((version[i] ?? 0) !== min[i]) return (version[i] ?? 0) > min[i]!;
+  }
+  return true;
+};
+
+/** Why this Node.js may not run Montagio, or null: too old, without the security fixes of its line, or out of support. */
+function nodeProblem(node: [number, number, number]): string | null {
+  const shown = node.join('.');
+  if (!atLeast(node, MIN_NODE)) return `Node.js ${shown} is too old: Montagio needs 22.23.4 or newer`;
+  const secure = SECURE_NODE[node[0]];
+  if (secure) return atLeast(node, secure) ? null : `Node.js ${shown} misses the security fixes of 2026-10-20: update it to ${secure.join('.')} or newer`;
+  return node[0] < 26 ? `Node.js ${shown} no longer gets security fixes: install Node.js 24 LTS (24.22.1 or newer)` : null;
+}
 const inRange = (version: number[]) => atLeast(version, PYTHON_RANGE.min) && !atLeast(version, [PYTHON_RANGE.max[0], PYTHON_RANGE.max[1] + 1]);
 
 export function pickGpu(gpus: Gpu[]): Gpu | null {
   return gpus.reduce<Gpu | null>((best, gpu) => (!best || gpu.vramMiB > best.vramMiB ? gpu : best), null);
 }
 
-/** The first Python of the probe order (3.12, 3.13, 3.11, 3.10) that is in range and can make a venv. */
+/** The first Python of the probe order (3.12, 3.13, 3.11) that is in range and can make a venv. */
 export function pickPython(pythons: PythonInfo[]): PythonInfo | null {
   return pythons.find((python) => inRange(python.version) && python.hasVenv) ?? null;
 }
@@ -66,7 +87,7 @@ export function pickTorch(driverCuda: [number, number] | null, versions: Version
 }
 
 const FIXES: Record<'node' | 'git' | 'python' | 'venv' | 'ffmpeg', Record<Os, string>> = {
-  node: { windows: 'winget install OpenJS.NodeJS.LTS', linux: 'install Node.js 22.18 or newer from https://nodejs.org (or: nvm install 22)' },
+  node: { windows: 'winget install OpenJS.NodeJS.LTS', linux: 'install Node.js 24 LTS from https://nodejs.org (or: nvm install 24)' },
   git: { windows: 'winget install Git.Git', linux: 'sudo apt install git' },
   python: {
     windows: 'winget install Python.Python.3.12 (and turn off the "python.exe" App execution alias in Windows settings if it opens the Microsoft Store)',
@@ -106,12 +127,8 @@ export function evaluate(facts: MachineFacts, ctx: Context): Check[] {
     add({ id: 'os', severity: 'ok', message: `${facts.os} ${facts.arch}` });
   }
 
-  const node = facts.node.join('.');
-  add(
-    atLeast(facts.node, MIN_NODE)
-      ? { id: 'node', severity: 'ok', message: `Node.js ${node}` }
-      : { id: 'node', severity: 'fail', message: `Node.js ${node} is too old: Montagio needs 22.18 or newer`, fix: FIXES.node[os] },
-  );
+  const nodeIssue = nodeProblem(facts.node);
+  add(nodeIssue ? { id: 'node', severity: 'fail', message: nodeIssue, fix: FIXES.node[os] } : { id: 'node', severity: 'ok', message: `Node.js ${facts.node.join('.')}` });
 
   if (full) {
     add(facts.git ? { id: 'git', severity: 'ok', message: 'git' } : { id: 'git', severity: 'fail', message: 'git is missing', fix: FIXES.git[os] });
@@ -122,7 +139,7 @@ export function evaluate(facts: MachineFacts, ctx: Context): Check[] {
     if (python) add({ id: 'python', severity: 'ok', message: `Python ${python.version.join('.')} (${python.command.join(' ')})` });
     else if (inRangeNoVenv)
       add({ id: 'python', severity: 'fail', message: `Python ${inRangeNoVenv.version.join('.')} cannot make a venv (no venv or ensurepip module)`, fix: FIXES.venv[os] });
-    else add({ id: 'python', severity: 'fail', message: `no Python 3.10 to 3.13 found (found: ${found})`, fix: FIXES.python[os] });
+    else add({ id: 'python', severity: 'fail', message: `no Python 3.11 to 3.13 found (found: ${found})`, fix: FIXES.python[os] });
   }
 
   add(

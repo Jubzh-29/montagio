@@ -20,6 +20,10 @@ test('the API and the files refuse a domain rebound to this machine, and answer 
   expect(await status(at('/media/data/uploads/a.png'), { host: `rebind.example:${port}` })).toBe(403);
   expect(await status(at('/api/history'), { host: `localhost:${port}`, origin: 'https://evil.example' })).toBe(403);
   expect(await status(at('/api/history'), { host: `127.0.0.1:${port}`, origin: `http://127.0.0.1:${port}` })).toBe(200);
+  // The pages too: a page takes Server Action and RSC requests, which a rebound domain could send.
+  expect(await status(at('/'), { host: `rebind.example:${port}` })).toBe(403);
+  expect(await status(at('/?_rsc=1'), { host: `rebind.example:${port}`, rsc: '1' })).toBe(403);
+  expect(await status(at('/'), { host: `localhost:${port}` })).toBe(200);
 });
 
 /** The status and headers of a GET to the app itself. */

@@ -28,8 +28,8 @@ test('parsePythonVersion reads a version and refuses the Microsoft Store stub', 
 });
 
 test('the Python candidates prefer 3.12 and never ask for 3.14', () => {
-  expect(pythonCandidates('windows')).toEqual([['py', '-3.12'], ['py', '-3.13'], ['py', '-3.11'], ['py', '-3.10'], ['python']]);
-  expect(pythonCandidates('linux')).toEqual([['python3.12'], ['python3.13'], ['python3.11'], ['python3.10'], ['python3']]);
+  expect(pythonCandidates('windows')).toEqual([['py', '-3.12'], ['py', '-3.13'], ['py', '-3.11'], ['python']]);
+  expect(pythonCandidates('linux')).toEqual([['python3.12'], ['python3.13'], ['python3.11'], ['python3']]);
 });
 
 test('freeBytesAt measures the nearest existing folder and creates nothing', async () => {

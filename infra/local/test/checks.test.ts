@@ -13,7 +13,7 @@ function facts(over: Partial<MachineFacts> = {}): MachineFacts {
     os: 'windows',
     platform: 'win32',
     arch: 'x64',
-    node: [22, 23, 2],
+    node: [22, 23, 4],
     git: true,
     ffmpeg: true,
     ffprobe: true,
@@ -176,6 +176,22 @@ test('a 32 GB machine does not warn about RAM, though the system reports a littl
   // totalmem() on a 32 GB laptop: the firmware and the integrated GPU keep a few hundred MiB.
   expect(byId(evaluate(facts({ ramBytes: 31.8 * GiB }), ctx), 'ram')?.severity).toBe('ok');
   expect(byId(evaluate(facts({ ramBytes: 24 * GiB }), ctx), 'ram')?.severity).toBe('warn');
+});
+
+test("Node.js holds the security release of its line (2026-10-20): 22.23.4, 24.22.1 or 26.12.1, never a line out of support", () => {
+  const node = (version: [number, number, number]) => byId(evaluate(facts({ node: version }), ctx), 'node')!;
+  for (const ok of [[22, 23, 4], [22, 24, 0], [24, 22, 1], [24, 23, 0], [26, 12, 1], [27, 0, 0]] as [number, number, number][]) expect(node(ok).severity, ok.join('.')).toBe('ok');
+  for (const old of [[22, 18, 0], [22, 23, 2], [24, 22, 0], [26, 12, 0], [23, 11, 1], [25, 9, 0], [20, 19, 0]] as [number, number, number][]) expect(node(old).severity, old.join('.')).toBe('fail');
+  expect(node([22, 23, 2]).message).toContain('22.23.4');
+  expect(node([25, 9, 0]).message).toContain('no longer');
+});
+
+test('Python 3.10 is no longer taken: out of support since 2026-10-01, and Pillow 13 left it', () => {
+  const only310 = facts({ os: 'linux', platform: 'linux', pythons: [{ command: ['python3.10'], version: [3, 10, 12], hasVenv: true }] });
+  const check = byId(evaluate(only310, ctx), 'python')!;
+  expect(check.severity).toBe('fail');
+  expect(check.message).toContain('3.11 to 3.13');
+  expect(pickPython([{ command: ['python3.10'], version: [3, 10, 12], hasVenv: true }, { command: ['python3.11'], version: [3, 11, 9], hasVenv: true }])?.version).toEqual([3, 11, 9]);
 });
 
 test('each failure gives the fix of its system', () => {

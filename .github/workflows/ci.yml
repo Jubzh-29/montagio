@@ -12,6 +12,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          # The newest 22.x, not the one cached on the runner: security releases land there first.
+          check-latest: true
           cache: npm
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: npm ci
@@ -41,6 +43,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          # The newest 22.x, not the one cached on the runner: security releases land there first.
+          check-latest: true
           cache: npm
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: npm ci

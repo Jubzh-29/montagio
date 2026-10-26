@@ -66,7 +66,7 @@ function facts(over: Partial<MachineFacts> = {}): MachineFacts {
     os,
     platform: process.platform,
     arch: 'x64',
-    node: [22, 23, 2],
+    node: [22, 23, 4],
     git: true,
     ffmpeg: true,
     ffprobe: true,

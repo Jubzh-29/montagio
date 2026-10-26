@@ -30,9 +30,9 @@ test('every route that changes something refuses another site, the newest ones i
   expect(open.map((file) => relative(app, file))).toEqual([]);
 });
 
-test('/api and /media pass the host check of proxy.ts, and nothing else of the app holds data', () => {
+test('/api and /media pass the host check of proxy.ts, as every page does, and no route lives elsewhere', () => {
   const proxy = readFileSync(join(app, '..', 'proxy.ts'), 'utf8');
-  expect(proxy).toContain("matcher: ['/api/:path*', '/media/:path*']");
+  expect(proxy).toContain("matcher: ['/((?!_next/static/).*)']");
   const outside = routeFiles(app)
     .map((file) => relative(app, file).split('\\').join('/'))
     .filter((name) => !name.startsWith('api/') && !name.startsWith('media/'));

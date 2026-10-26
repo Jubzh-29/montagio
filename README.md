@@ -226,7 +226,7 @@ powershell -ExecutionPolicy Bypass -File .\montagio.ps1 install
 | System | Windows 10 or 11 (x64), or Linux x64; macOS is not supported |
 | RAM | 32 GB or more recommended |
 | Disk | about 114 GB free by default |
-| Tools | Node.js 22.18+, Python 3.10–3.13 (3.12 on Windows for the avatar's voice), git, FFmpeg; the installer prints the command that installs whatever is missing |
+| Tools | Node.js 22.23.4+ or 24.22.1+, Python 3.11–3.13 (3.12 on Windows for the avatar's voice), git, FFmpeg; the installer prints the command that installs whatever is missing |
 
 What gets downloaded:
 

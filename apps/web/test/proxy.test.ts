@@ -59,11 +59,19 @@ test('a refusal names the variable in the log, once per host', () => {
   expect(vi.mocked(console.warn).mock.calls[0][0]).toContain('MONTAGIO_ALLOWED_HOSTS');
 });
 
-test('the guard runs on the API and the files, not on the pages', () => {
+test('the guard runs on every route, the pages included: a page decodes Server Action and RSC requests', () => {
   const matches = (url: string) => unstable_doesMiddlewareMatch({ config, url });
   expect(matches('/api/history')).toBe(true);
   expect(matches('/api/uploads/video/sample')).toBe(true);
   expect(matches('/media/data/uploads/a.png')).toBe(true);
-  expect(matches('/')).toBe(false);
+  for (const page of ['/', '/history', '/remix', '/?_rsc=1ab2c', '/favicon.ico', '/__nextjs_original-stack-frame']) expect(matches(page), page).toBe(true);
+  // The build's own scripts and styles: the same for everyone, nothing of the user's.
   expect(matches('/_next/static/chunks/app.js')).toBe(false);
+});
+
+test('a page asked under a domain rebound to 127.0.0.1, or posted from another site, is refused', () => {
+  expect(call('rebind.example:3000', {}, '/')?.status).toBe(403);
+  expect(call('rebind.example:3000', { origin: 'http://rebind.example:3000', 'next-action': 'x' }, '/')?.status).toBe(403);
+  expect(call('localhost:3000', { origin: 'https://evil.example' }, '/')?.status).toBe(403);
+  expect(call('localhost:3000', {}, '/')).toBeUndefined();
 });

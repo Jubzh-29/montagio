@@ -55,7 +55,7 @@ export function parsePythonVersion(text: string): [number, number, number] | nul
 
 /** In order of preference. 3.14 is left out: some of ComfyUI's dependencies have no wheel for it yet. */
 export function pythonCandidates(os: Os): string[][] {
-  const minors = ['3.12', '3.13', '3.11', '3.10'];
+  const minors = ['3.12', '3.13', '3.11'];
   return os === 'windows' ? [...minors.map((v) => ['py', `-${v}`]), ['python']] : [...minors.map((v) => [`python${v}`]), ['python3']];
 }
 

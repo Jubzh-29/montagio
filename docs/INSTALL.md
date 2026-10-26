@@ -22,10 +22,10 @@ If you just want to see Montagio, the showcase linked from the [README](../READM
 | NVIDIA driver | R580 or newer (CUDA 13.0); R570 (CUDA 12.8) works with an older PyTorch |
 | RAM | 32 GB or more recommended |
 | Disk | about 114 GB free by default: 72 GB of weights for the camera presets (their Turbo LoRAs included), 21 GB for the effects pack, ComfyUI and PyTorch, the app; about 93 GB with `--extensions none`, about 275 GB with `--extensions all`. These are the amounts the installer's own check asks for on a first install, with the install folder and the repository on one drive |
-| Node.js | 22.18 or newer |
-| Python | full install only: 3.10 to 3.13, with `venv` (3.12 is preferred; 3.14 is not used yet). On Windows, the avatar's voice needs 3.12 |
+| Node.js | 22.23.4 or newer on the 22 line, 24.22.1 or newer on the 24 line (LTS), or 26.12.1 or newer: the security releases of 2026-10-20 and 21. Lines 23 and 25 no longer get security fixes and are refused |
+| Python | full install only: 3.11 to 3.13, with `venv` (3.12 is preferred; 3.14 is not used yet; 3.10, out of support since 2026-10-01, is refused). On Windows, the avatar's voice needs 3.12 |
 | git | full install only |
-| FFmpeg | `ffmpeg` and `ffprobe` on the `PATH`, in both modes |
+| FFmpeg | `ffmpeg` and `ffprobe` on the `PATH`, in both modes. Keep it up to date: 9.0.2 or 8.1.3, or the newest release of your branch (`winget upgrade Gyan.FFmpeg`); see [SECURITY.md](../SECURITY.md) |
 
 Install what is missing:
 
@@ -297,7 +297,7 @@ A workflow ComfyUI refuses (a missing node or file) hides its extension until th
 | `running scripts is disabled on this system` | start the script with `powershell -ExecutionPolicy Bypass -File .\montagio.ps1 …` |
 | `darwin is not supported: Montagio installs on Windows or Linux, with an NVIDIA GPU` | macOS is not supported, not even for the app alone: see the showcase linked from the [README](../README.md) |
 | `arm64 is not supported: the full install needs an x64 machine` | install the app alone with `--app-only` |
-| `no Python 3.10 to 3.13 found`, or `python` opens the Microsoft Store | install Python 3.12 (`winget install Python.Python.3.12`); in Settings → Apps → Advanced app settings → App execution aliases, turn off `python.exe` and `python3.exe` |
+| `no Python 3.11 to 3.13 found`, or `python` opens the Microsoft Store | install Python 3.12 (`winget install Python.Python.3.12`); in Settings → Apps → Advanced app settings → App execution aliases, turn off `python.exe` and `python3.exe` |
 | `Python 3.x cannot make a venv (no venv or ensurepip module)` | Linux: `sudo apt install python3.12-venv`. Windows: reinstall Python 3.12 with `winget install Python.Python.3.12` |
 | `FFmpeg is missing` or `ffprobe is missing: the app needs both to tag clips and cut films` | install FFmpeg (`winget install Gyan.FFmpeg`, or `sudo apt install ffmpeg`) and open a new terminal, or name the binaries with `MONTAGIO_FFMPEG` and `MONTAGIO_FFPROBE`. The app alone needs them too |
 | `… free for the install folder, … needed` (or `… needed for both`, when the install folder and the repository share a drive) | free some space, or install on another drive with `--dir <folder>`; [Requirements](#requirements) gives the space each choice needs |

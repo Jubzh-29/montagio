@@ -22,7 +22,9 @@ import {
   PLACEHOLDER_METADATA,
   posterFrame,
   prepareMotionClip,
+  prepareRemixSource,
   prepareSpeechVideo,
+  prepareVoiceSample,
   previewClip,
   probe,
   probeAudio,
@@ -464,6 +466,33 @@ test('a sent file that is a list of other files is refused, not read through', a
   execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-protocol_whitelist', 'file', '-i', list, '-f', 'null', '-']);
   await expect(prepareMotionClip(list, join(dir, 'never-motion.mp4'))).rejects.toThrow(SequenceToolError);
   await expect(prepareSpeechVideo(list, join(dir, 'never.mp4'), join(dir, 'never.flac'))).rejects.toThrow(SequenceToolError);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test('a sent file that needs a rare decoder is never decoded: MagicYUV (CVE-2026-8461) among them', async () => {
+  const magic = join(dir, 'magicyuv.mkv');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=16', '-f', 'lavfi', '-i', 'sine', '-t', '1', '-c:v', 'magicyuv', '-c:a', 'aac', '-shortest', magic]);
+  // FFmpeg alone decodes it: the container is one a phone writes, only the codec is rare.
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-protocol_whitelist', 'file', '-format_whitelist', 'matroska,webm', '-i', magic, '-f', 'null', '-']);
+  await expect(probe(magic, { sent: 'video' })).rejects.toThrow(SequenceToolError);
+  await expect(prepareMotionClip(magic, join(dir, 'never-magic.mp4'))).rejects.toThrow(SequenceToolError);
+  await expect(prepareSpeechVideo(magic, join(dir, 'never-magic-talk.mp4'), join(dir, 'never-magic.flac'))).rejects.toThrow(SequenceToolError);
+  await expect(prepareRemixSource(magic, join(dir, 'never-magic-trend.mp4'))).rejects.toThrow(SequenceToolError);
+}, FFMPEG_TEST_TIMEOUT_MS);
+
+test("what phones and browsers write still goes through: HEVC, VP9 with Opus, an MP3 voice with its cover", async () => {
+  const hevc = join(dir, 'phone-hevc.mov');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=16', '-f', 'lavfi', '-i', 'sine', '-t', '1', '-c:v', 'libx265', '-tag:v', 'hvc1', '-c:a', 'aac', '-shortest', hevc]);
+  expect(await prepareMotionClip(hevc, join(dir, 'from-hevc.mp4'))).toMatchObject({ width: 320, height: 240 });
+  const recording = join(dir, 'browser.webm');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=16', '-f', 'lavfi', '-i', 'sine=sample_rate=48000', '-t', '1.5', '-c:v', 'libvpx-vp9', '-deadline', 'realtime', '-cpu-used', '8', '-c:a', 'libopus', '-shortest', recording]);
+  await prepareSpeechVideo(recording, join(dir, 'from-webm.mp4'), join(dir, 'from-webm.flac'));
+  const mp3 = join(dir, 'voice-plain.mp3');
+  const covered = join(dir, 'voice-cover.mp3');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=duration=4', '-c:a', 'libmp3lame', mp3]);
+  const cover = join(dir, 'cover.jpg');
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:s=64x64', '-frames:v', '1', cover]);
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-i', mp3, '-i', cover, '-map', '0:a', '-map', '1:v', '-c:a', 'copy', '-c:v', 'copy', '-disposition:v', 'attached_pic', covered]);
+  expect((await prepareVoiceSample(covered, join(dir, 'from-cover.flac'))).duration_s).toBeGreaterThan(3);
 }, FFMPEG_TEST_TIMEOUT_MS);
 
 test('a moodboard sheet puts one to four pictures side by side, two by two for four', async () => {

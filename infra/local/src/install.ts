@@ -345,7 +345,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
   const installNodePack = async (id: NodePackId, dir: string, want: string) => {
     const pin = id === 'voice' ? versions.voiceNode : versions.segmentNode;
     if (id === 'voice' && python && !voiceWheelsFit(os ?? 'linux', python.version)) {
-      throw new Error(`the avatar's voice node has its packages for Python 3.12 on Windows (3.10 to 3.13 on Linux), not ${python.version[0]}.${python.version[1]}`);
+      throw new Error(`the avatar's voice node has its packages for Python 3.12 on Windows (3.11 to 3.13 on Linux), not ${python.version[0]}.${python.version[1]}`);
     }
     if (existsSync(dir) && !existsSync(join(dir, '.git'))) {
       throw new Error(`${dir} is a folder Montagio did not clone: move it away, then run the same command again`);

@@ -52,7 +52,8 @@ preflight() {
   for tool in git curl python3 tar gzip sha256sum nvidia-smi; do
     command -v "$tool" >/dev/null || die "$tool is missing (use a Runpod PyTorch template, which ships all of them)"
   done
-  python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' || die "Python 3.10+ is required, found $(python3 --version)"
+  # 3.11 at least: 3.10 is out of support since 2026-10-01, and Pillow 13 (PILLOW_MIN) left it.
+  python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' || die "Python 3.11+ is required, found $(python3 --version)"
   mkdir -p "$WORKSPACE" "$CACHE_DIR" "$LOG_DIR" "$RUN_DIR"
   log "GPU: $(nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader)"
   log "driver supports CUDA $(cuda_version), Python $(python3 -c 'import platform; print(platform.python_version())')"

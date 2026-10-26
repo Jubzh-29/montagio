@@ -1,14 +1,17 @@
 import type { NextRequest } from 'next/server';
 
 /**
- * The API and the files answer only the app's own address. A site the visitor has open elsewhere can
- * point its domain at 127.0.0.1 (DNS rebinding): the browser then treats it as this site, but still
- * names that domain in Host. Allowed: localhost, 127.0.0.1 and [::1] on the port served, and the hosts
- * of MONTAGIO_ALLOWED_HOSTS ("192.168.1.20:8080,studio.example"; a name without a port takes any port).
- * An Origin, when the browser sends one, must be allowed too. The showcase is a static export: its
- * pageExtensions leave this file out, and no server runs.
+ * The app answers only its own address: the API, the files and the pages, which take Server Action and
+ * RSC requests too (an exploit of their decoding needs no route of ours). A site the visitor has open
+ * elsewhere can point its domain at 127.0.0.1 (DNS rebinding): the browser then treats it as this site,
+ * but still names that domain in Host, and in the Origin Next compares Host with. Allowed: localhost,
+ * 127.0.0.1 and [::1] on the port served, and the hosts of MONTAGIO_ALLOWED_HOSTS
+ * ("192.168.1.20:8080,studio.example"; a name without a port takes any port). An Origin, when the
+ * browser sends one, must be allowed too. Only the build's scripts and styles (/_next/static) are left
+ * out: the same for everyone. The showcase is a static export: its pageExtensions leave this file out,
+ * and no server runs.
  */
-export const config = { matcher: ['/api/:path*', '/media/:path*'] };
+export const config = { matcher: ['/((?!_next/static/).*)'] };
 
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
 

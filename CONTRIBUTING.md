@@ -24,7 +24,7 @@ The sign-off is asked for, but no workflow checks it: `.github/workflows/` holds
 
 You need:
 
-- **Node.js 22.18 or newer.** The root `package.json` says `>=22`, but `montagio.sh`, `montagio.ps1` and the installer refuse an older Node.js, and `npm test` runs `montagio.sh help` when bash is available (`infra/local/test/entry.test.ts`).
+- **Node.js 22.23.4 or newer** (or 24.22.1 or newer, the LTS): the security release of 2026-10-20. The root `package.json` says `>=22`, `montagio.sh` and `montagio.ps1` refuse a Node.js older than 22.18, which cannot run the installer, and the installer refuses one without that security release, and `npm test` runs `montagio.sh help` when bash is available (`infra/local/test/entry.test.ts`).
 - **FFmpeg with ffprobe** on your `PATH`, or `MONTAGIO_FFMPEG` / `MONTAGIO_FFPROBE` set to their full paths: the app tags every clip and assembles sequences with it, and refuses to render without it. Some tests (the MCP server's among them) call `ffmpeg` from the `PATH` to make their test files.
 - **Python** for the node pack's tests: the pack needs 3.10 or newer, CI uses 3.12.
 

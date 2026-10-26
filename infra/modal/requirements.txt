@@ -2,3 +2,11 @@
 #   py -3.12 -m venv ..\.venv-modal            (Windows; python3.12 -m venv ../.venv-modal elsewhere)
 #   ..\.venv-modal\Scripts\python -m pip install -r infra\modal\requirements.txt
 modal==1.6.2
+# Floors for what modal pulls in (2026-10-26; run the pip install above again to apply them):
+# certifi without the compromised emSign roots (GHSA-6q48-6c7w-9gw2), protobuf's json_format recursion fixed
+# (CVE-2026-0994), h2 without its request smuggling (CVE-2025-57804, CVE-2026-71554), cbor2 without its recursion
+# flaws (CVE-2025-64076, CVE-2025-68131, CVE-2026-26209).
+certifi>=2026.10.18
+protobuf>=6.33.5
+h2>=4.4.1
+cbor2>=5.9.0

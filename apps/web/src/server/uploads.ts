@@ -159,7 +159,7 @@ export async function saveVideoUpload(file: File): Promise<VideoMeta> {
     let sourceDuration_s: number;
     let prepared: Awaited<ReturnType<typeof prepareMotionClip>>;
     try {
-      sourceDuration_s = (await probe(source)).duration_s;
+      sourceDuration_s = (await probe(source, { sent: 'video' })).duration_s;
       prepared = await prepareMotionClip(source, out, { max_s: MAX_REFERENCE_S });
     } catch {
       throw new UploadError(400, 'the file is not a readable video');
