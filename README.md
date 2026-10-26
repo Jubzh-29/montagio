@@ -109,7 +109,7 @@ Montagio shows only what a GPU session rendered well. What it keeps out:
 | In the **showcase**: uploads and everything that needs them (Characters, Ads, Avatar, Motion, Voice change, Translation, Trend remix, Draw, publishing) | The showcase renders nothing: it plays clips made beforehand. Three effect renders on a person were also kept out of it for what they show. |
 | The trend remix's **link import** outside an install of your own | It runs only in the app on your machine, never in the demo mode nor the showcase. |
 
-A plain local install fetches the camera models and the effects pack only; `--extensions all` fetches the rest ([Install](#install)).
+A first local install fetches the camera models and the effects pack only; `--extensions all` fetches the rest, and the next installs keep that choice ([Install](#install)).
 
 ## The Montagio node pack for ComfyUI
 
