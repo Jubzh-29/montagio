@@ -1,6 +1,6 @@
 # Workflows
 
-ComfyUI workflows in the API format, one per model of `registry/models/`. The compiler (`packages/presets/src/compile.ts`) fills the inputs named by each model's `bindings` (image, prompt, seed, size, frames, fps, camera move) and leaves everything else as it is here.
+ComfyUI workflows in the API format: one per model of `registry/models/` (the four below), and one per model of `registry/extensions/` (the fifteen of [Extension workflows](#extension-workflows)), nineteen in all. The compiler (`packages/presets/src/compile.ts`, and `image.ts` for text to image) fills the inputs named by each model's `bindings` (image, prompt, seed, size, frames, fps, camera move) and leaves everything else as it is here.
 
 They are converted from the official ComfyUI templates of [Comfy-Org/workflow_templates](https://github.com/Comfy-Org/workflow_templates), MIT License, Copyright (c) 2023-present Comfy Org (full text in [LICENSE.workflow_templates](LICENSE.workflow_templates)), at commit `59a3b48bf369c5a15f29a1308bae3e279fa15505` (2026-10-18):
 
@@ -21,20 +21,20 @@ The node ids are the template's, so each node can be found in the template. The 
 
 Only active nodes are kept: notes are left out, as are bypassed nodes. The Z-Image-Turbo template wraps its nodes in a subgraph, whose widgets are proxies of the inner nodes. The workflow keeps the inner nodes with their own ids and values.
 
-Each workflow was then checked by `POST /prompt` on that ComfyUI v0.41.0, with empty model files named as in the lock. All three passed validation with no node error, and the run was interrupted before anything loaded. `infra/runpod/test/workflows.test.ts` repeats the check offline, on these files and on every preset compiled with them.
+Each workflow was then checked by `POST /prompt` on that ComfyUI v0.41.0, with empty model files named as in the lock. The first three (Fun Camera, 5B, Z-Image-Turbo) passed validation with no node error, and the run was interrupted before anything loaded. The Turbo workflow came later (2026-10-25): the offline check below covers it, and it rendered on an L4 on 2026-10-25 (`docs/S2_RESULTATS.md`, part 14). `infra/runpod/test/workflows.test.ts` repeats the check offline, on these files and on every preset compiled with them, against the `/object_info` of a real ComfyUI v0.41.0 (`infra/runpod/test/fixtures/object_info-v0.41.0.json`).
 
 ## Changes from the templates
 
 All models:
 - the prompt texts are empty (the compiler writes them);
 - the seeds are 0;
-- `LoadImage` loads `start.png`, a placeholder that the app replaces with the uploaded image;
-- the size is 832×480 (the compiler writes the size of the job);
+- `LoadImage` loads `start.png`, a placeholder that the app replaces with the uploaded image (Z-Image-Turbo has no `LoadImage`);
+- the size is 832×480, and 1024×1024 for Z-Image-Turbo (the compiler writes the size of the job);
 - `SaveVideo` writes `montagio/clip` as an MP4 in H.264 (`format` `mp4`, `format.codec` `h264`; the template has `auto` for both, which also gives an MP4). `SaveImage` writes `montagio/image`.
 
 Wan 2.2 Fun Camera:
 - only the 20-step group is kept: two `KSamplerAdvanced`, 10 steps on the high-noise model then 10 on the low-noise model, cfg 3.5, euler/simple, and `ModelSamplingSD3` with shift 8 on both models;
-- the template's second group (4 steps, with the LightX2V LoRAs) is the Turbo workflow, `wan22-fun-camera-turbo.api.json` (below). Its own note says these LoRAs lose some of the motion.
+- the template's second group (4 steps, with the LightX2V LoRAs) is the Turbo workflow, `wan22-fun-camera-turbo.api.json` (below). Its own note says these LoRAs lose some of the motion; on the L4 (2026-10-25) the camera move held on 11 of 13 clips, with a little less fine detail.
 - The template's negative prompt is the default Wan negative (Chinese text, node 99 of the template). The compiler replaces the negative with the preset's, so it is not kept here. GPU session S2 compares the two.
 
 Wan 2.2 5B:
@@ -45,7 +45,7 @@ Z-Image-Turbo:
 - the negative is `ConditioningZeroOut` of the positive, as in the template. At cfg 1 there is no negative prompt, so the model has no `negative` binding;
 - `ModelSamplingAuraFlow` with shift 3, `KSampler` 8 steps, cfg 1, res_multistep/simple.
 
-Wan 2.2 Fun Camera Turbo (2026-10-24), the template's 4-step group:
+Wan 2.2 Fun Camera Turbo (2026-10-25), the template's 4-step group:
 - `LoraLoaderModelOnly` 88 and 90 (the template's ids) put `wan2.2_i2v_lightx2v_4steps_lora_v1_{high,low}_noise` at strength 1 on the high- and low-noise models, before `ModelSamplingSD3` (shift 8 on both, as in the group);
 - two `KSamplerAdvanced`, 4 steps at cfg 1, euler/simple, split at step 2;
 - every other node keeps the id it has in `wan22-fun-camera.api.json` (the template's 20-step group), so both models share their bindings, and the changes listed above for the 20-step workflow apply as well. The template measures 536 s at 20 steps and 71 s warm at 4 steps on an RTX 4090D (640×640).
@@ -56,16 +56,17 @@ A preset with two moves needs the Montagio Camera Embedding node (`comfy-nodes/`
 
 ## Extension workflows
 
-The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe transitions, talking avatar, music, upscale) run their own workflows, described by `registry/extensions/*.yaml` and compiled by `packages/presets/src/{extensions,effects,transitions}.ts`. They come from the same templates repository and commit, with the same rules; the choices behind them are in `docs/EXTENSIONS_ANALYSE.md`.
+The extensions run their own workflows, described by `registry/extensions/*.yaml` and compiled by `packages/presets/src/{extensions,effects,transitions,motion,restyle,swap,remix}.ts`: the six decided on 2026-10-19 (image edit, one-photo effects, keyframe transitions, talking avatar, music, upscale), then the motion transfer (2026-10-20), the restyle and the object swap (2026-10-24). The avatar's extension also holds the voice change, the translation, the captions (Whisper's word timings) and the trend skeleton that the trend remix (2026-10-25) reads; the upscale's holds the HD photo. The trend remix has no workflow of its own: each of its shots is a motion transfer. They come from the same templates repository and commit, with the same rules; the choices behind them are in `docs/EXTENSIONS_ANALYSE.md`.
 
 | Workflow | Template | Model | Output |
 |---|---|---|---|
 | `ace-step15-music.api.json` | `templates/audio_ace_step_1_5_split.json` | ACE-Step 1.5 turbo (2B) | node 107, FLAC |
 | `seedvr2-upscale.api.json` | `templates/utility_seedvr2_3b_int8_upscale_video.json`, then RIFE written for Montagio | SeedVR2 3B int8, RIFE 4.26 | node 76, MP4 |
+| `seedvr2-image-upscale.api.json` | `templates/utility_seedvr2_3b_int8_upscale_video.json`, through `seedvr2-upscale.api.json`, on one frame | SeedVR2 3B int8 | node 9, PNG |
 | `qwen-image-edit-2511.api.json` | `templates/image_qwen_image_edit_2511.json` | Qwen-Image-Edit-2511 fp8mixed | node 9, PNG |
 | `chatterbox-mtl-voice.api.json` | none (no official template: ComfyUI has no local text-to-speech node) | Chatterbox Multilingual V3 | node 3, FLAC |
 | `chatterbox-vc.api.json` | none (no official template: ComfyUI has no local voice conversion node) | Chatterbox VC (S3Gen) | node 3, FLAC |
-| `translate-speech.api.json` | none (written for Montagio from the core TextGenerate node) | Gemma 4 E4B int8, then Chatterbox Multilingual V3 | node 5, FLAC |
+| `translate-speech.api.json` | none (written for Montagio from the core TextGenerate and StringConcatenate nodes) | Gemma 4 E4B int8 in two passes, then Chatterbox Multilingual V3 | node 5, FLAC |
 | `whisper-words.api.json` | none (written for Montagio: the pack's transcription node and the core Save Text) | Whisper large-v3 turbo | node 3, JSON |
 | `gemma-trend-skeleton.api.json` | none (written for Montagio from the core TextGenerate and Save Text nodes) | Gemma 4 E4B int8 | node 7, text |
 | `wan22-s2v-avatar.api.json` | `templates/video_wan2_2_14B_s2v.json` | Wan 2.2 S2V 14B fp8 | node 113, MP4 with the speech |
@@ -92,9 +93,16 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 - `CreateVideo` takes the frame rate, the audio and the bit depth of the source clip (node 74), so a 16 fps clip stays 16 fps. `SaveVideo` writes `montagio/upscale`, MP4 in H.264. The seed is 0, one step, cfg 1, euler/simple, as in the template.
 - Smooth motion (2026-10-24), written for Montagio on three core nodes of v0.41.0: `FrameInterpolationModelLoader` (101) loads `rife_v4.26.safetensors`, the file `templates/utility_video_frame_interpolation.json` lists from `Comfy-Org/Frame-Interpolation`; `FrameInterpolate` (102) puts one RIFE frame between each two restored ones (multiplier 2, so 81 frames become 161); `ComfyMathExpression` (103, `a * 2` on the clip's frame rate, `values.a` = 74.2) gives `CreateVideo` twice the frame rate, so the length and the sound stay. RIFE runs after SeedVR2, on the 1080p frames, and the clip is encoded once. `compileUpscale` keeps these nodes with `smooth`, and otherwise removes them and gives `CreateVideo` the restored frames (59) at the clip's frame rate (74.2).
 
+### seedvr2-image-upscale
+
+- The HD photo (2026-10-22): `seedvr2-upscale` run on one frame, with the same node ids and the same weights. `LoadImage` (41, `start.png`) replaces `LoadVideo` and `GetVideoComponents`, and `SaveImage` (9) writes `montagio/upscale-image` instead of `CreateVideo` and `SaveVideo`; there is no RIFE.
+- `ResizeImageMaskNode` 57 scales the photo to 2560 px on its long side (`scale dimensions`, bound: 2560×1440, 1440×2560, or 2048×2048 for a square photo), crop `center`, lanczos; SeedVR2 restores it at that size.
+- The temporal chunking stays in `manual` mode with chunks of one frame and no overlap. The rest is the clip's: seed 0, one step, cfg 1, euler/simple, colours corrected with `lab`.
+
 ### qwen-image-edit-2511
 
-- The template's subgraph is flattened with its inner ids. Its "Lightning" group becomes a `LoraLoaderModelOnly` (171, the 4-step LoRA of lightx2v) between the model and `ModelSamplingAuraFlow`, after a second one for a look (170: INFL8 by default, ACTION or fal's Multiple-Angles); a second `LoadImage` (42, `start2.png`) feeds `image2` of both encoders. `compileEdit` removes and rewires the nodes a job does not use, and sets the template's two settings: 4 steps at cfg 1 with Lightning (its default), 40 steps at cfg 4 without. The rest of the path: `ModelSamplingAuraFlow` shift 3.1, `CFGNorm` 1, euler/simple.
+- The template's subgraph is flattened with its inner ids. Its "Lightning" group becomes a `LoraLoaderModelOnly` (171, the 4-step LoRA of lightx2v) between the model and `ModelSamplingAuraFlow`, after a second one for a look (170: INFL8 by default, ACTION or fal's Multiple-Angles); a second `LoadImage` (42, `start2.png`) feeds `image2` of both encoders, and a third (43, `start3.png`) their `image3`, for a composed start photo (a place, a character, a product). `compileEdit` removes and rewires the nodes a job does not use, and sets the template's two settings: 4 steps at cfg 1 with Lightning (its default), 40 steps at cfg 4 without. The rest of the path: `ModelSamplingAuraFlow` shift 3.1, `CFGNorm` 1, euler/simple.
+- The inpaint, written for Montagio on core nodes: `LoadImage` 180 (`mask.png`, white where the photo changes), `ImageToMask` 181 (its red channel) and `ImageCompositeMasked` 182, which pastes the edited image over the scaled photo through the mask, so the photo stays as it was outside it. With a mask, `SaveImage` writes the output of 182; without one, `compileEdit` removes the three nodes.
 - `FluxKontextMultiReferenceLatentMethod` (147, 148) says `index_timestep_zero` on both encoders: the node has no default and would otherwise take `offset`, which is wrong for 2511.
 - The negative encoder (149) keeps an empty prompt and the same image, as in the template; only the positive one (151) is bound.
 - `FluxKontextImageScale` (160) is kept: it center-crops the photo to one of 17 sizes of about 1 megapixel (16:9 gives 1392×752), which is also the size of the edited PNG. Replacing it with `ImageScaleToTotalPixels` (no crop) is a GPU session S2 comparison.
@@ -104,7 +112,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 
 - Written for Montagio: `ChatterboxMTLTTS` from `wildminder/ComfyUI-Chatterbox` (pinned at `4597af8f`, patched, installed by `infra/runpod/bootstrap.sh`), then the core `SaveAudioAdvanced` in FLAC, `montagio/voice`.
 - The voice pack is the folder `models/tts/chatterbox/resembleai-mtl-v3` (`model_pack_name`), with `t3_mtl23ls_v3.safetensors`. `s3gen_v3.safetensors` is deliberately absent: the loader would prefer it, while the official V3 code pairs V3 with `s3gen`.
-- No `audio_prompt`: the built-in voice speaks (no cloned voice, and none left in the node's cache). `crash_protection_template` is empty (by default a text under 21 characters is wrapped in "hmm"); the watermark is off (`resemble-perth` is not installed).
+- `audio_prompt` reads a voice sample when the job has one: `LoadAudio` (node 4, `voice.flac`), a mono FLAC of 20 s at most, given with the speaker's consent. Without a sample, `compileSpeech` removes node 4 and the built-in voice speaks. `crash_protection_template` is empty (by default a text under 21 characters is wrapped in "hmm"); the watermark is off (`resemble-perth` is not installed).
 - The compiler writes `cfg_weight` 0 in French (the model card's advice when the voice is of another language) and 0.5 in English, removes square brackets (read as tags), and never sends seed 0 (random to this node).
 
 ### chatterbox-vc
@@ -115,7 +123,9 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 
 ### translate-speech
 
-- Written for Montagio: `LoadAudio` (node 1, the speech), the core `CLIPLoader` reading Gemma 4 E4B (int8, one file with its audio encoder and tokenizer), the core `TextGenerate` (node 3, greedy decoding, no thinking) asked for the translation alone, then `ChatterboxMTLTTS` (node 4) saying that text, its `text` input linked to node 3, with the speech as its voice reference (`audio_prompt`), and `SaveAudioAdvanced` in FLAC, `montagio/translation`.
+- Written for Montagio: `LoadAudio` (node 1, the speech), the core `CLIPLoader` (node 2) reading Gemma 4 E4B (int8, one file with its audio encoder and tokenizer), and two passes of the core `TextGenerate` (greedy decoding, no thinking, 256 tokens at most). The first (node 3) hears the speech and writes down its words, in the language they are spoken in. The second (node 7) reads the app's instruction (translate into the target language, the translation alone) followed by that transcription, joined by the core `StringConcatenate` (node 6). Asked for both at once, Gemma gave back the transcription (GPU session of 2026-10-24); the two passes translated on an L4 on 2026-10-25 (`docs/S2_RESULTATS.md`, part 13, « Fonctions finales »).
+- `ChatterboxMTLTTS` (node 4) says the text of node 7 in the target language, with the speech as its voice reference (`audio_prompt`), then `SaveAudioAdvanced` writes FLAC, `montagio/translation`.
+- The target is one of the eight languages of `TRANSLATE_LANGUAGES` (`packages/presets/src/extensions.ts`): English, French, Spanish, German, Italian, Portuguese, Japanese, Chinese in simplified characters.
 - `cfg_weight` is 0, the Chatterbox card's advice when the reference voice speaks another language than the text. The app then animates the face again on that speech (Wan 2.2 S2V): the lips follow the new words.
 - Gemma 4 hears 30 s of audio at most; the app keeps 15 s, what the avatar animates.
 
@@ -128,7 +138,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 
 - Written for Montagio: `LoadAudio` (node 1, the speech as mono FLAC at 16 kHz), `MontagioTranscribeWords` from the Montagio node pack (node 2: Whisper large-v3 turbo through transformers, which ComfyUI already needs; `language` `auto` or a code), and the core `SaveText` (node 3, format `json`, `montagio/captions`), whose file comes back as a JSON output.
 - The JSON is `montagio/words@1`: the language, whether Whisper detected it, the duration, the text, and Whisper's pieces of words with their start and end in seconds. The app joins the pieces into words, aligns the text the user corrects on them, and burns the captions into a 9:16 export with FFmpeg and libass.
-- The model folder is `models/whisper/whisper-large-v3-turbo` (the Hugging Face files of `openai/whisper-large-v3-turbo`, MIT, 1.6 GB). Ran for real on the CPU ComfyUI on 2026-10-25: 2.9 s of the avatar example in 95.7 s, the model loading included, in fp32 on a laptop CPU.
+- The model folder is `models/whisper/whisper-large-v3-turbo` (the Hugging Face files of `openai/whisper-large-v3-turbo`, MIT, 1.6 GB). Ran for real on the CPU ComfyUI on 2026-10-25: 2.9 s of the avatar example in 95.7 s, the model loading included, in fp32 on a laptop CPU. The same day on an L4: the same words in 10.5 s, the model loading included, 4.9 GB at most (`docs/S2_RESULTATS.md`, part 20).
 
 ### wan22-s2v-avatar
 
@@ -161,6 +171,7 @@ The extensions decided on 2026-10-19 (image edit, one-photo effects, keyframe tr
 - The template's control video was Canny edges and its LoRA the CausVid LoRA of Kijai (a refused repository). Here the control is the depth of each frame: `LoadDA3Model` (5) loads Depth Anything 3 Small, `DA3Inference` (6) runs on every frame in `mono` mode at 504 px, `DA3Render` (4) draws the depth normalised frame by frame (`v2_style`). Depth follows shapes without copying textures, so a scene can change material, light and season. The LoRA is lightx2v's own Wan 2.1 T2V 4-step LoRA (11): 4 steps, cfg 1, euler, shift 5.
 - `UNETLoader` (10) loads the fp16 file Comfy-Org publishes with `weight_dtype: fp8_e4m3fn`: about 17 GB on the card, a peak of 20.4 to 22.2 GB on an L4 in the spike of 2026-10-24.
 - The reference image (20, scaled by 21) has two uses. A look to follow goes to `WanVaceToVideo.reference_image`. The clip's first frame restyled by the edit is also put before the depth of the other frames (`ImageFromBatch` 22, `ImageBatch` 23), under a mask that is 0 on it and 1 elsewhere (`EmptyImage` 24 and 25, `ImageBatch` 26, `ImageToMask` 27): VACE keeps that frame and rebuilds the others along the depth. `compileRestyle` removes nodes 22 to 27 for a look, and 20 to 27 for a text alone.
+- `LoadVideo` (1) and `GetVideoComponents` (2) read the clip; `ImageFromBatch` (7) keeps its first frames, 81 at most (5 s at 16 fps), and `ImageScale` (3) brings them to the job's size. The frame count is bound to both `7.length` and VACE's `30.length`.
 - `TrimVideoLatent` (32) drops the reference's latent frame before decoding; `CreateVideo` (34) writes 16 fps without the clip's sound, `SaveVideo` (35) `montagio/restyle`.
 
 ### wan21-vace-swap
@@ -184,15 +195,16 @@ Extension models (a binding with several inputs gets the same value in each):
 |---|---|---|
 | `ace-step15-music` | prompt 94.tags; duration_s 98.seconds + 94.duration; seed 3.seed + 94.seed; bpm 94.bpm | 107 (audio) |
 | `seedvr2-upscale` | video 73.file; width / height 57.resize_type.width / 57.resize_type.height; seed 54.seed | 76 (video) |
-| `qwen-image-edit-2511` | image 41.image; image2 42.image; prompt 151.prompt; seed 169.seed | 9 (image) |
-| `chatterbox-mtl-voice` | text 2.text; language 2.language; seed 2.seed; cfg 2.cfg_weight | 3 (audio) |
+| `seedvr2-image-upscale` | image 41.image; width / height 57.resize_type.width / 57.resize_type.height; seed 54.seed | 9 (image) |
+| `qwen-image-edit-2511` | image 41.image; image2 42.image; image3 43.image; mask 180.image; prompt 151.prompt; seed 169.seed | 9 (image) |
+| `chatterbox-mtl-voice` | text 2.text; language 2.language; seed 2.seed; cfg 2.cfg_weight; audio (the voice sample) 4.audio | 3 (audio) |
 | `chatterbox-vc` | audio 1.audio; voice 4.audio | 3 (audio) |
-| `gemma4-translate` | audio 1.audio; prompt 3.prompt; language 4.language; cfg 4.cfg_weight; seed 4.seed | 5 (audio) |
+| `gemma4-translate` | audio 1.audio; prompt 6.string_a; language 4.language; cfg 4.cfg_weight; seed 4.seed | 5 (audio) |
 | `whisper-turbo-words` | audio 1.audio; language 2.language | 3 (file) |
 | `gemma4-trend-skeleton` | image 1.image; prompt 4.string_a | 7 (file) |
 | `wan22-s2v-avatar` | image 52.image; audio 58.audio; prompt 6.text; seed 3.seed (+1, +2 on the extension samplers); width / height 93.width / 93.height; frames 96.length | 113 (video) |
 | `wan21-i2v-effects` | image 52.image; prompt 6.text; negative 7.text; seed 3.seed; width / height / frames 50.width / height / length; lora 200.lora_name; lora_strength 200.strength_model | 56 (video) |
 | `wan22-flf2v-transition` | image 68.image; end_image 62.image; prompt 6.text; negative 7.text; seed 57.noise_seed; width / height / frames 67.width / height / length | 61 (video) |
 | `wan-animate2-motion` | image 189.image; video 240.file; prompt 582.text; motion_prompt 585.text; negative 581.text; seed 597.noise_seed; width / height 600.resize_type.width / height; frames 587.length | 246 (video) |
-| `wan21-vace-restyle` | video 1.file; image 20.image; prompt 14.text; negative 15.text; seed 31.seed; width / height 3, 21, 24, 25 and 30; frames 30.length | 35 (video) |
+| `wan21-vace-restyle` | video 1.file; image 20.image; prompt 14.text; negative 15.text; seed 31.seed; width / height 3, 21, 24, 25 and 30; frames 7.length, 30.length | 35 (video) |
 | `wan21-vace-swap` | video 1.file; image 20.image; prompt 14.text; negative 15.text; seed 31.seed; points 41.coordinates_positive; exclude_points 41.coordinates_negative; width / height 3, 44, 30 and 21.target_width / target_height; frames 7.length, 30.length | 35 (video) |

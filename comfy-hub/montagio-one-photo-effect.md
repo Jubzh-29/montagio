@@ -31,11 +31,11 @@ The download URLs and sha256 of every file are in [`registry/models.lock.yaml`](
 | `52` | Load Image | the photo |
 | `6` | CLIP Text Encode | the effect's template, with its trigger words and what the photo shows |
 | `200` | Load LoRA | the effect LoRA (see the table below) |
-| `201` | Load LoRA | the 4-step lightx2v LoRA; bypass it and set 20 steps and cfg 6 on node `3` for the full-quality path |
+| `201` | Load LoRA | the 4-step lightx2v LoRA; bypass it and set 20 steps, cfg 6 and the `uni_pc` sampler on node `3` for the full-quality path |
 | `3` | KSampler | `seed`; 4 steps, cfg 1 |
 | `56` | Save Video | the clip |
 
-The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node. To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
+The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node, except that node `56` saves under `montagio/effect`, where the app's job saves under `montagio/effect`. To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
 
 The six effects of the pack, all validated on a GPU on 2026-10-21. Swap the LoRA of node `200` and the trigger in the text of node `6`:
 
@@ -66,4 +66,4 @@ On an NVIDIA L4 with 24 GB of VRAM, the memory of an RTX 4090 (which is about tw
 
 ## License
 
-The graph is converted, like every Montagio workflow but the voice's, from the official [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) (MIT, [license text](../workflows/LICENSE.workflow_templates)). Every model file is Apache-2.0 or MIT.
+The graph is converted from the official [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) (MIT, [license text](../workflows/LICENSE.workflow_templates)), like most Montagio workflows; the five with no template (the voice, the voice change, the translation, the captions and the trend post) are written for Montagio ([`workflows/README.md`](../workflows/README.md#extension-workflows)). Every model file is Apache-2.0 or MIT.

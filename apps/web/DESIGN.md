@@ -20,8 +20,8 @@ Restrained: graphite neutrals (chroma 0.003 to 0.008, hue 250) and one vivid acc
 | `--ink` / `--ink-muted` / `--ink-faint` | `oklch(0.97 / 0.77 / 0.65, hue 250)` | `#F4F5F7` / `#B2B4B7` / `#8C8F93` | text; faint still meets 4.5:1 on every surface (5.0:1 on `--surface-2`) |
 | `--rec` / `--rec-hover` / `--rec-soft` | `oklch(0.89 0.22 132)` / `oklch(0.93 0.16 132)` / 14 % | `#A2F745` | Generate, selection border and tint, shot numbers, the live tally; named for its role (rolling the take), not its hue |
 | `--on-rec` | `oklch(0.2 0.04 132)` | `#0F1A06` | text and marks on the lime, never white (13.6:1) |
-| `--ok` | `oklch(0.82 0.11 200)` | `#5DDAE0` | licences, the verified open stack: cyan, since the lime already means "act here" |
-| `--warn` | `oklch(0.82 0.13 80)` | `#F0BA59` | placeholder badges, remix problems |
+| `--ok` / `--ok-soft` | `oklch(0.82 0.11 200)` / 12 % | `#5DDAE0` | licences, the verified open stack, a reproduction that matches its recipe: cyan, since the lime already means "act here" |
+| `--warn` | `oklch(0.82 0.13 80)` | `#F0BA59` | placeholder badges, preset remix problems, a reproduction that differs from its recipe, a captions language not available yet |
 | `--error` | `oklch(0.7 0.17 25)` | `#F66D67` | failures: a mark and a tinted notice, never red body text alone |
 
 ## Typography
@@ -45,6 +45,9 @@ Two opposite viewfinder corners around the tally dot (the mark: thick corners, t
 - **Buttons**: one vocabulary. Primary (lime with dark text, 48 px), one on screen at a time: Generate, or the result's Download once a result shows (Generate then steps back to an outline, as it does while the photo atelier is open); secondary (bordered), ghost (over pictures), tool (text-sized, in a section head or beside Change: Pause, Remix preset), link. On touch screens every control is 44 px high.
 - **View tabs and pills**: the canvas's views (Gallery, Monitor, Photo atelier while one is open) are words underlined like the header's tabs; the pill (a rounded segmented box) is kept for options: filters, formats, looks, languages.
 - **Open-stack badge**: pill with a tally mark; cyan when the check passed, red when it failed.
+- **Model choice** (Camera and Film): on a large screen, by Generate, a pill with one segment per tier (Quality, Turbo, Fast) and its time, and under it what the chosen tier buys; on a phone, in the fields, one row per model with its tier, name, licence, time and what it buys.
+- **Recipe panel**: a disclosure under a result and on each History card, facts in rows, sha256s in mono. After a reproduction its verdict is cyan when the workflow is the same, amber when the workflow or its input files differ.
+- **Captions panel**: under a talking clip, the words, a row of style swatches (each a word in the export's own type and colours, never the interface's) and the exact 9:16 frame of the export, with viewfinder marks in two corners.
 
 ## Motion
 

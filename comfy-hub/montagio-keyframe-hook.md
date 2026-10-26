@@ -40,7 +40,7 @@ The download URLs and sha256 of every file are in [`registry/models.lock.yaml`](
 | `9` | Save Image | the end frame |
 | `1061` | Save Video | the clip |
 
-The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node (the transition's nodes are numbered from 1000: node `1006` is node `6` of the app's transition job, and the end frame goes straight from the edit's decoder to node `1067` instead of through a file). To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
+The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node (the transition's nodes are numbered from 1000: node `1006` is node `6` of the app's transition job, and the end frame goes straight from the edit's decoder to node `1067` instead of through a file). The save nodes write under `montagio/hook-end-frame` and `montagio/hook`, where the app's two jobs write under `montagio/edit` and `montagio/transition`. To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
 
 ## Measured
 
@@ -58,4 +58,4 @@ On an NVIDIA L4 with 24 GB of VRAM, the memory of an RTX 4090 (which is about tw
 
 ## License
 
-The graph is converted, like every Montagio workflow but the voice's, from the official [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) (MIT, [license text](../workflows/LICENSE.workflow_templates)). Every model file is Apache-2.0 or MIT.
+The graph is converted from the official [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) (MIT, [license text](../workflows/LICENSE.workflow_templates)), like most Montagio workflows; the five with no template (the voice, the voice change, the translation, the captions and the trend post) are written for Montagio ([`workflows/README.md`](../workflows/README.md#extension-workflows)). Every model file is Apache-2.0 or MIT.

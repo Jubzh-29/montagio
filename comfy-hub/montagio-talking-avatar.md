@@ -33,7 +33,7 @@ The download URLs and sha256 of every file are in [`registry/models.lock.yaml`](
 | `3` | KSampler | `seed`; 4 steps, cfg 1, uni_pc |
 | `113` | Save Video | the clip, with the speech |
 
-The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node. To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
+The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node, except that node `113` saves under `montagio/avatar`, where the app's job saves under `montagio/avatar`. To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
 
 ## Measured
 
@@ -51,4 +51,4 @@ On an NVIDIA L4 with 24 GB of VRAM, the memory of an RTX 4090 (which is about tw
 
 ## License
 
-The graph is converted, like every Montagio workflow but the voice's, from the official [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) (MIT, [license text](../workflows/LICENSE.workflow_templates)). Every model file is Apache-2.0 or MIT.
+The graph is converted from the official [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) (MIT, [license text](../workflows/LICENSE.workflow_templates)), like most Montagio workflows; the five with no template (the voice, the voice change, the translation, the captions and the trend post) are written for Montagio ([`workflows/README.md`](../workflows/README.md#extension-workflows)). Every model file is Apache-2.0 or MIT.

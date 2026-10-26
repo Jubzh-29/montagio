@@ -1,6 +1,6 @@
 # Montagio nodes for ComfyUI
 
-**Camera presets as files, and two camera moves in one clip, for Wan 2.2 Fun Camera.**
+**Camera presets as files, and two camera moves in one clip, for Wan 2.2 Fun Camera. And the words of a speech with their timing, for captions.**
 
 ![The Montagio nodes in a Wan 2.2 Fun Camera graph: Load Montagio Preset feeds Montagio Camera Embedding, the prompts and the video size](docs/graph-pack.jpg)
 
@@ -13,15 +13,17 @@ The core `WanCameraEmbedding` node takes one camera move. This pack adds three c
 
 The preset files are the ones the [Montagio app](../README.md) renders, under CC-BY-4.0: the same file gives the same clip in the app and in a ComfyUI graph, and in ComfyUI's App Mode a whole graph becomes a preset menu, an image and a prompt. The 11 presets bundled here were rendered on a 24 GB GPU (an NVIDIA L4) on 2026-10-21, five of them with two moves.
 
-The nodes use the V3 node API, so they need ComfyUI 0.41.0 or newer. They are light: they read a file and compute a camera path. The video model they feed needs a 24 GB GPU.
+In the app, each preset names the model it starts on (`models.preferred`). Seven start on the Turbo model, the same Fun Camera with the 4-step LoRAs of lightx2v: Crash Push, Slow Push, Pull Back Reveal, Crane Up, Pull Back & Tilt Up, Push & Settle and Breathing. The other four start on the 20-step Quality model: Pan Left, Pan Right and Drift Left Push, which share a side move, because in 4 steps a person doubled into a ghost on Pan Left; and Rise & Push, which lost its subject out of the frame. The nodes do not read this field: the graph sets the model.
+
+The nodes use the V3 node API, so they need ComfyUI 0.41.0 or newer. The three camera nodes are light: they read a file and compute a camera path. On an NVIDIA L4, the 20-step graph of the example peaked at 18 to 21 GB of VRAM; the Turbo graph of the same model ran within 11.5 GiB, on an L4 held to that much free memory (2026-10-25). The 20-step graph has not been tried within 12 GB. Montagio Transcribe Words loads Whisper for its job and frees it after: 4.9 GB at most on the L4.
 
 ## Install
 
-Once the pack is on the Comfy Registry, install it with the ComfyUI Manager (search "Montagio") or with `comfy node install montagio`. Until then, copy the `comfy-nodes` folder of this repository to `ComfyUI/custom_nodes/montagio` and restart ComfyUI. Its two dependencies, PyYAML and numpy, come with ComfyUI. The nodes appear in the `Montagio` category.
+Once the pack is on the Comfy Registry, install it with the ComfyUI Manager (search "Montagio") or with `comfy node install montagio`. Until then, copy the `comfy-nodes` folder of this repository to `ComfyUI/custom_nodes/montagio` and restart ComfyUI. Its two dependencies, PyYAML and numpy, come with ComfyUI, as do `torch` and `transformers`, which Montagio Transcribe Words uses. The nodes appear in the `Montagio` category.
 
 ## Example workflow
 
-The pack ships one example, [`example_workflows/montagio-camera-presets.json`](example_workflows/montagio-camera-presets.json). ComfyUI lists it under **Templates**, in the pack's own category, with its thumbnail. It is the Wan 2.2 Fun Camera 14B graph of the official template (20 steps, 480p), with Load Montagio Preset on Rise & Push (two moves at once) feeding Montagio Camera Embedding, the two prompts and `CreateVideo`. A note in the graph lists the model files.
+The pack ships one example, [`example_workflows/montagio-camera-presets.json`](example_workflows/montagio-camera-presets.json). ComfyUI lists it under **Templates**, in the pack's own category, with its thumbnail. It is the Wan 2.2 Fun Camera 14B graph of the official template (20 steps), set to 832×480, with Load Montagio Preset on Rise & Push (two moves at once) feeding Montagio Camera Embedding, the two prompts and `CreateVideo`. A note in the graph lists the model files.
 
 ![The whole example graph, with its note](docs/graph-full.jpg)
 
@@ -34,12 +36,14 @@ The pack ships one example, [`example_workflows/montagio-camera-presets.json`](e
 
 The files are Comfy-Org's repackagings in [Comfy-Org/Wan_2.2_ComfyUI_Repackaged](https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged) and [Comfy-Org/Wan_2.1_ComfyUI_repackaged](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged); their exact URLs and sha256 are in the repository's [`registry/models.lock.yaml`](../registry/models.lock.yaml). On the L4, a 5 s clip at 480p took 1,110 to 1,170 s, with a peak of 18 to 21 GB of VRAM; an RTX 4090 is about twice as fast.
 
+The pack ships no Turbo example. The app's Turbo model is the official template's 4-step group, in API format in the repository ([`workflows/wan22-fun-camera-turbo.api.json`](../workflows/wan22-fun-camera-turbo.api.json)): the same files plus `wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors` and `wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors` (Apache-2.0, [lightx2v/Wan2.2-Lightning](https://huggingface.co/lightx2v/Wan2.2-Lightning), 1.2 GB each, under `loras/`), 4 steps at cfg 1. On the L4 it took 156 s cold, then 136 to 138 s a clip, 8.3 times faster than 20 steps, with a little less fine detail.
+
 Two rules from those renders:
 
 - **Say what the photo shows.** Write it in the preset node's `prompt`, before the preset's own text. Without it, Fun Camera invents what it cannot see and the clip turns ghostly.
 - **Push-ins, pull-backs and side moves work best.** Vertical moves and rolls barely show on Fun Camera, which is why the library has Crane Up (Pan Up at speed 2) and no tilt or Dutch preset.
 
-The other Montagio workflows (effects, hooks, avatar, motion transfer, HD), in the same format, are in [`comfy-hub/`](../comfy-hub/README.md).
+Six other Montagio workflows (one-photo effect, keyframe hook, talking avatar, motion transfer, HD with smooth motion, film music), in the same format, are in [`comfy-hub/`](../comfy-hub/README.md). The app's captions workflow, Montagio Transcribe Words then the core Save Text, is [`workflows/whisper-words.api.json`](../workflows/whisper-words.api.json), in API format.
 
 ## Nodes
 
@@ -48,7 +52,7 @@ The other Montagio workflows (effects, hooks, avatar, motion transfer, HD), in t
 | Load Montagio Preset | `MontagioLoadPreset` | the `preset` menu, which lists the `.yaml` and `.yml` files of the [preset folders](#preset-folders) |
 | Montagio Preset from YAML | `MontagioPresetFromYAML` | the `yaml` text field: paste a preset, for example one remixed in the Montagio app (it starts with the text of Crash Push) |
 
-Both nodes have the same other inputs and the same 13 outputs. A third node, [Montagio Camera Embedding](#montagio-camera-embedding), combines two camera moves.
+Both nodes have the same other inputs and the same 13 outputs. A third node, [Montagio Camera Embedding](#montagio-camera-embedding), combines two camera moves. A fourth, [Montagio Transcribe Words](#montagio-transcribe-words) (`MontagioTranscribeWords`), takes no preset: it transcribes a speech.
 
 ### Inputs
 
@@ -142,7 +146,7 @@ The model loads for the job and is freed after it:
 - fp16 on CUDA, fp32 elsewhere;
 - read from its folder only, never downloaded.
 
-It runs on `transformers`, which ComfyUI already needs: the pack adds no dependency. The Montagio app uses `openai/whisper-large-v3-turbo` (MIT, 1.6 GB), with the files of its lock, in `models/whisper/whisper-large-v3-turbo/`.
+It runs on `transformers`, which ComfyUI already needs: the pack adds no dependency. The Montagio app uses `openai/whisper-large-v3-turbo` (MIT, 1.6 GB), with the 11 files of its lock, in `models/whisper/whisper-large-v3-turbo/`. A ComfyUI without that folder offers no model, so it refuses the workflow, and the app then hides its captions. On an NVIDIA L4, 2.9 s of speech took 10.5 s, the model's loading included, with a peak of 4.9 GB (2026-10-25); on a laptop CPU, 95.7 s.
 
 ## App Mode
 
@@ -188,7 +192,7 @@ The node accepts the presets the app accepts, and its values are the app's own (
 - **A few rare YAML spellings with tabs.** A tab works as a separator, as in the app: after a colon, before a comment, at the end of a line, inside a value, or on a blank line. A tab used as indentation is refused, as in the app. Two spellings still differ: a tab right after a tag (`!!str<TAB>text`) or inside a `%YAML` directive line is refused by the node but accepted by the app, and a quoted text that goes on over lines indented with a tab alone is accepted by the node but refused by the app. Indent with spaces and a file reads the same in both. The other rare corners are listed at the top of `montagio_nodes/preset.py`.
 - **Combined moves in the app.** For a preset with two moves, the app's compiler (`packages/presets/src/compile.ts`) turns the camera node of its workflow into Montagio Camera Embedding and fills `camera_pose_2` and `combine` (`together` by default, `then` when the preset says `combine: then`). `combined` mode outputs the same values, for you to link into that node. For a preset with one move, the app keeps the core node and sends no second move; `combined` mode gives `Static` and `together`, the same path on Montagio Camera Embedding.
 - **Presets may say how two moves combine.** `camera.combine` is `together` (the default) or `then`. `static` can be one of two moves only with `then`: before a move it waits, after one it holds. Two opposite moves (`zoom_in` and `zoom_out`, `pan_left` and `pan_right`, `pan_up` and `pan_down`, `roll_ccw` and `roll_cw`) also need `then`: together they would cancel out to a still camera. In `prompt` mode the two moves are joined with ", then " instead of ", ".
-- **Bundled presets with two moves.** Rise & Push, Drift Left Push, Pull Back & Tilt Up, Push & Settle and Breathing combine two moves. Run them with `camera_mode` `combined` and Montagio Camera Embedding (see [Wiring](#wiring)), or with `prompt` for a model without camera control. `parametric` mode refuses them (see above). The other seven bundled presets have one move and give the same outputs in `parametric` and `combined`.
+- **Bundled presets with two moves.** Rise & Push, Drift Left Push, Pull Back & Tilt Up, Push & Settle and Breathing combine two moves. Run them with `camera_mode` `combined` and Montagio Camera Embedding (see [Wiring](#wiring)), or with `prompt` for a model without camera control. `parametric` mode refuses them (see above). The other six bundled presets have one move and give the same outputs in `parametric` and `combined`.
 
 ## Development
 
@@ -202,7 +206,7 @@ npm run test:nodes                                  # python -m pytest comfy-nod
 
 The tests do not need ComfyUI or a GPU: a small fake of `comfy_api` stands in for it. The parity suite compares the Python reader and the Python outputs with the app's real `parsePreset` and `compileJob`, which it runs through a `tsx` bridge. Without the repository around the pack (a standalone checkout), these tests are skipped. `MONTAGIO_REQUIRE_TS_PARITY=1` turns a skip into a failure, which is how CI runs them.
 
-Three tests of `tests/test_camera.py` run Montagio Camera Embedding beside the core `WanCameraEmbedding` in a real ComfyUI v0.41.0 and want the same tensor. They are skipped unless `MONTAGIO_COMFYUI_DIR` names a ComfyUI checkout; its Python (with torch, a CPU build is enough) is `MONTAGIO_COMFYUI_PYTHON` or a `.venv` inside the checkout. Example on a GPU pod: `MONTAGIO_COMFYUI_DIR=/workspace/ComfyUI MONTAGIO_COMFYUI_PYTHON=/workspace/venvs/comfyui/bin/python npm run test:nodes`.
+Three tests of `tests/test_camera.py` run Montagio Camera Embedding beside the core `WanCameraEmbedding` in a real ComfyUI v0.41.0 and compare them: the same tensor for each single pose, the same shape for two moves, the same `CAMERA_DICT`. They are skipped unless `MONTAGIO_COMFYUI_DIR` names a ComfyUI checkout; its Python (with torch, a CPU build is enough) is `MONTAGIO_COMFYUI_PYTHON` or a `.venv` inside the checkout. Example on a GPU pod: `MONTAGIO_COMFYUI_DIR=/workspace/ComfyUI MONTAGIO_COMFYUI_PYTHON=/workspace/venvs/comfyui/bin/python npm run test:nodes`.
 
 `presets/` holds copies of the repository's `presets/*.yaml` and `presets/*.yml`, because the Registry publishes only this folder. Refresh them with `python comfy-nodes/scripts/sync_presets.py` (add `--check` to only list the differences). A test fails when the copies differ from the originals.
 

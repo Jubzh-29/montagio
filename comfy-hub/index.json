@@ -195,7 +195,7 @@
       {
         "name": "montagio-motion-transfer",
         "title": "Montagio · Motion transfer",
-        "description": "The character of a photo moves like a reference video of up to 5 s: Wan2.2-Animate-2, distilled, in 10 steps. The reference video is taken as it is, with no pose extractor and no mask, and its sound is left out.",
+        "description": "The character of a photo moves like a reference video: Wan2.2-Animate-2, distilled, in 10 steps. This graph is the one-window case, a reference of up to 5 s; the Montagio app takes up to 30 s. The reference video is taken as it is, with no pose extractor and no mask, and its sound is left out.",
         "mediaType": "image",
         "mediaSubtype": "jpg",
         "tags": [

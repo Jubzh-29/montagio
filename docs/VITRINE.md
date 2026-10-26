@@ -2,7 +2,7 @@
 
 La vitrine est le lien de démo du concours : le jury l'ouvre sans rien installer. Elle montre le vrai Studio :
 - le juré choisit une photo d'exemple et un preset, et voit le clip pré-généré correspondant ;
-- en mode Séquence, il monte un film de 2 ou 3 plans dans son navigateur ;
+- dans l'onglet Film, il monte un film de 2 ou 3 plans dans son navigateur ;
 - il peut remixer et vérifier un preset, télécharger le workflow ComfyUI et lire la page Open Stack.
 
 Elle ne génère rien. Ses clips ont été rendus avec Montagio sur des poids ouverts, et la page le dit.
@@ -22,7 +22,7 @@ Les autres hébergeurs gratuits avec serveur, vérifiés le même jour, ne convi
 | Google Cloud Run | carte bancaire obligatoire |
 | Fly.io, Koyeb | plus d'offre gratuite pour les nouveaux comptes |
 
-La vitrine est donc un **dossier statique**, `apps/web/out`. Il ne fait tourner aucun serveur et ne se met jamais en veille. Le Studio y fonctionne grâce à un « routeur » qui répond dans la page aux mêmes appels `/api/...` que le serveur, à partir de `showcase/data.json`. Le film de la Séquence est monté dans le navigateur du juré par FFmpeg compilé en WebAssembly : ffmpeg.wasm, 31 Mo, chargé une seule fois, au premier film.
+La vitrine est donc un **dossier statique**, `apps/web/out`. Il ne fait tourner aucun serveur et ne se met jamais en veille. Le Studio y fonctionne grâce à un « routeur » qui répond dans la page aux mêmes appels `/api/...` que le serveur, à partir de `showcase/data.json`. Le film de l'onglet Film est monté dans le navigateur du juré par FFmpeg compilé en WebAssembly : ffmpeg.wasm, 31 Mo, chargé une seule fois, au premier film.
 
 ## 2. Construire
 
@@ -78,7 +78,7 @@ Ouvrir ensuite http://127.0.0.1:3101/ (le serveur de test n'écoute que sur la m
 
 ## 3. Déployer sur Hugging Face, pas à pas
 
-**C'est vous qui créez le compte et qui publiez** : rien n'est publié automatiquement.
+**C'est le mainteneur du dépôt qui crée le compte et qui publie.**
 
 1. **Créer un compte** sur https://huggingface.co (gratuit), si ce n'est pas déjà fait.
 2. **Créer le Space** depuis le site : https://huggingface.co/new-space.
@@ -117,7 +117,7 @@ Pour mettre à jour la vitrine, reconstruire, puis relancer la même commande `h
 - [ ] `/open-stack/`, ouvert directement (rechargement compris), liste chaque modèle par fonction (caméra, effets, transitions et hooks, photo, avatar, musique, HD, mouvement), tous en Apache-2.0 ou MIT, et la légende d’un clip mène à la ligne de son modèle.
 - [ ] Une photo, un preset, puis « Show clip » : le clip joue, et sa légende dit s'il est provisoire ou pré-généré. Depuis la passe HD (partie 7), elle nomme aussi SeedVR2, et l'ardoise sous le moniteur dit « 1080p ».
 - [ ] « Open in ComfyUI » télécharge `montagio-<preset>.json`.
-- [ ] En Séquence, une photo et trois presets, puis « Assemble film » : le film joue en quelques secondes après le chargement de FFmpeg. « Download film » et « Download 9:16 » fonctionnent.
+- [ ] Dans l'onglet Film, une photo et trois presets, puis « Assemble film » : le film joue en quelques secondes après le chargement de FFmpeg. « Download film » et « Download 9:16 » fonctionnent.
 - [ ] Les étiquettes du film téléchargé sont les bonnes : `ffprobe -v error -show_entries format_tags -of json montagio-film.mp4` doit afficher `"comment": "AI-generated"` après la S3, ou `"Montagio showcase placeholder"` avant.
 - [ ] Le bouton FR passe l'interface en français (les noms et descriptions des presets restent en anglais).
 - [ ] Dans les outils de développement, la console n'affiche aucune erreur. L'onglet Réseau ne montre aucune requête hors du domaine `*.hf.space` et aucune réponse 404.
@@ -220,7 +220,7 @@ Avant la S3, chaque clip est **provisoire** : FFmpeg déplace une fenêtre sur l
 
 ## 7. La passe HD 1080p (24/10)
 
-Le 24/10, l'utilisateur a trouvé laids une partie des clips de la S3. Le tri (hors dépôt, `tri-qualite-2026-10-24.md` de la vidéo de démo) a donné 18 clips caméra bons, 9 moyens et 6 ratés. La résolution n'en était pas la cause principale : chaque clip était une prise unique, et le sujet partait du cadre (la voiture « garée » qui démarre, la passante qui sort) ou devenait fantôme quand la caméra traversait le bateau du port. Tout a été refait sur Modal (compte `montagio-2`) :
+Le 24/10, une partie des clips de la S3 a été jugée laide. Le tri (hors dépôt, `tri-qualite-2026-10-24.md` de la vidéo de démo) a donné 18 clips caméra bons, 9 moyens et 6 ratés. La résolution n'en était pas la cause principale : chaque clip était une prise unique, et le sujet partait du cadre (la voiture « garée » qui démarre, la passante qui sort) ou devenait fantôme quand la caméra traversait le bateau du port. Tout a été refait sur Modal (compte `montagio-2`) :
 - **15 clips caméra rendus de nouveau en 480p**, à partir de la photo d'exemple exacte, avec une description de la photo propre au clip (`--prompt`, par exemple « The car stays parked and does not move ») et un négatif ciblé (`--negative`), en seed 7, ou 8 pour les reprises ;
 - **les 43 clips de la vitrine passés en 1080p** par SeedVR2 (`smoke.ts --extension upscale --clip <clip 480p>`) : les 33 clips caméra (ces 15, et les 18 autres de la S3 tels quels), 9 effets et le hook Ignite.
 
@@ -256,7 +256,7 @@ Un exemple d'effet ou de hook passe en HD de la même façon, mais il doit d'abo
 
 **Trois effets écartés.** Cake-ify, Explode et Squish sur la passante (`portrait-a`) sont techniquement réussis, mais montrent un couteau qui tranche une personne, une personne dans une explosion et des mains qui écrasent une personne. Ils ont quitté la vitrine (fichiers et workflows supprimés) et sont listés sous `withheld`, avec leur raison : `ingest`, `ingest --examples` et `ingest --hd` les écartent, et le manifeste refuse qu'un rendu écarté soit aussi listé. Les mêmes effets sur la voiture restent.
 
-**Le poids.** En sortie de SeedVR2, les 43 clips pèsent 346 Mo. L'encodage de la vitrine (`SHOWCASE_X264`) est passé de CRF 18 `veryfast` à **CRF 23 `slow`**, au choix de l'utilisateur : environ 5 Mo par clip 1080p au lieu de 10, avec un PSNR de 42 à 43 dB par rapport à la sortie de SeedVR2 (45 à 46 dB pour l'ancien réglage), sans différence visible. Les 43 fichiers font 214 Mo dans le dépôt, et la vitrine construite environ 290 Mo. Le dépôt d'un Space Hugging Face est limité à environ 1 Go, historique compris : chaque envoi de clips modifiés s'y ajoute. Avant un nouvel envoi complet (après une passe de fluidification, par exemple), vérifier la place prise dans les réglages du Space, et au besoin écraser son historique (`HfApi().super_squash_history("<compte>/montagio", repo_type="space")`).
+**Le poids.** En sortie de SeedVR2, les 43 clips pèsent 346 Mo. L'encodage de la vitrine (`SHOWCASE_X264`) est passé de CRF 18 `veryfast` à **CRF 23 `slow`**, le réglage retenu : environ 5 Mo par clip 1080p au lieu de 10, avec un PSNR de 42 à 43 dB par rapport à la sortie de SeedVR2 (45 à 46 dB pour l'ancien réglage), sans différence visible. Les 43 fichiers font 214 Mo dans le dépôt, et la vitrine construite environ 290 Mo. Le dépôt d'un Space Hugging Face est limité à environ 1 Go, historique compris : chaque envoi de clips modifiés s'y ajoute. Avant un nouvel envoi complet (après une passe de fluidification, par exemple), vérifier la place prise dans les réglages du Space, et au besoin écraser son historique (`HfApi().super_squash_history("<compte>/montagio", repo_type="space")`).
 
 **Fluidification.** Une passe HD avec RIFE (`--smooth`, 32 i/s) n'est pas encore prise en charge par la vitrine : `ingest --hd` et `verify` attendent la cadence du preset (16 i/s). Il faudra l'ajouter avec la branche de fluidification, puis refaire la passe HD des clips depuis leur 480p.
 

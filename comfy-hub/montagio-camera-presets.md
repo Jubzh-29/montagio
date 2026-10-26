@@ -32,11 +32,13 @@ The download URLs and sha256 of every file are in [`registry/models.lock.yaml`](
 | `102` | KSampler (Advanced) | `noise_seed` |
 | `106` | Save Video | the clip, MP4 H.264 |
 
-The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node (node `200`, the preset node, is the one addition: the app writes the preset's values into node `108` itself). To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
+The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node, with two differences: node `200`, the preset node, is an addition (the app writes the preset's values into node `108` itself), and node `106` saves under `montagio/camera-preset`, where the app's job saves under `montagio/clip`. To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
 
 ## Measured
 
-On an NVIDIA L4 with 24 GB of VRAM, the memory of an RTX 4090 (which is about twice as fast). 480p, 20 steps (10 on the high-noise model, then 10 on the low-noise one): 1,110 to 1,170 s, peak 18 to 21 GB. The template's 720p took 4,331 s; Montagio renders 480p and gets 1080p from the [HD workflow](montagio-hd-smooth.md) instead, about three times faster. Every measure, with its date: [`docs/BUILD_NOTES.md`](../docs/BUILD_NOTES.md#measured-on-a-gpu).
+On an NVIDIA L4 with 24 GB of VRAM, the memory of an RTX 4090 (which is about twice as fast). 480p, 20 steps (10 on the high-noise model, then 10 on the low-noise one): 1,110 to 1,170 s, peak 18 to 21 GB. The same graph at 720p took 4,331 s; Montagio renders 480p and gets 1080p from the [HD workflow](montagio-hd-smooth.md) instead, about three times faster. Every measure, with its date: [`docs/BUILD_NOTES.md`](../docs/BUILD_NOTES.md#measured-on-a-gpu).
+
+**Turbo, 4 steps.** In the app, 7 of the 11 presets start on the Turbo model: this graph with the template's 4-step group, two LoRAs (`wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors` and `wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors`, under `loras/`, 1.2 GB each, Apache-2.0, [lightx2v/Wan2.2-Lightning](https://huggingface.co/lightx2v/Wan2.2-Lightning)) and 4 steps at cfg 1, split at step 2. This folder has no graph of it; its API workflow is [`workflows/wan22-fun-camera-turbo.api.json`](../workflows/wan22-fun-camera-turbo.api.json). On the L4 (2026-10-25): 156 s cold, then 136 to 138 s a clip warm, 8.3 times faster than 20 steps, with a little less fine detail; peak 22.4 GB, because ComfyUI's dynamic VRAM fills the card. On an L4 held to 11.5 GiB free, the size of a 12 GB card, Crash Push took 153.5 s. In 4 steps Pan Left doubled a person into a ghost and Rise & Push lost its subject, so those two, Pan Right and Drift Left Push start on 20 steps. Details in French: [`docs/S2_RESULTATS.md`](../docs/S2_RESULTATS.md), parts 14 and 15.
 
 ## Example
 
@@ -50,4 +52,4 @@ On an NVIDIA L4 with 24 GB of VRAM, the memory of an RTX 4090 (which is about tw
 
 ## License
 
-The graph is converted, like every Montagio workflow but the voice's, from the official [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) (MIT, [license text](../workflows/LICENSE.workflow_templates)). Every model file is Apache-2.0 or MIT. The Montagio nodes are GPL-3.0-only, the presets CC-BY-4.0.
+The graph is converted from the official [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) (MIT, [license text](../workflows/LICENSE.workflow_templates)), like most Montagio workflows; the five with no template (the voice, the voice change, the translation, the captions and the trend post) are written for Montagio ([`workflows/README.md`](../workflows/README.md#extension-workflows)). Every model file is Apache-2.0 or MIT. The Montagio nodes are GPL-3.0-only, the presets CC-BY-4.0.

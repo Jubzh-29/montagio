@@ -1,6 +1,6 @@
 # Analyse des extensions, sans GPU (19/10/2026)
 
-Le 19/10, l'utilisateur a choisi d'ajouter à Montagio quatre extensions (musique, upscale HD, édition d'image, avatar parlant). Le même jour, il les a réorientées vers les « hooks » viraux d'une photo, d'après le rapport du 19/10 sur les fonctions virales du concurrent (dossier `reports/`, à côté du dépôt) : ce qui manque à Montagio, ce sont des effets d'une photo, de trois secondes, nommés et rejouables. Ordre de priorité retenu :
+Décision du 19/10 : ajouter à Montagio quatre extensions (musique, upscale HD, édition d'image, avatar parlant). Le même jour, elles ont été réorientées vers les « hooks » viraux d'une photo, d'après le rapport du 19/10 sur les fonctions virales du concurrent (dossier `reports/`, à côté du dépôt) : ce qui manque à Montagio, ce sont des effets d'une photo, de trois secondes, nommés et rejouables. Ordre de priorité retenu :
 1. **Édition d'image** (Qwen-Image-Edit-2511) : la photo modifiée par une instruction, en 4 étapes avec la LoRA Lightning, avec trois « looks » (gonflé, figurine, angle de vue) et une seconde image. Elle fait aussi l'image finale des transitions.
 2. **Pack de 6 effets** : Squish, Cake-ify, Explode, Snap Zoom, Frozen Moment et Full Circle, des LoRA de Remade-AI sur Wan 2.1 I2V 480p.
 3. **Transitions par images clés** : l'édition fait l'image finale, Wan 2.2 FLF2V anime le passage. Hooks : Iris Dive et Wardrobe Swap en S2, Figurine et Ignite (embrasement) en S3.
@@ -64,7 +64,7 @@ Les fichiers téléchargés viennent de miroirs Comfy-Org, sauf la voix et les L
 - **LoRA 4 étapes de Wan 2.1 : l'original de lightx2v**, pas l'extraction de Kijai que copient les templates (aussi dans `Comfy-Org/Wan-Animate-2`, octets différents). Son format de clés n'a pas pu être vérifié sans lire l'en-tête du fichier : la S2 vérifie l'absence d'avertissement `lora key not loaded`, sinon elle prend la copie de Wan-Animate-2 avec `fetch-weights --extra`.
 - **Avertissement d'usage d'ACE-Step.** Le README GitHub demande d'utiliser le modèle de façon éthique. La phrase n'est ni dans le LICENSE (MIT standard) ni sur les cartes des poids, et n'ajoute aucune clause commerciale, de seuil ou de territoire : informatif.
 - **LoRA, deux décisions différentes.** La LoRA Lightning de Qwen-Image-Edit (Apache-2.0) reste hors du lock et hors du workflow jusqu'à la S2, comme LightX2V en S1. Celle de l'avatar entre au lock : sans elle, 15 s de parole demandent plus d'une heure de GPU (partie 4).
-- **InfiniteTalk écarté pour l'avatar.** Son encodeur audio, `TencentGameMate/chinese-wav2vec2-base`, n'a qu'une étiquette MIT, sans fichier LICENSE ; son dépôt GitHub n'a aucune licence ; il a été pré-entraîné sur WenetSpeech, distribué pour un usage non commercial. Ses poids passent la règle à la lettre, mais leur provenance est faible. Il ne tient pas non plus en 24 Go (partie 4). Il partagerait la base des effets (Wan 2.1 I2V 480p), ce qui économiserait du disque, pas de la VRAM. L'utilisateur a choisi Wan 2.2 S2V le 19/10, et l'a gardé à la validation du plan révisé.
+- **InfiniteTalk écarté pour l'avatar.** Son encodeur audio, `TencentGameMate/chinese-wav2vec2-base`, n'a qu'une étiquette MIT, sans fichier LICENSE ; son dépôt GitHub n'a aucune licence ; il a été pré-entraîné sur WenetSpeech, distribué pour un usage non commercial. Ses poids passent la règle à la lettre, mais leur provenance est faible. Il ne tient pas non plus en 24 Go (partie 4). Il partagerait la base des effets (Wan 2.1 I2V 480p), ce qui économiserait du disque, pas de la VRAM. Choix retenu le 19/10 : Wan 2.2 S2V, gardé à la validation du plan révisé.
 
 ### Code tiers
 
@@ -136,7 +136,7 @@ Les workflows partent des templates officiels de [Comfy-Org/workflow_templates](
 
 ### Avatar parlant : Wan 2.2 S2V, nodes du cœur
 
-- **Choix de l'utilisateur le 19/10**, au lieu d'InfiniteTalk (partie 1 pour la licence de son encodeur, partie 4 pour sa mémoire).
+- **Choix retenu le 19/10**, au lieu d'InfiniteTalk (partie 1 pour la licence de son encodeur, partie 4 pour sa mémoire).
 - Template `templates/video_wan2_2_14B_s2v.json`, chemin actif « 4 étapes ». Nodes : `UNETLoader`, `LoraLoaderModelOnly`, `ModelSamplingSD3` (shift 8), `CLIPLoader`, `CLIPTextEncode`, `VAELoader`, `LoadImage`, `LoadAudio`, `AudioEncoderLoader` et `AudioEncoderEncode` (`comfy_extras/nodes_audio_encoder.py`), `WanSoundImageToVideo` et `WanSoundImageToVideoExtend` (`comfy_extras/nodes_wan.py:956` et `:989`), `KSampler` (4 étapes, cfg 1, uni_pc), `LatentConcat`, `LatentCut`, `VAEDecode`, `ImageFromBatch`, `CreateVideo`, `SaveVideo`. ComfyUI v0.41.0 reconnaît S2V (`comfy/model_detection.py:775`).
 - **Morceaux.** Un passage rend 77 images et couvre 5,0 s d'audio (16 fps). Une extension lit le latent **cumulé** : sa longueur fixe le décalage de l'audio (`nodes_wan.py:1018`). Le template officiel est câblé ainsi ; celui d'InfiniteTalk, lui, rejouerait la même fenêtre audio dès le troisième morceau. Le compilateur garde 1, 2 ou 3 morceaux selon la durée de la parole (15 s au plus).
 - **Ce que l'avatar n'est pas.** La vidéo est conditionnée par l'identité de la photo, elle ne commence pas sur ses pixels ; `ref_motion` (photo en guise de mouvement passé) est un essai de la S2. Sortie en 16 fps.
@@ -322,7 +322,7 @@ Codes d'erreur stables, comme l'existant : `extension-disabled`, `invalid-input`
 
 **Textes EN et FR.** Un seul bloc de clés i18n, à regrouper avec la session « texte → image » pour limiter les conflits : `ext.edit.*`, `ext.effects.*`, `ext.hooks.*`, `ext.avatar.*`, `ext.music.*`, `ext.upscale.*`, `ext.errors.*`. Chaque libellé dit ce qui sort (« Vidéo générée par IA »). Les noms d'effets restent ceux des presets (Squish, Cake-ify…), les déclencheurs en leetspeak n'apparaissent jamais.
 
-**Garde-fous retenus par l'utilisateur le 19/10** (proposés, pas imposés : le filtre SFW a été retiré de la v0.1) :
+**Garde-fous retenus le 19/10** (proposés, pas imposés : le filtre SFW a été retiré de la v0.1) :
 - une case de consentement, « Je suis la personne sur la photo ou j'ai son accord », avant l'avatar, et avant une édition, un effet ou un hook sur une photo de personne ; sans elle, le serveur répond 400 `consent-required` ;
 - une liste de blocage de noms de célébrités, appliquée aux instructions d'édition, aux sujets des effets et aux textes de l'avatar, côté serveur (`blocked-name`) ;
 - des métadonnées C2PA (`c2pa-python`, Apache-2.0) sur chaque sortie, en plus de la mention visible « AI-generated » déjà en place (article 50 de l'AI Act, en vigueur depuis le 2 août 2026).
@@ -339,7 +339,7 @@ Codes d'erreur stables, comme l'existant : `extension-disabled`, `invalid-input`
 
 ## 9. Transfert de mouvement (7e extension, 20/10)
 
-Décidé par l'utilisateur le 20/10 : « ajoute quand même le transfert de mouvement minimal (Wan2.2-Animate) en 7e extension, dernière priorité et soumise à la règle de coupe ». Périmètre de la v0.1 : la photo d'un personnage (fictif de préférence) et une vidéo de référence de 5 s au plus donnent ce personnage qui reproduit le mouvement. Hors périmètre : remplacer une personne dans sa propre vidéo, « Objects swap ». Moteur seulement : rien dans `apps/web/src/components`.
+Décision du 20/10 : ajouter quand même le transfert de mouvement minimal (Wan2.2-Animate) en 7e extension, en dernière priorité et soumis à la règle de coupe. Périmètre de la v0.1 : la photo d'un personnage (fictif de préférence) et une vidéo de référence de 5 s au plus donnent ce personnage qui reproduit le mouvement. Hors périmètre : remplacer une personne dans sa propre vidéo, « Objects swap ». Moteur seulement : rien dans `apps/web/src/components`.
 
 ### Le nœud retenu : Wan2.2-Animate-2 distillé
 
@@ -378,7 +378,7 @@ Nodes expérimentaux, VRAM juste, qualité non mesurée, et un cadrage photo/vid
 ### Mini-plan d'interface (pour la session du Studio unifié)
 
 - **Écran** : un onglet « Mouvement » (affiché seulement si l'extension est visible) : la photo du personnage (celle du Studio ou une autre), la vidéo de référence (5 s au plus, avec un aperçu et la durée gardée), deux champs facultatifs, « À quoi ressemble le personnage » et « Ce qu'il fait », et la durée estimée.
-- **Garde-fou retenu par l'utilisateur le 20/10** : une case obligatoire, « J'ai les droits sur cette vidéo et sur cette photo » ; sans elle, le serveur refuse le job (400 `rights-required`). La mention « AI-generated » reste.
+- **Garde-fou retenu le 20/10** : une case obligatoire, « J'ai les droits sur cette vidéo et sur cette photo » ; sans elle, le serveur refuse le job (400 `rights-required`). La mention « AI-generated » reste.
 - **Route** : `POST /api/motion` (`imageRef`, `videoRef`, `character?`, `motion?`, `rights: true`) : le serveur prépare la vidéo (`prepareMotionClip`), lit sa durée et son aspect, compile (`compileMotion`) et envoie les deux fichiers ; un job du moteur de jobs, comme les effets. Codes : `extension-disabled`, `rights-required`, `invalid-input` (vidéo trop courte, sans image), `ffmpeg-missing`, `backend-unavailable`, `workflow-rejected`.
 - **Textes EN et FR** : `ext.motion.*`. Le libellé dit ce qui sort (« Vidéo générée par IA ») et que le son de la vidéo de référence n'est pas repris.
 - **e2e** : un parcours en mode démo (un MP4 pré-rendu), et un test de la case : sans elle, le bouton reste désactivé.
@@ -386,7 +386,7 @@ Nodes expérimentaux, VRAM juste, qualité non mesurée, et un cadrage photo/vid
 
 ## 10. Restyle, ou remix vidéo (8e extension, 24/10)
 
-Demandé par l'utilisateur le 24/10 : un mode vidéo vers vidéo qui reconstruit toute la scène d'un court clip en gardant son mouvement, son mouvement de caméra et son rythme. Spike d'abord, avec un go/no-go, puis câblage sur un go (accordé le 24/10 : « câble Restyle comme tu le proposes : mode Restyle dans l'onglet Mouvement, contrôle par profondeur, référence facultative »). Hors périmètre : remplacer un seul objet dans un clip (il faudrait des masques par image ; SAM 3.1 est sous licence Meta, refusée).
+Décision du 24/10 : un mode vidéo vers vidéo qui reconstruit toute la scène d'un court clip en gardant son mouvement, son mouvement de caméra et son rythme. Spike d'abord, avec un go/no-go, puis câblage sur un go (accordé le 24/10 : mode Restyle dans l'onglet Mouvement, contrôle par profondeur, référence facultative). Hors périmètre : remplacer un seul objet dans un clip (il faudrait des masques par image ; SAM 3.1 est sous licence Meta, refusée).
 
 ### Le nœud retenu : Wan 2.1 VACE 14B, nodes du cœur
 
@@ -428,7 +428,7 @@ Sur 3 clips très différents (un Crash Push de voiture, un Rise & Push de port,
 
 ## 11. Mouvement jusqu'à 30 s, personnage composé, bibliothèque Motion et remplacement d'objet (24–25/10)
 
-Demandé par l'utilisateur le 24/10 (« fais-le en version maximale »), en lots dans cet ordre : Restyle (partie 10), le transfert de mouvement jusqu'à 30 s, plusieurs références composées puis animées, le remplacement d'un objet, une bibliothèque de mouvements faits par Montagio. Chaque lot a sa branche ; un lot non validé sur GPU reste codé, testé et masqué par la règle de coupe, noté « prochaine étape » dans la feuille de route du README.
+Décision du 24/10 : la version la plus complète, en lots dans cet ordre : Restyle (partie 10), le transfert de mouvement jusqu'à 30 s, plusieurs références composées puis animées, le remplacement d'un objet, une bibliothèque de mouvements faits par Montagio. Chaque lot a sa branche ; un lot non validé sur GPU reste codé, testé et masqué par la règle de coupe, noté « prochaine étape » dans la feuille de route du README.
 
 ### Transfert de mouvement jusqu'à 30 s (`feat/motion-30s`)
 
@@ -462,7 +462,7 @@ Demandé par l'utilisateur le 24/10 (« fais-le en version maximale »), en lots
 
 ## 12. Remix de tendance (25/10, extension `remix`, derrière son drapeau)
 
-Demandé par l'utilisateur le 25/10 : refaire une courte vidéo de tendance plan par plan avec son personnage, au même rythme, avec une légende écrite en local, prêt pour un export 9:16 ; sans publication automatique. Complété le même jour : l'import par lien (yt-dlp en local), le lien du son, une case d'accord pour le visage et le squelette de la tendance lu par Gemma ; rien de cela dans la vitrine ni dans la démo.
+Décision du 25/10 : refaire une courte vidéo de tendance plan par plan avec son personnage, au même rythme, avec une légende écrite en local, prêt pour un export 9:16 ; sans publication automatique. Complété le même jour : l'import par lien (yt-dlp en local), le lien du son, une case d'accord pour le visage et le squelette de la tendance lu par Gemma ; rien de cela dans la vitrine ni dans la démo.
 
 - **Aucun nouveau modèle de rendu.** Les plans sont refaits par l'existant : le transfert de mouvement (Wan2.2-Animate-2 distillé), ou, dans la scène du plan, le remplacement d'objet (SAM 2.1 puis VACE 14B). Les mêmes références et **la même graine** pour tous les plans gardent le même personnage d'un plan à l'autre. L'extension `remix` demande `motion` ; le mode « scène » demande en plus `swap`.
 - **La découpe.** Le filtre `scene` de FFmpeg (seuil 0,3, plans d'au moins 0,25 s) trouve les coupes de la tendance, ramenée d'abord à une cadence constante de 30 i/s au plus (`prepareRemixSource`, 60 s au plus, métadonnées retirées). L'utilisateur voit chaque plan avec sa première image, peut déplacer une coupe d'un cinquième de seconde, la supprimer, couper un plan en deux, ou garder un plan tel qu'il a été filmé. 16 plans au plus ; un plan refait dure 30 s au plus avec le personnage, 5 s (une fenêtre VACE) dans sa scène.
@@ -472,7 +472,7 @@ Demandé par l'utilisateur le 25/10 : refaire une courte vidéo de tendance plan
 - **Garde-fous.** La case de droits (la vidéo, la photo, l'accord des personnes filmées), sauf sur l'exemple fait par Montagio avec une photo qui n'est pas un import. La case du visage pour toute photo, cochée à chaque fois, jamais déduite d'un envoi, et enregistrée dans le job (`faceConsentAt`). Les noms bloqués sur tous les textes, post compris. La mention « généré par IA » dans le fichier (« demo render » quand FFmpeg a seulement bougé une photo). La recette rejoue un remix sur le fichier de la tendance, par son empreinte, jamais par son lien ni avec son son ; le lien n'apparaît que sur la page, à côté de la tendance. Un remix d'une tendance qui n'est pas l'exemple ne peut pas aller dans la galerie communautaire.
 - **L'exemple.** Trois mouvements de la bibliothèque Motion (hip-hop, salut et bravo, jumping jacks), 2 s chacun, montés par Montagio : des personnages fictifs, sans droits à confirmer. C'est lui que la démo, la vitrine et la vidéo montreront, jamais une vraie tendance.
 - **Vérifié sans GPU.** Les tests unitaires (découpe, recollage à l'image près, son facultatif, planche, refus, import simulé, recette), les e2e en mode démo (l'exemple, le personnage d'exemple, le post de Gemma, le 9:16 ; la correction des coupes), la page dans un navigateur (le texte d'accroche incrusté sur le premier plan seulement), le workflow de Gemma compilé par l'app et accepté par le ComfyUI v0.41.0 CPU.
-- **Validé sur GPU** (25/10, partie 18 de `docs/S2_RESULTATS.md`), avec l'accord de l'utilisateur (« ≈ 0,30 $ »), sur l'exemple : ses trois plans de 2 s refaits par le garçon cartoon d'exemple, une seule graine. 166 s pour le premier plan (chargement compris), puis 125 s chacun, 21,9 Go au plus. Le même personnage d'un plan à l'autre, chaque plan suit sa source (le troisième athlète reste immobile 1,5 s puis s'élance, le personnage aussi), et les coupes tombent sur les images 32 et 64 : 96 images à 16 i/s, comme l'exemple. Gemma 4 E4B, en 23 s et 7,9 Go, a décrit les trois plans puis écrit un post en français. Ses hashtags sont venus sans guillemets (JSON invalide) : `parseTrendSkeleton` les accepte désormais, et sa réponse réelle est un test. Le fichier de Gemma manquait sur le volume du compte : téléchargé (8,1 Go, sha256 vérifié). Coût réel : 0,23 $.
+- **Validé sur GPU** (25/10, partie 18 de `docs/S2_RESULTATS.md`), avec un budget accordé de ≈ 0,30 $, sur l'exemple : ses trois plans de 2 s refaits par le garçon cartoon d'exemple, une seule graine. 166 s pour le premier plan (chargement compris), puis 125 s chacun, 21,9 Go au plus. Le même personnage d'un plan à l'autre, chaque plan suit sa source (le troisième athlète reste immobile 1,5 s puis s'élance, le personnage aussi), et les coupes tombent sur les images 32 et 64 : 96 images à 16 i/s, comme l'exemple. Gemma 4 E4B, en 23 s et 7,9 Go, a décrit les trois plans puis écrit un post en français. Ses hashtags sont venus sans guillemets (JSON invalide) : `parseTrendSkeleton` les accepte désormais, et sa réponse réelle est un test. Le fichier de Gemma manquait sur le volume du compte : téléchargé (8,1 Go, sha256 vérifié). Coût réel : 0,23 $.
 - **Limite.** Gemma ne lit que la première image de chaque plan : des danseurs encore immobiles au début y deviennent « une publicité de mode ». Une image du milieu de chaque plan donnerait mieux le mouvement ; la première reste celle où l'on marque l'objet du mode scène.
 - **Verdict : validé**, `gpu_validated: 2026-10-25`. L'aperçu (`presets/extensions/previews/remix.mp4`) montre l'exemple et son remix côte à côte. Le mode scène passe par le remplacement d'objet déjà validé, plan par plan ; il n'a pas tourné sur GPU dans ce remix.
 

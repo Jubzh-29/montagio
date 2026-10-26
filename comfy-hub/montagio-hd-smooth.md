@@ -30,7 +30,7 @@ The download URLs and sha256 of every file are in [`registry/models.lock.yaml`](
 | `54` | KSampler | `seed`; one step, cfg 1 |
 | `76` | Save Video | the 1080p clip, at twice the frame rate |
 
-The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node. To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
+The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node, except that node `76` saves under `montagio/upscale`, where the app's job saves under `montagio/upscale`. To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
 
 ## Measured
 
@@ -38,7 +38,7 @@ On an NVIDIA L4 with 24 GB of VRAM, the memory of an RTX 4090 (which is about tw
 
 ## Example
 
-[`presets/previews/crash-push.mp4`](../presets/previews/crash-push.mp4), the clip smoothed in the run of 2026-10-24.
+[`presets/previews/crash-push.mp4`](../presets/previews/crash-push.mp4), a 480p gallery clip of the same kind; the run of 2026-10-24 smoothed a Crash Push of the harbour rendered that day.
 
 ## Limits
 
@@ -48,4 +48,4 @@ On an NVIDIA L4 with 24 GB of VRAM, the memory of an RTX 4090 (which is about tw
 
 ## License
 
-The graph is converted, like every Montagio workflow but the voice's, from the official [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) (MIT, [license text](../workflows/LICENSE.workflow_templates)). Every model file is Apache-2.0 or MIT.
+The graph is converted from the official [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) (MIT, [license text](../workflows/LICENSE.workflow_templates)), its RIFE part written for Montagio, like most Montagio workflows; the five with no template (the voice, the voice change, the translation, the captions and the trend post) are written for Montagio ([`workflows/README.md`](../workflows/README.md#extension-workflows)). Every model file is Apache-2.0 or MIT.

@@ -1,6 +1,6 @@
 # Session GPU S2 : résultats (21/10/2026)
 
-Première session GPU de Montagio : avant elle, rien n'avait jamais été rendu. Elle s'est faite sur **Modal**, pas sur un pod Runpod loué. L'utilisateur ne voulait rien louer, et l'offre Starter de Modal inclut 30 $ de calcul par mois. Le GPU est une **L4 de 24 Go**, la mémoire de la RTX 4090 que l'app vise. L'outillage est dans [`infra/modal/`](../infra/modal/README.md), et le déroulé dans la partie Modal de [S2_CHECKLIST.md](S2_CHECKLIST.md).
+Première session GPU de Montagio : avant elle, rien n'avait jamais été rendu. Elle s'est faite sur **Modal**, pas sur un pod Runpod loué. Le choix était de ne rien louer, et l'offre Starter de Modal inclut 30 $ de calcul par mois. Le GPU est une **L4 de 24 Go**, la mémoire de la RTX 4090 que l'app vise. L'outillage est dans [`infra/modal/`](../infra/modal/README.md), et le déroulé dans la partie Modal de [S2_CHECKLIST.md](S2_CHECKLIST.md).
 
 **Conversion des temps.** Tous les temps ci-dessous sont mesurés sur la L4. Une RTX 4090 va environ **deux fois plus vite**. Deux templates officiels le montrent :
 - Fun Camera : 536 s sur une RTX 4090D en 640×640, contre 1 134 s ici en 832×480 ;
@@ -35,7 +35,7 @@ Premier clip : Crash Push en 480p, avec le workflow officiel (20 étapes, shift 
 - **1 158 s à froid, 1 133 s à chaud** ; le chargement depuis le volume ne coûte qu'environ 25 s ;
 - pic de VRAM de **18,4 à 19,5 Go**.
 
-Verdict de l'utilisateur : « dégueulasse ». On y voit une double exposition : le bateau du premier plan devient translucide quand la caméra le traverse.
+Verdict : clip raté. On y voit une double exposition : le bateau du premier plan devient translucide quand la caméra le traverse.
 
 Le workflow compilé respecte l'échantillonnage du template officiel. Trois écarts restaient pourtant :
 - notre texte ne décrivait pas la scène (« dynamic camera push-in, cinematic… ») ;
@@ -53,7 +53,7 @@ Diagnostic : **4 clips, une seule variable changée par clip**, même photo, mê
 
 **Cause : sans description de ce que montre la photo, le modèle invente au lieu de la suivre.** La vitesse aggrave le défaut ; le négatif ne joue presque pas. Le Studio avait déjà un champ de description (`userPrompt`), mais il était facultatif : un utilisateur aurait obtenu le clip du premier rendu.
 
-**Décision de l'utilisateur (21/10) : la description devient indispensable.** Dans les onglets Caméra et Film, et dans l'éditeur de remix, le champ s'appelle « Ce que montre la photo ». Il est pré-rempli :
+**Décision du 21/10 : la description devient indispensable.** Dans les onglets Caméra et Film, et dans l'éditeur de remix, le champ s'appelle « Ce que montre la photo ». Il est pré-rempli :
 - par le texte d'une photo issue du texte → image ;
 - par la description de la photo d'exemple ;
 - dans la vitrine, par le `prompt` de chaque photo du manifeste.
@@ -74,7 +74,7 @@ Tous ont été rendus avec la description de la photo, à la seed 42 : environ 1
 | Tilt Down (Pan Down ×0,8, puis ×2) | ❌ presque immobile, même à ×2 |
 | Rotation CW ×0,3 (candidat « Dutch ») | ❌ aucun basculement visible |
 
-**Décisions de l'utilisateur :**
+**Décisions :**
 - **Tilt Up devient Crane Up**, à la vitesse 2 (la caméra s'élève, elle ne pivote pas) ;
 - **Tilt Down est retiré** ;
 - **pas de preset Dutch**.
@@ -102,7 +102,7 @@ Les 7 sont **validées** : `gpu_validated: 2026-10-21` dans `registry/extensions
 | Édition (Qwen-Image-Edit-2511) | 4 étapes : 20 à 25 s à chaud, 71 s à froid ; 40 étapes : 306 s ; pic 21,5 à 22,6 Go | ✅ consigne en français suivie ; looks gonflé et figurine nets. Le look « angles » est peu visible, car la photo était déjà de trois quarts : à refaire avec une vue arrière. 0 ligne `lora key not loaded`. Le 4 étapes reste par défaut |
 | Effets (6 LoRA de Remade-AI) | 156 s à chaud par effet ; pic 21 à 22,6 Go | ✅ les 6 effets sur une personne, un chien et une voiture, lisibles dès la 1ʳᵉ seconde. 0 ligne `lora key not loaded`. Explode et Snap Zoom tiennent en 4 étapes. Pour la démo, éviter Cake-ify sur un visage |
 | Transitions (FLF2V) | 134 à 157 s (4 étapes), 1 084 s (20 étapes), plus l'édition de l'image finale | ✅ **Wardrobe Swap** : image finale exacte, et un gag de « changement express » ; le t-shirt flotte un instant au-dessus de la tête. ❌ **Iris Dive** : un fondu enchaîné en 4 étapes ; en 20 étapes, l'iris pousse d'abord dans la bouche. Laissé sans date, donc masqué |
-| Avatar (S2V et voix Chatterbox) | voix : 14 s à froid, 2,5 à 5 s à chaud, 3,3 Go ; avatar : 127 à 145 s pour 3 à 4 s de parole, pic 21,7 Go | ✅ la bouche suit, l'identité est gardée. Seul défaut, « un détail » selon l'utilisateur : la voix intégrée est masculine, même sur un visage féminin. Une autre voix demande un échantillon de référence consenti |
+| Avatar (S2V et voix Chatterbox) | voix : 14 s à froid, 2,5 à 5 s à chaud, 3,3 Go ; avatar : 127 à 145 s pour 3 à 4 s de parole, pic 21,7 Go | ✅ la bouche suit, l'identité est gardée. Seul défaut, jugé mineur : la voix intégrée est masculine, même sur un visage féminin. Une autre voix demande un échantillon de référence consenti |
 | Musique (ACE-Step 1.5) | 60 s de musique en 9,5 s à chaud, 10 s en 32 s à froid ; pic 10 à 14,6 Go | ✅ aucune voix entendue ; FLAC 48 kHz stéréo, durées exactes |
 | Upscale (SeedVR2 3B) | 81 images vers 1080p en 428 s ; pic 18,4 Go | ✅ nettement plus net qu'un lanczos, sans sur-netteté, aucune couture visible |
 | Transfert de mouvement (Animate-2 distillé) | 391 à 415 s ; pic 20,1 à 22,2 Go | ✅ sur un personnage en pied, les poses et même l'avancée de caméra sont reproduites, l'identité gardée. Sur une personne en buste, l'échec annoncé par le template (cadrages discordants). L'interface doit demander une photo cadrée comme la vidéo |
@@ -230,7 +230,7 @@ Une série de 5 jobs dans un seul conteneur L4, le 24/10 à 21:40 : 692 s, plus 
 
 ## 14. Mode Turbo (25/10)
 
-Un conteneur L4 du compte Modal « montagio-2 » (`series`, 13 jobs), le 25/10 entre 2 h 53 et 3 h 24 (heure de Paris), avec l'accord de l'utilisateur. Le workflow `wan22-fun-camera-turbo.api.json` est le second groupe du template officiel : les deux LoRA 4 étapes de lightx2v (déjà au lock pour les transitions), 4 étapes à cfg 1, coupure à l'étape 2, shift 8. Pour comparer à l'identique, chaque job reprend la photo, la description, le négatif et la seed de la prise 20 étapes gardée pour la démo (S3, ou la refonte du 24/10). Résultats, planches et mesures : `s3/validation/perf/`, hors dépôt.
+Un conteneur L4 du compte Modal « montagio-2 » (`series`, 13 jobs), le 25/10 entre 2 h 53 et 3 h 24 (heure de Paris), sur un budget accordé. Le workflow `wan22-fun-camera-turbo.api.json` est le second groupe du template officiel : les deux LoRA 4 étapes de lightx2v (déjà au lock pour les transitions), 4 étapes à cfg 1, coupure à l'étape 2, shift 8. Pour comparer à l'identique, chaque job reprend la photo, la description, le négatif et la seed de la prise 20 étapes gardée pour la démo (S3, ou la refonte du 24/10). Résultats, planches et mesures : `s3/validation/perf/`, hors dépôt.
 
 **Temps** : 156 s à froid, puis 136 à 138 s par clip, contre 1 113 à 1 183 s en 20 étapes : **8,3 fois plus rapide**. Sur une RTX 4090, environ 70 s (`estimate_s` 75). Le pic de VRAM ne change pas : la VRAM dynamique de ComfyUI occupe la carte (22,4 Go).
 
@@ -261,7 +261,7 @@ Contrairement à l'avertissement du template, le mouvement de caméra n'est pas 
 
 ## 15. Profil 12 Go (25/10)
 
-Un conteneur L4 du compte « montagio-2 » (fonction `lowvram`, 4 jobs), le 25/10 entre 2 h 51 et 3 h 02 (heure de Paris), en même temps que le lot Turbo, avec l'accord de l'utilisateur.
+Un conteneur L4 du compte « montagio-2 » (fonction `lowvram`, 4 jobs), le 25/10 entre 2 h 51 et 3 h 02 (heure de Paris), en même temps que le lot Turbo, sur un budget accordé.
 
 **Méthode.** `infra/modal/vram_cap.py` prend la mémoire de la L4 avant le démarrage de ComfyUI : 10 622 Mio tenus, 11 776 Mio (11,5 Gio) laissés libres, soit une carte de 12 Go dont le bureau garde environ un demi-gigaoctet. La RAM du conteneur est plafonnée à 32 Gio, une limite stricte. ComfyUI v0.41.0 mesure la pression mémoire sur tout le GPU (NVML) : il traite la mémoire tenue comme celle d'une autre application, et une allocation au-delà échouerait comme sur la vraie carte.
 
@@ -288,7 +288,7 @@ Une L4 calcule à peu près comme une RTX 4070 de 12 Go : les temps du profil so
 
 ## 16. Restyle : spike VACE 14B (24/10)
 
-Avec l'accord de l'utilisateur (≈ 1,20 $ annoncés, plafond 1,50 $), sur le compte Modal montagio-2 : les poids téléchargés par un conteneur sans GPU (≈ 0,05 $), puis deux conteneurs L4 en parallèle qui ont lancé `infra/modal/spike_restyle.py` (0,25 $ et 0,18 $ au relevé ; 15,18 $ sur le mois avant le spike). Rien n'était câblé : le script fait l'image de référence avec l'extension d'édition (smoke `--extension edit`), puis envoie à ComfyUI des graphes du cœur. Résultats dans `s3/restyle-spike/`, hors dépôt (clips, planches, `results.jsonl`, vidéos côte à côte).
+Avec un budget accordé (≈ 1,20 $ annoncés, plafond 1,50 $), sur le compte Modal montagio-2 : les poids téléchargés par un conteneur sans GPU (≈ 0,05 $), puis deux conteneurs L4 en parallèle qui ont lancé `infra/modal/spike_restyle.py` (0,25 $ et 0,18 $ au relevé ; 15,18 $ sur le mois avant le spike). Rien n'était câblé : le script fait l'image de référence avec l'extension d'édition (smoke `--extension edit`), puis envoie à ComfyUI des graphes du cœur. Résultats dans `s3/restyle-spike/`, hors dépôt (clips, planches, `results.jsonl`, vidéos côte à côte).
 
 | Job | Clip source | Contrôle | Référence | Temps sur la L4 | Pic de VRAM | Verdict |
 |---|---|---|---|---|---|---|
@@ -305,7 +305,7 @@ Avec l'accord de l'utilisateur (≈ 1,20 $ annoncés, plafond 1,50 $), sur le co
 
 ### Validation du chemin câblé (24/10, 19:29)
 
-Avec l'accord de l'utilisateur (≈ 0,30 $) : une `series` de trois runs du vrai smoke dans un conteneur L4, les workflows compilés par `compileRestyle` (profondeur dans les trois cas). 0,32 $ au relevé ; Restyle a coûté 0,80 $ en tout, spike compris (16,13 $ sur le mois). Résultats dans `s3/restyle-validation/`, hors dépôt ; le résultat est le fichier `…__r1-1.mp4` (81 images), `…__r1.mp4` étant le clip d'entrée préparé (80 images). La session locale s'est arrêtée pendant la série, qui a continué sur Modal (`--detach`).
+Avec un budget accordé (≈ 0,30 $) : une `series` de trois runs du vrai smoke dans un conteneur L4, les workflows compilés par `compileRestyle` (profondeur dans les trois cas). 0,32 $ au relevé ; Restyle a coûté 0,80 $ en tout, spike compris (16,13 $ sur le mois). Résultats dans `s3/restyle-validation/`, hors dépôt ; le résultat est le fichier `…__r1-1.mp4` (81 images), `…__r1.mp4` étant le clip d'entrée préparé (80 images). La session locale s'est arrêtée pendant la série, qui a continué sur Modal (`--detach`).
 
 | Job du smoke | Clip source | Chemin | Temps sur la L4 | Pic de VRAM | Verdict |
 |---|---|---|---|---|---|
@@ -319,7 +319,7 @@ Avec l'accord de l'utilisateur (≈ 0,30 $) : une `series` de trois runs du vrai
 
 ## 17. Mouvement 30 s, personnage composé, bibliothèque Motion (24/10), remplacement d'objet (25/10)
 
-Sur le compte Modal montagio-2, avec l'accord de l'utilisateur (« Oui, utilise montagio-2 »), lot par lot. Relevé : les 8 apps lancées de 19:40 à 22:04 (heure de Paris) ont coûté 5,15 $, dont 1,70 $ pour la série du transfert de 30 s ; au-delà des ≈ 2 $ visés, ce qui a été dit à l'utilisateur. Le compte affichait 21,13 $ sur le mois le 24/10 au soir. Résultats hors dépôt, sur le volume `montagio-results` (`runs/20261024-…`).
+Sur le compte Modal montagio-2, avec un budget accordé, lot par lot. Relevé : les 8 apps lancées de 19:40 à 22:04 (heure de Paris) ont coûté 5,15 $, dont 1,70 $ pour la série du transfert de 30 s ; au-delà des ≈ 2 $ visés, un dépassement signalé. Le compte affichait 21,13 $ sur le mois le 24/10 au soir. Résultats hors dépôt, sur le volume `montagio-results` (`runs/20261024-…`).
 
 | Job | Entrées | Temps sur la L4 | Pic de VRAM | Verdict |
 |---|---|---|---|---|
@@ -337,7 +337,7 @@ Sur le compte Modal montagio-2, avec l'accord de l'utilisateur (« Oui, utilise 
 
 Sur le ComfyUI v0.41.0 CPU (`../comfyui-cpu-v0.41.0`), le pack `kijai/ComfyUI-segment-anything-2` au commit `0c35fff5`, installé depuis l'archive de ce commit, s'est chargé en 0,9 s sans rien ajouter au venv ; les définitions `/object_info` de ses trois nodes et de `GrowMask` et `ResizeAndPadImage` sont celles du fixture des tests. Les workflows compilés (photo du nouvel objet, texte seul) passent `/prompt`. La partie suivi a tourné pour de bon : 17 images de « Boxe dans le vide », deux points sur les gants, SAM 2.1 base+ en fp32 sur le CPU, 314 s ; les deux gants sont couverts de gris, marge comprise, sur toutes les images, pendant que le boxeur pivote. Coût prévu sur GPU : la reconstruction de l'image Modal (le script d'amorçage a changé) puis deux rendus de 5 s (photo, texte seul), de l'ordre de 0,40 $.
 
-Sur GPU le 25/10, avec l'accord de l'utilisateur (« Oui, lance (≈ 0,45 $) »). Coût réel : 0,27 $ pour les quatre apps (deux téléchargements de poids, dont la reconstruction de l'image Modal : 231 s pour la couche GPU, `bootstrap.sh` ayant changé ; deux séries). Le relevé du mois est à 22,05 $, dont une app `montagio-s2` d'une autre session, lancée à 02:49 et toujours en cours au relevé (0,46 $). Résultats sur le volume `montagio-results` (`runs/20261025-015859-lot4-swap`, `runs/20261025-020707-lot4-swap-fp16`) ; le résultat d'un job est le fichier `…__r1-1.mp4`.
+Sur GPU le 25/10, avec un budget accordé de ≈ 0,45 $. Coût réel : 0,27 $ pour les quatre apps (deux téléchargements de poids, dont la reconstruction de l'image Modal : 231 s pour la couche GPU, `bootstrap.sh` ayant changé ; deux séries). Le relevé du mois est à 22,05 $, dont une app `montagio-s2` lancée en parallèle à 02:49 et toujours en cours au relevé (0,46 $). Résultats sur le volume `montagio-results` (`runs/20261025-015859-lot4-swap`, `runs/20261025-020707-lot4-swap-fp16`) ; le résultat d'un job est le fichier `…__r1-1.mp4`.
 
 | Job | Entrées | Temps sur la L4 | Pic de VRAM | Verdict |
 |---|---|---|---|---|
@@ -350,7 +350,7 @@ Sur GPU le 25/10, avec l'accord de l'utilisateur (« Oui, lance (≈ 0,45 $) »)
 
 ## 18. Remix de tendance (25/10)
 
-Avec l'accord de l'utilisateur (« Oui, lance la validation GPU du remix de tendance sur montagio-2 (≈ 0,30 $), avec l'exemple de 3 plans »). L'exemple de l'app (hip-hop, salut et bravo, jumping jacks de la bibliothèque Motion, 2 s chacun, 480×832, 16 i/s) monté en local, envoyé sur le volume (`inputs/remix-sample.mp4`), puis `smoke --extension remix-skeleton,remix --motion … --cuts 32,64 --input demo-assets/images/sample-character.png --text 'remix=a cartoon boy in a green jacket and a red scarf' --language fr`. Résultats sur le volume `montagio-results` (`runs/20261025-193044-remix`, `runs/20261025-194213-remix-skeleton`), et hors dépôt dans `s3/validation/20261025-193044-remix/`.
+Validation GPU du remix de tendance sur montagio-2, avec l'exemple de 3 plans, sur un budget accordé de ≈ 0,30 $. L'exemple de l'app (hip-hop, salut et bravo, jumping jacks de la bibliothèque Motion, 2 s chacun, 480×832, 16 i/s) monté en local, envoyé sur le volume (`inputs/remix-sample.mp4`), puis `smoke --extension remix-skeleton,remix --motion … --cuts 32,64 --input demo-assets/images/sample-character.png --text 'remix=a cartoon boy in a green jacket and a red scarf' --language fr`. Résultats sur le volume `montagio-results` (`runs/20261025-193044-remix`, `runs/20261025-194213-remix-skeleton`), et hors dépôt dans `s3/validation/20261025-193044-remix/`.
 
 | Job | Entrées | Temps sur la L4 | Pic de VRAM | Verdict |
 |---|---|---|---|---|
@@ -371,7 +371,7 @@ Avec l'accord de l'utilisateur (« Oui, lance la validation GPU du remix de tend
 
 ## 19. Banque de visages de départ (25/10)
 
-Un conteneur L4 du compte « montagio-2 » (fonction `series`), le 25/10 à 15 h 13 (heure de Paris), puis une reprise de 5 visages à 15 h 22, avec l'accord de l'utilisateur (environ 0,13 $ annoncés, plafond 0,20 $).
+Un conteneur L4 du compte « montagio-2 » (fonction `series`), le 25/10 à 15 h 13 (heure de Paris), puis une reprise de 5 visages à 15 h 22, avec un budget accordé (environ 0,13 $ annoncés, plafond 0,20 $).
 
 **Méthode.** 28 personnages fictifs (`apps/web/src/lib/character-bank.ts`) : humains hors norme, animaux debout, robots, extraterrestres, quelques-uns en pâte à modeler et en anime. Chacun a son espèce, son style, ses traits (coiffure, proportions, peau, ajouts, yeux), sa description et sa graine. Le texte est celui de l'onglet Personnages (`characterPrompt`), à 720p en 9:16, comme `/api/images`. Avant toute dépense, le smoke en `--dry-run` a compilé les 28 workflows : identiques, après normalisation, à ceux du Studio, et acceptés par le ComfyUI CPU (`node_errors` vide). Le smoke donne sa graine à chaque image (`--t2i "id@9:16#graine=texte"`).
 
@@ -393,7 +393,7 @@ La vitrine statique n'en montre que 6 (`SHOWCASE_FACES`). Elle copie tout `publi
 
 ## 20. Sous-titres sur GPU (25/10)
 
-Demandé par l'utilisateur (« go » à « On boucle les deux trous (sous-titres sur GPU et installeur) avant la coupe ? », environ 0,05 à 0,10 $, plafond 0,15 $). Le node Montagio Transcribe Words (Whisper large-v3 turbo) n'avait tourné que sur le ComfyUI CPU.
+Décision du 25/10 : boucler les deux trous (sous-titres sur GPU et installeur) avant la coupe, avec un budget accordé d'environ 0,05 à 0,10 $, plafond 0,15 $. Le node Montagio Transcribe Words (Whisper large-v3 turbo) n'avait tourné que sur le ComfyUI CPU.
 
 - Les 11 fichiers de Whisper manquaient sur le volume du compte montagio-2 : téléchargés par `weights --only whisper-turbo-…` (1,6 Go, sha256 vérifiés), 0,003 $.
 - `smoke --extension transcribe --audio demo-assets/examples/avatar.mp4` : la parole du clip préparée comme l'app la prépare (FLAC mono à 16 kHz), langue détectée. **10,5 s** sur la L4, chargement du modèle compris, **4,9 Go** au plus (contre 95,7 s sur le CPU d'un portable). Résultat sur le volume (`runs/20261025-205422-captions`) et hors dépôt dans `s3/validation/20261025-205422-captions/`.
