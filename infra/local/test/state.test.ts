@@ -2,13 +2,22 @@ import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { LockWeight } from '../src/pins.ts';
-import { emptyState, readState, recordWeights, writeState } from '../src/state.ts';
+import { emptyState, readState, recordWeights, withProxyToken, writeState } from '../src/state.ts';
 
 let dir: string;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'montagio state '));
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+test("a full install gets one proxy token, kept from then on; the app alone and an empty state get none", () => {
+  const full = withProxyToken({ ...emptyState(), mode: 'full' });
+  expect(full.proxyToken).toMatch(/^[0-9a-f]{64}$/);
+  expect(withProxyToken(full)).toBe(full);
+  expect(withProxyToken({ ...emptyState(), mode: 'full' }).proxyToken).not.toBe(full.proxyToken);
+  expect(withProxyToken({ ...emptyState(), mode: 'app-only' }).proxyToken).toBeNull();
+  expect(withProxyToken(emptyState()).proxyToken).toBeNull();
+});
 
 test('a missing, corrupt or foreign state file reads as an empty state', () => {
   expect(readState(join(dir, 'absent.json'))).toEqual(emptyState());
@@ -26,7 +35,9 @@ test('the empty state has the default ports and no stamp', () => {
     gpuIndex: null,
     proxyUrl: null,
     extensions: null,
+    extensionsAsked: null,
     vramProfile: null,
+    proxyToken: null,
     stamps: {},
     weights: {},
   });
@@ -36,6 +47,7 @@ test('a state written before the extensions field reads them as null', () => {
   const path = join(dir, 'old.json');
   writeFileSync(path, JSON.stringify({ schema: 'montagio/install@0.1', mode: 'full', ports: { comfy: 8188, proxy: 8189, app: 3000 }, gpuIndex: 0, proxyUrl: null, stamps: {}, weights: {} }));
   expect(readState(path).extensions).toBeNull();
+  expect(readState(path).extensionsAsked).toBeNull();
 });
 
 test('writeState then readState gives the same state, and leaves no temporary file', () => {

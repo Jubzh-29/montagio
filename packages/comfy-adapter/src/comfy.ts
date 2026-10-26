@@ -106,10 +106,12 @@ export class ComfyBackend implements GenerationBackend {
       fetch?: typeof fetch;
       downloadTimeoutMs?: number;
       now?: () => number;
+      /** The install's comfy-api-proxy token (`--token`): without it, a page rebound to 127.0.0.1 could drive the proxy. */
+      token?: string;
     },
   ) {
     const target = assertLocalBaseUrl(opts.baseUrl);
-    this.client = buildClient(target.base, () => new Comfy({ fetch: guardFetch(target.url, opts.fetch), clientInfo: 'montagio/0.1' }));
+    this.client = buildClient(target.base, () => new Comfy({ fetch: guardFetch(target.url, opts.fetch, opts.token), clientInfo: 'montagio/0.1' }));
   }
 
   submit(job: SubmitJob): Promise<{ backendJobId: string }> {

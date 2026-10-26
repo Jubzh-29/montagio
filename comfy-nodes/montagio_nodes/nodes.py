@@ -31,6 +31,7 @@ from comfy_api.latest import ComfyExtension, io
 
 from .camera import COMBINE_MODES, camera_rows, check_length, trajectory
 from .catalog import BUNDLED_DIR, list_presets, resolve_preset
+from .host_guard import install as install_host_guard
 from .params import ASPECTS, AUTO, CAMERA_MODES, DIMENSIONS, ParamsError, compute_params, resolve_aspect
 from .preset import PresetError, parse_preset
 from .wan import WAN_CAMERA_POSES
@@ -355,4 +356,6 @@ class MontagioExtension(ComfyExtension):
 
 
 async def comfy_entrypoint() -> MontagioExtension:
+    # ComfyUI loads the pack before its server starts: the host check goes in front of every route then.
+    install_host_guard()
     return MontagioExtension()

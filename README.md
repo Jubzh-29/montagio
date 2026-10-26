@@ -109,7 +109,7 @@ Montagio shows only what a GPU session rendered well. What it keeps out:
 | In the **showcase**: uploads and everything that needs them (Characters, Ads, Avatar, Motion, Voice change, Translation, Trend remix, Draw, publishing) | The showcase renders nothing: it plays clips made beforehand. Three effect renders on a person were also kept out of it for what they show. |
 | The trend remix's **link import** outside an install of your own | It runs only in the app on your machine, never in the demo mode nor the showcase. |
 
-A plain local install fetches the camera models and the effects pack only; `--extensions all` fetches the rest ([Install](#install)).
+A first local install fetches the camera models and the effects pack only; `--extensions all` fetches the rest, and the next installs keep that choice ([Install](#install)).
 
 ## The Montagio node pack for ComfyUI
 
@@ -237,7 +237,7 @@ What gets downloaded:
 | `--extensions none` | the camera models alone (72 GB) | about 93 GB |
 | `--app-only` | none: the app alone, in demo mode or rendering on a remote GPU with `--proxy-url` | — |
 
-Add `--dry-run` to see every step without changing anything. A stopped download resumes when you run the same command again. The extensions you ask for are not remembered: pass the same `--extensions` again when you update. Asked for, the talking avatar (and with it the voice change, the translation and the captions) and the object swap come with the custom node each runs on, cloned at a pinned commit: the voice node, patched to remove its HTTP routes, with its Python packages pinned by hash, and the SAM 2 tracker. A node that fails to install leaves its extension out, not the rest of the install.
+Add `--dry-run` to see every step without changing anything. A stopped download resumes when you run the same command again. The extensions you ask for are kept for the next runs, so a plain `install` updates them; `--extensions default` goes back to the effects pack. Asked for, the talking avatar (and with it the voice change, the translation and the captions) and the object swap come with the custom node each runs on, cloned at a pinned commit: the voice node, patched to remove its HTTP routes, with its Python packages pinned by hash, and the SAM 2 tracker. A node that fails to install leaves its extension out, not the rest of the install.
 
 Everything else, from the 12 GB profile and everyday commands to troubleshooting and uninstalling: [docs/INSTALL.md](docs/INSTALL.md).
 

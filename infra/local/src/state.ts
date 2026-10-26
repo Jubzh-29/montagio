@@ -3,6 +3,7 @@
  * per finished step. A stamp is written right after its step succeeds, so a
  * run cut short redoes exactly the steps that had not finished.
  */
+import { randomBytes } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DEFAULT_PORTS, type Mode, type Ports, type VramProfile } from './checks.ts';
@@ -24,8 +25,18 @@ export type InstallState = {
    * recorded them, or for the app alone, which keeps the user's variable.
    */
   extensions: string[] | null;
+  /**
+   * What --extensions (or MONTAGIO_EXTENSIONS) asked for, as given ("all", "music,edit"), kept for the next runs
+   * until another value or "default"; null for the default.
+   */
+  extensionsAsked: string | null;
   /** Full install: its memory profile, passed to the app as MONTAGIO_VRAM_PROFILE; null before one, or for the app alone. */
   vramProfile: VramProfile | null;
+  /**
+   * Full install: the token comfy-api-proxy is started with (--token) and the app sends (MONTAGIO_PROXY_TOKEN), so
+   * a page rebound to 127.0.0.1 cannot drive the proxy. Kept here, in the install folder, never in the repository.
+   */
+  proxyToken: string | null;
   stamps: Partial<Record<StampId, string>>;
   /** Weights hashed once: same size and mtime later means the same bytes, without hashing 70 GB again. */
   weights: Record<string, WeightRecord>;
@@ -34,7 +45,7 @@ export type InstallState = {
 const SCHEMA = 'montagio/install@0.1';
 
 export function emptyState(): InstallState {
-  return { schema: SCHEMA, mode: null, ports: { ...DEFAULT_PORTS }, gpuIndex: null, proxyUrl: null, extensions: null, vramProfile: null, stamps: {}, weights: {} };
+  return { schema: SCHEMA, mode: null, ports: { ...DEFAULT_PORTS }, gpuIndex: null, proxyUrl: null, extensions: null, extensionsAsked: null, vramProfile: null, proxyToken: null, stamps: {}, weights: {} };
 }
 
 /** An absent, unreadable or foreign file gives an empty state: every step runs again, which is always safe. */
@@ -53,6 +64,12 @@ export function readState(path: string): InstallState {
   } catch {
     return emptyState();
   }
+}
+
+/** A full install with its proxy token: a new random one when it has none yet (an install made before the token). */
+export function withProxyToken(state: InstallState): InstallState {
+  if (state.mode !== 'full' || state.proxyToken) return state;
+  return { ...state, proxyToken: randomBytes(32).toString('hex') };
 }
 
 /** Written to <path>.tmp then renamed, so a crash never leaves half a file. */

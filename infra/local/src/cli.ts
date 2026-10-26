@@ -16,7 +16,7 @@ import { install } from './install.ts';
 import { defaultInstallDir, layout, osOf } from './platform.ts';
 import { probe } from './probe.ts';
 import { runningPorts, startAll, status, stopAll, type ServiceContext } from './services.ts';
-import { readState } from './state.ts';
+import { readState, withProxyToken, writeState } from './state.ts';
 
 export const USAGE = `Usage: ./montagio.sh <command> [options]           (Linux)
        powershell -ExecutionPolicy Bypass -File .\\montagio.ps1 <command> [options]   (Windows)
@@ -44,11 +44,11 @@ Options:
   --no-browser       install, start: do not open the browser
   --extensions LIST  install: the extensions whose weights to fetch besides the camera presets': all (every one,
                      the node packs of the avatar and the object swap included), validated (those a GPU session
-                     validated), none, or a list such as music,edit. Default: the effects pack (about 21 GB), once a
-                     GPU session validated it
+                     validated), none, a list such as music,edit, or default (forget the kept choice): the effects
+                     pack (about 21 GB), once a GPU session validated it. The choice is kept for the next runs
 
 Environment:
-  MONTAGIO_EXTENSIONS     install: the default of --extensions (the app reads it too)
+  MONTAGIO_EXTENSIONS     install: the default of --extensions, kept the same way (the app reads it too)
   MONTAGIO_COMFYUI_ARGS   extra ComfyUI arguments, for example "--reserve-vram 1"
   HF_TOKEN               Hugging Face token, only if a download is refused
   MONTAGIO_FFMPEG, MONTAGIO_FFPROBE   FFmpeg binaries outside the PATH
@@ -67,7 +67,7 @@ export type CliOptions = {
   proxyUrl: string | null;
   demo: boolean;
   ports: Partial<Ports>;
-  /** --extensions; null leaves it to MONTAGIO_EXTENSIONS, then the effects pack if a GPU session validated it. */
+  /** --extensions; null leaves it to MONTAGIO_EXTENSIONS, then to the last install's choice, then to the effects pack if a GPU session validated it. */
   extensions: string | null;
   /** --low-vram: the 12 GB profile. */
   lowVram: boolean;
@@ -192,7 +192,13 @@ export async function main(argv: string[]): Promise<number> {
   const log = (line: string) => console.log(line);
   const L = layout(dir, os ?? 'linux');
   // Read the state at each call: install writes it (save-state) right before it starts the services.
-  const services = (): ServiceContext => ({ os: os ?? 'linux', layout: L, repoRoot, state: readState(L.statePath), capture, log });
+  // A full install made before the proxy token gets one here, kept for every start after.
+  const services = (): ServiceContext => {
+    const read = readState(L.statePath);
+    const state = withProxyToken(read);
+    if (state !== read) writeState(L.statePath, state);
+    return { os: os ?? 'linux', layout: L, repoRoot, state, capture, log };
+  };
 
   if (command === 'start') return startAll(services(), { browser: options.browser });
   if (command === 'stop') {

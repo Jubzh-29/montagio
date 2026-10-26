@@ -31,7 +31,9 @@ export function createBackend(env: Record<string, string | undefined>, opts: { d
         );
       }
       assertLocalBaseUrl(baseUrl);
-      return new ComfyBackend({ baseUrl, outputsDir: join(env.MONTAGIO_DATA ?? join(root, 'data'), 'comfy-outputs') });
+      // MONTAGIO_PROXY_TOKEN: the token the installer starts comfy-api-proxy with, sent on every request to it.
+      const token = env.MONTAGIO_PROXY_TOKEN?.trim();
+      return new ComfyBackend({ baseUrl, outputsDir: join(env.MONTAGIO_DATA ?? join(root, 'data'), 'comfy-outputs'), ...(token ? { token } : {}) });
     }
     case 'hosted':
       throw new Error('Backend "hosted" is not available yet: it comes with the demo link');

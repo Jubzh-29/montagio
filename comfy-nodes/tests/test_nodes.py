@@ -514,6 +514,8 @@ def test_pack_modules_import_only_what_they_may(path):
     allowed = set(sys.stdlib_module_names) - FORBIDDEN_MODULES | {"yaml", "numpy"}
     if path.name == "nodes.py":  # the only module that talks to ComfyUI (and to torch and transformers, which come with it)
         allowed |= {"comfy_api", "folder_paths", "comfy", "torch", "transformers"}
+    if path.name == "host_guard.py":  # the host check sits on ComfyUI's own aiohttp server
+        allowed |= {"aiohttp", "comfy", "server"}
     tree = ast.parse(path.read_text(encoding="utf-8"))
     imported, called = set(), set()
     for node in ast.walk(tree):

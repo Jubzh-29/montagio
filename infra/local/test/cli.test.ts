@@ -1,4 +1,4 @@
-import { argvFrom, main, parseArgs } from '../src/cli.ts';
+import { argvFrom, main, parseArgs, USAGE } from '../src/cli.ts';
 
 test('montagio.ps1 hands the arguments over as JSON, untouched by PowerShell 5.1', () => {
   expect(argvFrom({ MONTAGIO_ARGV: '["install","--dir=C:\\\\A B","--bogus option"]' }, ['ignored'])).toEqual(['install', '--dir=C:\\A B', '--bogus option']);
@@ -36,6 +36,10 @@ test('--extensions is read for install only, and left to MONTAGIO_EXTENSIONS or 
   expect(parseArgs(['install', '--extensions', 'music,edit']).options.extensions).toBe('music,edit');
   expect(parseArgs(['install']).options.extensions).toBeNull();
   expect(() => parseArgs(['start', '--extensions', 'all'])).toThrow(/--extensions only goes with install/);
+});
+
+test('the help says --extensions is kept for the next runs, and how to go back to the default', () => {
+  expect(USAGE).toMatch(/--extensions LIST[\s\S]*default \(forget the kept choice\)[\s\S]*kept for the next runs/);
 });
 
 test('no command means help', () => {
