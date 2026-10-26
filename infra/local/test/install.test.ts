@@ -290,6 +290,7 @@ test('a full install runs every step and records it', async () => {
   const state = readState(h.L.statePath);
   expect(state.mode).toBe('full');
   expect(state.gpuIndex).toBe(0);
+  expect(state.proxyToken).toMatch(/^[0-9a-f]{64}$/);
   expect(Object.keys(state.stamps).sort()).toEqual(['build', 'comfyEnv', 'comfyui', 'npm', 'proxy', 'ytDlp']);
   expect(Object.keys(state.weights).sort()).toEqual(['tiny-te', 'tiny-vae']);
   expect(existsSync(h.L.comfyTmp)).toBe(false);

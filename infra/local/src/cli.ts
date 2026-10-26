@@ -16,7 +16,7 @@ import { install } from './install.ts';
 import { defaultInstallDir, layout, osOf } from './platform.ts';
 import { probe } from './probe.ts';
 import { runningPorts, startAll, status, stopAll, type ServiceContext } from './services.ts';
-import { readState } from './state.ts';
+import { readState, withProxyToken, writeState } from './state.ts';
 
 export const USAGE = `Usage: ./montagio.sh <command> [options]           (Linux)
        powershell -ExecutionPolicy Bypass -File .\\montagio.ps1 <command> [options]   (Windows)
@@ -192,7 +192,13 @@ export async function main(argv: string[]): Promise<number> {
   const log = (line: string) => console.log(line);
   const L = layout(dir, os ?? 'linux');
   // Read the state at each call: install writes it (save-state) right before it starts the services.
-  const services = (): ServiceContext => ({ os: os ?? 'linux', layout: L, repoRoot, state: readState(L.statePath), capture, log });
+  // A full install made before the proxy token gets one here, kept for every start after.
+  const services = (): ServiceContext => {
+    const read = readState(L.statePath);
+    const state = withProxyToken(read);
+    if (state !== read) writeState(L.statePath, state);
+    return { os: os ?? 'linux', layout: L, repoRoot, state, capture, log };
+  };
 
   if (command === 'start') return startAll(services(), { browser: options.browser });
   if (command === 'stop') {

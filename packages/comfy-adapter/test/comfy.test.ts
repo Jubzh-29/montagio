@@ -4,7 +4,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BackendError, ComfyBackend, IDEMPOTENCY_WINDOW_MS, isBackendError, type SubmitJob } from '../src/index';
+import { BackendError, ComfyBackend, createBackend, IDEMPOTENCY_WINDOW_MS, isBackendError, type SubmitJob } from '../src/index';
 import { startFakeProxy, type FakeJobState, type FakeProxy } from '../src/testing/fake-proxy';
 
 const sample = fileURLToPath(new URL('../../../demo-assets/images/sample-16x9.png', import.meta.url));
@@ -71,6 +71,24 @@ test('submit uploads the image and binds it as an asset, with no credential', as
   expect(fake.requests.every((r) => r.headers.authorization === undefined)).toBe(true);
   expect(process.env.COMFY_API_KEY).toBe('cloud-secret');
   expect(process.env.COMFY_BASE_URL).toBe('http://127.0.0.1:1');
+});
+
+test("with the install's proxy token, every request carries it, the downloads included; never to another origin", async () => {
+  const b = new ComfyBackend({ baseUrl: fake.url, outputsDir, token: 'install-token' });
+  const { backendJobId } = await b.submit(job());
+  const state = fake.jobs.get(backendJobId)!;
+  state.status = 'succeeded';
+  state.outputs = [output('clip.mp4', 'video', 'video/mp4')];
+  expect((await b.get(backendJobId)).state).toBe('succeeded');
+  expect(contentRequests()).toBe(1);
+  expect(fake.requests.length).toBeGreaterThan(2);
+  expect(fake.requests.every((r) => r.headers.authorization === 'Bearer install-token')).toBe(true);
+});
+
+test('createBackend hands MONTAGIO_PROXY_TOKEN to the local backend', async () => {
+  const b = createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: fake.url, MONTAGIO_DATA: outputsDir, MONTAGIO_PROXY_TOKEN: 'from-env' });
+  await b.submit(job());
+  expect(fake.requests.every((r) => r.headers.authorization === 'Bearer from-env')).toBe(true);
 });
 
 test('the workflow given to submit is not modified', async () => {

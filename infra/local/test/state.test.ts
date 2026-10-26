@@ -2,13 +2,22 @@ import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { LockWeight } from '../src/pins.ts';
-import { emptyState, readState, recordWeights, writeState } from '../src/state.ts';
+import { emptyState, readState, recordWeights, withProxyToken, writeState } from '../src/state.ts';
 
 let dir: string;
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'montagio state '));
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+test("a full install gets one proxy token, kept from then on; the app alone and an empty state get none", () => {
+  const full = withProxyToken({ ...emptyState(), mode: 'full' });
+  expect(full.proxyToken).toMatch(/^[0-9a-f]{64}$/);
+  expect(withProxyToken(full)).toBe(full);
+  expect(withProxyToken({ ...emptyState(), mode: 'full' }).proxyToken).not.toBe(full.proxyToken);
+  expect(withProxyToken({ ...emptyState(), mode: 'app-only' }).proxyToken).toBeNull();
+  expect(withProxyToken(emptyState()).proxyToken).toBeNull();
+});
 
 test('a missing, corrupt or foreign state file reads as an empty state', () => {
   expect(readState(join(dir, 'absent.json'))).toEqual(emptyState());
@@ -27,6 +36,7 @@ test('the empty state has the default ports and no stamp', () => {
     proxyUrl: null,
     extensions: null,
     vramProfile: null,
+    proxyToken: null,
     stamps: {},
     weights: {},
   });

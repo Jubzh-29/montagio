@@ -181,6 +181,10 @@ Links (symbolic links, junctions) inside a preset folder that point outside it a
 
 A new file shows up in the menu when the frontend refreshes the node definitions, with no restart. An edit to a preset file is picked up on the next run when the `preset` menu of the Load node is used directly.
 
+## Host check
+
+Set `MONTAGIO_HOST_GUARD=1` in ComfyUI's environment, as Montagio's installer does, and the pack puts a check in front of every route of ComfyUI's server: a request must name this machine in `Host` (`localhost`, `127.0.0.1` or `[::1]`, on any port), or a host listed in `MONTAGIO_ALLOWED_HOSTS` (`studio.lan,192.168.1.20:8188`), and an `Origin`, when there is one, must be that address. A page rebound to 127.0.0.1 (DNS rebinding) then gets 403 instead of queueing workflows and reading your files. It stays off when ComfyUI listens on another address than this machine's (`--listen 0.0.0.0`), and without the variable.
+
 ## Differences with the Montagio app
 
 The node accepts the presets the app accepts, and its values are the app's own (tests compare both with the app's code), with these exceptions:

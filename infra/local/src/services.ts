@@ -92,6 +92,7 @@ export function serviceSpecs(input: {
     if (state.extensions) appEnv.MONTAGIO_EXTENSIONS = state.extensions.length > 0 ? state.extensions.join(',') : 'none';
     // The 12 GB profile: the app offers only the models and extensions a GPU held to 12 GB ran, with their times there.
     if (state.vramProfile === '12gb') appEnv.MONTAGIO_VRAM_PROFILE = '12gb';
+    if (state.proxyToken) appEnv.MONTAGIO_PROXY_TOKEN = state.proxyToken;
   }
   else if (state.proxyUrl) Object.assign(appEnv, { MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: state.proxyUrl });
   else appEnv.MONTAGIO_BACKEND = 'demo';
@@ -124,6 +125,8 @@ export function serviceSpecs(input: {
     HF_HUB_OFFLINE: '1',
     TRANSFORMERS_OFFLINE: '1',
     HF_HUB_DISABLE_TELEMETRY: '1',
+    // Montagio's host check on ComfyUI (comfy-nodes/montagio_nodes/host_guard.py): only requests that name this machine.
+    MONTAGIO_HOST_GUARD: '1',
   };
   return [
     {
@@ -141,7 +144,8 @@ export function serviceSpecs(input: {
     {
       name: 'proxy',
       cmd: L.proxyExe,
-      args: ['run', '--comfyui', local(ports.comfy, ''), '--host', '127.0.0.1', '--port', String(ports.proxy), '--comfyui-base-dir', L.comfyDir],
+      // --token: the proxy refuses a request without the install's token, which only the app has.
+      args: ['run', '--comfyui', local(ports.comfy, ''), '--host', '127.0.0.1', '--port', String(ports.proxy), '--comfyui-base-dir', L.comfyDir, ...(state.proxyToken ? ['--token', state.proxyToken] : [])],
       cwd: L.dir,
       env: pyEnv,
       health: local(ports.proxy, '/api/v2/health'),

@@ -199,7 +199,7 @@ Without a GPU of 12 GB at least, `install --app-only` installs the app alone: no
   ./montagio.sh install --app-only --proxy-url http://127.0.0.1:9189
   ```
 
-  The URL is kept: the next `install --app-only` uses it again. `install --app-only --demo` forgets it and goes back to demo mode.
+  The URL is kept: the next `install --app-only` uses it again. `install --app-only --demo` forgets it and goes back to demo mode. The rented GPU's comfy-api-proxy has no token: keep the tunnel open for the time you render (see [SECURITY.md](../SECURITY.md)).
 
 With `--app-only`, `start` sets no extension list: `MONTAGIO_EXTENSIONS` decides what the Studio shows (unset: every extension a GPU session validated), and `MONTAGIO_VRAM_PROFILE=12gb` gives the choices of the 12 GB profile, for a remote GPU of 12 GB.
 
@@ -352,7 +352,7 @@ Its license, GPL-3.0, is not the issue. The repository uses comfy-cli only to pu
 
 - ComfyUI runs with `--disable-partner-nodes` and `--offline` (its own page cannot reach the internet). At each start, the installer reads `/object_info` and stops everything if a partner node is loaded.
 - ComfyUI and the proxy run offline for Hugging Face (`HF_HUB_OFFLINE`), without its telemetry: a node pack cannot download a file the lock does not pin.
-- ComfyUI, comfy-api-proxy and the app listen on `127.0.0.1` only.
+- ComfyUI, comfy-api-proxy and the app listen on `127.0.0.1` only, and refuse another site's page: the app and ComfyUI answer only requests that name this machine (or a host of `MONTAGIO_ALLOWED_HOSTS`), and the proxy asks for a random token the install keeps in `install-state.json` and gives the app.
 - The app talks to the local proxy through an explicit `COMFY_BASE_URL` (the Comfy SDK would otherwise target Comfy Cloud), and no `COMFY_API_KEY` reaches it.
 - Weights come only from `registry/models.lock.yaml`; each file is checked against the sha256 the lock pins.
 - `check-open-stack` runs on every install and writes the report behind the app's "open weights" badge.

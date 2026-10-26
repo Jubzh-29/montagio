@@ -30,17 +30,25 @@ export function assertLocalBaseUrl(raw: string): { url: URL; base: string; loopb
 /**
  * A `fetch` for the SDK that refuses every request outside the base URL's
  * origin, so nothing can reach Comfy Cloud or the Router even if the SDK or a
- * server-provided link points elsewhere.
+ * server-provided link points elsewhere. With `token` (the install's
+ * comfy-api-proxy token), every request carries it as a bearer: only to that
+ * origin, since nothing else is ever reached.
  */
-export function guardFetch(base: URL, inner: typeof fetch = fetch): typeof fetch {
+export function guardFetch(base: URL, inner: typeof fetch = fetch, token?: string): typeof fetch {
+  const signed = (input: RequestInfo | URL, init: RequestInit | undefined): RequestInit | undefined => {
+    if (!token) return init;
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+    headers.set('authorization', `Bearer ${token}`);
+    return { ...init, headers };
+  };
   const guarded = async (input: RequestInfo | URL, init: RequestInit | undefined, hops: number): Promise<Response> => {
     const target = new URL(input instanceof Request ? input.url : String(input));
     if (target.origin !== base.origin) throw new Error(`refused request to ${target.origin}: only ${base.origin} is allowed`);
     // A caller that handles redirects itself gets them as they are.
-    if (init?.redirect === 'manual' || init?.redirect === 'error') return inner(input, init);
+    if (init?.redirect === 'manual' || init?.redirect === 'error') return inner(input, signed(input, init));
     // Otherwise the redirects are followed here, not by fetch, which would send the
     // request (and a 307/308's body) to the new location before anyone could look at it.
-    const response = await inner(input, { ...init, redirect: 'manual' });
+    const response = await inner(input, { ...signed(input, init), redirect: 'manual' });
     const location = response.headers.get('location');
     if (response.status < 300 || response.status > 399 || !location) return response;
     await response.body?.cancel();

@@ -263,7 +263,8 @@ start_comfyui() {
     # whole repository for a file it misses.
     (
       cd "$COMFY_DIR"
-      HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+      # MONTAGIO_HOST_GUARD: Montagio's host check on ComfyUI, off by itself when --expose-ui listens on 0.0.0.0.
+      HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 MONTAGIO_HOST_GUARD=1 \
         setsid nohup "$COMFY_VENV/bin/python" main.py --listen "$LISTEN" --port "$COMFY_PORT" --disable-partner-nodes --offline \
         >>"$LOG_DIR/comfyui.log" 2>&1 &
       echo $! >"$RUN_DIR/comfyui.pid"

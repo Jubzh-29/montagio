@@ -48,7 +48,7 @@ import {
 } from './plan.ts';
 import { layout, osOf, withoutVars, type Os } from './platform.ts';
 import type { probe as probeMachine } from './probe.ts';
-import { readState, recordWeights, writeState, type InstallState } from './state.ts';
+import { readState, recordWeights, withProxyToken, writeState, type InstallState } from './state.ts';
 
 export type InstallOptions = {
   dir: string;
@@ -503,15 +503,17 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
       if (build) stamp('build', build);
     },
     'save-state': async () =>
-      save({
-        ...state,
-        mode: plan.mode,
-        ports,
-        gpuIndex: plan.mode === 'full' ? (pickGpu(facts.gpus)?.index ?? null) : null,
-        proxyUrl,
-        extensions: plan.mode === 'full' ? enabled : null,
-        vramProfile: plan.mode === 'full' ? profile : null,
-      }),
+      save(
+        withProxyToken({
+          ...state,
+          mode: plan.mode,
+          ports,
+          gpuIndex: plan.mode === 'full' ? (pickGpu(facts.gpus)?.index ?? null) : null,
+          proxyUrl,
+          extensions: plan.mode === 'full' ? enabled : null,
+          vramProfile: plan.mode === 'full' ? profile : null,
+        }),
+      ),
     start: () => deps.startAll({ browser: opts.browser }),
   };
 

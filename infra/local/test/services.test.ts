@@ -66,6 +66,10 @@ test('the Python services never reach Hugging Face, send it no telemetry, and ke
   }
 });
 
+test("ComfyUI gets Montagio's host check: a page rebound to 127.0.0.1 cannot drive it", () => {
+  expect(specsOf(full).find((s) => s.name === 'comfyui')!.env.MONTAGIO_HOST_GUARD).toBe('1');
+});
+
 test('the Python services write their logs unbuffered, so a crash keeps its last lines', () => {
   const specs = specsOf(full);
   for (const name of ['comfyui', 'proxy']) expect(specs.find((s) => s.name === name)!.env.PYTHONUNBUFFERED).toBe('1');
@@ -74,6 +78,15 @@ test('the Python services write their logs unbuffered, so a crash keeps its last
 test('CUDA numbers the GPUs as nvidia-smi does, so --cuda-device picks the card the checks chose', () => {
   // CUDA's default order is fastest first; nvidia-smi's (and pickGpu's) is the PCI bus.
   expect(specsOf({ ...full, gpuIndex: 1 }).find((s) => s.name === 'comfyui')!.env.CUDA_DEVICE_ORDER).toBe('PCI_BUS_ID');
+});
+
+test("the proxy asks for the install's token, and the app sends it: a page rebound to 127.0.0.1 cannot drive the proxy", () => {
+  const specs = specsOf({ ...full, proxyToken: 'a'.repeat(64) });
+  expect(specs.find((s) => s.name === 'proxy')!.args.slice(-2)).toEqual(['--token', 'a'.repeat(64)]);
+  expect(specs.find((s) => s.name === 'app')!.env.MONTAGIO_PROXY_TOKEN).toBe('a'.repeat(64));
+  // The app alone talks to a proxy elsewhere: it keeps the token the user gives it, if any.
+  const appOnly = specsOf({ ...full, mode: 'app-only', proxyUrl: 'http://127.0.0.1:18189', proxyToken: null }, { MONTAGIO_PROXY_TOKEN: 'remote' });
+  expect(appOnly.find((s) => s.name === 'app')!.env.MONTAGIO_PROXY_TOKEN).toBe('remote');
 });
 
 test('the proxy and the app follow the install ports', () => {

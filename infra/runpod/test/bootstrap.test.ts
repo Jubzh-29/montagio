@@ -71,6 +71,8 @@ test.runIf(hasBash)('a SAM 2 node left half-made goes: ComfyUI never loads a com
 test("ComfyUI's frontend stays off the internet and Pillow is lifted past its known flaws, as in infra/local", () => {
   const text = readFileSync(script, 'utf8');
   expect(text).toContain('main.py --listen "$LISTEN" --port "$COMFY_PORT" --disable-partner-nodes --offline');
+  // Montagio's host check on ComfyUI (comfy-nodes/montagio_nodes/host_guard.py), off by itself when --expose-ui listens on 0.0.0.0.
+  expect(text).toContain('HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 MONTAGIO_HOST_GUARD=1 \\');
   expect(text).toContain(`'pillow>=%s; python_version >= "3.11"\\n' "$PILLOW_MIN"`);
 });
 
