@@ -10,7 +10,7 @@ name: Chatterbox Multilingual V3 (avatar voice)
 extension: avatar
 task: tts
 license: MIT
-weights: [chatterbox-t3-mtl-v3, chatterbox-s3gen, chatterbox-ve, chatterbox-conds, chatterbox-grapheme-mtl]
+weights: [chatterbox-t3-mtl-v3, chatterbox-s3gen, chatterbox-ve, chatterbox-conds, chatterbox-grapheme-mtl, chatterbox-cangjie]
 workflow: workflows/chatterbox-mtl-voice.api.json
 bindings:
   text: { node: "2", field: text }

@@ -150,8 +150,9 @@ print(f"[montagio] torch {torch.__version__} (CUDA {torch.version.cuda}) on {tor
   echo "$stamp" >"$COMFY_VENV/.montagio-stamp"
 }
 
-# The avatar's voice: wildminder/ComfyUI-Chatterbox at the commit of versions.env, its /chatterbox/* routes
-# removed by our patch, its Python packages installed without their own dependencies and checked by hash.
+# The avatar's voice: wildminder/ComfyUI-Chatterbox at the commit of versions.env, patched (its /chatterbox/* routes
+# removed, its Chinese table read from the model folder), its Python packages installed without their own
+# dependencies and checked by hash.
 # Every step is checked here, not by set -e: install_voice_node calls it where a failure must not end the script.
 install_extension_nodes() {
   local dir=$COMFY_DIR/custom_nodes/ComfyUI-Chatterbox
@@ -167,8 +168,10 @@ install_extension_nodes() {
   # --force drops an earlier copy of the patch, so it is applied once, to the pinned files
   git -C "$dir" checkout --quiet --force "$CHATTERBOX_NODE_COMMIT" || return 1
   [ "$(git -C "$dir" rev-parse HEAD)" = "$CHATTERBOX_NODE_COMMIT" ] || { warn "the Chatterbox node in $dir is not at $CHATTERBOX_NODE_COMMIT"; return 1; }
-  git -C "$dir" apply --check "$patch" || { warn "$patch no longer applies to the Chatterbox node at $CHATTERBOX_NODE_COMMIT"; return 1; }
-  git -C "$dir" apply "$patch" || return 1
+  # --ignore-whitespace: the tokenizer the patch changes is CRLF upstream, the patch is kept in LF (.gitattributes);
+  # the commit checked above fixes every line it matches
+  git -C "$dir" apply --check --ignore-whitespace "$patch" || { warn "$patch no longer applies to the Chatterbox node at $CHATTERBOX_NODE_COMMIT"; return 1; }
+  git -C "$dir" apply --ignore-whitespace "$patch" || return 1
   log "installing the Python packages of the Chatterbox node (pinned, hashed, no dependencies)"
   "$COMFY_VENV/bin/pip" install --quiet --no-deps --require-hashes -r "$requirements" || return 1
   echo "$stamp" >"$dir/.montagio-stamp"

@@ -48,6 +48,7 @@ describe('buildRecipe', () => {
       've.safetensors',
       'conds.pt',
       'grapheme_mtl_merged_expanded_v1.json',
+      'Cangjie5_TC.json',
     ]);
     expect(recipe.models.map((model) => model.id)).toEqual(['chatterbox-mtl-voice']);
   });

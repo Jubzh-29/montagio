@@ -50,7 +50,15 @@ export const LOCK = [
 ];
 
 /** A pack the voice node reads by folder name: no file of it is named in the workflow. */
-export const VOICE_LOCK = ['t3_mtl23ls_v3.safetensors', 's3gen.safetensors', 've.safetensors', 'conds.pt', 'grapheme_mtl_merged_expanded_v1.json'].map(
+export const VOICE_LOCK = [
+  't3_mtl23ls_v3.safetensors',
+  's3gen.safetensors',
+  've.safetensors',
+  'conds.pt',
+  'grapheme_mtl_merged_expanded_v1.json',
+  // the Chinese table the patched tokenizer reads beside the grapheme table
+  'Cangjie5_TC.json',
+].map(
   (file, index) => ({
     id: `chatterbox-${index}`,
     file,

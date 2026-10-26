@@ -12,7 +12,7 @@ name: Gemma 4 E4B + Chatterbox (translate)
 extension: avatar
 task: a2a-translate
 license: Apache-2.0
-weights: [gemma4-e4b-it, chatterbox-t3-mtl-v3, chatterbox-s3gen, chatterbox-ve, chatterbox-conds, chatterbox-grapheme-mtl]
+weights: [gemma4-e4b-it, chatterbox-t3-mtl-v3, chatterbox-s3gen, chatterbox-ve, chatterbox-conds, chatterbox-grapheme-mtl, chatterbox-cangjie]
 workflow: workflows/translate-speech.api.json
 bindings:
   # the speech to translate: mono FLAC as the app prepares it; also the voice it is said again in

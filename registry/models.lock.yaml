@@ -246,6 +246,22 @@ weights:
     source: https://huggingface.co/ResembleAI/chatterbox
     extension: avatar
     folder: tts/chatterbox/resembleai-mtl-v3
+  # The multilingual tokenizer's Chinese table: its vocabulary holds Cangjie codes ([cj_*]), not
+  # Chinese characters, and this table turns one into the other. Without it the voice does not speak
+  # Chinese. The pack used to fetch it at every load; patched, it reads it here, beside the grapheme
+  # table (ComfyUI runs offline). It is Cangjie5_TC.txt of Jackchows/Cangjie5 (MIT as well) in
+  # JSON. Kept out of LFS as well: the sha256 was computed on the
+  # 1,920,163-byte file on 2026-10-26, and its git blob id matches the one Hugging Face publishes.
+  - id: chatterbox-cangjie
+    file: Cangjie5_TC.json
+    url: https://huggingface.co/ResembleAI/chatterbox/resolve/main/Cangjie5_TC.json
+    sha256: 7073fd9de919443ae88e0bd2449917a65fe54898a4413ed1edcc4b67f28bce8c
+    git_sha1: d77891f84ca1db0d6f7058a4ee081d4bb0bfe88e
+    size: 1920163
+    license: MIT
+    source: https://huggingface.co/ResembleAI/chatterbox
+    extension: avatar
+    folder: tts/chatterbox/resembleai-mtl-v3
   # The voice change (ChatterboxVC) opens the pack through the node's classic loader, which also
   # builds the English TTS: its T3 and its tokenizer join the same folder. The multilingual voice
   # still picks its own T3 (t3_mtl23ls_v3) and grapheme table by name.

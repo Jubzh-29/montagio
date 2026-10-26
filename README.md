@@ -75,7 +75,7 @@ The 11 camera presets are Crash Push, Slow Push, Pull Back Reveal, Pan Left, Pan
 | **Community gallery** | Publish a result from History with a title, remix an entry back into the Studio, or pass it on as a share file: the settings only, never a photo or a clip. | — |
 | **Recipe and Reproduce** | Every result carries its recipe: the preset, the exact ComfyUI workflow of each step and its sha256, the weight files with their licences, the seed, the settings and the sha256 of each input, never the photo. A Recipe panel shows it under each result and in History, and a compact copy rides in each exported MP4 and PNG. Reproduce renders a clip or a film again with the same seed and says whether the workflow matches, in the Studio, from a terminal (`npm run reproduce`) or from an MCP client. Ads, voice changes and a film's music keep their recipe without the button. | — |
 | **History** | Every photo, clip and film made on this machine, with download, reuse, publish and its recipe. | — |
-| **Open Stack** | One page lists the 19 models and 64 weight files Montagio can run, by what they make, each weight linked to the repository its licence was read from, with the latest open-stack check. Every caption under a result links to its model's line. | — |
+| **Open Stack** | One page lists the 19 models and 65 weight files Montagio can run, by what they make, each weight linked to the repository its licence was read from, with the latest open-stack check. Every caption under a result links to its model's line. | — |
 
 ### Ten extensions, each validated on a GPU
 
@@ -327,7 +327,7 @@ Every file, with its source, revision and sha256, is in [registry/models.lock.ya
 - [ComfyUI](https://github.com/Comfy-Org/ComfyUI) v0.41.0 (GPL-3.0), installed beside Montagio, never bundled;
 - the [Comfy SDK](https://github.com/Comfy-Org/comfy-typescript-sdk) (`@comfyorg/sdk`) and [comfy-api-proxy](https://github.com/Comfy-Org/comfy-api-proxy), MIT;
 - the [Comfy-Org workflow templates](https://github.com/Comfy-Org/workflow_templates) at commit `59a3b48b`, MIT, which the Montagio workflows are converted from, except five written where no template exists ([license text](workflows/LICENSE.workflow_templates));
-- [wildminder/ComfyUI-Chatterbox](https://github.com/wildminder/ComfyUI-Chatterbox) at commit `4597af8f` (Apache-2.0), the voice node, pinned and patched to remove its HTTP routes ([patch](infra/runpod/patches/comfyui-chatterbox-no-routes.patch));
+- [wildminder/ComfyUI-Chatterbox](https://github.com/wildminder/ComfyUI-Chatterbox) at commit `4597af8f` (Apache-2.0), the voice node, pinned and patched to remove its HTTP routes and read its Chinese table from the model folder ([patch](infra/runpod/patches/comfyui-chatterbox-no-routes.patch));
 - [kijai/ComfyUI-segment-anything-2](https://github.com/kijai/ComfyUI-segment-anything-2) at commit `0c35fff5` (Apache-2.0), the object swap's tracking nodes, pinned and unchanged: they open no HTTP route and need no Python package ComfyUI lacks;
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) 2026.10.21 (Unlicense), the trend remix's link importer: the release binary, checked by its sha256, downloaded by the local installer and never bundled;
 - [ffmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) in the showcase, whose license texts ship beside it;
