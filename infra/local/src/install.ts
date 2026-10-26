@@ -22,7 +22,7 @@ import {
 import { basename, dirname, join } from 'node:path';
 import { decide, evaluate, MIN_VRAM_MIB, pickGpu, pickPython, pickTorch, type Check, type Decision, type Mode, type Ports, type VramProfile } from './checks.ts';
 import { npmInvocation, nextBin, tsxCli, type Capture, type Stream } from './exec.ts';
-import { installDefaultExtensions, readExtensions, readLock, readVersions, selectExtensions, weightsFor, type LockWeight } from './pins.ts';
+import { askedExtensions, installDefaultExtensions, readExtensions, readLock, readVersions, selectExtensions, weightsFor, type ExtensionsSource, type LockWeight } from './pins.ts';
 import {
   buildPlan,
   buildStamp,
@@ -61,7 +61,10 @@ export type InstallOptions = {
   dryRun: boolean;
   start: boolean;
   browser: boolean;
-  /** --extensions: whose weights to fetch besides the camera presets'; null or absent reads MONTAGIO_EXTENSIONS, then the effects pack if validated. */
+  /**
+   * --extensions: whose weights to fetch besides the camera presets', kept for the next runs; null or absent reads
+   * MONTAGIO_EXTENSIONS, then the last install's choice, then the effects pack if validated. "default" forgets the choice.
+   */
   extensions?: string | null;
   /** --low-vram: the 12 GB profile, asked for; otherwise the saved profile, or the one the GPU allows once accepted. */
   lowVram?: boolean;
@@ -86,6 +89,13 @@ export type InstallDeps = {
 };
 
 const LABEL = { ok: 'ok  ', warn: 'warn', fail: 'FAIL' } as const;
+/** Why a run takes its extensions, after their list in the report. */
+const EXTENSIONS_WHY: Record<ExtensionsSource, string> = {
+  '--extensions': '--extensions, kept for the next runs',
+  MONTAGIO_EXTENSIONS: 'MONTAGIO_EXTENSIONS, kept for the next runs',
+  kept: 'kept from the last install; --extensions default goes back to the default',
+  default: 'the default',
+};
 /** What a node pack's folder holds once installed, as infra/runpod/bootstrap.sh writes it. */
 const NODE_STAMP = '.montagio-stamp';
 /** Where a node pack is made before it goes into custom_nodes: beside ComfyUI's folders, where ComfyUI loads nothing. */
@@ -98,9 +108,13 @@ export function renderReport(
   checks: Check[],
   decision: Decision,
   steps: Step[],
-  ctx: { dir: string; dryRun: boolean; mode: Mode; profile?: VramProfile },
+  ctx: { dir: string; dryRun: boolean; mode: Mode; profile?: VramProfile; extensions?: { enabled: readonly string[]; source: ExtensionsSource } },
 ): string {
-  const lines = [`Montagio installer${ctx.dryRun ? ' (dry run: nothing will be changed)' : ''}`, `Install folder: ${ctx.dir}`, '', 'Machine'];
+  const lines = [`Montagio installer${ctx.dryRun ? ' (dry run: nothing will be changed)' : ''}`, `Install folder: ${ctx.dir}`];
+  if (ctx.mode === 'full' && ctx.extensions) {
+    lines.push(`Extensions: ${ctx.extensions.enabled.length > 0 ? ctx.extensions.enabled.join(', ') : 'none'} (${EXTENSIONS_WHY[ctx.extensions.source]})`);
+  }
+  lines.push('', 'Machine');
   for (const check of checks) {
     lines.push(`  ${LABEL[check.severity]}  ${check.id.padEnd(7)} ${check.message}`);
     if (check.fix && check.severity !== 'ok') lines.push(`${' '.repeat(16)}-> ${check.fix}`);
@@ -197,9 +211,18 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
   let state: InstallState = readState(L.statePath);
   // The 12 GB profile once asked for (--low-vram, or accepted on a 12 to 20 GB card) stays for the next runs, on that card.
   let profile: VramProfile = opts.lowVram || state.vramProfile === '12gb' ? '12gb' : 'standard';
-  const flag = opts.extensions ?? env.MONTAGIO_EXTENSIONS;
+  // --extensions, else MONTAGIO_EXTENSIONS, else what the last install was asked for; "default" forgets it.
+  const { asked, source } = askedExtensions(opts.extensions, env.MONTAGIO_EXTENSIONS, state.extensionsAsked);
   const config = readExtensions(repoRoot);
-  const extensionsFor = (asked: VramProfile) => (flag?.trim() ? selectExtensions(config, flag, asked) : installDefaultExtensions(config, asked));
+  const extensionsFor = (p: VramProfile) => {
+    try {
+      return asked ? selectExtensions(config, asked, p) : installDefaultExtensions(config, p);
+    } catch (error) {
+      // A choice kept from an older install may name an extension the registry no longer has.
+      if (source === 'kept') throw new Error(`${(error as Error).message} (kept from the last install: run install with --extensions default to forget it)`);
+      throw error;
+    }
+  };
   let enabled: string[];
   try {
     enabled = extensionsFor(profile);
@@ -307,7 +330,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     deps.log(`error: ${(error as Error).message}`);
     return 2;
   }
-  deps.log(renderReport(plan.checks, plan.decision, plan.steps, { dir: opts.dir, dryRun: opts.dryRun, mode: plan.mode, profile }));
+  deps.log(renderReport(plan.checks, plan.decision, plan.steps, { dir: opts.dir, dryRun: opts.dryRun, mode: plan.mode, profile, extensions: { enabled, source } }));
 
   if (plan.decision.kind === 'offer-low-vram') {
     if (opts.dryRun || !deps.ask) return 2;
@@ -316,7 +339,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     enabled = extensionsFor(profile);
     lock = weightsFor(fullLock, enabled);
     plan = planFor('full');
-    deps.log(renderReport(plan.checks, plan.decision, plan.steps, { dir: opts.dir, dryRun: false, mode: plan.mode, profile }));
+    deps.log(renderReport(plan.checks, plan.decision, plan.steps, { dir: opts.dir, dryRun: false, mode: plan.mode, profile, extensions: { enabled, source } }));
   }
   if (plan.decision.kind === 'offer-app-only') {
     if (opts.dryRun || !deps.ask) return 2;
@@ -511,6 +534,7 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
           gpuIndex: plan.mode === 'full' ? (pickGpu(facts.gpus)?.index ?? null) : null,
           proxyUrl,
           extensions: plan.mode === 'full' ? enabled : null,
+          extensionsAsked: asked,
           vramProfile: plan.mode === 'full' ? profile : null,
         }),
       ),

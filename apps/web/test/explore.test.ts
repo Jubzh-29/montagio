@@ -63,3 +63,16 @@ test("an extension's tool shows only when the extension is shown", () => {
   // The community gallery is in the showcase too: its rendered clips, remixed on their sample photo.
   expect(exploreTools([], info(), true).map((tool) => tool.id)).toContain('community');
 });
+
+test('HD and Open in ComfyUI lead to the Camera tab, where a finished clip carries both actions', () => {
+  const everything = info({
+    extensions: ['edit', 'effects', 'transitions', 'avatar', 'music', 'upscale', 'motion', 'restyle', 'swap', 'remix'],
+    estimates: { t2i: 5, translate: 60, voiceChange: 30 },
+  });
+  const tools = exploreTools([], everything);
+  expect(tools.find((tool) => tool.id === 'hd')).toMatchObject({ href: '/?tab=camera' });
+  expect(tools.find((tool) => tool.id === 'comfy')).toMatchObject({ href: '/?tab=camera' });
+  // The history lists past creations, without these two actions: no card leads there.
+  expect(tools.map((tool) => tool.href)).not.toContain('/history');
+  expect(exploreTools([], everything, true).map((tool) => tool.href)).not.toContain('/history');
+});

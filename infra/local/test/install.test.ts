@@ -668,6 +668,76 @@ test('a saved --proxy-url is kept by the next runs, and --demo forgets it', asyn
   expect(readState(h.L.statePath).proxyUrl).toBeNull();
 });
 
+test('--extensions is kept for the next runs: a plain install keeps every extension, and so does the list start passes to the app', async () => {
+  withMusicWeight(5);
+  await install(repo, options({ start: false, extensions: 'all' }), harness().deps);
+  const h = harness();
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+  const state = readState(h.L.statePath);
+  expect(state.extensionsAsked).toBe('all');
+  expect(state.extensions).toContain('music');
+  expect(state.extensions).toContain('avatar');
+  // The report says which extensions the run takes, and why.
+  expect(h.output()).toMatch(/^Extensions: edit, effects, .*remix \(kept from the last install; --extensions default goes back to the default\)$/m);
+});
+
+test('--extensions default forgets the kept choice and goes back to the default extensions', async () => {
+  withMusicWeight(5);
+  await install(repo, options({ start: false, extensions: 'music' }), harness().deps);
+  const h = harness();
+  expect(await install(repo, options({ start: false, extensions: 'default' }), h.deps)).toBe(0);
+  // Nothing is validated in this registry: the default is no extension.
+  expect(readState(h.L.statePath)).toMatchObject({ extensionsAsked: null, extensions: [] });
+  expect(h.output()).toMatch(/^Extensions: none \(the default\)$/m);
+  await install(repo, options({ start: false }), harness().deps);
+  expect(readState(h.L.statePath)).toMatchObject({ extensionsAsked: null, extensions: [] });
+});
+
+test('MONTAGIO_EXTENSIONS, the default of --extensions, wins over the kept choice and is kept in its turn', async () => {
+  withMusicWeight(5);
+  await install(repo, options({ start: false, extensions: 'all' }), harness().deps);
+  const h = harness();
+  expect(await install(repo, options({ start: false }), { ...h.deps, env: { ...h.deps.env, MONTAGIO_EXTENSIONS: ' music ' } })).toBe(0);
+  expect(readState(h.L.statePath)).toMatchObject({ extensionsAsked: 'music', extensions: ['music'] });
+  expect(h.output()).toMatch(/^Extensions: music \(MONTAGIO_EXTENSIONS, kept for the next runs\)$/m);
+  // --extensions wins over both.
+  const option = harness();
+  await install(repo, options({ start: false, extensions: 'none' }), { ...option.deps, env: { ...option.deps.env, MONTAGIO_EXTENSIONS: 'music' } });
+  expect(readState(h.L.statePath)).toMatchObject({ extensionsAsked: 'none', extensions: [] });
+  expect(option.output()).toMatch(/^Extensions: none \(--extensions, kept for the next runs\)$/m);
+});
+
+test('an --app-only run leaves the kept choice for the next full install', async () => {
+  withMusicWeight(5);
+  await install(repo, options({ start: false, extensions: 'music' }), harness().deps);
+  await install(repo, options({ start: false, mode: 'app-only' }), harness().deps);
+  expect(readState(join(dir, 'install-state.json')).extensionsAsked).toBe('music');
+  const h = harness();
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+  expect(readState(h.L.statePath).extensions).toEqual(['music']);
+});
+
+test('a node pack that fails keeps the extensions asked for: the next install tries the pack again', async () => {
+  withNodeExtensionWeights();
+  await install(repo, options({ start: false, extensions: 'all' }), harness({ failOn: (call) => call.args.includes('--require-hashes') }).deps);
+  expect(readState(join(dir, 'install-state.json'))).toMatchObject({ extensionsAsked: 'all' });
+  const h = harness();
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(0);
+  expect(described(h.calls).some((c) => c.includes('--require-hashes'))).toBe(true);
+  expect(readState(h.L.statePath).extensions).toContain('avatar');
+});
+
+test('a kept choice the registry no longer accepts is refused, saying where it comes from and how to forget it', async () => {
+  withMusicWeight(5);
+  await install(repo, options({ start: false, extensions: 'music' }), harness().deps);
+  const statePath = join(dir, 'install-state.json');
+  writeFileSync(statePath, JSON.stringify({ ...readState(statePath), extensionsAsked: 'music,karaoke' }));
+  const h = harness();
+  expect(await install(repo, options({ start: false }), h.deps)).toBe(2);
+  expect(h.output()).toMatch(/unknown extension "karaoke".*kept from the last install: run install with --extensions default to forget it/);
+  expect(h.calls).toEqual([]);
+});
+
 test('no Comfy key reaches the programs install runs, whatever the case of its name on Windows', async () => {
   const h = harness();
   h.deps.env = { PATH: process.env.PATH, COMFY_API_KEY: 'secret', Comfy_Api_Key: 'secret' };

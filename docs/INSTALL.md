@@ -113,7 +113,7 @@ Everything except the app goes into one folder:
 | `logs/` | `comfyui.log`, `proxy.log`, `app.log`, and the download report `weights/weights-report.json` |
 | `run/` | the pid file of each service started |
 | `cache/` | `torch-constraints.txt`, which keeps pip from replacing the CUDA build of PyTorch |
-| `install-state.json` | what was installed: the mode, the ports, the GPU, the remote proxy URL, the extensions and the memory profile |
+| `install-state.json` | what was installed: the mode, the ports, the GPU, the remote proxy URL, the extensions asked for and those fetched, and the memory profile |
 
 With `--app-only`, the folder holds only `tools/`, `logs/`, `run/` and `install-state.json`.
 
@@ -149,7 +149,7 @@ git pull
 
 Running `install` again only does what changed: a new ComfyUI or PyTorch version, a new weight in the lock, new npm dependencies, new app code. Running services are stopped first and started again at the end. A weight that leaves the lock stays on the disk; delete it from `ComfyUI/models/` if you need the space.
 
-The next runs keep the ports, `--proxy-url` and `--low-vram` (until a GPU of 22 GiB or more, see above). They do not keep `--extensions` nor `--ignore-vram`: pass them again. An install made with `--extensions all` is updated with `./montagio.sh install --extensions all`. A plain `install` goes back to the effects pack alone and starts the app with that list: the weights and node packs of the other extensions stay on the disk, and the Studio hides them. A `MONTAGIO_EXTENSIONS` set in your environment gives the same choice to every run.
+The next runs keep the ports, `--proxy-url`, `--low-vram` (until a GPU of 22 GiB or more, see above) and `--extensions`: an install made with `--extensions all` is updated with a plain `./montagio.sh install`, and `start` opens the Studio with every extension. The report's `Extensions:` line says which ones the run takes, and why. A `MONTAGIO_EXTENSIONS` set in your environment counts as `--extensions` when the command line has none, and is kept the same way. `--extensions default` forgets the choice and goes back to the effects pack alone: the weights and node packs of the other extensions stay on the disk, and the Studio hides them. A run with `--app-only` leaves the choice for the next full install. `--ignore-vram` is not kept: pass it again.
 
 ## Reproduce a recipe
 
@@ -217,14 +217,14 @@ With `--app-only`, `start` sets no extension list: `MONTAGIO_EXTENSIONS` decides
 | `--comfy-port N`, `--proxy-port N`, `--app-port N` | ports (defaults 8188, 8189, 3000), kept for the next runs |
 | `--no-start` | install without starting |
 | `--no-browser` | `install` and `start`: do not open the browser |
-| `--extensions LIST` | `install`: the extensions whose weights to fetch too: `all` (the ten), `validated` (those a GPU session validated: all ten since 2026-10-25; in the 12 GB profile, the effects pack), `none`, or a list such as `edit,transitions`, which must name what each one requires (see below). By default, the effects pack alone. Not kept: pass it again with each `install` |
+| `--extensions LIST` | `install`: the extensions whose weights to fetch too: `all` (the ten), `validated` (those a GPU session validated: all ten since 2026-10-25; in the 12 GB profile, the effects pack), `none`, a list such as `edit,transitions`, which must name what each one requires (see below), or `default`: the effects pack alone, as on a first install. Kept for the next runs, until another `--extensions` |
 
 `help` (or `--help`) prints every command and option. An option a command does not take is refused, not ignored.
 
 | Variable | Meaning |
 |---|---|
 | `MONTAGIO_HOME` | install folder (`--dir` wins over it) |
-| `MONTAGIO_EXTENSIONS` | `install`: the default of `--extensions`. The app reads it too, but `start` on a full install replaces it with the list the install fetched: it decides what the Studio shows only with `--app-only`, or for an app you start yourself. There, `all` also shows the effects and hooks no GPU session dated |
+| `MONTAGIO_EXTENSIONS` | `install`: the default of `--extensions`, kept the same way. The app reads it too, but `start` on a full install replaces it with the list the install fetched: it decides what the Studio shows only with `--app-only`, or for an app you start yourself. There, `all` also shows the effects and hooks no GPU session dated |
 | `MONTAGIO_VRAM_PROFILE` | the app's memory profile: `standard` (the default) or `12gb`. `start` sets `12gb` on an install in the 12 GB profile. The app reads an unknown value as `12gb` |
 | `MONTAGIO_EXPERIMENTAL` | features no GPU session validated, shown anyway (comma list): `moodboard` (a picture that takes the colours and mood of reference pictures) and `palette-photo` (a palette taken from a photo). They are hidden because, on the GPU session of 2026-10-24, the photo edit did not carry a style over from a reference image |
 | `MONTAGIO_COMFYUI_ARGS` | extra ComfyUI arguments, separated by spaces, for example `--reserve-vram 1` (ComfyUI v0.41.0's dynamic VRAM makes `--lowvram` a no-op); `--listen` and `--port` are refused, ComfyUI stays on 127.0.0.1 and the install's port. Read by `start` on a full install |
@@ -252,11 +252,13 @@ On Windows, set `$env:MONTAGIO_ALLOWED_HOSTS = 'studio.example,192.168.1.20:8080
 
 Ten extensions add to the Studio, beyond the camera presets. Their weights are in the lock, marked with their extension, and the installer fetches them only for the extensions asked for:
 
-- a plain `install` takes the **effects pack** alone, the most shareable one and among the lightest;
+- a first `install` takes the **effects pack** alone, the most shareable one and among the lightest, and so does `--extensions default`;
 - `--extensions validated` takes those a GPU session validated, listed with a date in `registry/extensions.yaml`: all ten, dated from 2026-10-21 to 2026-10-25 (in the 12 GB profile, only those run within 12 GB: the effects pack);
 - `--extensions all` takes the ten: about 253 GB of weights on disk with those of the camera presets (the avatar and the object swap with their node packs, see below);
 - `--extensions none` keeps the 72 GB of the camera presets;
 - a list such as `edit,transitions` takes those extensions, and must name what each one requires.
+
+The choice is kept: the next `install` takes the same extensions until you pass another `--extensions` (see [Update](#update)).
 
 In their order of priority, with their extra disk space, all Apache-2.0 or MIT (the effect LoRAs declare it in their card metadata only):
 
@@ -303,12 +305,12 @@ A workflow ComfyUI refuses (a missing node or file) hides its extension until th
 | `… free for the install folder, … needed` (or `… needed for both`, when the install folder and the repository share a drive) | free some space, or install on another drive with `--dir <folder>`; [Requirements](#requirements) gives the space each choice needs |
 | `the driver supports CUDA 12.x: PyTorch needs 12.8 or newer` | update the NVIDIA driver (R580 or newer) |
 | `torch sees no CUDA device` | the driver is too old for the PyTorch build, or the GPU is busy elsewhere: update the driver, reboot, run `install` again |
-| `warning: the avatar's voice node has its packages for Python 3.12 on Windows (3.10 to 3.13 on Linux), not 3.x; the avatar extension is left out` | install Python 3.12 (`winget install Python.Python.3.12`), which the installer prefers, then run `install` again with the same `--extensions`: it makes ComfyUI's Python environment again with 3.12 |
+| `warning: the avatar's voice node has its packages for Python 3.12 on Windows (3.11 to 3.13 on Linux), not 3.x; the avatar extension is left out` | install Python 3.12 (`winget install Python.Python.3.12`), which the installer prefers, then run `install` again (it keeps your `--extensions`): it makes ComfyUI's Python environment again with 3.12 |
 | `warning: … is a folder Montagio did not clone: move it away …; the … extension is left out` | a folder of yours sits where a node pack goes (`custom_nodes/ComfyUI-Chatterbox` or `custom_nodes/ComfyUI-segment-anything-2`): move it, then run `install` again |
 | `… has local changes: move them away` | the ComfyUI folder holds changes (`git status` is not empty): move them out of it, then run again |
 | `git status failed in …` | git cannot read the ComfyUI folder; git's own reason follows (a folder owned by another user, a broken `.git`) |
 | `…custom_nodes/montagio is a folder, not a link to …` | a real folder sits where the link to the node pack goes: move it away, then run again |
-| `--extensions: unknown extension …`, or `--extensions: X requires Y; add it to the list` | name extensions of the [Extensions](#extensions) table, with what each requires: `transitions` needs `edit`, `swap` needs `restyle`, `remix` needs `motion` |
+| `--extensions: unknown extension …`, or `--extensions: X requires Y; add it to the list` | name extensions of the [Extensions](#extensions) table, with what each requires: `transitions` needs `edit`, `swap` needs `restyle`, `remix` needs `motion`. When the message says `kept from the last install`, the choice comes from an older install: pass a new `--extensions`, or `--extensions default` to forget it |
 | `yt-dlp: the file downloaded has the sha256 …, not the pinned …: nothing was written` | run again; if it persists, the release file changed upstream, report it |
 | `Montagio is not installed in <folder>: run the install command first` | `start` found no install in that folder: run `install`, or give the `--dir` you installed with |
 | `port N (<service>) is used by another program` (at `start`) | stop that program, or `install` again with `--comfy-port`, `--proxy-port` or `--app-port` |

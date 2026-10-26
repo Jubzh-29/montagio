@@ -56,9 +56,7 @@ Job `e2e`, after `npx playwright install --with-deps chromium` in `apps/web`:
 | Step | What it checks |
 |---|---|
 | `npm run e2e -w @montagio/web` | the Studio on the demo backend with every extension shown (port 3100), then the static showcase build (port 3101) |
-| `npm run e2e:local -w @montagio/web` | the Studio on the local backend, against a fake comfy-api-proxy (`packages/comfy-adapter/scripts/fake-proxy.ts`, port 8190; the app on port 3101) |
-
-The `e2e:local` spec (`apps/web/e2e-local/local.spec.ts`) still clicks a "Try with a sample photo" button and a "Sequence" button that the Studio no longer shows, so expect that step to fail until the spec is updated.
+| `npm run e2e:local -w @montagio/web` | the Studio on the local backend, against a fake comfy-api-proxy (`packages/comfy-adapter/scripts/fake-proxy.ts`, port 8190; the app on port 3101): a camera clip and a two-shot film made from the sample photo, each delivered by the proxy, the clip with its model's caption |
 
 `npm run test:modal` (the Modal tooling's helpers, `python -m pytest infra/modal -q`, no `modal` package needed) is not run by CI.
 

@@ -12,14 +12,14 @@ The code is TypeScript with no npm dependency: Node.js runs it as it is (type st
 | `src/exec.ts` | Running programs without a shell (a shell only for the last-resort `npm`); finding npm, tsx and next |
 | `src/probe.ts` | What the machine has: GPU, driver, Pythons, tools, disk, RAM, ports |
 | `src/checks.ts` | Verdicts with their fix, choice of PyTorch and Python, and the decision: full install, the 12 GB profile, or the app alone |
-| `src/state.ts` | `install-state.json`: mode, ports, GPU, remote proxy URL, extensions fetched, memory profile, one stamp per finished step, verified weights |
+| `src/state.ts` | `install-state.json`: mode, ports, GPU, remote proxy URL, extensions asked for and fetched, memory profile, one stamp per finished step, verified weights |
 | `src/plan.ts` | The steps, whether each runs and why, and the disk they need |
 | `src/install.ts` | Runs the plan, or prints it with `--dry-run`; asks before the 12 GB profile or the app alone, when there is a terminal |
 | `src/services.ts` | Start, stop and status of ComfyUI, comfy-api-proxy and the app, and the environment `start` gives the app |
 
 The steps, in this order: `stop-services`, `npm-ci`, then for the full install `comfyui`, `comfyui-env`, `proxy`, `node-pack`, `extension-nodes` (the voice pack for `avatar`, the SAM 2 pack for `swap`) and `weights`, then in both modes `yt-dlp`, `open-stack`, `app-build`, `save-state` and `start`. A step runs when its stamp in `install-state.json` no longer matches what it would install. A node pack that fails leaves its extension out, with its weights, and the run goes on.
 
-The next runs keep the ports, `--proxy-url` and the 12 GB profile (dropped when a GPU of 22 GiB or more is found, unless `--low-vram` is passed again). `--extensions` and `--ignore-vram` count for the run they are given to only. `save-state` records the extensions fetched; `start` passes them to the app as `MONTAGIO_EXTENSIONS`, with `MONTAGIO_VRAM_PROFILE=12gb` in the 12 GB profile.
+The next runs keep the ports, `--proxy-url` and the 12 GB profile (dropped when a GPU of 22 GiB or more is found, unless `--low-vram` is passed again). They keep `--extensions` too (`MONTAGIO_EXTENSIONS` when the command line has none), until another value or `--extensions default`, which goes back to the effects pack; `--ignore-vram` counts for the run it is given to only. `save-state` records the extensions asked for and those fetched; `start` passes them to the app as `MONTAGIO_EXTENSIONS`, with `MONTAGIO_VRAM_PROFILE=12gb` in the 12 GB profile.
 
 Shared with `infra/runpod`, used as they are: `versions.env` (pinned versions), `fetch-weights.ts` (weight download with resume and sha256), `patches/comfyui-chatterbox-no-routes.patch` and `requirements-chatterbox.txt` (the avatar's voice pack). The `open-stack` step runs `tools/check-open-stack/src/cli.ts`.
 

@@ -35,6 +35,7 @@ test('the empty state has the default ports and no stamp', () => {
     gpuIndex: null,
     proxyUrl: null,
     extensions: null,
+    extensionsAsked: null,
     vramProfile: null,
     proxyToken: null,
     stamps: {},
@@ -46,6 +47,7 @@ test('a state written before the extensions field reads them as null', () => {
   const path = join(dir, 'old.json');
   writeFileSync(path, JSON.stringify({ schema: 'montagio/install@0.1', mode: 'full', ports: { comfy: 8188, proxy: 8189, app: 3000 }, gpuIndex: 0, proxyUrl: null, stamps: {}, weights: {} }));
   expect(readState(path).extensions).toBeNull();
+  expect(readState(path).extensionsAsked).toBeNull();
 });
 
 test('writeState then readState gives the same state, and leaves no temporary file', () => {
