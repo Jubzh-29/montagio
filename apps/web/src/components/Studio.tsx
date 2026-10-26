@@ -165,7 +165,7 @@ const RESTYLE_SECONDS = 5;
 const FACE_TABS: readonly Tab[] = ['effects', 'avatar', 'motion'];
 
 /** What the avatar of the sample portrait says in the GPU session's render (demo-assets/examples/avatar.mp4), in English. */
-const SAMPLE_SPEECH = 'Hello, this is a test of the Montagio avatar.';
+const SAMPLE_SPEECH = 'Hello, I am a talking avatar made with Montagio.';
 
 /** Under the promise: what each tab makes, in one line. */
 const TAB_LEDES: Record<Tab, MessageKey> = {

@@ -334,7 +334,7 @@ Dans l'ordre de priorité réorienté. Le détail de ce qu'il faut regarder est 
 4. **Voix seule** (≈ 5 min) : `npm run smoke -w @montagio/infra-runpod -- --extension voice --text "Bonjour, ceci est un essai." --language fr`. Le node est-il chargé (fin du bootstrap) ? Combien de temps pour la phrase ?
 5. **Avatar et sa voix** (≈ 30 min) : une photo d'une personne dont vous avez les droits, de face.
    ```bash
-   npm run smoke -w @montagio/infra-runpod -- --extension avatar --input /workspace/face.png --text "Hello, this is a test of the Montagio avatar." --language en
+   npm run smoke -w @montagio/infra-runpod -- --extension avatar --input /workspace/face.png --text "Hello, I am a talking avatar made with Montagio." --language en
    npm run smoke -w @montagio/infra-runpod -- --extension avatar --input /workspace/face.png --text "Bonjour, ceci est un essai de l'avatar de Montagio." --language fr
    ```
    La voix tourne d'abord, puis l'avatar dit sa sortie. Regardez la synchronisation des lèvres (sur les « p » et les « b »), l'identité, les coutures à 5 et 10 s, et l'accent de la voix en français. Si le temps le permet, comparez dans l'interface : le chemin 20 étapes sans LoRA (`steps` 20, `cfg` 6, LoRA retirée), et `ImageFromBatch.batch_index` à 1 et 3 au lieu de 4.

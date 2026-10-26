@@ -60,15 +60,15 @@ async function finished(id: string, exportId: string): Promise<CaptionExportSumm
 
 test('an export says "succeeded" only once the job points to it, whatever the load', async () => {
   const imageRef = ((await (await postSampleUpload()).json()) as { imageRef: string }).imageRef;
-  const avatar = (await (await postAvatars(post('/api/avatars', { imageRef, text: 'Hello, this is a test of the Shot Rate avatar.', language: 'en' }))).json()) as JobSummary;
+  const avatar = (await (await postAvatars(post('/api/avatars', { imageRef, text: 'Hello, I am a talking avatar made with Montage Yo.', language: 'en' }))).json()) as JobSummary;
   expect((await settle(avatar.id)).state).toBe('succeeded');
   const captions = (await (await postCaptions(post(`/api/jobs/${avatar.id}/captions`, {}), params({ id: avatar.id }))).json()) as JobSummary;
   expect((await settle(captions.id)).state).toBe('succeeded');
   const id = captions.id;
 
   // Two exports one after the other: at the moment each writes "succeeded", the job already points to it.
-  const first = (await (await postExport(post(`/api/captions/${id}/export`, { text: 'Hello, this is a test of the Montagio avatar.', style: 'pop' }), params({ id }))).json()) as CaptionExportSummary;
-  const second = (await (await postExport(post(`/api/captions/${id}/export`, { text: 'Hello, this is a test of the Montagio avatar.', style: 'classic' }), params({ id }))).json()) as CaptionExportSummary;
+  const first = (await (await postExport(post(`/api/captions/${id}/export`, { text: 'Hello, I am a talking avatar made with Montagio.', style: 'pop' }), params({ id }))).json()) as CaptionExportSummary;
+  const second = (await (await postExport(post(`/api/captions/${id}/export`, { text: 'Hello, I am a talking avatar made with Montagio.', style: 'classic' }), params({ id }))).json()) as CaptionExportSummary;
   const [a, b] = [await finished(id, first.id), await finished(id, second.id)];
   expect([a.state, b.state]).toEqual(['succeeded', 'succeeded']);
   expect(seen).toEqual([

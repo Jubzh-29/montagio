@@ -7,14 +7,14 @@ test('a talking avatar gets 9:16 captions: the words, a style, the exact preview
   await expect(page.getByRole('link', { name: 'Avatar', exact: true })).toHaveAttribute('aria-current', 'page');
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
   const line = page.getByRole('textbox', { name: 'What the photo says' });
-  await expect(line).toHaveValue('Hello, this is a test of the Montagio avatar.');
+  await expect(line).toHaveValue('Hello, I am a talking avatar made with Montagio.');
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
 
   const panel = page.getByTestId('captions-panel');
   await panel.getByRole('button', { name: /^Make captions/ }).click();
-  // The words start from the typed text; Whisper heard "Shotrate" in the example clip.
-  await expect(panel.getByTestId('captions-text')).toHaveValue('Hello, this is a test of the Montagio avatar.', { timeout: 30_000 });
+  // The words start from the typed text, the line the example clip says.
+  await expect(panel.getByTestId('captions-text')).toHaveValue('Hello, I am a talking avatar made with Montagio.', { timeout: 30_000 });
   await expect(panel.getByRole('combobox', { name: 'Language' })).toHaveValue('auto');
   await expect(panel.getByText('Demo: Whisper did not run here; the timings come with the demo.')).toBeVisible();
 

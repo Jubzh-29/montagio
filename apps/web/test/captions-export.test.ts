@@ -34,8 +34,8 @@ afterEach(() => {
   }
 });
 
-const SPEECH = 'Hello, this is a test of the Shot Rate avatar.';
-const FIXED = 'Hello, this is a test of the Montagio avatar.';
+const SPEECH = 'Hello, I am a talking avatar made with Montage Yo.';
+const FIXED = 'Hello, I am a talking avatar made with Montagio.';
 
 const post = (path: string, body: unknown, key = crypto.randomUUID()) =>
   new Request(`http://localhost${path}`, { method: 'POST', headers: { 'content-type': 'application/json', 'idempotency-key': key }, body: JSON.stringify(body) });
@@ -97,7 +97,7 @@ test('an export burns the corrected words in a 9:16 clip with its sound, the AI 
 
   const ass = readFileSync(join(jobDir(id), 'exports', started.id, 'captions.ass'), 'utf8');
   expect(ass).toContain('MONTAGIO');
-  expect(ass).not.toContain('RATE');
+  expect(ass).not.toContain('MONTAGE');
   // The job's result is the export now, and its recipe is the export's.
   expect((await jobs.read(id))!.outputUrl).toBe(done.url);
   const full = (await (await getRecipe(new Request('http://localhost/x'), params({ source: 'job', id }))).json()) as Recipe;

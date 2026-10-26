@@ -22,13 +22,13 @@ test('Sample writes the line its example says; without a line, Generate says wha
   await expect(page.getByRole('link', { name: 'Avatar', exact: true })).toHaveAttribute('aria-current', 'page');
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
   const line = page.getByRole('textbox', { name: 'What the photo says' });
-  await expect(line).toHaveValue('Hello, this is a test of the Montagio avatar.');
+  await expect(line).toHaveValue('Hello, I am a talking avatar made with Montagio.');
   const generate = page.getByRole('button', { name: /^Generate/ });
   await expect(generate).toBeEnabled();
   await line.fill('');
   await expect(generate).toBeDisabled();
   await expect(generate).toHaveAccessibleDescription('Write what the avatar says to generate.');
-  await line.fill('Hello, this is a test of the Montagio avatar.');
+  await line.fill('Hello, I am a talking avatar made with Montagio.');
   await generate.click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('ai-caption')).toHaveText(/^Demo render: no model ran here\. On a GPU, .*S2V.* made this clip of the same sample photo · AI-generated$/);

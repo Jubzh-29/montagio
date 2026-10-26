@@ -1,6 +1,6 @@
 import { alignText, CaptionsError, normalizeToken, type CaptionWord } from '../src';
 
-// What Whisper heard on demo-assets/examples/avatar.mp4 (the CPU spike of 25/10).
+// What Whisper heard on the first avatar example (the CPU spike of 25/10), whose line named the app's former name.
 const heard: CaptionWord[] = [
   ['Hello,', 0, 0.68],
   ['this', 0.68, 0.86],
