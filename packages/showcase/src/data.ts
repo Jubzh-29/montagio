@@ -18,6 +18,33 @@ export type ShowcaseExampleItem = {
   examples: { sample: string; url: string; workflowUrl: string; poster?: string; hd?: ShowcaseHdModel }[];
 };
 
+/** A model a feature example ran, as its caption names it and Open Stack lists it. */
+export type ShowcaseModel = { id: string; name: string; license: string };
+
+/**
+ * A feature example of the showcase (avatar, translation, captions, motion, Restyle, object swap, trend
+ * remix): the clip, what it started from, and each job of its chain with the workflow it ran.
+ */
+export type ShowcaseFeatureExample = {
+  id: string;
+  feature: 'avatar' | 'translate' | 'captions' | 'motion' | 'restyle' | 'swap' | 'remix';
+  aspect: '16:9' | '9:16';
+  url: string;
+  poster: string;
+  /** It speaks: the page plays it with its sound. */
+  audio: boolean;
+  text?: string;
+  language?: string;
+  face?: string;
+  from?: string;
+  style?: string;
+  post?: { caption: string; hashtags: string[] };
+  inputs: { role: 'photo' | 'clip' | 'frame'; url: string }[];
+  steps: { model: ShowcaseModel; workflowUrl: string }[];
+  /** Its 1080p pass: the upscaler, the frame rate it ends at, and its workflow. */
+  hd?: ShowcaseHdModel & { fps: number; workflowUrl: string };
+};
+
 /**
  * Everything the static showcase needs, written by `showcase prepare` to
  * public/showcase/data.json. URLs are relative to the showcase folder
@@ -42,5 +69,7 @@ export type ShowcaseData = {
   /** The effects and hooks rendered on a sample in a GPU session; one without an example is not listed. */
   effects: ShowcaseExampleItem[];
   hooks: (ShowcaseExampleItem & { references: 1 | 2 })[];
+  /** The feature examples (absent in data written before them). */
+  features?: ShowcaseFeatureExample[];
   openStack: OpenStackReport;
 };

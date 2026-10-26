@@ -46,14 +46,19 @@ export function showcaseJob(
 
 /**
  * The workflow of a clip's 1080p pass, as smoke.ts --extension upscale compiled it: the
- * 480p clip under the name the run loaded it, the sample's aspect and the pass's seed.
+ * 480p clip under the name the run loaded it, the sample's aspect and the pass's seed; `smooth`, with
+ * RIFE's frames in between (a feature example's pass).
  */
-export function hdWorkflow(library: Pick<Library, 'extensionModels' | 'extensionTemplates'>, hd: Pick<HdPass, 'model' | 'input' | 'seed'>, aspect: Aspect): ApiWorkflow {
+export function hdWorkflow(
+  library: Pick<Library, 'extensionModels' | 'extensionTemplates'>,
+  hd: Pick<HdPass, 'model' | 'input' | 'seed'> & { smooth?: boolean },
+  aspect: Aspect,
+): ApiWorkflow {
   const model = library.extensionModels.get(hd.model);
   if (!model || model.task !== 'v2v-upscale') throw new Error(`"${hd.model}" is not a clip upscaler of the registry`);
   const template = library.extensionTemplates.get(model.workflow);
   if (!template) throw new Error(`the workflow of ${model.id} (${model.workflow}) is not loaded`);
-  return compileUpscale(model, template, { videoRef: hd.input, aspect, seed: hd.seed }).workflow;
+  return compileUpscale(model, template, { videoRef: hd.input, aspect, seed: hd.seed, ...(hd.smooth ? { smooth: true } : {}) }).workflow;
 }
 
 /** The workflow of that job: "Open in ComfyUI" hands it out, and its hash ties a rendered clip to it. */

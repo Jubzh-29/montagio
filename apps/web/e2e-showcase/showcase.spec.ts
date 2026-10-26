@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
 /**
@@ -21,10 +23,10 @@ function watchRequests(page: Page): () => string[] {
 
 const probe = (file: string) =>
   JSON.parse(
-    execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=width,height:format=duration:format_tags=comment', '-of', 'json', file], {
+    execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height,r_frame_rate:format=duration:format_tags=comment', '-of', 'json', file], {
       encoding: 'utf8',
     }),
-  ) as { streams: { width: number; height: number }[]; format: { duration: string; tags?: { comment?: string } } };
+  ) as { streams: { codec_type: string; width: number; height: number; r_frame_rate: string }[]; format: { duration: string; tags?: { comment?: string } } };
 
 const result = (page: Page) => page.locator('video[data-testid=result]');
 /** The canvas shows the monitor on arrival; the wall of presets is its other view. */
@@ -214,9 +216,9 @@ test('when FFmpeg cannot load, the film says so and single clips still play', as
 test('the showcase shows only the tabs it can play, and no photo tool beyond the samples', async ({ page }) => {
   await page.goto('/');
   await arrival(page);
-  // Explore, the creation tabs the showcase has clips for, then the History link that closes the row.
+  // Explore, the creation tabs the showcase has clips for, the examples of the other functions, then History.
   const tabs = page.getByRole('navigation', { name: 'Creation' }).getByRole('link');
-  await expect(tabs).toHaveText(['Explore', 'Effects', 'Camera', 'Film', 'History']);
+  await expect(tabs).toHaveText(['Explore', 'Effects', 'Camera', 'Film', 'Examples', 'History']);
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
   // Text to image offers the texts the sample photos were made from, never a text of one's own.
   await page.getByRole('button', { name: 'Text to image', exact: true }).click();
@@ -282,5 +284,64 @@ test('with an effect example, the showcase opens on it, and offers it only on it
   await page.getByRole('button', { name: /Yellow raincoat on a rainy night/ }).click();
   await showGallery(page);
   await expect(page.getByRole('button', { name: 'Squish' })).toHaveCount(0);
+  expect(problems()).toEqual([]);
+});
+
+type Feature = { id: string; feature: string; url: string; audio: boolean; inputs: { url: string }[]; steps: { workflowUrl: string }[]; hd?: { fps: number; workflowUrl: string } };
+const featuresOf = async (page: Page) => ((await (await page.request.get('/showcase/data.json')).json()) as { features?: Feature[] }).features ?? [];
+
+test('the examples page shows every function the showcase cannot run, from what it started to each workflow', async ({ page }) => {
+  const problems = watchRequests(page);
+  const features = await featuresOf(page);
+  expect(features.length).toBeGreaterThan(0);
+  await page.goto('/explore/');
+  await page.getByRole('link', { name: 'See every function at work' }).click();
+  await expect(page.getByRole('heading', { name: 'Every function, rendered', level: 1 })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Examples', exact: true })).toHaveAttribute('aria-current', 'page');
+  for (const example of features) {
+    const card = page.getByTestId(`example-${example.id}`);
+    await expect(card).toBeVisible();
+    await expect(card.locator('video').last()).toHaveAttribute('src', new RegExp(`/showcase/${example.url.replace(/[.]/g, '[.]')}$`));
+    await expect(card.getByRole('link', { name: 'Open in ComfyUI' })).toHaveCount(example.steps.length + (example.hd ? 1 : 0));
+    // A clip that speaks plays with its sound; the others stay muted.
+    expect(await card.locator('video').last().evaluate((video: HTMLVideoElement) => video.muted)).toBe(!example.audio);
+  }
+  // The first workflow of the first example is a ComfyUI graph, saved under the app's name.
+  const first = page.getByTestId(`example-${features[0]!.id}`).getByRole('link', { name: 'Open in ComfyUI' }).first();
+  const [download] = await Promise.all([page.waitForEvent('download'), first.click()]);
+  expect(download.suggestedFilename()).toBe(`montagio-${features[0]!.id}-1.json`);
+  const graph = JSON.parse(readFileSync((await download.path())!, 'utf8')) as Record<string, { class_type?: string }>;
+  expect(Object.values(graph).every((node) => typeof node.class_type === 'string')).toBe(true);
+  expect(problems()).toEqual([]);
+});
+
+test('a speaking example is a 1080p file at 32 fps with its sound and the AI mention', async ({ page }) => {
+  const speaking = (await featuresOf(page)).find((example) => example.audio && example.hd);
+  test.skip(!speaking, 'no speaking example with an HD pass in this build');
+  const file = join(mkdtempSync(join(tmpdir(), 'montagio-example-')), 'example.mp4');
+  writeFileSync(file, await (await page.request.get(`/showcase/${speaking!.url}`)).body());
+  const info = probe(file);
+  expect(info.streams.map((stream) => stream.codec_type).sort()).toEqual(['audio', 'video']);
+  const video = info.streams.find((stream) => stream.codec_type === 'video')!;
+  expect([video.width, video.height].sort((a, b) => a - b)).toEqual([1080, 1920]);
+  expect(video.r_frame_rate).toBe('32/1');
+  expect(info.format.tags?.comment).toBe('AI-generated');
+});
+
+test('the trend remix and translation pages show their own examples, beside the note on the local app', async ({ page }) => {
+  const problems = watchRequests(page);
+  const features = await featuresOf(page);
+  for (const [path, kinds, note] of [
+    ['/remix/', ['remix'], /The trend remix runs in the app installed on your machine/],
+    ['/translate/', ['translate', 'captions'], /Translation runs in the app installed on your machine/],
+  ] as const) {
+    await page.goto(path);
+    await expect(page.getByText(note)).toBeVisible();
+    for (const example of features.filter((candidate) => (kinds as readonly string[]).includes(candidate.feature))) {
+      await expect(page.getByTestId(`example-${example.id}`)).toBeVisible();
+    }
+  }
+  await page.goto('/voice/');
+  await expect(page.getByText(/Voice change runs in the app installed on your machine/)).toBeVisible();
   expect(problems()).toEqual([]);
 });

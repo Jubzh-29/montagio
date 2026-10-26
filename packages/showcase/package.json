@@ -14,6 +14,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@montagio/captions": "*",
     "@montagio/check-open-stack": "*",
     "@montagio/presets": "*",
     "@montagio/recipe": "*",

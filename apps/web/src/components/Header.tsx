@@ -80,7 +80,7 @@ function useMoreOutOfView(ref: RefObject<HTMLElement | null>, count: number): { 
 }
 
 /** The creation tabs, as links: the Studio reads the tab from the URL. */
-function Tabs({ current }: { current?: Tab | 'history' | 'explore' | 'characters' | 'ads' }) {
+function Tabs({ current }: { current?: Tab | 'history' | 'explore' | 'characters' | 'ads' | 'examples' }) {
   const { t } = useI18n();
   const tabs = visibleTabs(useExtensions());
   const row = useRef<HTMLElement>(null);
@@ -117,6 +117,12 @@ function Tabs({ current }: { current?: Tab | 'history' | 'explore' | 'characters
           {t(TAB_LABELS[tab])}
         </Link>
       ))}
+      {/* The functions the showcase cannot run, shown by the clips Montagio rendered for them. */}
+      {IS_SHOWCASE && (
+        <Link href="/examples" className={styles.tab} aria-current={current === 'examples' ? 'page' : undefined}>
+          {t('tabExamples')}
+        </Link>
+      )}
       <Link href="/history" className={styles.tab} aria-current={current === 'history' ? 'page' : undefined}>
         {t('tabHistory')}
       </Link>
@@ -124,7 +130,7 @@ function Tabs({ current }: { current?: Tab | 'history' | 'explore' | 'characters
   );
 }
 
-export function Header({ recording = false, current }: { recording?: boolean; current?: Tab | 'history' | 'explore' | 'characters' | 'ads' }) {
+export function Header({ recording = false, current }: { recording?: boolean; current?: Tab | 'history' | 'explore' | 'characters' | 'ads' | 'examples' }) {
   const { t } = useI18n();
   return (
     <header className={styles.header}>

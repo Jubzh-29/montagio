@@ -7,7 +7,10 @@ export {
   SHOWCASE_DIR,
   verticalFile,
   workflowFile,
+  FEATURE_KINDS,
   type ClipEntry,
+  type FeatureEntry,
+  type FeatureKind,
   type HdPass,
   type Manifest,
   type SampleEntry,
@@ -16,6 +19,7 @@ export { motionKeyframes, toZoompan, type Keyframe } from './motion';
 export { planClips, renderedSize, strayClips, type PlannedClip } from './plan';
 export { DEFAULT_PLACEHOLDER_SEED, hdWorkflow, showcaseWorkflow, workflowSha256, type ClipTexts } from './workflow';
 export { IngestError, ingestExamples, ingestHd, ingestSmoke, type HdSources, type IngestResult } from './ingest';
+export { FeatureError, ingestFeature, type FeatureSources } from './features';
 export { sha256File, verifyShowcase, type VerifyReport } from './verify';
 export { PrepareError, prepareShowcase } from './prepare';
-export type { ShowcaseData } from './data';
+export type { ShowcaseData, ShowcaseFeatureExample } from './data';

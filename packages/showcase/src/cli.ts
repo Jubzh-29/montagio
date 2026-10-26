@@ -6,13 +6,17 @@
  *   npm run showcase -- ingest <smoke results folder> --sample <id> [--pick <preset>=<run> ...]
  *   npm run showcase -- ingest --examples <smoke results folder> --sample <id>
  *   npm run showcase -- ingest --hd <smoke results folder> --inputs <dir> [--renders <smoke results folder> ...]
+ *   npm run showcase -- ingest --feature <id> --kind <kind> <smoke results folder> [--photo <file>] [--face <id>]
+ *                      [--from <id>] [--hd-run <upscale smoke folder> --inputs <dir>] [--text <text> --style <style>]
  *   npm run showcase -- prepare [--strict] [--out <dir>] [--repo-url <url>]
  *
  * Exit code: 0 when everything is fine, 1 on an error, 2 on a usage error.
  */
 import { isAbsolute, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { FeatureError, ingestFeature } from './features';
 import { IngestError, ingestExamples, ingestHd, ingestSmoke } from './ingest';
+import { FEATURE_KINDS } from './manifest';
 import { PrepareError, prepareShowcase } from './prepare';
 import { verifyShowcase } from './verify';
 
@@ -24,6 +28,8 @@ const USAGE = [
   '  showcase ingest <smoke results folder> --sample <id> [--pick <preset>=<run> ...]',
   '  showcase ingest --examples <smoke results folder> --sample <id>   (one smoke folder per call)',
   '  showcase ingest --hd <smoke results folder> --inputs <folder of the clips it upscaled> [--renders <smoke results folder> ...]',
+  `  showcase ingest --feature <id> --kind <${FEATURE_KINDS.join('|')}> <smoke results folder> [--photo <file>] [--face <id>]`,
+  '                  [--from <id>] [--hd-run <upscale smoke folder> --inputs <folder of the clips it upscaled>] [--text <text> --style <style>]',
   '  showcase prepare [--strict] [--out <dir>] [--repo-url <url>]',
 ].join('\n');
 
@@ -36,7 +42,7 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     if (command === 'ingest') return await ingest(rest, io);
     if (command === 'prepare') return await prepare(rest, io);
   } catch (error) {
-    if (error instanceof IngestError || error instanceof PrepareError) {
+    if (error instanceof IngestError || error instanceof PrepareError || error instanceof FeatureError) {
       for (const problem of error.problems) io.err(`error: ${problem}`);
       return 1;
     }
@@ -73,9 +79,38 @@ async function ingest(args: string[], io: CliIo): Promise<number> {
       hd: { type: 'boolean', default: false },
       inputs: { type: 'string' },
       renders: { type: 'string', multiple: true },
+      feature: { type: 'string' },
+      kind: { type: 'string' },
+      photo: { type: 'string' },
+      face: { type: 'string' },
+      from: { type: 'string' },
+      'hd-run': { type: 'string' },
+      text: { type: 'string' },
+      style: { type: 'string' },
     },
   });
   const fromCwd = (path: string) => (isAbsolute(path) ? path : resolve(io.cwd ?? process.cwd(), path));
+  if (values.feature !== undefined) {
+    const kind = FEATURE_KINDS.find((candidate) => candidate === values.kind);
+    if (positionals.length !== 1 || !kind || values.sample || values.examples || values.hd || values.renders || (values['hd-run'] !== undefined) !== (values.inputs !== undefined)) {
+      io.err(`--feature takes one smoke results folder and --kind; --hd-run goes with --inputs\n${USAGE}`);
+      return 2;
+    }
+    const result = await ingestFeature(io.root, {
+      id: values.feature,
+      kind,
+      render: fromCwd(positionals[0]!),
+      ...(values.photo ? { photo: fromCwd(values.photo) } : {}),
+      ...(values.face ? { face: values.face } : {}),
+      ...(values.from ? { from: values.from } : {}),
+      ...(values['hd-run'] && values.inputs ? { hd: { dir: fromCwd(values['hd-run']), inputs: fromCwd(values.inputs) } } : {}),
+      ...(values.text !== undefined ? { captions: { text: values.text, style: values.style ?? '' } } : {}),
+    });
+    for (const file of result.added) io.out(`added: ${file}`);
+    for (const file of result.replaced) io.out(`replaced: ${file}`);
+    io.out(`showcase: feature example ${values.feature} ingested; run "showcase verify" next`);
+    return 0;
+  }
   if (values.hd) {
     // The upscaled clip says which photo it comes from: no --sample, and nothing to --pick.
     if (positionals.length !== 1 || !values.inputs || values.sample || values.examples || (values.pick ?? []).length > 0) {

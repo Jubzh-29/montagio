@@ -4,7 +4,7 @@ import type { CommunityEntry } from '@/lib/community';
 import { galleryOrder } from '@/lib/gallery-order';
 import { MAX_PRESET_YAML_BYTES } from '@/lib/limits';
 import { EFFECT_ORDER, HOOK_ORDER, wallOrder } from '@/lib/wall-order';
-import type { EffectSummary, ExtensionsInfo, GenerationRecord, HistoryItem, HookSummary, JobSummary, PresetSummary, SequenceSummary, ShowcaseInfo } from '@/lib/api-types';
+import type { EffectSummary, ExtensionsInfo, FeatureExample, GenerationRecord, HistoryItem, HookSummary, JobSummary, PresetSummary, SequenceSummary, ShowcaseInfo } from '@/lib/api-types';
 import { filmTags } from './montage-args';
 import { MontageError, type Montage, type MontageStage } from './types';
 import { BASE_PATH, urlsFor } from './urls';
@@ -222,6 +222,18 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     };
   }
 
+  /** The feature examples of data.json, every file behind the showcase's base path (a data.json written before them has none). */
+  function featureExamples(): FeatureExample[] {
+    return (data.features ?? []).map((example) => ({
+      ...example,
+      url: showcaseUrl(example.url),
+      poster: showcaseUrl(example.poster),
+      inputs: example.inputs.map((input) => ({ ...input, url: showcaseUrl(input.url) })),
+      steps: example.steps.map((step) => ({ ...step, workflowUrl: showcaseUrl(step.workflowUrl) })),
+      ...(example.hd ? { hd: { ...example.hd, workflowUrl: showcaseUrl(example.hd.workflowUrl) } } : {}),
+    }));
+  }
+
   function validate(input: Record<string, unknown>): Response {
     if (typeof input.yaml !== 'string') return refuse('invalid-request', 400);
     if (new TextEncoder().encode(input.yaml).byteLength > MAX_PRESET_YAML_BYTES) return refuse('preset-too-large', 413);
@@ -387,6 +399,8 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
     if (method === 'GET' && resource === 'extensions' && !id) return json(extensionsInfo());
     if (method === 'GET' && resource === 'open-stack') return json(data.openStack);
     if (method === 'GET' && resource === 'showcase' && !id) return json(info());
+    // The feature examples (avatar, translation, captions, motion, Restyle, object swap, trend remix), their URLs from the page's base.
+    if (method === 'GET' && resource === 'showcase' && id === 'features' && !action) return json(featureExamples());
     if (method === 'POST' && resource === 'showcase' && id === 'preload') {
       deps.montage.preload();
       return new Response(null, { status: 204 });

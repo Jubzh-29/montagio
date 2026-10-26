@@ -12,6 +12,7 @@ import { useExtensions } from '@/lib/use-extensions';
 import { useJob } from '@/lib/use-job';
 import { CaptionsPanel } from './CaptionsPanel';
 import { ConsentCheck } from './ConsentCheck';
+import { FeatureExamples, useFeatureExamples } from './FeatureExamples';
 import { Header } from './Header';
 import { ShowcaseFooter } from './ShowcaseFooter';
 import page from './ads.module.css';
@@ -34,6 +35,8 @@ const jobIdOf = (item: HistoryItem) => item.key.slice('job:'.length);
 export function VoicePage({ mode = 'change' }: { mode?: 'change' | 'translate' }) {
   const { t } = useI18n();
   const translating = mode === 'translate';
+  // The showcase shows the translations Montagio rendered of its avatar, and their captions.
+  const examples = useFeatureExamples();
   const [language, setLanguage] = useState<TranslateChoice>('en');
   const info = useExtensions();
   const { job, refusal, busy, start } = useJob();
@@ -125,7 +128,10 @@ export function VoicePage({ mode = 'change' }: { mode?: 'change' | 'translate' }
           <p className={page.lead}>{t(translating ? 'translateLead' : 'voiceChangeLead')}</p>
         </div>
         {IS_SHOWCASE ? (
-          <p className={studio.hint}>{t('charactersShowcase')}</p>
+          <>
+            <p className={studio.hint}>{t(translating ? 'translateShowcase' : 'voiceChangeShowcase')}</p>
+            {translating && <FeatureExamples kinds={['translate', 'captions']} examples={examples} />}
+          </>
         ) : !available ? (
           <p className={studio.hint}>{t(translating ? 'translateNeedsExtension' : 'voiceChangeNeedsExtension')}</p>
         ) : (

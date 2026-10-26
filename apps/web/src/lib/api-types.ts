@@ -1,3 +1,5 @@
+import type { ShowcaseFeatureExample } from '@montagio/showcase/data';
+
 export type PresetSummary = {
   id: string;
   name: string;
@@ -135,6 +137,13 @@ export type ShowcaseInfo = {
   hd: boolean;
   repoUrl: string | null;
 };
+
+/**
+ * A feature example of the showcase (GET /api/showcase/features): an avatar, its translation or
+ * captions, a motion transfer, a Restyle, an object swap or a trend remix, rendered by Montagio on a
+ * GPU from the showcase's own pictures and clips, with what it started from and each job's workflow.
+ */
+export type FeatureExample = ShowcaseFeatureExample;
 
 /** The seven extensions, as registry/extensions.yaml names them. */
 export type ExtensionId = 'edit' | 'effects' | 'transitions' | 'avatar' | 'music' | 'upscale' | 'motion' | 'restyle' | 'swap' | 'remix';

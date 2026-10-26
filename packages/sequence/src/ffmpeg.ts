@@ -412,19 +412,22 @@ async function writeAtomically(out: string, args: (partial: string) => string[],
   }
 }
 
-/** Re-encode a clip in the showcase encoding, fitted (letterboxed) to `width`×`height` at `fps`, with `tags`. */
+/** Re-encode a clip in the showcase encoding, fitted (letterboxed) to `width`×`height` at `fps`, with `tags`; `audio`: its sound kept. */
 export async function normalizeClip(
   input: string,
   out: string,
-  opts: { width: number; height: number; fps: number; tags: VideoTags },
+  opts: { width: number; height: number; fps: number; tags: VideoTags; audio?: boolean },
 ): Promise<void> {
   const { width: w, height: h, fps } = opts;
+  // A clip that speaks (a feature example of the showcase: an avatar, its translation) keeps its sound, in AAC.
+  const encoder = opts.audio ? [...SHOWCASE_X264.filter((arg) => arg !== '-an'), '-c:a', 'aac', '-b:a', '128k'] : SHOWCASE_X264;
   await writeAtomically(out, (partial) => [
     '-loglevel', 'error', '-y',
     '-i', input,
     '-map', '0:v:0',
+    ...(opts.audio ? ['-map', '0:a:0'] : []),
     '-vf', `scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps},${SHOWCASE_COLOUR}`,
-    ...SHOWCASE_X264,
+    ...encoder,
     ...metadataArgs(opts.tags),
     '-f', 'mp4', partial,
   ]);

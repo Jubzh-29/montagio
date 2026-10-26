@@ -2,10 +2,25 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
-import { frameCount, LibraryError, loadLibrary, pickAspect, type ApiWorkflow, type Aspect, type Library } from '@montagio/presets';
-import { AI_METADATA, concatCopy, decodeCheck, headerHash, probe, readTags } from '@montagio/sequence';
+import { dimensionsFor, frameCount, LibraryError, loadLibrary, pickAspect, UPSCALE_TARGETS, type ApiWorkflow, type Aspect, type Library } from '@montagio/presets';
+import { AI_METADATA, concatCopy, decodeCheck, headerHash, outputFps, probe, probeAudio, readTags } from '@montagio/sequence';
 import { imageSize } from 'image-size';
-import { effectFile, exampleWorkflowFile, hookFile, loadManifest, ManifestError, SHOWCASE_DIR, type HdPass, type Manifest } from './manifest';
+import {
+  effectFile,
+  exampleWorkflowFile,
+  FEATURE_FPS,
+  featureFile,
+  featureWorkflowFile,
+  hookFile,
+  loadManifest,
+  ManifestError,
+  SHOWCASE_DIR,
+  SMOOTH_FPS,
+  SPEAKING_FEATURES,
+  type FeatureEntry,
+  type HdPass,
+  type Manifest,
+} from './manifest';
 import { planClips, renderedSize, strayClips, type PlannedClip } from './plan';
 import { hdWorkflow, showcaseWorkflow, workflowSha256 } from './workflow';
 
@@ -126,15 +141,49 @@ export async function verifyShowcase(root: string, opts: { strict: boolean }): P
     }
   }
 
-  for (const folder of ['clips', 'effects', 'hooks']) {
+  // The feature examples: each file as ingest wrote it, what it started from, its workflows and its HD pass.
+  for (const entry of manifest.features) {
+    const label = `feature ${entry.id}`;
+    const file = featureFile(entry.id);
+    listed.add(file);
+    const from = manifest.features.find((candidate) => candidate.id === entry.from);
+    errors.push(...(await checkFeatureClip(dir, file, entry, from)));
+    for (const input of entry.inputs) {
+      listed.add(input.file);
+      const actual = await sha256File(join(dir, input.file)).catch(() => null);
+      if (actual === null) errors.push(`${input.file}: missing`);
+      else if (actual !== input.sha256) errors.push(`${input.file}: sha256 is ${actual}, the manifest says ${input.sha256}`);
+    }
+    for (const [index, step] of entry.steps.entries()) {
+      if (!library.extensionModels.has(step.model)) errors.push(`${label}: "${step.model}" is not a model of the registry`);
+      const workflow = featureWorkflowFile(entry.id, index, step.model);
+      listed.add(workflow);
+      try {
+        const text = await readFile(join(dir, workflow), 'utf8');
+        if (workflowSha256(JSON.parse(text) as ApiWorkflow) !== step.workflow_sha256) errors.push(`${workflow}: the workflow changed since it was ingested (workflow_sha256 differs)`);
+      } catch {
+        errors.push(`${workflow}: missing or not JSON`);
+      }
+    }
+    if (entry.hd) checkHd(label, entry.hd, entry.aspect);
+  }
+
+  for (const folder of ['clips', 'effects', 'hooks', 'features', 'features/inputs']) {
     let files: string[] = [];
     try {
-      files = (await readdir(join(dir, folder))).filter((name) => !name.startsWith('.'));
+      files = (await readdir(join(dir, folder), { withFileTypes: true })).filter((item) => item.isFile() && !item.name.startsWith('.')).map((item) => item.name);
     } catch {
       // no such folder yet: nothing rendered there
     }
     for (const name of files) if (!listed.has(`${folder}/${name}`)) errors.push(`${folder}/${name}: no manifest entry`);
   }
+  let workflowFiles: string[] = [];
+  try {
+    workflowFiles = (await readdir(join(dir, 'workflows'))).filter((name) => name.startsWith('feature-'));
+  } catch {
+    // no workflow kept yet
+  }
+  for (const name of workflowFiles) if (!listed.has(`workflows/${name}`)) errors.push(`workflows/${name}: no feature example of the manifest`);
 
   // Every rendered clip of a sample must join the others with -c copy, as the browser joins them.
   for (const sample of manifest.samples) {
@@ -164,6 +213,41 @@ export async function verifyShowcase(root: string, opts: { strict: boolean }): P
 
 /** Effects and transitions render at 480p and 16 fps. */
 const EXAMPLE_FPS = 16;
+
+/**
+ * The file of a feature example against its entry: sha256, stream, size (1080p after its HD pass, or
+ * 1080x1920 for captions), frame rate (32 fps after a smooth pass; the 9:16 export's for captions, which
+ * doubles a rate under 24), sound when it speaks, mention.
+ */
+async function checkFeatureClip(dir: string, file: string, entry: FeatureEntry, from: FeatureEntry | undefined): Promise<string[]> {
+  const path = join(dir, file);
+  const problems: string[] = [];
+  let actual: string;
+  try {
+    actual = await sha256File(path);
+  } catch {
+    return [`${file}: missing`];
+  }
+  if (actual !== entry.sha256) problems.push(`${file}: sha256 is ${actual}, the manifest says ${entry.sha256}`);
+  const fpsOf = (item: FeatureEntry | undefined) => (item?.hd?.smooth ? SMOOTH_FPS : FEATURE_FPS);
+  const expected =
+    entry.feature === 'captions'
+      ? { width: 1080, height: 1920, fps: outputFps(fpsOf(from)) }
+      : { ...(entry.hd ? UPSCALE_TARGETS[entry.aspect] : dimensionsFor(entry.aspect, '480p')), fps: fpsOf(entry) };
+  try {
+    const info = await probe(path);
+    if (info.codec !== 'h264' || info.pixFmt !== 'yuv420p') problems.push(`${file}: ${info.codec}/${info.pixFmt}, expected h264/yuv420p`);
+    if (info.width !== expected.width || info.height !== expected.height) problems.push(`${file}: ${info.width}x${info.height}, expected ${expected.width}x${expected.height}`);
+    if (Math.abs(info.fps - expected.fps) > FPS_TOLERANCE) problems.push(`${file}: ${info.fps} fps, expected ${expected.fps}`);
+    const sound = await probeAudio(path);
+    if (SPEAKING_FEATURES.has(entry.feature) && !sound) problems.push(`${file}: a ${entry.feature} example speaks, and the file has no sound`);
+    const tags = await readTags(path);
+    if (tags.comment !== AI_METADATA.comment) problems.push(`${file}: the MP4 comment is not "${AI_METADATA.comment}"`);
+  } catch (error) {
+    problems.push(`${file}: unreadable video (${(error as Error).message})`);
+  }
+  return problems;
+}
 
 /** The file of an effect or hook example against its entry: sha256, stream, size, mention. */
 async function checkExampleClip(dir: string, file: string, sha256: string, expected: { width: number; height: number }): Promise<string[]> {

@@ -12,6 +12,7 @@ import { useExtensions } from '@/lib/use-extensions';
 import { useJob } from '@/lib/use-job';
 import { ConsentCheck } from './ConsentCheck';
 import { FacePicker } from './FacePicker';
+import { FeatureExamples, useFeatureExamples } from './FeatureExamples';
 import { Header } from './Header';
 import { ShowcaseFooter } from './ShowcaseFooter';
 import page from './ads.module.css';
@@ -67,6 +68,8 @@ const seconds = (frame: number, fps: number) => (frame / fps).toFixed(1);
 export function RemixPage() {
   const { t, lang } = useI18n();
   const info = useExtensions();
+  // The showcase shows the remixes Montagio rendered of its own trend.
+  const examples = useFeatureExamples();
   const remix = useJob();
   const reading = useJob();
   const [source, setSource] = useState<Source>('file');
@@ -344,7 +347,10 @@ export function RemixPage() {
           <p className={page.lead}>{t('trendLead')}</p>
         </div>
         {IS_SHOWCASE ? (
-          <p className={studio.hint}>{t('trendShowcase')}</p>
+          <>
+            <p className={studio.hint}>{t('trendShowcase')}</p>
+            <FeatureExamples kinds={['remix']} examples={examples} />
+          </>
         ) : !available ? (
           <p className={studio.hint}>{t('trendNeedsExtension')}</p>
         ) : (

@@ -78,6 +78,11 @@ export function ExplorePage() {
             <Link href="/?tab=effects" className={styles.primary}>
               {t('exploreStart')}
             </Link>
+            {IS_SHOWCASE && (
+              <Link href="/examples" className={styles.secondary}>
+                {t('exploreExamples')}
+              </Link>
+            )}
             <Link href="/open-stack" className={styles.secondary}>
               {t('exploreOpenStack')}
             </Link>

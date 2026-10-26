@@ -166,7 +166,7 @@ export function AdsPage() {
           <p className={styles.lead}>{t('adsLead')}</p>
         </div>
         {IS_SHOWCASE ? (
-          <p className={studio.hint}>{t('charactersShowcase')}</p>
+          <p className={studio.hint}>{t('adsShowcase')}</p>
         ) : !available ? (
           <p className={studio.hint}>{t('adsNeedsExtensions')}</p>
         ) : (

@@ -18,16 +18,32 @@ import {
   SHOWCASE_COLOUR,
   SHOWCASE_X264,
 } from '@montagio/sequence';
-import type { ShowcaseData, ShowcaseExampleItem, ShowcaseHdModel } from './data';
-import { effectFile, exampleWorkflowFile, hookFile, loadManifest, recipeFile, SHOWCASE_DIR, type HdPass } from './manifest';
+import type { ShowcaseData, ShowcaseExampleItem, ShowcaseFeatureExample, ShowcaseHdModel, ShowcaseModel } from './data';
+import {
+  effectFile,
+  exampleWorkflowFile,
+  FEATURE_FPS,
+  featureFile,
+  featureHdWorkflowFile,
+  featureWorkflowFile,
+  hookFile,
+  loadManifest,
+  recipeFile,
+  SHOWCASE_DIR,
+  SMOOTH_FPS,
+  SPEAKING_FEATURES,
+  type HdPass,
+} from './manifest';
 import { motionKeyframes, toZoompan } from './motion';
 import { planClips, type PlannedClip } from './plan';
 import { showcaseRecipe } from './recipe';
 import { sha256File, verifyShowcase } from './verify';
-import { DEFAULT_PLACEHOLDER_SEED, showcaseWorkflow } from './workflow';
+import { DEFAULT_PLACEHOLDER_SEED, hdWorkflow, showcaseWorkflow } from './workflow';
 
 /** Width of the gallery tile loops. */
 const PREVIEW_WIDTH = 320;
+/** Width of a feature example's poster: its card shows it while the clip loads. */
+const FEATURE_POSTER_WIDTH = 640;
 const previewFile = (preset: string) => `previews/${preset}.mp4`;
 /** The first frame of a clip, beside it: what a tile shows while the clip loads. */
 const posterOf = (file: string) => file.replace(/\.mp4$/, '.jpg');
@@ -196,6 +212,49 @@ export async function prepareShowcase(
     };
   };
 
+  // The feature examples, copied as ingest wrote them: the clip and its poster, what it started from,
+  // the workflow of each job, and its HD pass compiled again (verify has checked its hash).
+  const features: ShowcaseFeatureExample[] = [];
+  for (const entry of manifest.features) {
+    const file = featureFile(entry.id);
+    await ensure(file, hash('feature', entry.sha256), (path) => copyFile(join(showcaseDir, file), path));
+    await ensure(posterOf(file), hash('feature-poster', entry.sha256, FEATURE_POSTER_WIDTH), (path) =>
+      posterFrame(join(outDir, file), path, { width: FEATURE_POSTER_WIDTH, comment: AI_METADATA.comment }),
+    );
+    for (const input of entry.inputs) await ensure(input.file, hash('feature-input', input.sha256), (path) => copyFile(join(showcaseDir, input.file), path));
+    const steps = [];
+    for (const [index, step] of entry.steps.entries()) {
+      const workflowUrl = featureWorkflowFile(entry.id, index, step.model);
+      await ensure(workflowUrl, hash('feature-workflow', step.workflow_sha256), (path) => copyFile(join(showcaseDir, workflowUrl), path));
+      steps.push({ model: modelOf(library, step.model), workflowUrl });
+    }
+    let hd: ShowcaseFeatureExample['hd'];
+    if (entry.hd) {
+      const workflowUrl = featureHdWorkflowFile(entry.id);
+      const workflow = hdWorkflow(library, entry.hd, entry.aspect);
+      produced.add(workflowUrl);
+      await writeFile(join(outDir, workflowUrl), `${JSON.stringify(workflow, null, 2)}\n`);
+      hd = { ...modelOf(library, entry.hd.model), fps: entry.hd.smooth ? SMOOTH_FPS : FEATURE_FPS, workflowUrl };
+    }
+    features.push({
+      id: entry.id,
+      feature: entry.feature,
+      aspect: entry.aspect,
+      url: file,
+      poster: posterOf(file),
+      audio: SPEAKING_FEATURES.has(entry.feature),
+      ...(entry.text ? { text: entry.text } : {}),
+      ...(entry.language ? { language: entry.language } : {}),
+      ...(entry.face ? { face: entry.face } : {}),
+      ...(entry.from ? { from: entry.from } : {}),
+      ...(entry.style ? { style: entry.style } : {}),
+      ...(entry.post ? { post: entry.post } : {}),
+      inputs: entry.inputs.map((input) => ({ role: input.role, url: input.file })),
+      steps,
+      ...(hd ? { hd } : {}),
+    });
+  }
+
   // The browser joins a sample's clips (and their 9:16 cuts) with -c copy: prove it works here first.
   for (const sample of manifest.samples) {
     const items = planned.filter((item) => item.sample.id === sample.id);
@@ -263,6 +322,7 @@ export async function prepareShowcase(
     hooks: [...library.hooks.values()]
       .map((preset) => ({ ...exampleItem('hook', preset), references: preset.end_frame.references }))
       .filter((item) => item.examples.length > 0),
+    features,
     openStack,
   };
   await writeFile(join(outDir, 'data.json'), `${JSON.stringify(data)}\n`);
@@ -315,6 +375,12 @@ async function checkJoin(files: string[], label: string): Promise<void> {
 function modelSummary(library: Library, id: string): ShowcaseData['model'] {
   const model = library.models.get(id)!;
   return { id: model.id, name: model.name, license: model.license };
+}
+
+/** A model of the registry as a feature example's caption names it (verify has checked it is there). */
+function modelOf(library: Library, id: string): ShowcaseModel {
+  const model = library.extensionModels.get(id);
+  return { id, name: model?.name ?? id, license: model?.license ?? '' };
 }
 
 /** The upscaler of a file's HD pass, as the caption names it (verify has checked it is in the registry). */
