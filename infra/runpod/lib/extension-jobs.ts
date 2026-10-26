@@ -148,6 +148,8 @@ export type ExtensionJobOptions = {
   remixSheet?: string;
   /** The transcription's speech, as the app prepares it (mono FLAC at 16 kHz). */
   words?: string;
+  /** The language Whisper writes the words in, as the captions panel imposes one; "auto" (the default) detects it. */
+  wordsLanguage?: string;
   /** The speech of avatar, and its length in seconds (the caller reads it). */
   audio?: string;
   /** The voice job's sample (mono FLAC, as the app prepares it): the cloned voice. */
@@ -438,8 +440,8 @@ export function extensionJobs(library: Library, opts: ExtensionJobOptions): Exte
       }
       case 'transcribe': {
         const speech = need(opts.words, '--audio', name);
-        // "auto": Whisper detects the language, as the captions panel asks by default.
-        const job = compileTranscribe(model, template, { audioRef: basename(speech), language: 'auto' });
+        // "auto": Whisper detects the language, as the captions panel asks by default; it can impose one too.
+        const job = compileTranscribe(model, template, { audioRef: basename(speech), language: opts.wordsLanguage ?? 'auto' });
         return [{ name, tag: name, model, ...job, files: [file('audio', speech)] }];
       }
       case 'upscale-image': {

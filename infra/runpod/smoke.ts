@@ -109,6 +109,7 @@ const { values: args } = parseArgs({
     voice: { type: 'string' },
     text: { type: 'string', multiple: true, default: [] },
     language: { type: 'string', default: 'en' },
+    'words-language': { type: 'string', default: 'auto' },
     to: { type: 'string', default: 'fr' },
     duration: { type: 'string', default: '10' },
     t2i: { type: 'string', multiple: true, default: [] },
@@ -169,6 +170,7 @@ Extensions (instead of presets):
   --audio PATH       the speech of avatar; without it, the voice job runs first and the avatar speaks its output;
                      transcribe: a clip or a sound that speaks, read by Whisper as the captions read it (its sound as
                      mono FLAC at 16 kHz, 60 s at most, the language detected)
+  --words-language L transcribe: the language Whisper writes in, as the captions panel imposes one (default auto)
   --voice PATH       voice: speak with this sample (a consented recording, mono FLAC) instead of the built-in voice
   --text [JOB=]TEXT  the edit instruction, the effects' subject, the words to say, the music description or the
                      restyle's new look or the swap's new object (each has a default), for the one job of the run that
@@ -726,6 +728,7 @@ async function runExtensions(
     restyleFrame,
     restyleReference,
     words,
+    wordsLanguage: args['words-language'],
     remixShots,
     remixAspect,
     remixSheet,

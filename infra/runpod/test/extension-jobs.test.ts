@@ -279,3 +279,10 @@ test('the edit reads a second image with --ref (a palette, a moodboard sheet), n
   expect(checkWorkflow(edit!.workflow, info, { skip: ['41.image', '42.image'] })).toEqual([]);
   expect(() => extensionJobs(library, { ...base, jobs: ['edit'], input: '/p.png', ref: '/r.png', mask: '/m.png' })).toThrow(/--mask and --ref/);
 });
+
+test('the transcription leaves the language to Whisper, or writes in the one imposed, as the captions panel does', () => {
+  const transcribe = (extra: object) => extensionJobs(library, { ...base, words: '/data/speech-16k.flac', jobs: ['transcribe'], ...extra })[0]!;
+  expect(transcribe({}).params).toEqual({ language: 'auto' });
+  expect(transcribe({ wordsLanguage: 'es' }).params).toEqual({ language: 'es' });
+  expect(() => transcribe({ wordsLanguage: 'spanish' })).toThrow(/not a language code/);
+});
