@@ -124,5 +124,6 @@ describe('a seed given again', () => {
     expect(record.state).toBe('succeeded');
     const seeds = await Promise.all(record.shots.map(async (shot) => (await readRecord(shot.generationId!))!.seed));
     expect(seeds).toEqual([7, 8]);
-  });
+    // FFmpeg joins the film: on a loaded machine that alone passes Vitest's 5 s, as in sequences.test.ts.
+  }, 60_000);
 });
