@@ -5,6 +5,7 @@ import { exportVertical, mixMusic, probe } from '@montagio/sequence';
 import { JobError } from '../errors';
 import { musicModel, requireExtension } from '../extensions';
 import { mediaFileFor, mediaUrlFor } from '../generations';
+import { assertNoBlockedName } from '../guards';
 import type { TaskDef } from '../jobs';
 import { readSequence, setSequenceMusic } from '../sequences';
 
@@ -25,6 +26,7 @@ export const musicTask: TaskDef = {
     const model = musicModel(lib);
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
     if (!prompt || prompt.length > (model.limits.max_chars ?? PROMPT_MAX)) throw new JobError('invalid-input');
+    await assertNoBlockedName(prompt);
     const bpm = body.bpm === undefined || body.bpm === null ? undefined : body.bpm;
     if (bpm !== undefined && !(Number.isInteger(bpm) && (bpm as number) >= 10 && (bpm as number) <= 300)) throw new JobError('invalid-input');
     const { duration_s } = await probe(film);

@@ -59,7 +59,7 @@ function installedState(): InstallState {
     mode: 'full',
     stamps: {
       comfyui: versions.comfyuiCommit,
-      comfyEnv: envStamp(versions.comfyuiCommit, versions.torch, python.version),
+      comfyEnv: envStamp(versions.comfyuiCommit, versions.torch, python.version, versions.pillowMin),
       proxy: proxyStamp(versions, python.version)!,
       npm: 'h1',
       build: buildStamp('abc123', 'h1')!,
@@ -248,7 +248,8 @@ test('another Python rebuilds the proxy environment too', () => {
 });
 
 test('envStamp and buildStamp change with what they depend on', () => {
-  expect(envStamp('c', versions.torch, [3, 12, 10])).toBe('c torch==2.14.1+cu130 torchvision==0.29.1 python==3.12');
+  // A new Pillow floor reinstalls the requirements of an existing ComfyUI.
+  expect(envStamp('c', versions.torch, [3, 12, 10], '13.0.0')).toBe('c torch==2.14.1+cu130 torchvision==0.29.1 python==3.12 pillow>=13.0.0');
   expect(buildStamp(null, 'h')).toBeNull();
   expect(buildStamp('a', 'h')).not.toBe(buildStamp('a', 'h2'));
 });

@@ -33,9 +33,19 @@ const LINK_MAX_BYTES = '50M';
 const LINK_TIMEOUT_MS = 180_000;
 
 /**
+ * A TikTok video's own paths, those yt-dlp's TikTok extractors take: /@user/video/<id>, /embed/<id> and
+ * a short link (/t/<code>, vm. or vt.<code>). Any other page of the site (its /link/v2 redirect page among
+ * them) is not a video, and could send yt-dlp on to an address of the local network.
+ */
+function tiktokVideoPath(host: string, path: string): boolean {
+  if (host === 'vm.tiktok.com' || host === 'vt.tiktok.com') return /^\/\w+\/?$/.test(path);
+  return /^\/(@[\w.-]+\/video\/\d+|embed\/\d+|t\/\w+)\/?$/.test(path);
+}
+
+/**
  * A link checked: an http(s) URL without user nor port on a listed host; on YouTube, a Short
- * (youtube.com/shorts/…, or youtu.be/…); on Instagram, a reel or a post. Returns it without its
- * fragment, or why it is refused.
+ * (youtube.com/shorts/…, or youtu.be/…); on Instagram, a reel or a post; on TikTok, a video. Returns
+ * it without its fragment, or why it is refused.
  */
 export function checkImportLink(raw: unknown): { ok: true; url: string; host: string; platform: LinkPlatform } | { ok: false; reason: LinkRefusal } {
   if (typeof raw !== 'string' || !raw.trim() || raw.length > LINK_MAX) return { ok: false, reason: 'link-invalid' };
@@ -54,8 +64,11 @@ export function checkImportLink(raw: unknown): { ok: true; url: string; host: st
   if (platform === 'youtube' && host !== 'youtu.be' && !/^\/shorts\/[\w-]+\/?$/.test(path)) return { ok: false, reason: 'link-path' };
   if (host === 'youtu.be' && !/^\/[\w-]+\/?$/.test(path)) return { ok: false, reason: 'link-path' };
   if (platform === 'instagram' && !/^\/(reel|reels|p|tv)\/[\w-]+\/?$/.test(path)) return { ok: false, reason: 'link-path' };
+  if (platform === 'tiktok' && !tiktokVideoPath(host, path)) return { ok: false, reason: 'link-path' };
   url.hash = '';
-  return { ok: true, url: url.href, host, platform };
+  // The same pages on www., the only host the TikTok extractor of a video takes.
+  if (host === 'tiktok.com' || host === 'm.tiktok.com') url.hostname = 'www.tiktok.com';
+  return { ok: true, url: url.href, host: url.hostname, platform };
 }
 
 /** What yt-dlp's info file says that the remix keeps: the length, the sound. */
@@ -137,7 +150,7 @@ export async function ytDlpVersion(run: YtDlpRun = runYtDlp): Promise<string | n
 }
 
 /**
- * Fetch a checked link into `dir` with yt-dlp: its own configuration ignored, one video, 60 s and
+ * Fetch a checked link into `dir` with yt-dlp: its own configuration and its generic extractor left out, one video, 60 s and
  * 50 MB at most, in MP4 when the platform has it; FFmpeg (MONTAGIO_FFMPEG when set) merges the
  * streams. Returns the video file and what its info says.
  */
@@ -147,6 +160,8 @@ export async function downloadLink(url: string, dir: string, run: YtDlpRun = run
     ytDlpBin(),
     [
       '--ignore-config', '--no-playlist', '--no-progress', '--no-warnings', '--no-mtime',
+      // The platforms' own extractors only: the generic one reads whatever page a link leads to, and follows it.
+      '--use-extractors', 'default,-generic',
       '--max-filesize', LINK_MAX_BYTES,
       '--match-filters', `duration <= ${REMIX_MAX_S}`,
       '-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b',

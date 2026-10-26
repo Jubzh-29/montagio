@@ -412,14 +412,14 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
       await run(py!, [...pre, '-m', 'venv', L.comfyVenv]);
       await run(L.comfyPython, ['-m', 'pip', 'install', '--upgrade', 'pip']);
       await run(L.comfyPython, ['-m', 'pip', 'install', '--index-url', `https://download.pytorch.org/whl/${torch.cuda}`, `torch==${torch.torch}`, `torchvision==${torch.torchvision}`]);
-      // The constraint stops pip from swapping the CUDA build above for a PyPI one.
+      // The constraint stops pip from swapping the CUDA build above for a PyPI one, and lifts the Pillow that came with it.
       const constraints = join(L.cacheDir, 'torch-constraints.txt');
       mkdirSync(L.cacheDir, { recursive: true });
-      writeFileSync(constraints, `torch==${torch.torch}\ntorchvision==${torch.torchvision}\n`);
+      writeFileSync(constraints, `torch==${torch.torch}\ntorchvision==${torch.torchvision}\npillow>=${versions.pillowMin}; python_version >= "3.11"\n`);
       await run(L.comfyPython, ['-m', 'pip', 'install', '-r', join(L.comfyDir, 'requirements.txt'), '-c', constraints]);
       // The GPU the checks chose, numbered as nvidia-smi numbers it.
       await run(L.comfyPython, ['-I', '-c', CUDA_CHECK], { env: { ...env, CUDA_VISIBLE_DEVICES: String(pickGpu(facts.gpus)?.index ?? 0) } });
-      stamp('comfyEnv', envStamp(versions.comfyuiCommit, torch, python.version));
+      stamp('comfyEnv', envStamp(versions.comfyuiCommit, torch, python.version, versions.pillowMin));
     },
     proxy: async () => {
       if (!python) throw new Error('no suitable Python');

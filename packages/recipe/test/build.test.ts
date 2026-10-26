@@ -69,7 +69,7 @@ describe('buildRecipe', () => {
 
   it('refuses a local path that no input slot covers', () => {
     const workflow = cameraWorkflow();
-    workflow['58']!.inputs.image = 'C:\\Users\\julien\\Pictures\\me.jpg';
+    workflow['58']!.inputs.image = 'C:\\Users\\someone\\Pictures\\me.jpg';
     expect(() => buildRecipe(cameraDraft({ steps: [{ name: 'camera', workflow, inputs: [] }] }), CONTEXT)).toThrow(/local path/);
     // Declared as the photo, the same value is replaced and the recipe builds.
     expect(() => buildRecipe(cameraDraft({ steps: [{ name: 'camera', workflow, inputs: [PHOTO_SLOT] }] }), CONTEXT)).not.toThrow();

@@ -16,6 +16,8 @@ export type Versions = {
   proxyVersion: string;
   torch: TorchPin;
   torchFallback: TorchPin;
+  /** The lowest Pillow of ComfyUI's environment, on Python 3.11 and newer (Pillow 13 left Python 3.10). */
+  pillowMin: string;
   /** The remix's link importer: a release binary per system, by its sha256. */
   ytDlp: { version: string; sha256: { windows: string; linux: string } };
   /** The custom node packs an extension needs, at their pinned commits: the avatar's voice, the object swap's tracker. */
@@ -85,6 +87,7 @@ export function versionsFrom(env: Record<string, string>): Versions {
     proxyVersion: get('COMFY_API_PROXY_VERSION'),
     torch: pin('TORCH_VERSION', 'TORCHVISION_VERSION', 'TORCH_CUDA'),
     torchFallback: pin('TORCH_FALLBACK_VERSION', 'TORCHVISION_FALLBACK_VERSION', 'TORCH_FALLBACK_CUDA'),
+    pillowMin: get('PILLOW_MIN'),
     ytDlp: { version: get('YTDLP_VERSION'), sha256: { windows: get('YTDLP_SHA256_WINDOWS'), linux: get('YTDLP_SHA256_LINUX') } },
     voiceNode: { repo: get('CHATTERBOX_NODE_REPO'), commit: get('CHATTERBOX_NODE_COMMIT') },
     segmentNode: { repo: get('SAM2_NODE_REPO'), commit: get('SAM2_NODE_COMMIT') },

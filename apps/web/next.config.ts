@@ -25,6 +25,25 @@ const nextConfig: NextConfig = showcaseExport
       // The Comfy SDK reads files and hashes them with WebAssembly: load it with Node's own
       // module loader instead of bundling it into the route handlers.
       serverExternalPackages: ['@comfyorg/sdk'],
+      // No next/image here: /_next/image, which fetches what its URL names, stays closed.
+      images: { unoptimized: true },
+      async headers() {
+        const page = [
+          // Another site cannot show the app in a frame and have the user click in it unseen.
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          // A link followed out of the app (a trend's sound, a model's page) does not say where it was clicked.
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+        ];
+        // The answers and the files are for this app's pages only: another site cannot even embed them.
+        const own = [{ key: 'Cross-Origin-Resource-Policy', value: 'same-origin' }];
+        return [
+          { source: '/:path*', headers: page },
+          { source: '/api/:path*', headers: own },
+          { source: '/media/:path*', headers: own },
+        ];
+      },
     };
 
 export default nextConfig;

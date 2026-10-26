@@ -1,6 +1,7 @@
 import { readJsonBody } from '@/server/body';
-import { createGeneration, failureResponse, MAX_REQUEST_BYTES } from '@/server/generations';
+import { createGeneration, MAX_REQUEST_BYTES } from '@/server/generations';
 import { replaySeed } from '@/server/inputs';
+import { jobFailureResponse } from '@/server/jobs';
 
 type Body = {
   presetId?: unknown;
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
     });
     return Response.json(record, { status: created ? 201 : 200 });
   } catch (error) {
-    const failure = failureResponse(error);
+    const failure = jobFailureResponse(error);
     if (failure) return failure;
     throw error;
   }

@@ -64,3 +64,18 @@ test('a JPEG is refused with ImageTagError', async () => {
   writeFileSync(input, Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1]));
   await expect(tagImage(input, join(dir, 'out.png'))).rejects.toBeInstanceOf(ImageTagError);
 });
+
+test("an image handed out keeps no EXIF: a camera's eXIf chunk (its GPS position among it) is dropped", async () => {
+  const exif = Buffer.from('MM\0*\0\0\0\x08GPS 48.8566 N 2.3522 E', 'latin1');
+  const head = Buffer.alloc(8);
+  head.writeUInt32BE(exif.length, 0);
+  head.write('eXIf', 4, 'latin1');
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([head.subarray(4), exif])) >>> 0, 0);
+  const iend = PNG_1X1.length - 12;
+  const input = join(dir, 'gps.png');
+  writeFileSync(input, Buffer.concat([PNG_1X1.subarray(0, iend), head, exif, crc, PNG_1X1.subarray(iend)]));
+  expect(chunksOf(readFileSync(input)).map((chunk) => chunk.type)).toContain('eXIf');
+  await tagImage(input, join(dir, 'out.png'));
+  expect(chunksOf(readFileSync(join(dir, 'out.png'))).map((chunk) => chunk.type)).toEqual(['IHDR', 'IDAT', 'tEXt', 'tEXt', 'IEND']);
+});

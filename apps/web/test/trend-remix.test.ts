@@ -251,8 +251,34 @@ describe('the import by link: on a machine of its own only, yt-dlp simulated (ne
       ['https://www.youtube.com/watch?v=abcDEF12345', 'link-path'],
       ['https://www.instagram.com/someone/', 'link-path'],
       ['not a link', 'link-invalid'],
+      // Never an option of yt-dlp: a link is a URL, and it goes after "--".
+      ['--exec=calc.exe', 'link-invalid'],
+      ['-https://www.tiktok.com/@a/video/1', 'link-invalid'],
     ];
     for (const [url, reason] of refused) expect({ url, check: checkImportLink(url) }).toEqual({ url, check: { ok: false, reason } });
+  });
+
+  test("on TikTok, a video's own paths only: a redirect page could send yt-dlp into the local network", () => {
+    const ok = [
+      'https://www.tiktok.com/@some.one_1/video/7400000000000000000',
+      'https://www.tiktok.com/embed/7400000000000000000',
+      'https://www.tiktok.com/t/ZTabc123/',
+      'https://vt.tiktok.com/ZSabc123',
+    ];
+    for (const url of ok) expect({ url, check: checkImportLink(url) }).toMatchObject({ url, check: { ok: true, url } });
+    // Without www., the same video: yt-dlp gets it on www.
+    for (const url of ['https://tiktok.com/@a/video/7400000000000000000', 'https://m.tiktok.com/@a/video/7400000000000000000']) {
+      expect(checkImportLink(url)).toMatchObject({ ok: true, url: 'https://www.tiktok.com/@a/video/7400000000000000000', host: 'www.tiktok.com' });
+    }
+    const refused = [
+      'https://www.tiktok.com/link/v2?aid=1988&target=http%3A%2F%2F127.0.0.1%3A8188%2Fview',
+      'https://m.tiktok.com/v/7400000000000000000.html',
+      'https://www.tiktok.com/',
+      'https://www.tiktok.com/@someone',
+      'https://vm.tiktok.com/a/b',
+      'https://www.tiktok.com/@a/video/1/../../link/v2',
+    ];
+    for (const url of refused) expect({ url, check: checkImportLink(url) }).toEqual({ url, check: { ok: false, reason: 'link-path' } });
   });
 
   test("the sound its platform names: its title, its artists, a search for it there", () => {
@@ -280,6 +306,8 @@ describe('the import by link: on a machine of its own only, yt-dlp simulated (ne
     expect(meta).toMatchObject({ origin: 'link', frames: 105, cuts: [30, 75], link: { url: 'https://www.tiktok.com/@a/video/1', host: 'www.tiktok.com' }, sound: { title: 'Song' } });
     const args = calls[0]!;
     expect(args).toEqual(expect.arrayContaining(['--ignore-config', '--no-playlist', '--max-filesize', '50M', '--match-filters', 'duration <= 60']));
+    // The platforms' own extractors only: the generic one would read any page a link redirects to, and follow it.
+    expect(args[args.indexOf('--use-extractors') + 1]).toBe('default,-generic');
     // The link comes last, after "--": never read as an option.
     expect(args.slice(-2)).toEqual(['--', 'https://www.tiktok.com/@a/video/1']);
   }, 60_000);

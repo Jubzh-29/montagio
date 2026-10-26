@@ -37,10 +37,10 @@ const full: InstallState = { ...emptyState(), mode: 'full', gpuIndex: 0 };
 const specsOf = (state: InstallState, baseEnv: NodeJS.ProcessEnv = {}, extra: string[] = []) =>
   serviceSpecs({ os, layout: L, repoRoot: '/repo dir', state, nodePath: '/bin/node', baseEnv, extraComfyArgs: extra });
 
-test('ComfyUI listens on 127.0.0.1 with partner nodes disabled', () => {
+test('ComfyUI listens on 127.0.0.1 with partner nodes disabled, its frontend kept off the internet', () => {
   const comfy = specsOf(full).find((s) => s.name === 'comfyui')!;
   expect(comfy.cmd).toBe(L.comfyPython);
-  expect(comfy.args).toEqual(['main.py', '--listen', '127.0.0.1', '--port', '8188', '--disable-partner-nodes']);
+  expect(comfy.args).toEqual(['main.py', '--listen', '127.0.0.1', '--port', '8188', '--disable-partner-nodes', '--offline']);
   expect(comfy.args.join(' ')).not.toContain('0.0.0.0');
   expect(comfy.health).toBe('http://127.0.0.1:8188/system_stats');
   expect(specsOf({ ...full, gpuIndex: 1 }, {}, ['--lowvram']).find((s) => s.name === 'comfyui')!.args.slice(-3)).toEqual(['--cuda-device', '1', '--lowvram']);
@@ -54,6 +54,16 @@ test('MONTAGIO_COMFYUI_ARGS adds arguments but cannot move ComfyUI off 127.0.0.1
   // ComfyUI's argparse takes an unambiguous abbreviation of an option.
   expect(() => comfyExtraArgs('--liste 0.0.0.0')).toThrow(/--liste/);
   expect(() => comfyExtraArgs('--listen')).toThrow(/127\.0\.0\.1/);
+});
+
+test('the Python services never reach Hugging Face, send it no telemetry, and keep torch.load on weights only', () => {
+  // The voice node downloads a file it misses, or a whole repository, when Hugging Face is reachable.
+  const specs = specsOf(full, { HF_HUB_OFFLINE: '0', TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD: '1', PATH: '/bin' });
+  for (const name of ['comfyui', 'proxy']) {
+    const env = specs.find((s) => s.name === name)!.env;
+    expect(env).toMatchObject({ HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', HF_HUB_DISABLE_TELEMETRY: '1', PATH: '/bin' });
+    expect(env.TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD).toBeUndefined();
+  }
 });
 
 test('the Python services write their logs unbuffered, so a crash keeps its last lines', () => {

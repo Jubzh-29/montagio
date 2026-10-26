@@ -187,7 +187,9 @@ export async function publishToCommunity(body: Record<string, unknown>): Promise
 
 /** A share file someone sent, added to this gallery; it shows the example of its move or effect, when there is one. */
 export async function importShared(shared: SharedEntry): Promise<CommunityEntry> {
-  await assertNoBlockedName(shared.title, shared.author ?? '', shared.reprise.prompt ?? '', shared.reprise.motion ?? '');
+  const shots = (shared.reprise.shots ?? []).map((shot) => shot.prompt);
+  // A remixed move's text is checked whole: its name, its prompts, what it says of itself.
+  await assertNoBlockedName(shared.title, shared.author, shared.name, shared.reprise.prompt, shared.reprise.motion, ...shots, shared.presetYaml);
   const id = randomUUID();
   const example = (await examples()).find(
     (entry) => (shared.reprise.presetId && entry.reprise.presetId === shared.reprise.presetId) || (shared.reprise.effectId && entry.reprise.effectId === shared.reprise.effectId),

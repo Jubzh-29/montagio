@@ -1,5 +1,7 @@
-import { failureResponse } from '@/server/generations';
+import { MAX_REQUEST_BYTES } from '@/lib/limits';
+import { readJsonBody } from '@/server/body';
 import { replaySeed } from '@/server/inputs';
+import { jobFailureResponse } from '@/server/jobs';
 import { createSequence } from '@/server/sequences';
 
 type ShotInput = { presetId?: unknown; modelId?: unknown; userPrompt?: unknown; seed?: unknown };
@@ -10,12 +12,10 @@ export async function POST(request: Request) {
   const idempotencyKey = request.headers.get('idempotency-key');
   if (!idempotencyKey) return Response.json({ error: 'missing-idempotency-key' }, { status: 400 });
 
-  let body: { imageRef?: unknown; shots?: unknown };
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return Response.json({ error: 'invalid-json' }, { status: 400 });
-  }
+  // Past the cap, nothing more is read: a film's body is a photo's ref and a few shots.
+  const read = await readJsonBody(request, MAX_REQUEST_BYTES);
+  if (!read.ok) return Response.json({ error: read.reason === 'too-large' ? 'invalid-request' : 'invalid-json' }, { status: 400 });
+  const body = (read.value && typeof read.value === 'object' ? read.value : {}) as { imageRef?: unknown; shots?: unknown };
   if (typeof body.imageRef !== 'string') return Response.json({ error: 'invalid-request' }, { status: 400 });
   if (!Array.isArray(body.shots) || !body.shots.every((shot: ShotInput) => typeof shot?.presetId === 'string')) {
     return Response.json({ error: 'invalid-shots' }, { status: 400 });
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     });
     return Response.json(record, { status: created ? 201 : 200 });
   } catch (error) {
-    const failure = failureResponse(error);
+    const failure = jobFailureResponse(error);
     if (failure) return failure;
     throw error;
   }

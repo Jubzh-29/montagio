@@ -378,12 +378,13 @@ test('paths with spaces reach every command as single arguments', async () => {
   expect(venv.args.at(-1)).toBe(h.L.comfyVenv);
 });
 
-test('the torch command and its constraints pin the exact build', async () => {
+test('the torch command and its constraints pin the exact build, and lift Pillow past its known flaws', async () => {
   const h = harness();
   await install(repo, options(), h.deps);
   const torch = described(h.calls).find((c) => c.includes('--index-url'))!;
   expect(torch).toContain('--index-url https://download.pytorch.org/whl/cu130 torch==2.14.1 torchvision==0.29.1');
-  expect(readFileSync(join(h.L.cacheDir, 'torch-constraints.txt'), 'utf8')).toBe('torch==2.14.1\ntorchvision==0.29.1\n');
+  // The PyTorch index stops at Pillow 12.3.0, which a crafted PNG can stall (GHSA-5xm2-6676-qcp9, GHSA-g4qv-2jxx-769h).
+  expect(readFileSync(join(h.L.cacheDir, 'torch-constraints.txt'), 'utf8')).toBe('torch==2.14.1\ntorchvision==0.29.1\npillow>=13.0.0; python_version >= "3.11"\n');
 });
 
 test('the CUDA check looks at the GPU the checks chose, numbered as nvidia-smi numbers it', async () => {

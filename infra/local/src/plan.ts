@@ -79,8 +79,8 @@ export const CHECK_OPEN_STACK = 'tools/check-open-stack/src/cli.ts';
 
 const gib = (bytes: number) => `${(bytes / GiB).toFixed(2)} GiB`;
 
-export function envStamp(commit: string, torch: TorchPin, python: [number, number, number]): string {
-  return `${commit} torch==${torch.torch}+${torch.cuda} torchvision==${torch.torchvision} python==${python[0]}.${python[1]}`;
+export function envStamp(commit: string, torch: TorchPin, python: [number, number, number], pillowMin: string): string {
+  return `${commit} torch==${torch.torch}+${torch.cuda} torchvision==${torch.torchvision} python==${python[0]}.${python[1]} pillow>=${pillowMin}`;
 }
 
 /** The release file of yt-dlp for a system: the standalone binary, which needs no Python. */
@@ -211,7 +211,7 @@ export function buildPlan(input: PlanInput): Step[] {
     });
 
     const torch = input.torch;
-    const env = torch && input.python ? envStamp(versions.comfyuiCommit, torch, input.python.version) : null;
+    const env = torch && input.python ? envStamp(versions.comfyuiCommit, torch, input.python.version, versions.pillowMin) : null;
     const envStale = env === null || state.stamps.comfyEnv !== env || !input.artifacts.comfyPython;
     const constraints = path.join(L.cacheDir, 'torch-constraints.txt');
     add({

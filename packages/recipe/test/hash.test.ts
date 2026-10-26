@@ -58,11 +58,11 @@ describe('summarizeWorkflow', () => {
 
 describe('findLocalPath', () => {
   it.each([
-    'C:\\Users\\julien\\Pictures\\me.jpg',
+    'C:\\Users\\someone\\Pictures\\me.jpg',
     'D:/montagio/data/uploads/a.png',
     '\\\\nas\\share\\a.png',
-    '/home/julien/a.png',
-    '/Users/julien/a.png',
+    '/home/someone/a.png',
+    '/Users/someone/a.png',
     'uploads/1b2c3d4e-0000-4000-8000-123456789abc.jpg',
   ])('finds %s', (path) => {
     expect(findLocalPath({ deep: [{ value: path }] })).toBe(path);

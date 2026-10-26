@@ -2,7 +2,7 @@
 
 One command checks your machine, installs everything Montagio needs and opens it in your browser:
 
-- [ComfyUI](https://github.com/Comfy-Org/ComfyUI) v0.41.0, in its own Python environment, with a pinned CUDA build of PyTorch, started with `--disable-partner-nodes`;
+- [ComfyUI](https://github.com/Comfy-Org/ComfyUI) v0.41.0, in its own Python environment, with a pinned CUDA build of PyTorch, started with `--disable-partner-nodes --offline`;
 - [comfy-api-proxy](https://github.com/Comfy-Org/comfy-api-proxy) 0.1.6 (MIT), which gives the app the Comfy API in front of that ComfyUI;
 - the Montagio node pack (`comfy-nodes`), linked into ComfyUI;
 - the open weights of [`registry/models.lock.yaml`](../registry/models.lock.yaml), each checked against its sha256: by default those of the camera presets (about 72 GB, all Apache-2.0) and of the effects pack (about 21 GB, Apache-2.0 and MIT), more with [`--extensions`](#extensions);
@@ -350,7 +350,8 @@ Its license, GPL-3.0, is not the issue. The repository uses comfy-cli only to pu
 
 ## Open-stack guarantees
 
-- ComfyUI runs with `--disable-partner-nodes`. At each start, the installer reads `/object_info` and stops everything if a partner node is loaded.
+- ComfyUI runs with `--disable-partner-nodes` and `--offline` (its own page cannot reach the internet). At each start, the installer reads `/object_info` and stops everything if a partner node is loaded.
+- ComfyUI and the proxy run offline for Hugging Face (`HF_HUB_OFFLINE`), without its telemetry: a node pack cannot download a file the lock does not pin.
 - ComfyUI, comfy-api-proxy and the app listen on `127.0.0.1` only.
 - The app talks to the local proxy through an explicit `COMFY_BASE_URL` (the Comfy SDK would otherwise target Comfy Cloud), and no `COMFY_API_KEY` reaches it.
 - Weights come only from `registry/models.lock.yaml`; each file is checked against the sha256 the lock pins.

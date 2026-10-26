@@ -8,7 +8,7 @@
 #   - the object swap's tracker (kijai/ComfyUI-segment-anything-2) at a pinned commit;
 #   - Node.js 22 (checksum verified) and the repository's npm dependencies.
 # Then links the Montagio node pack (comfy-nodes) into ComfyUI's custom_nodes,
-# starts ComfyUI with --disable-partner-nodes on :8188 and the proxy on
+# starts ComfyUI with --disable-partner-nodes --offline on :8188 and the proxy on
 # 127.0.0.1:8189, and fails if a single partner node got loaded.
 #
 # Usage, from the repository root on the pod:
@@ -131,15 +131,16 @@ install_comfyui() {
     warn "ComfyUI $COMFYUI_TAG prefers a CUDA 13.0 build; if it misbehaves, redeploy on a host filtered on CUDA 13.0"
     torch=$TORCH_FALLBACK_VERSION vision=$TORCHVISION_FALLBACK_VERSION flavor=$TORCH_FALLBACK_CUDA
   fi
-  local stamp="$COMFYUI_COMMIT torch==$torch+$flavor torchvision==$vision"
+  local stamp="$COMFYUI_COMMIT torch==$torch+$flavor torchvision==$vision pillow>=$PILLOW_MIN"
   if [ "$(cat "$COMFY_VENV/.montagio-stamp" 2>/dev/null)" = "$stamp" ]; then return 0; fi
 
   make_venv "$COMFY_VENV"
   log "installing torch $torch and torchvision $vision ($flavor)"
   "$COMFY_VENV/bin/pip" install --quiet --index-url "https://download.pytorch.org/whl/$flavor" "torch==$torch" "torchvision==$vision"
   log "installing ComfyUI requirements"
-  # The constraint stops pip from swapping the CUDA build above for a PyPI one.
+  # The constraint stops pip from swapping the CUDA build above for a PyPI one, and lifts the Pillow that came with it.
   printf 'torch==%s\ntorchvision==%s\n' "$torch" "$vision" >"$CACHE_DIR/torch-constraints.txt"
+  printf 'pillow>=%s; python_version >= "3.11"\n' "$PILLOW_MIN" >>"$CACHE_DIR/torch-constraints.txt"
   "$COMFY_VENV/bin/pip" install --quiet -r "$COMFY_DIR/requirements.txt" -c "$CACHE_DIR/torch-constraints.txt"
   "$COMFY_VENV/bin/python" -I -c '
 import torch
@@ -175,7 +176,10 @@ install_extension_nodes() {
 
 # Last and optional: without its voice node the avatar is refused, the presets and the other extensions are not.
 install_voice_node() {
-  install_extension_nodes || warn "the avatar's voice node is not installed (see above): the avatar job will be refused, the presets and the other extensions run as usual"
+  install_extension_nodes && return 0
+  # What the failed step left goes: a pack not at the pinned commit, or not patched, opens /chatterbox/* routes that read any absolute path.
+  rm -rf "$COMFY_DIR/custom_nodes/ComfyUI-Chatterbox"
+  warn "the avatar's voice node is not installed (see above): the avatar job will be refused, the presets and the other extensions run as usual"
 }
 
 # The object swap's tracker: kijai/ComfyUI-segment-anything-2 at the commit of versions.env, as it is.
@@ -194,7 +198,10 @@ install_segment_nodes() {
 
 # Last and optional, as the voice: without its tracker the object swap is refused, nothing else.
 install_segment_node() {
-  install_segment_nodes || warn "the object swap's SAM 2 node is not installed (see above): the swap job will be refused, the presets and the other extensions run as usual"
+  install_segment_nodes && return 0
+  # What the failed step left goes: ComfyUI never loads a pack at a commit that was not checked.
+  rm -rf "$COMFY_DIR/custom_nodes/ComfyUI-segment-anything-2"
+  warn "the object swap's SAM 2 node is not installed (see above): the swap job will be refused, the presets and the other extensions run as usual"
 }
 
 install_proxy() {
@@ -245,7 +252,7 @@ start_comfyui() {
   if running "$RUN_DIR/comfyui.pid"; then
     log "ComfyUI already running (pid $(cat "$RUN_DIR/comfyui.pid"))"
   else
-    log "starting ComfyUI on $LISTEN:$COMFY_PORT with --disable-partner-nodes"
+    log "starting ComfyUI on $LISTEN:$COMFY_PORT with --disable-partner-nodes --offline"
     # Only the server goes to the background, so $! is its pid; setsid keeps
     # it alive when the web terminal closes. Offline for Hugging Face: every weight
     # is placed by fetch-weights, and the voice node would otherwise download a
@@ -253,7 +260,7 @@ start_comfyui() {
     (
       cd "$COMFY_DIR"
       HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
-        setsid nohup "$COMFY_VENV/bin/python" main.py --listen "$LISTEN" --port "$COMFY_PORT" --disable-partner-nodes \
+        setsid nohup "$COMFY_VENV/bin/python" main.py --listen "$LISTEN" --port "$COMFY_PORT" --disable-partner-nodes --offline \
         >>"$LOG_DIR/comfyui.log" 2>&1 &
       echo $! >"$RUN_DIR/comfyui.pid"
     )

@@ -30,10 +30,10 @@ We aim to acknowledge a report within 7 days, and we will tell you how we plan t
 
 ## How Montagio limits its attack surface
 
-- **Local by default.** The installer's start (`montagio.sh start`, `montagio.ps1 start`) binds ComfyUI, comfy-api-proxy and the web app to `127.0.0.1` only. It starts ComfyUI with `--disable-partner-nodes`, removes `COMFY_API_KEY` from the services' environment and turns off Next.js telemetry. With `install --app-only --proxy-url <url>`, the app sends its renders, input files included, to the comfy-api-proxy at that URL.
-- **`npm run dev` is not the installer's start.** `next dev`, and `next start` run by hand, listen on every address of the machine (Next.js's default host, `0.0.0.0`), and use the demo backend unless `MONTAGIO_BACKEND` is set. The pages then answer on the local network. `/api` and `/media` still refuse a host that is not allowed (see below).
+- **Local by default.** The installer's start (`montagio.sh start`, `montagio.ps1 start`) binds ComfyUI, comfy-api-proxy and the web app to `127.0.0.1` only. It starts ComfyUI with `--disable-partner-nodes` and `--offline` (a Content-Security-Policy that keeps ComfyUI's own page off the internet: no node registry, no sign-in, no version check), removes `COMFY_API_KEY` and `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD` from the services' environment, sets `HF_HUB_OFFLINE`, `TRANSFORMERS_OFFLINE` and `HF_HUB_DISABLE_TELEMETRY` for ComfyUI and the proxy, and turns off Next.js telemetry. With `install --app-only --proxy-url <url>`, the app sends its renders, input files included, to the comfy-api-proxy at that URL.
+- **`npm run dev` and `npm start` answer this machine only.** Both pass `-H 127.0.0.1`. `next dev` or `next start` run by hand without `-H` listen on every address of the machine (Next.js's default host, `0.0.0.0`), and use the demo backend unless `MONTAGIO_BACKEND` is set: the pages then answer on the local network, while `/api` and `/media` still refuse a host that is not allowed (see below).
 - **No closed services.** Montagio ships no connector to a proprietary generation API and does not use the Comfy Router. The ComfyUI client refuses a base URL on `comfy.org` or `comfy.app`, and every request it makes stays on that base URL's origin. `check-open-stack` fails the build if a closed service appears, as a code pattern or as a package.
-- **Verified weights.** Every model file is pinned in `registry/models.lock.yaml` by exact URL and sha256. A download must match its hash before it is used.
+- **Verified weights.** Every model file is pinned in `registry/models.lock.yaml` by exact URL and sha256. `fetch-weights` (used by the installer, the Runpod bootstrap and the Modal tooling) refuses a lock entry whose sha256 or size no longer matches what Hugging Face publishes before downloading anything, hashes the bytes as they arrive, and moves a file into place only once its sha256 matches. A file already on disk is hashed again, and the install stops if it differs.
 - **Checked origins.** `check-open-stack` also refuses a weight whose repository is not listed in `tools/check-open-stack/allowed-sources.yaml`. Each listed repository comes with the license read at its source. Only Apache-2.0 or MIT weights are accepted.
 - **No upload in the online showcase.** The online showcase is a static site with no server code. It plays pre-generated clips, so it never receives a visitor's photo.
 
@@ -41,10 +41,11 @@ We aim to acknowledge a report within 7 days, and we will tell you how we plan t
 
 The app's API (`/api/...`) and its files (`/media/...`) have no login. These checks keep other sites out:
 
-- **Its own address only** (`apps/web/src/proxy.ts`, on every request to `/api` and `/media`). The `Host` header must be `localhost`, `127.0.0.1` or `[::1]` on the port the app serves, or a host listed in `MONTAGIO_ALLOWED_HOSTS` (comma-separated; an entry without a port takes any port; a scheme and a trailing `/` are dropped). An `Origin` header, when the browser sends one, must pass the same test, and `Origin: null` never does. Anything else gets 403 `host-not-allowed`, and the app logs each refused host and origin once, 50 lines at most. A page open elsewhere in the browser cannot drive the app, even by pointing its domain at 127.0.0.1 (DNS rebinding): the browser still names that domain in `Host`.
+- **Its own address only** (`apps/web/src/proxy.ts`, on every request to `/api` and `/media`; every route handler of the app lives under one of the two). The `Host` header must be `localhost`, `127.0.0.1` or `[::1]` on the port the app serves, or a host listed in `MONTAGIO_ALLOWED_HOSTS` (comma-separated; an entry without a port takes any port; a scheme and a trailing `/` are dropped). An `Origin` header, when the browser sends one, must pass the same test, and `Origin: null` never does. Anything else gets 403 `host-not-allowed`, and the app logs each refused host and origin once, 50 lines at most. A page open elsewhere in the browser cannot drive the app, even by pointing its domain at 127.0.0.1 (DNS rebinding): the browser still names that domain in `Host`.
 - **An `Idempotency-Key` header** on every route that starts a render (images, edits, moodboards, effects, hooks, avatars, camera clips, films, motion transfers, restyles, object swaps, trend remixes and their skeletons, ads, a film's music, captions, HD copies, translations, voice changes). Without it, the app answers 400 `missing-idempotency-key`. Another site cannot add this header without the browser asking first, and that request carries the other site's `Origin`, which the host check refuses.
-- **Cross-site refusals** on the other routes that change something (uploads, cancels, characters, community presets, captions export and preview, remix shots, import by link). When the browser sends `Sec-Fetch-Site`, it must be `same-origin` or `none`, otherwise the app answers 403 `cross-site`. The routes among them that take JSON also refuse another content type, so a form or plain text sent by another site is refused.
+- **Cross-site refusals** on the other routes that change something (uploads, cancels, characters, community presets, captions export and preview, remix shots, import by link). When the browser sends `Sec-Fetch-Site`, it must be `same-origin` or `none`, otherwise the app answers 403 `cross-site`. The routes among them that take JSON also refuse another content type, so a form or plain text sent by another site is refused. A test (`apps/web/test/route-guards.test.ts`) fails if a route that changes something has none of these checks.
 - `POST /api/presets/validate` has neither check: it only checks a preset text and saves nothing.
+- **No frame, no embedding.** Every answer carries `X-Frame-Options: DENY` and `Content-Security-Policy: frame-ancestors 'none'`, so another site cannot show the app in a hidden frame and have the user click in it. `/api` and `/media` answer with `Cross-Origin-Resource-Policy: same-origin`, so another site cannot even embed a file of the app in an `<img>` or a `<video>`. Every answer also carries `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`. Next's image optimizer (`/_next/image`) is turned off: the app does not use it.
 
 **What a script gets.** curl, a script or the MCP server sends no `Sec-Fetch-Site` and no `Origin`. With an allowed `Host`, such a request passes every check above and can use the whole API (with an `Idempotency-Key` to start a render). Any program on the machine that can reach the app's port can drive it, and so can any device that reaches it under a host listed in `MONTAGIO_ALLOWED_HOSTS`.
 
@@ -61,7 +62,19 @@ A body is refused as soon as its declared length, or the bytes read so far, pass
 | A shared preset imported (`POST /api/community/import`) | 80 KB |
 | A camera preset's YAML | 16 KB |
 
-A multipart upload may add 64 KB for the form around its file. Two routes read their JSON body without the 128 KB limit: `POST /api/sequences` and `POST /api/uploads/video/library`.
+A multipart upload may add 64 KB for the form around its file.
+
+- **Files by reference only.** A request names an uploaded file by its ref (`uploads/<uuid>.png`, `videos/<uuid>.mp4`…), checked against a strict pattern before it becomes a path; record and job ids are checked the same way, and `Idempotency-Key` values are hashed before they name a file. `/media` serves three folders only, one plain name per path segment (no `..`, separator, drive colon or NUL).
+- **FFmpeg.** It never runs through a shell, reads a sent file with `-protocol_whitelist file`, and converts a sent video or sound only from a real media container (`-format_whitelist`), so a playlist or an `ffconcat` list named `.mp4` cannot make it read other files into a result. Every video and sound it writes drops its source's metadata (`-map_metadata -1`), a phone's GPS position included. Captions and an ad's tagline reach FFmpeg as files with plain names, never inside the filter graph.
+
+### Files shared by others
+
+Recipes (`montagio/recipe@1`, in a `.json` file or in the tags of a Montagio MP4 or PNG), share files of the community gallery (`montagio/share@0.1`) and preset YAML files come from anyone. None of them sends a workflow to ComfyUI:
+
+- **Presets** are declarative: a strict schema (`packages/presets/src/schema.ts`) of known fields, ids and bounded texts. The workflow is the app's own template for the model, with the preset's values bound to known inputs. A preset with LoRAs is refused, and the YAML parser keeps its alias limit.
+- **A recipe replayed** (`npm run reproduce`, the MCP tool `reproduce`) sends only its `request` to the app, never its workflows: one of the app's creation routes from a closed list, at most one follow-up from another closed list, without any file ref, composition, other render, consent or rights it may carry. Its files are the ones the user gives. The app then checks that body as any other request.
+- **A share file** keeps only known fields, each checked (ids, texts of bounded length, a preset text of 64 KB at most): never a photo, a file, a URL or an id of the machine. A preset text it carries is validated when it is rendered.
+- **The list of well-known names** (`registry/blocked-names.txt`) is checked in every text typed in the app: prompts, descriptions of a photo (a camera clip, every shot of a film), negative prompts, the texts of a remixed move, edit instructions, effects' subjects, the avatar's text, a film's music, captions, ads, characters, the trend remix, the gallery's titles and authors, and every text of a share file. A request that names a listed person gets 400 `blocked-name`.
 
 ### Import by link
 
@@ -73,16 +86,29 @@ The trend remix can import a video from its link with yt-dlp (`apps/web/src/serv
 
   | Host | Paths taken |
   |---|---|
-  | `tiktok.com`, `www.tiktok.com`, `m.tiktok.com`, `vm.tiktok.com`, `vt.tiktok.com` | any |
+  | `tiktok.com`, `www.tiktok.com`, `m.tiktok.com` | `/@<user>/video/<id>`, `/embed/<id>`, `/t/<code>` (sent to yt-dlp on `www.tiktok.com`) |
+  | `vm.tiktok.com`, `vt.tiktok.com` | `/<code>` |
   | `instagram.com`, `www.instagram.com` | `/reel/<id>`, `/reels/<id>`, `/p/<id>`, `/tv/<id>` |
   | `youtube.com`, `www.youtube.com`, `m.youtube.com` | `/shorts/<id>` |
   | `youtu.be` | `/<id>` |
 
-  Any other host, an IP address or `localhost` among them, is refused by name. The fragment is dropped.
+  Any other host, an IP address or `localhost` among them, is refused by name, and so is any other page of these sites (TikTok's `/link/v2` redirect page among them). The fragment is dropped.
 - **One import at a time.** A second import while one runs gets 429 `link-busy`.
-- **yt-dlp held short.** It runs without a shell, with its own configuration ignored (`--ignore-config`), no playlist, the link after `--`, files of 50 MB at most (`--max-filesize`) and clips of 60 s at most (`--match-filters`, checked again on yt-dlp's info file afterwards). A run that has not ended after 180 s is killed. Its working folder is deleted whatever happens.
-- **Which yt-dlp.** The app runs `MONTAGIO_YTDLP`, or else `yt-dlp` from the `PATH`. Only the copy the installer downloads into its `tools` folder, and hands to the app as `MONTAGIO_YTDLP`, is checked against a pinned sha256 (`infra/runpod/versions.env`). A `MONTAGIO_YTDLP` you set yourself, or a yt-dlp on the `PATH`, runs as it is.
-- **After the link.** The host check applies to the link given. What yt-dlp fetches next (redirects, the platform's media servers) is yt-dlp's decision: the app does not check those addresses.
+- **yt-dlp held short.** It runs without a shell, with its own configuration ignored (`--ignore-config`), its site extractors only (`--use-extractors default,-generic`: the generic extractor, which reads whatever page a link leads to, never runs), no playlist, the link after `--`, files of 50 MB at most (`--max-filesize`) and clips of 60 s at most (`--match-filters`, checked again on yt-dlp's info file afterwards). A run that has not ended after 180 s is killed. Its working folder is deleted whatever happens.
+- **Which yt-dlp.** The app runs `MONTAGIO_YTDLP`, or else `yt-dlp` from the `PATH`. The installer downloads the release binary into memory, checks it against the sha256 pinned in `infra/runpod/versions.env`, and only then writes it into its `tools` folder and hands it to the app as `MONTAGIO_YTDLP`. A `MONTAGIO_YTDLP` you set yourself, or a yt-dlp on the `PATH`, runs as it is.
+- **After the link.** The host check applies to the link given. What an extractor fetches next (the platform's API, its media servers, a redirect it serves) is yt-dlp's decision: the app does not check those addresses. A TikTok short link (`vm.`, `vt.`, `/t/`) is resolved by following TikTok's redirect, and the page it leads to goes to whichever of yt-dlp's site extractors takes it.
+
+### Model weights and node packs
+
+- **One pickle.** Every weight of the lock is a `.safetensors` file, except the avatar voice's `conds.pt` (Chatterbox, 107 KB), for which no safetensors version exists in an allowed repository. Its sha256 is checked at download like every weight, Chatterbox loads it with `torch.load(..., weights_only=True)`, PyTorch 2.14 does the same by default for its other `torch.load` call, and the installer removes `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD` from ComfyUI's environment. The RIFE and SAM 2.1 weights are the safetensors repackagings of their pickled originals, tensor for tensor.
+- **Third-party node packs** (the avatar's voice, wildminder/ComfyUI-Chatterbox; the object swap's tracker, kijai/ComfyUI-segment-anything-2) are cloned, checked out at the commit of `infra/runpod/versions.env`, and that commit is verified before use. The voice pack is patched (`infra/runpod/patches/comfyui-chatterbox-no-routes.patch`) to remove its `/chatterbox/*` HTTP routes, which read any absolute path; its Python packages are installed with `--no-deps --require-hashes`. The local installer builds each pack in a folder of its own and moves it into `custom_nodes` only once it is complete; the GPU-session bootstrap removes a pack whose install failed half way, so ComfyUI never loads an unpatched or unchecked pack.
+- **Reviewed** (2026-10-26, at the pinned commits): neither pack runs `exec`, `eval` or a process of its own, sends telemetry, or reaches the network at import. With Hugging Face offline, the voice pack does not fetch a missing file (it would otherwise download a whole repository) nor its Chinese tokenizer table, which it fetched at every load, unpinned (without that table, the voice does not speak Chinese), and the tracker does not fetch a missing weight. Montagio's own pack (`comfy-nodes`) opens no route and makes no network call; its Whisper loads local files only.
+
+### Privacy
+
+- **Nothing leaves the machine while the app runs**, except the downloads you start (the installer's, the weights) and a link you import. Next.js, Hugging Face and ComfyUI's page send no telemetry (see above).
+- **A recipe never holds a photo, a clip or a path of the machine.** Each input file is named by where it came from and by its sha256: `buildRecipe` refuses to write a recipe that holds a local path, and the link a trend was imported from is never written. The sha256 lets anyone who has the same file confirm it was the input, nothing more.
+- **No EXIF in what Montagio hands out.** A photo you send is kept as sent in `MONTAGIO_DATA/uploads` on your machine, and reaches ComfyUI from there; it is never handed out as it is. The images Montagio delivers are written from pixels, and their PNG text and EXIF chunks are replaced by the AI mention and the recipe; the videos and sounds drop their source's metadata. A reference video, a voice sample and a trend are converted at upload, without their metadata.
 
 ### The MCP server
 
@@ -96,19 +122,27 @@ The trend remix can import a video from its link with yt-dlp (`apps/web/src/serv
 
 ### GPU sessions
 
-The GPU-session tooling (`infra/runpod`, `infra/modal`) starts ComfyUI with `--disable-partner-nodes` on `127.0.0.1`, and comfy-api-proxy on `127.0.0.1`. Two options make ComfyUI, which has no login, reachable from the internet while they run: `bootstrap.sh --expose-ui` on Runpod (ComfyUI on `0.0.0.0`, behind the pod's public proxy URL) and the `ui` function on Modal (a public Modal tunnel).
+The GPU-session tooling (`infra/runpod`, `infra/modal`) starts ComfyUI with `--disable-partner-nodes --offline` on `127.0.0.1`, offline for Hugging Face, and comfy-api-proxy on `127.0.0.1`. Two options make ComfyUI, which has no login, reachable from the internet while they run: `bootstrap.sh --expose-ui` on Runpod (ComfyUI on `0.0.0.0`, behind the pod's public proxy URL) and the `ui` function on Modal (a public Modal tunnel).
+
+## Known remaining risks
+
+What Montagio does not protect against today, and why:
+
+| Risk | Why it is accepted |
+|---|---|
+| Any program of the machine can drive the API (no login). | The app is a local, single-user tool. A program that already runs as you can do more than drive it. |
+| The list of names is a good-faith guardrail. | It cannot know every name, and it cannot see who is in a photo: the consent boxes cover photos. |
+| `conds.pt` is a pickle. | Its sha256 is pinned and it is loaded with `weights_only=True`; no safetensors version exists in an allowed repository. |
+| FFmpeg parses the files you send. | It is your FFmpeg (`MONTAGIO_FFMPEG` or the `PATH`): keep it up to date. Before converting a sent file, `ffprobe` reads its size and length with local files only, before the container check applies; nothing it reads goes into a result. |
+| On Python 3.10, ComfyUI keeps the Pillow that comes with PyTorch (12.3.0), which a crafted PNG can stall (GHSA-5xm2-6676-qcp9, GHSA-g4qv-2jxx-769h). | Pillow 13.0.0 fixes them but needs Python 3.11 or newer. The installer prefers Python 3.12; on 3.11 and newer it installs Pillow 13 or newer. |
+| ComfyUI's and comfy-api-proxy's Python packages, other than PyTorch, torchvision and the voice pack's, are not pinned by hash. | They come from PyPI as ComfyUI v0.41.0 and comfy-api-proxy 0.1.6 ask for them; their audit is part of each release (below). |
+| yt-dlp follows what a platform serves after the link (a short link's redirect among it), and a yt-dlp you name yourself is not checked. | The link is checked by name, and the generic extractor never runs. |
+| A photo you send keeps its metadata on your disk. | It never leaves the machine; delete `MONTAGIO_DATA/uploads` to remove it. |
+| `--expose-ui` (Runpod) and the `ui` tunnel (Modal) make ComfyUI public without a login while they run. | They are opt-in, for a GPU session you rent and stop. |
 
 ## Dependency audits
 
 Before each release:
 
-- JavaScript: `npm audit --omit=dev` covers what the app ships. `npm audit` covers the development tools too.
-- Python: the node pack's dependencies (`comfy-nodes/requirements-dev.txt`), the two environments the installer creates (ComfyUI's and comfy-api-proxy's), and the avatar voice pack's packages installed into ComfyUI's environment with `--no-deps --require-hashes` (`infra/runpod/requirements-chatterbox.txt`: s3tokenizer, onnx, protobuf, ml_dtypes, torchaudio) are checked against the [OSV](https://osv.dev) database.
-
-## Known advisories we accept
-
-These advisories appear in `npm audit` but do not affect what Montagio ships. Each is reviewed again when a fix is published.
-
-| Advisory | Package | Where it comes from | Why it is accepted | Status |
-|---|---|---|---|---|
-| [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) (high): stack exhaustion through deeply nested brace patterns | `braces` ≤ 3.0.3 | `eslint-config-next` → `@next/eslint-plugin-next` → `fast-glob` → `micromatch` → `braces`. Development only: the linter. | `npm audit --omit=dev` reports 0 vulnerabilities. The linter only expands glob patterns written in this repository, never input from users or the network, so an attacker has no way to feed it a crafted pattern. npm's suggested "fix" would downgrade `eslint-config-next` to 14.2.35, an older major version than the Next.js 16 the app uses. We do not apply it. | No patched version of `braces` exists as of 2026-10-19 (latest: 3.0.3). Update the lockfile once one is published. |
+- JavaScript: `npm audit` (development tools included) and `npm audit --omit=dev` (what the app ships). On 2026-10-26 both report 0 vulnerabilities, after `body-parser` 2.4.0 (GHSA-27r3-jxmh-p828, through `@modelcontextprotocol/sdk` → `express`; the MCP server speaks stdio and never parsed an HTTP body). The advisory on `braces` (GHSA-vfj7-8cjw-p6xm) that was accepted here was withdrawn on 2026-10-23.
+- Python: ComfyUI's requirements at the pinned commit, comfy-api-proxy and its dependencies, the voice pack's packages (`infra/runpod/requirements-chatterbox.txt`), the node pack's development packages (`comfy-nodes/requirements-dev.txt`) and the Modal tooling's (`infra/modal/requirements.txt`) are checked with pip-audit against PyPI's and [OSV](https://osv.dev)'s databases, and against what the installer really installs (the PyTorch index brings its own Pillow, hence the floor in `infra/runpod/versions.env`). On 2026-10-26: no advisory once Pillow is 13.0.0 or newer. PyTorch 2.11.0, the build for drivers that stop at CUDA 12.8, carries PYSEC-2025-194 (`torch.jit.script`), which Montagio never calls.

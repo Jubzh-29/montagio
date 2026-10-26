@@ -44,3 +44,10 @@ test('an unknown motion is not found; without motion and restyle the library is 
   expect(await (await getMotions()).json()).toEqual([]);
   expect((await pick('hip-hop')).status).toBe(404);
 });
+
+test('a body past the JSON limit is refused before it is read', async () => {
+  const body = JSON.stringify({ id: 'moonwalk', pad: 'x'.repeat(200 * 1024) });
+  const res = await pickMotion(new Request('http://localhost/api/uploads/video/library', { method: 'POST', headers: { 'content-type': 'application/json' }, body }));
+  expect(res.status).toBe(400);
+  expect(await res.json()).toEqual({ error: 'invalid-input' });
+});

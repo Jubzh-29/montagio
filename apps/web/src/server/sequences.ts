@@ -13,6 +13,7 @@ import {
   SequenceToolError,
 } from '@montagio/sequence';
 import { getEnv } from './env';
+import { JobError } from './errors';
 import {
   cancelGeneration,
   checkGenerationInput,
@@ -258,6 +259,8 @@ export function advanceSequence(id: string): Promise<SequenceRecord | null> {
 /** Stable error code for failures a retry cannot fix, or null for transient ones. */
 function permanentErrorCode(error: unknown): string | null {
   if (error instanceof GenerationError) return error.code;
+  // A shot's text that names a listed person (a film started before the name was listed): no retry changes it.
+  if (error instanceof JobError) return error.code;
   if (isBackendError(error) && !error.retryable) return error.code;
   if (error instanceof SequenceToolError) return error.code === 'tool-missing' ? 'ffmpeg-missing' : 'ffmpeg-failed';
   if (error instanceof UploadError) return 'frame-unreadable';

@@ -81,7 +81,8 @@ export function serviceSpecs(input: {
 }): ServiceSpec[] {
   const { layout: L, state } = input;
   const ports: Ports = state.ports;
-  const env: NodeJS.ProcessEnv = withoutVars(input.baseEnv, ['COMFY_API_KEY'], input.os);
+  // torch.load stays on weights only (the voice's conds.pt is a pickle), whatever the user's shell says.
+  const env: NodeJS.ProcessEnv = withoutVars(input.baseEnv, ['COMFY_API_KEY', 'TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD'], input.os);
   const local = (port: number, path: string) => `http://127.0.0.1:${port}${path}`;
 
   const appEnv: NodeJS.ProcessEnv = { ...withoutVars(env, ['COMFY_BASE_URL'], input.os), NEXT_TELEMETRY_DISABLED: '1', MONTAGIO_ROOT: input.repoRoot };
@@ -114,12 +115,22 @@ export function serviceSpecs(input: {
   const gpu = state.gpuIndex && state.gpuIndex > 0 ? ['--cuda-device', String(state.gpuIndex)] : [];
   // Python buffers a redirected output: unbuffered, a crash still leaves its last lines in the log.
   // CUDA numbers GPUs fastest first unless told otherwise; nvidia-smi and gpuIndex follow the PCI bus.
-  const pyEnv: NodeJS.ProcessEnv = { ...env, PYTHONUNBUFFERED: '1', CUDA_DEVICE_ORDER: 'PCI_BUS_ID' };
+  // Offline for Hugging Face, as on the GPU pod: every weight is placed and checked by fetch-weights, and the voice
+  // node would otherwise fetch a file at each load, or a whole repository for a file it misses.
+  const pyEnv: NodeJS.ProcessEnv = {
+    ...withoutVars(env, ['HF_HUB_OFFLINE', 'TRANSFORMERS_OFFLINE', 'HF_HUB_DISABLE_TELEMETRY'], input.os),
+    PYTHONUNBUFFERED: '1',
+    CUDA_DEVICE_ORDER: 'PCI_BUS_ID',
+    HF_HUB_OFFLINE: '1',
+    TRANSFORMERS_OFFLINE: '1',
+    HF_HUB_DISABLE_TELEMETRY: '1',
+  };
   return [
     {
       name: 'comfyui',
       cmd: L.comfyPython,
-      args: ['main.py', '--listen', '127.0.0.1', '--port', String(ports.comfy), '--disable-partner-nodes', ...gpu, ...input.extraComfyArgs],
+      // --offline: a Content-Security-Policy keeps ComfyUI's own page off the internet (no node registry, no sign-in).
+      args: ['main.py', '--listen', '127.0.0.1', '--port', String(ports.comfy), '--disable-partner-nodes', '--offline', ...gpu, ...input.extraComfyArgs],
       cwd: L.comfyDir,
       env: pyEnv,
       health: local(ports.comfy, '/system_stats'),

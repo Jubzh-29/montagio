@@ -49,6 +49,13 @@ describe('validation', () => {
     expect(await res.json()).toEqual({ error: 'invalid-shots' });
   });
 
+  test('a body past the JSON limit is refused before it is read, and starts nothing', async () => {
+    const imageRef = await uploadedImageRef();
+    const res = await postSequence(sequenceRequest({ imageRef, shots: threeShots, pad: 'x'.repeat(200 * 1024) }, 'too-large'));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'invalid-request' });
+  });
+
   test('missing Idempotency-Key -> 400', async () => {
     const res = await postSequence(sequenceRequest({ imageRef: 'uploads/x.png', shots: threeShots }, null));
     expect(await res.json()).toEqual({ error: 'missing-idempotency-key' });
@@ -183,6 +190,43 @@ describe('resilience', () => {
       delete process.env.MONTAGIO_FFMPEG;
     }
   });
+
+  test('a film started before a name was listed fails its next shot with blocked-name, never a 500 at each poll', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    seedRecordFile(dataDir(), {
+      id: 'gfirst',
+      presetId: 'crash-push',
+      modelId: 'wan22-i2v-a14b-fun-camera',
+      imageRef: 'uploads/x.png',
+      seed: 1,
+      aspect: '16:9',
+      state: 'succeeded',
+      progress: 1,
+      backendKind: 'demo',
+      backendJobId: 'demo-gfirst',
+      outputUrl: '/media/demo-assets/clips/crash-push.mp4',
+      idempotencyKey: 'gfirst',
+      createdAt: now,
+      updatedAt: now,
+    });
+    seedSequence({
+      ...base,
+      id: 'listed-seq',
+      state: 'running',
+      currentShot: 0,
+      shots: [
+        { presetId: 'crash-push', generationId: 'gfirst', state: 'running' },
+        { presetId: 'pan-left', userPrompt: 'Taylor Swift waves', state: 'pending' },
+      ],
+    });
+    try {
+      expect(await getSeq('listed-seq')).toMatchObject({ state: 'failed', error: 'blocked-name' });
+    } finally {
+      warn.mockRestore();
+      error.mockRestore();
+    }
+  }, 60_000);
 
   test('a montage failure stores a stable code, never server paths', async () => {
     seedRecordFile(dataDir(), {

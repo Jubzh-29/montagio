@@ -9,8 +9,8 @@ export class ImageTagError extends Error {
 }
 
 const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-/** Text chunks the source may carry: replaced by ours, never kept beside them. */
-const TEXT_CHUNKS = new Set(['tEXt', 'iTXt', 'zTXt']);
+/** Text chunks the source may carry (replaced by ours, never kept beside them), and its EXIF (a camera's GPS position). */
+const METADATA_CHUNKS = new Set(['tEXt', 'iTXt', 'zTXt', 'eXIf']);
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -60,10 +60,10 @@ const keyword = (key: string) => key.charAt(0).toUpperCase() + key.slice(1);
 
 /**
  * Copy the PNG `input` to `out` with one tEXt chunk per tag (by default the
- * AI-generated mention), before IEND; the source's text chunks are dropped.
+ * AI-generated mention), before IEND; the source's text chunks and EXIF are dropped.
  */
 export async function tagImage(input: string, out: string, tags: VideoTags = AI_IMAGE_METADATA): Promise<void> {
-  const chunks = readChunks(await readFile(input), input).filter((chunk) => !TEXT_CHUNKS.has(chunk.type));
+  const chunks = readChunks(await readFile(input), input).filter((chunk) => !METADATA_CHUNKS.has(chunk.type));
   const text = Object.entries(tags).map(([key, value]) => ({
     type: 'tEXt',
     data: Buffer.concat([Buffer.from(keyword(key), 'latin1'), Buffer.from([0]), Buffer.from(value, 'latin1')]),

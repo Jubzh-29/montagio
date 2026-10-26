@@ -71,7 +71,7 @@ The `e2e:local` spec (`apps/web/e2e-local/local.spec.ts`) still clicks a "Try wi
 | `npm run previews:posters` | makes the still image of each new preview clip under `presets/**/previews` (`--force` remakes them all) |
 | `npm run mcp` | starts the MCP server on stdio ([packages/mcp](packages/mcp/README.md)) |
 | `npm run reproduce -- <recipe> --photo <file>` | renders a recipe again on the running app |
-| `npm run dev -w @montagio/web` | the app in development mode: the demo backend unless `MONTAGIO_BACKEND` is set, listening on every address of the machine (see [SECURITY.md](SECURITY.md)) |
+| `npm run dev -w @montagio/web` | the app in development mode: the demo backend unless `MONTAGIO_BACKEND` is set, on `127.0.0.1` only (see [SECURITY.md](SECURITY.md)) |
 | `npm run showcase:build -w @montagio/web` | builds the static showcase into `apps/web/out` |
 | `python comfy-nodes/scripts/sync_presets.py` | copies `presets/` into the node pack after a preset changes; `test:nodes` fails while the copies differ |
 | `./montagio.sh`, `montagio.ps1` | the installer: see [docs/INSTALL.md](docs/INSTALL.md) |

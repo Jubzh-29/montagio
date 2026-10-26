@@ -21,3 +21,30 @@ test('the API and the files refuse a domain rebound to this machine, and answer 
   expect(await status(at('/api/history'), { host: `localhost:${port}`, origin: 'https://evil.example' })).toBe(403);
   expect(await status(at('/api/history'), { host: `127.0.0.1:${port}`, origin: `http://127.0.0.1:${port}` })).toBe(200);
 });
+
+/** The status and headers of a GET to the app itself. */
+function answer(url: URL): Promise<{ status: number; headers: Record<string, string | string[] | undefined> }> {
+  return new Promise((resolve, reject) => {
+    httpRequest(url, (res) => {
+      res.resume();
+      resolve({ status: res.statusCode ?? 0, headers: res.headers });
+    })
+      .on('error', reject)
+      .end();
+  });
+}
+
+test('no other site can frame the app or embed its files, and the image optimizer is closed', async ({ baseURL }) => {
+  const at = (path: string) => new URL(path, baseURL);
+  const page = await answer(at('/'));
+  expect(page.headers['x-frame-options']).toBe('DENY');
+  expect(page.headers['content-security-policy']).toContain("frame-ancestors 'none'");
+  expect(page.headers['referrer-policy']).toBe('no-referrer');
+  for (const path of ['/api/history', '/media/presets/previews/crash-push.jpg']) {
+    const own = await answer(at(path));
+    expect(own.status, path).toBe(200);
+    expect(own.headers['cross-origin-resource-policy'], path).toBe('same-origin');
+    expect(own.headers['x-content-type-options'], path).toBe('nosniff');
+  }
+  expect((await answer(at('/_next/image?url=%2Fmedia%2Fpresets%2Fpreviews%2Fcrash-push.jpg&w=64&q=75'))).status).not.toBe(200);
+});
