@@ -102,9 +102,10 @@ export function exploreTools(presets: readonly PresetSummary[], info: Extensions
     },
     { id: 't2i', href: tabHref('camera'), name: 'exploreT2iName', description: 'exploreT2iText', icon: 'Aa' },
     has('edit') && { id: 'edit', href: tabHref('camera'), name: 'exploreEditName', description: 'exploreEditText', icon: '✎' },
-    has('upscale') && { id: 'hd', href: '/history', name: 'exploreHdName', description: 'exploreHdText', icon: 'HD' },
+    // The HD and the ComfyUI workflow are actions under a clip the Studio just made: the cards open where clips are made.
+    has('upscale') && { id: 'hd', href: tabHref('camera'), name: 'exploreHdName', description: 'exploreHdText', icon: 'HD' },
     has('music') && { id: 'music', href: tabHref('film'), name: 'exploreMusicName', description: 'exploreMusicText', icon: '♪' },
-    { id: 'comfy', href: '/history', name: 'exploreComfyName', description: 'exploreComfyText', icon: '{ }' },
+    { id: 'comfy', href: tabHref('camera'), name: 'exploreComfyName', description: 'exploreComfyText', icon: '{ }' },
   ];
   return tools.filter((tool): tool is ExploreCard => Boolean(tool));
 }
