@@ -402,3 +402,21 @@ Décision du 25/10 : boucler les deux trous (sous-titres sur GPU et installeur) 
 - **L'app et la recette** : les tests des sous-titres, rejoués sur ces mots (`MONTAGIO_DEMO_CAPTIONS`), passent (14 sur 14). Ils couvrent le transcript, l'export 1080×1920 avec son et mention « AI-generated », et la recette qui rejoue l'avatar puis ses sous-titres dans le même style.
 - **Coût réel : 0,016 $** (Whisper sur le volume 0,003 $, le passage 0,013 $). Relevé du mois : 22,62 $.
 - **Daté** : la validation est notée dans `registry/extensions/whisper-turbo-words.yaml`, dont l'estimation passe de 8 s à 12 s. Les sous-titres suivent l'extension « avatar », déjà datée.
+
+## 21. Voix chinoise hors ligne (26/10)
+
+Le vocabulaire de Chatterbox Multilingual V3 ne contient pas de caractères chinois, seulement des codes Cangjie (`[cj_*]`). La table qui fait la conversion, `Cangjie5_TC.json` (1,9 Mo), était téléchargée à chaque chargement et n'était pas dans le lock. Hors ligne, c'est-à-dire sur les pods depuis toujours et en local depuis l'audit du 26/10, chaque caractère chinois devenait `[UNK]`. Correctif sur `fix/chinese-voice` : la table est épinglée dans le lock, à côté de la table des graphèmes, et le patch du pack la fait lire dans ce dossier. Accord de l'utilisateur : voix seule, compte montagio-2, plafond 0,25 $.
+
+- **Poids** : les 6 fichiers de la voix sont téléchargés sur le volume de montagio-2 par `weights --args "--extensions avatar --only chatterbox-…"`, soit 2,99 Gio, sha256 conformes, `Cangjie5_TC.json` compris. Sous Linux, le pack s'installe dans l'image avec `git apply --ignore-whitespace` : son tokenizer est en CRLF en amont, et le patch reste en LF.
+- **Traduction en chinois** (`--extension translate --audio speech-builtin.flac --to zh`, sur une parole française de 3,9 s) : **51,1 s** à froid, **10,8 Go** au plus.
+  - Le journal de ComfyUI ne contient pas « Could not load Cangjie mapping ». Il note « spoke 19 character(s) of zh », et seul l'avertissement « pkuseg not available » reste.
+  - Le dossier du pack ne contient que les 6 fichiers du lock : rien n'a été téléchargé à côté.
+  - Whisper large-v3 turbo, en local, détecte du chinois (p = 1,00) dans 5,16 s de parole : « 您好，这是…视频工作室的一段… ».
+  - Le texte écrit par Gemma n'est pas journalisé, si bien que le milieu de la phrase (sans doute le nom de l'app, en lettres latines) n'a pas pu être comparé.
+- **Phrases connues** : deux phrases de 29 et 30 caractères, dites par la voix intégrée avec `cfg_weight` 0 (comme dans la traduction), envoyées à l'API de ComfyUI depuis un conteneur `cmd`. La première a pris 27,3 s, chargement compris, la seconde 7,0 s, pour 5,7 et 5,5 s de parole. Whisper large-v3 turbo et medium relisent les deux **mot pour mot**, avec un taux d'erreur par caractère de **0 %** :
+  - « 大家好，欢迎来到我的频道。今天我们一起学习做一道简单的家常菜。 »
+  - « 这是一个完全开源的视频工作室，所有模型都在你自己的电脑上运行。 »
+- **pkuseg** : le paquet n'est pas installé, par choix, car il télécharge son modèle depuis GitHub. La découpe en mots est donc sautée, sans effet sur ce que relit Whisper. Le rythme des phrases longues n'a pas été jugé à l'oreille.
+- **Coût réel : 0,090 $.** Le détail : poids et image 0,041 $, traduction 0,026 $, phrases connues 0,024 $. Relevé du mois de montagio-2 : 22,71 $. À la fin, aucune app Modal ne tourne.
+- Les résultats sont hors dépôt, dans `s3/validation/20261026-193907-zh-voice/` et `s3/validation/20261026-zh-check/` (phrases, textes et FLAC).
+- **Daté** : la validation est notée dans `registry/extensions/gemma4-translate.yaml`, le modèle par lequel l'app fait parler chinois.

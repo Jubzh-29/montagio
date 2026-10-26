@@ -265,7 +265,7 @@ test('the avatar and the object swap get their node packs, at the commits of ver
   expect(nodes.detail).toEqual([
     `git -c core.autocrlf=false clone https://github.com/wildminder/ComfyUI-Chatterbox.git ${voiceBuild}`,
     `git -C ${voiceBuild} checkout --force ${versions.voiceNode.commit}, then check that HEAD is ${versions.voiceNode.commit}`,
-    `git -C ${voiceBuild} apply ${win32.join(repoRoot, 'infra/runpod/patches/comfyui-chatterbox-no-routes.patch')} (its /chatterbox/* HTTP routes removed)`,
+    `git -C ${voiceBuild} apply --ignore-whitespace ${win32.join(repoRoot, 'infra/runpod/patches/comfyui-chatterbox-no-routes.patch')} (its /chatterbox/* HTTP routes removed, its Chinese table read from the model folder)`,
     `${L.comfyPython} -m pip install --no-deps --require-hashes -r ${win32.join(repoRoot, 'infra/runpod/requirements-chatterbox.txt')}`,
     `${L.comfyPython} -I -c "import torchaudio, s3tokenizer, onnx"`,
     `move it to ${L.voiceNodeDir}`,

@@ -80,7 +80,7 @@ The workflows are converted from the official [Comfy-Org workflow templates](htt
 | Ad studio | the edit (the scene), an effect, the music, then an FFmpeg overlay of the tagline | as above |
 | Trend remix | `gemma-trend-skeleton.api.json` for the post, then the motion transfer or the object swap per shot, on one seed, then FFmpeg | Gemma 4 E4B, Wan2.2-Animate-2 or VACE |
 
-19 models and 64 entries in the weight lock (40 Apache-2.0, 24 MIT, 254 GB), each listed with its size and source on the app's Open Stack page. One image encoder serves two extensions; Whisper's 11 entries are its weights and its configuration and tokenizer files.
+19 models and 65 entries in the weight lock (40 Apache-2.0, 25 MIT, 254 GB), each listed with its size and source on the app's Open Stack page. One image encoder serves two extensions; Whisper's 11 entries are its weights and its configuration and tokenizer files.
 
 ## Measured on a GPU
 

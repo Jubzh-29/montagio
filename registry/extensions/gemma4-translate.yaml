@@ -6,13 +6,15 @@
 # back the transcription (GPU session of 2026-10-24). Chatterbox Multilingual V3 (MIT, the avatar's voice)
 # says the translated text with the source speech as its voice reference. The app then makes the
 # talking avatar again on that speech: the lips follow the new words.
+# Chinese validated on an L4 on 2026-10-26 (docs/S2_RESULTATS.md, part 21), with Hugging Face offline: the voice reads
+# its Cangjie table from the pack folder, and Whisper read two known lines back word for word.
 schema: montagio/extension-model@0.1
 id: gemma4-translate
 name: Gemma 4 E4B + Chatterbox (translate)
 extension: avatar
 task: a2a-translate
 license: Apache-2.0
-weights: [gemma4-e4b-it, chatterbox-t3-mtl-v3, chatterbox-s3gen, chatterbox-ve, chatterbox-conds, chatterbox-grapheme-mtl]
+weights: [gemma4-e4b-it, chatterbox-t3-mtl-v3, chatterbox-s3gen, chatterbox-ve, chatterbox-conds, chatterbox-grapheme-mtl, chatterbox-cangjie]
 workflow: workflows/translate-speech.api.json
 bindings:
   # the speech to translate: mono FLAC as the app prepares it; also the voice it is said again in

@@ -9,7 +9,7 @@ Scripts that turn a rented GPU pod (RTX 4090, 24 GB) into a Montagio backend: Co
 | `smoke.ts` | Compiles presets with `@montagio/presets`, submits them through `@comfyorg/sdk` to the proxy, downloads the clips, and records wall time, execution time and peak VRAM in `s1-results/smoke.jsonl`. Also runs the extension jobs and text to image (below). |
 | `lib/` | The helpers of `smoke.ts` and `fetch-weights.ts`: the extension jobs, the ComfyUI checks, the weight download, the `.safetensors` header reader. |
 | `versions.env` | Every pinned version and checksum, also read by the local installer (`infra/local`). |
-| `patches/comfyui-chatterbox-no-routes.patch` | Removes the voice node's `/chatterbox/*` HTTP routes. |
+| `patches/comfyui-chatterbox-no-routes.patch` | Removes the voice node's `/chatterbox/*` HTTP routes; its tokenizer reads the Chinese table (`Cangjie5_TC.json`, in the lock) from the model folder. Kept in LF and applied with `git apply --ignore-whitespace`: that tokenizer is CRLF upstream. |
 | `requirements-chatterbox.txt` | The voice node's Python packages, pinned and hashed, installed with `--no-deps --require-hashes`. |
 | `test/` | Vitest tests, among them the offline check of every workflow (`test/workflows.test.ts`). |
 

@@ -361,8 +361,8 @@ export async function install(repoRoot: string, opts: InstallOptions, deps: Inst
     if (head !== pin.commit) throw new Error(`${pin.repo} is at ${head ?? 'an unreadable commit'}, expected ${pin.commit}`);
     if (id === 'voice') {
       const patch = join(repoRoot, VOICE_NODE_PATCH);
-      await run('git', ['-C', build, 'apply', '--check', patch]);
-      await run('git', ['-C', build, 'apply', patch]);
+      await run('git', ['-C', build, 'apply', '--check', '--ignore-whitespace', patch]);
+      await run('git', ['-C', build, 'apply', '--ignore-whitespace', patch]);
       await run(L.comfyPython, ['-m', 'pip', 'install', '--no-deps', '--require-hashes', '-r', join(repoRoot, VOICE_NODE_REQUIREMENTS)]);
       await run(L.comfyPython, ['-I', '-c', VOICE_NODE_IMPORTS]);
     }

@@ -69,7 +69,11 @@ export const BUILD_BYTES = 1 * GiB;
 export const MARGIN_BYTES = 2 * GiB;
 
 export const OPEN_STACK_REPORT = 'apps/web/public/open-stack-report.json';
-/** The avatar's voice pack is patched (its /chatterbox/* HTTP routes removed) and gets its Python packages, pinned and hashed. */
+/**
+ * The avatar's voice pack is patched (its /chatterbox/* HTTP routes removed, its Chinese table read from the model folder)
+ * and gets its Python packages, pinned and hashed. The patch is applied whitespace-blind: the tokenizer it changes is CRLF
+ * upstream, the patch is kept in LF, and the checked commit fixes every line it matches.
+ */
 export const VOICE_NODE_PATCH = 'infra/runpod/patches/comfyui-chatterbox-no-routes.patch';
 export const VOICE_NODE_REQUIREMENTS = 'infra/runpod/requirements-chatterbox.txt';
 /** What the voice pack's packages must import once installed, in ComfyUI's Python. */
@@ -290,7 +294,7 @@ export function buildPlan(input: PlanInput): Step[] {
         pack.id === 'voice'
           ? [
               ...clone(versions.voiceNode.repo, L.voiceNodeDir, versions.voiceNode.commit),
-              `git -C ${build(L.voiceNodeDir)} apply ${path.join(input.repoRoot, VOICE_NODE_PATCH)} (its /chatterbox/* HTTP routes removed)`,
+              `git -C ${build(L.voiceNodeDir)} apply --ignore-whitespace ${path.join(input.repoRoot, VOICE_NODE_PATCH)} (its /chatterbox/* HTTP routes removed, its Chinese table read from the model folder)`,
               `${L.comfyPython} -m pip install --no-deps --require-hashes -r ${path.join(input.repoRoot, VOICE_NODE_REQUIREMENTS)}`,
               `${L.comfyPython} -I -c "${VOICE_NODE_IMPORTS}"`,
               `move it to ${L.voiceNodeDir}`,

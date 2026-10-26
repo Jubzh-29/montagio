@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { loadLibrary } from '@montagio/presets';
 import { afterEach, expect, test } from 'vitest';
 
 const script = join(import.meta.dirname, '..', 'bootstrap.sh');
@@ -77,4 +78,19 @@ test('the voice node is installed last, once the proxy, the npm dependencies and
   const text = readFileSync(script, 'utf8');
   expect(text.match(/install_npm; write_env; install_voice_node; install_segment_node/g)).toHaveLength(2);
   expect(text).not.toMatch(/install_comfyui; install_extension_nodes/);
+});
+
+test('the voice speaks Chinese offline: its table is pinned beside the grapheme table, where the patched tokenizer reads it', async () => {
+  const library = await loadLibrary(join(import.meta.dirname, '..', '..', '..'), { presets: false });
+  const lock = [...library.lock.values()];
+  const table = lock.find((entry) => entry.file === 'Cangjie5_TC.json');
+  // MTLTokenizer hands the converter the folder of its vocabulary file.
+  expect(table?.folder).toBeDefined();
+  expect(table?.folder).toBe(lock.find((entry) => entry.file === 'grapheme_mtl_merged_expanded_v1.json')?.folder);
+  for (const id of ['chatterbox-mtl-voice', 'gemma4-translate']) expect(library.extensionModels.get(id)?.weights).toContain(table?.id);
+  const patch = readFileSync(join(import.meta.dirname, '..', 'patches', 'comfyui-chatterbox-no-routes.patch'), 'utf8');
+  expect(patch).toContain('+            local_file = Path(model_dir) / "Cangjie5_TC.json"');
+  // Kept in LF (.gitattributes); the tokenizer is CRLF upstream, so the patch is applied whitespace-blind.
+  expect(patch).not.toContain('\r');
+  expect(readFileSync(script, 'utf8')).toContain('git -C "$dir" apply --check --ignore-whitespace "$patch"');
 });
