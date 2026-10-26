@@ -120,6 +120,8 @@ Pour mettre à jour la vitrine, reconstruire, puis relancer la même commande `h
 - [ ] Dans l'onglet Film, une photo et trois presets, puis « Assemble film » : le film joue en quelques secondes après le chargement de FFmpeg. « Download film » et « Download 9:16 » fonctionnent.
 - [ ] Les étiquettes du film téléchargé sont les bonnes : `ffprobe -v error -show_entries format_tags -of json montagio-film.mp4` doit afficher `"comment": "AI-generated"` après la S3, ou `"Montagio showcase placeholder"` avant.
 - [ ] Le bouton FR passe l'interface en français (les noms et descriptions des presets restent en anglais).
+- [ ] `/examples/` (lien « Examples » de l'en-tête, ou « See every function at work » d'Explore) montre chaque exemple de fonction : ce dont il part, le résultat, chaque modèle lié à sa ligne d'Open Stack et « Open in ComfyUI » pour chaque étape. L'avatar et ses traductions jouent avec leur son.
+- [ ] `/remix/` et `/translate/` montrent leurs propres exemples sous la phrase qui renvoie à l'app installée.
 - [ ] Dans les outils de développement, la console n'affiche aucune erreur. L'onglet Réseau ne montre aucune requête hors du domaine `*.hf.space` et aucune réponse 404.
 - [ ] Le pied de page affiche le lien du code source.
 
@@ -258,7 +260,7 @@ Un exemple d'effet ou de hook passe en HD de la même façon, mais il doit d'abo
 
 **Le poids.** En sortie de SeedVR2, les 43 clips pèsent 346 Mo. L'encodage de la vitrine (`SHOWCASE_X264`) est passé de CRF 18 `veryfast` à **CRF 23 `slow`**, le réglage retenu : environ 5 Mo par clip 1080p au lieu de 10, avec un PSNR de 42 à 43 dB par rapport à la sortie de SeedVR2 (45 à 46 dB pour l'ancien réglage), sans différence visible. Les 43 fichiers font 214 Mo dans le dépôt, et la vitrine construite environ 290 Mo. Le dépôt d'un Space Hugging Face est limité à environ 1 Go, historique compris : chaque envoi de clips modifiés s'y ajoute. Avant un nouvel envoi complet (après une passe de fluidification, par exemple), vérifier la place prise dans les réglages du Space, et au besoin écraser son historique (`HfApi().super_squash_history("<compte>/montagio", repo_type="space")`).
 
-**Fluidification.** Une passe HD avec RIFE (`--smooth`, 32 i/s) n'est pas encore prise en charge par la vitrine : `ingest --hd` et `verify` attendent la cadence du preset (16 i/s). Il faudra l'ajouter avec la branche de fluidification, puis refaire la passe HD des clips depuis leur 480p.
+**Fluidification.** Pour les clips caméra, les effets et les hooks, la passe HD avec RIFE (`--smooth`, 32 i/s) n'est pas prise en charge : `ingest --hd` et `verify` attendent la cadence du preset (16 i/s). Les exemples de fonctions (partie 10), eux, sont en 32 i/s.
 
 ## 8. Ce que la vitrine collecte : rien
 
@@ -287,3 +289,49 @@ La décision viendra après la S2 (21–22/10). Le point d'extension est prévu 
   - un interrupteur d'arrêt.
 
 Rien de cela n'est écrit aujourd'hui. La vitrine reste gratuite et statique.
+
+## 10. Les exemples des fonctions (26–27/10)
+
+La vitrine ne fait tourner aucun GPU. Jusqu'au 26/10, les fonctions qui en demandent un n'y avaient aucun exemple : le routeur les refusait, et leurs pages disaient seulement « il faut l'app installée ». Elles ont maintenant chacune un exemple rendu par Montagio, à partir des photos et des clips de la vitrine et de la banque de visages, sans personne réelle ni tendance réelle.
+
+**Ce que voit le juré.** La page `/examples` (lien « Examples » de l'en-tête, et « See every function at work » sur Explore) groupe les exemples par fonction, dans l'ordre du chemin d'or : Remix de tendance, Restyle, remplacement d'objet, transfert de mouvement, avatar parlant, traduction avec lip-sync, sous-titres karaoké en 9:16. Chaque carte montre :
+- ce dont l'exemple part : la photo (un visage de la banque est nommé), le clip de référence tel que le smoke l'a préparé, la première image restylisée, ou l'avatar de départ d'une traduction ;
+- le résultat, avec son badge « 1080p · 32 fps » et la mention « AI-generated ». L'avatar, ses traductions et les sous-titres jouent avec leur son ;
+- le texte donné au modèle (la phrase dite, le nouveau style, le nouvel objet, le personnage), la langue, le style des sous-titres, et le post écrit par Gemma pour le remix ;
+- chaque étape de la chaîne : le modèle, lié à sa ligne d'Open Stack, sa licence, et « Open in ComfyUI », qui télécharge le workflow de cette étape. La passe HD a la sienne.
+
+Les pages `/remix` et `/translate` montrent aussi leurs exemples sous leur phrase. `/voice` et `/ads` gardent une phrase propre, sans exemple.
+
+**Le manifeste.** La section `features` de `demo-assets/showcase/manifest.yaml` note pour chaque exemple : la fonction, l'aspect, la graine, le texte, la langue, le visage de départ, l'exemple dont il part (`from`), le style des sous-titres, le post du remix, les fichiers de départ (`inputs`, avec leur sha256), chaque étape (`steps` : le modèle et le sha256 du workflow) et la passe HD (`hd`, avec `smooth`). Les fichiers :
+- `features/<id>.mp4`, le résultat, réencodé dans l'encodage de la vitrine (CRF 23 `slow`), le son gardé en AAC quand il parle ;
+- `features/inputs/<id>--<rôle>.<ext>` ;
+- `workflows/feature-<id>--<n>-<modèle>.json`, le workflow de chaque étape tel que le smoke l'a écrit. `prepare` compile de nouveau celui de la passe HD (`workflows/feature-<id>--hd.json`).
+
+**L'intégration.** Une commande par exemple, depuis le dossier du rendu (`modal volume get montagio-results runs/<run> C:/…`) :
+
+```bash
+npm run showcase -- ingest --feature motion-pip --kind motion <run du rendu> --photo demo-assets/faces/pip.jpg --face pip --hd-run <run de la passe HD> --inputs <run du rendu>/clips
+```
+
+- `--kind` vaut `avatar`, `translate`, `captions`, `motion`, `restyle`, `swap` ou `remix`. La commande exige dans le dossier les jobs de la fonction (la voix puis l'avatar, la traduction puis l'avatar, la 1re image retouchée puis le Restyle, le squelette puis les plans du remix…), chacun une seule fois.
+- `--photo` donne la photo qu'a lue le rendu ; son sha256 doit être celui du job.
+- `--hd-run` et `--inputs` : la passe HD (`smoke --extension upscale --clip <résultat> --smooth`) doit avoir pris ce rendu exact (sha256 du clip chargé), à la taille 1080p de son aspect. Son workflow doit être celui que la vitrine compile.
+- Les sous-titres partent d'un exemple déjà intégré (`--from avatar-montagio`) et du dossier de sa transcription : `--text` (le texte corrigé) et `--style` (un style de l'éditeur). Ils sont incrustés comme l'export de l'app : mots de Whisper alignés sur le texte, libass et la police du style, cadre 9:16, cadence doublée sous 24 i/s, son et mention AI-generated.
+
+`verify` contrôle chaque exemple : sha256, H.264, taille (1080p après la passe HD, 1080×1920 pour les sous-titres), cadence (32 i/s après une passe fluide), son pour ce qui parle, mention AI-generated, sha256 des fichiers de départ et des workflows, modèles connus du registre, workflow de la passe HD inchangé. Un fichier de `features/` ou un workflow `feature-*` sans entrée est une erreur.
+
+**Les rendus du 26/10** (compte Modal `montagio-2`, détail et coûts dans [S2_RESULTATS.md](S2_RESULTATS.md), partie 22) :
+
+| Exemple | Fonction | Départ | Chaîne |
+|---|---|---|---|
+| `remix-juniper` | Remix de tendance | la tendance d'exemple de l'app (hip-hop, salut et bravo, jumping jacks de la bibliothèque Motion), Juniper le renard de la banque | Gemma 4 (squelette et post), Animate-2 sur 3 plans |
+| `restyle-snow` | Restyle | le Crash Push de la voiture (la source 480p du clip de la vitrine) | édition Qwen en étapes complètes, VACE 14B |
+| `restyle-watercolor` | Restyle | le Rise & Push du port (idem) | édition Qwen en étapes complètes, VACE 14B |
+| `swap-gloves` | Remplacement d'objet | le boxeur de la bibliothèque Motion, deux points sur les gants | SAM 2.1, VACE 14B |
+| `motion-pip` | Transfert de mouvement | Pip la grenouille de la banque, le hip-hop de la bibliothèque | Animate-2 distillé |
+| `avatar-montagio` | Avatar parlant | le portrait d'exemple, « Hello, I am a talking avatar made with Montagio. » | Chatterbox, S2V |
+| `translate-zh`, `translate-es` | Traduction et lip-sync | l'avatar précédent | Gemma 4 (deux passes), Chatterbox, S2V |
+| `captions-en`, `captions-es` | Sous-titres karaoké 9:16 | l'avatar et sa traduction espagnole | Whisper large-v3 turbo, puis l'export de l'app |
+
+Chacun est passé en 1080p par SeedVR2, avec RIFE (32 i/s). Les sous-titres n'existent qu'en alphabet latin (pas de police CJK) : la traduction chinoise n'a donc pas de sous-titres.
+

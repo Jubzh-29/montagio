@@ -1,0 +1,89 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "shots.png"
+    }
+  },
+  "2": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "gemma4_e4b_it_int8_convrot.safetensors",
+      "type": "stable_diffusion",
+      "device": "default"
+    }
+  },
+  "3": {
+    "class_type": "TextGenerate",
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "prompt": "This sheet shows the first frame of each shot of a short video, in reading order: left to right, then top to bottom. Describe the video as JSON only, with no other text: {\"shots\": [one short line per shot, in order, saying what it shows], \"hook\": \"the words written on screen in the first shots, or an empty string\", \"style\": \"the tone of the video, in a few words\"}",
+      "image": [
+        "1",
+        0
+      ],
+      "max_length": 512,
+      "sampling_mode": "off",
+      "thinking": false,
+      "use_default_template": true,
+      "mtp": "auto"
+    }
+  },
+  "4": {
+    "class_type": "StringConcatenate",
+    "inputs": {
+      "string_a": "Here is the description of a short trend video. Write the post of a remix of it in which a fox in a cream cable-knit sweater, corduroy trousers and a leather satchel performs the same shots, in the same tone. Answer as JSON only, with no other text: {\"caption\": \"one or two short sentences in English\", \"hashtags\": [\"five hashtags, without #\"], \"onscreen\": \"a short hook to write on screen, in English\"}. Never name a real person or a brand.",
+      "string_b": [
+        "3",
+        0
+      ],
+      "delimiter": "\n\n"
+    }
+  },
+  "5": {
+    "class_type": "TextGenerate",
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "prompt": [
+        "4",
+        0
+      ],
+      "max_length": 384,
+      "sampling_mode": "off",
+      "thinking": false,
+      "use_default_template": true,
+      "mtp": "auto"
+    }
+  },
+  "6": {
+    "class_type": "StringConcatenate",
+    "inputs": {
+      "string_a": [
+        "3",
+        0
+      ],
+      "string_b": [
+        "5",
+        0
+      ],
+      "delimiter": "\n=====\n"
+    }
+  },
+  "7": {
+    "class_type": "SaveText",
+    "inputs": {
+      "text": [
+        "6",
+        0
+      ],
+      "filename_prefix": "montagio/remix-skeleton",
+      "format": "txt"
+    }
+  }
+}

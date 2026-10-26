@@ -420,3 +420,52 @@ Le vocabulaire de Chatterbox Multilingual V3 ne contient pas de caractères chin
 - **Coût réel : 0,090 $.** Le détail : poids et image 0,041 $, traduction 0,026 $, phrases connues 0,024 $. Relevé du mois de montagio-2 : 22,71 $. À la fin, aucune app Modal ne tourne.
 - Les résultats sont hors dépôt, dans `s3/validation/20261026-193907-zh-voice/` et `s3/validation/20261026-zh-check/` (phrases, textes et FLAC).
 - **Daté** : la validation est notée dans `registry/extensions/gemma4-translate.yaml`, le modèle par lequel l'app fait parler chinois.
+
+## 22. Exemples de la vitrine (26/10)
+
+Les fonctions qui demandent un GPU n'avaient aucun exemple dans la vitrine statique. Elles en ont un chacune, rendu sur le compte Modal montagio-2 avec un budget accordé de 5,00 $ au plus. L'avatar d'exemple de l'app, qui disait encore l'ancien nom, a été rendu de nouveau. Tout part des photos et des clips de la vitrine, de la bibliothèque Motion et de la banque de visages : aucune personne réelle, aucune tendance réelle. Scripts, rendus, planches et sorties brutes : `s3/validation/vitrine-2026-10-26/`, hors dépôt.
+
+**Poids ajoutés au volume de montagio-2** : S2V 14B fp8 (16,4 Go) et wav2vec2 (0,6 Go), puis la LoRA 4 pas `wan2.2_t2v_lightx2v_4steps_lora_v1.1_high_noise` (1,2 Go), que le premier essai de l'avatar a réclamée ; sha256 conformes. Le premier lancement a aussi reconstruit l'image Modal (Node.js 22.23.4 et le contrôle Python 3.11 de `main`) : un premier essai a échoué sur `tar` (« Directory renamed before its status could be extracted »), le second est passé tel quel.
+
+**Rendus (L4, réglages de l'app : 480p, 16 i/s)**
+
+| Exemple | Job | Temps sur la L4 | Pic de VRAM | Verdict |
+|---|---|---|---|---|
+| Avatar « Montagio » (portrait d'exemple) | voix Chatterbox, puis S2V | 21 s, puis 145 s | 3,3 Go, puis 22,0 Go | ✅ 3,4 s de parole, lèvres synchrones, identité gardée ; Whisper relit la phrase mot pour mot, « Montagio » compris |
+| Traduction en chinois | Gemma 4 (deux passes), puis S2V | 27 s, puis 266 s | 10,1 Go, puis 22,0 Go | ✅ 6,7 s de parole (2 morceaux S2V) |
+| Traduction en espagnol | Gemma 4, puis S2V | 18 s, puis 130 s | 13,8 Go, puis 22,0 Go | ✅ « Hola, soy un avatar parlante con Montagio. » |
+| Mots de l'avatar et de l'espagnol | Whisper large-v3 turbo | 9 s ; 4 s ; 9 s (langue imposée) | 13,6 à 14,0 Go ; 4,9 Go | ✅ en « auto », Whisper a détecté `en` sur l'espagnol (accent de la voix) : l'exemple prend la transcription faite avec `es` imposé, comme le permet le panneau des sous-titres (nouvelle option `smoke --words-language`) |
+| Remix de tendance (Juniper le renard) | squelette Gemma, puis 3 plans Animate-2 | 33 s ; 154, 122 et 122 s | 7,9 Go ; 21,0 à 21,6 Go | ✅ même personnage sur les trois plans, coupes aux images 32 et 64 ; post de Gemma en anglais |
+| Restyle « soir d'hiver enneigé » (voiture) | édition Qwen en étapes complètes (`--quality`), puis VACE | 359 s, puis 248 s | 22,3 Go, puis 22,6 Go | ✅ neige sur la route et les falaises, phares allumés, poussée de caméra identique |
+| Restyle « aquarelle » (port) | idem | 315 s, puis 204 s | 22,4 Go, puis 22,6 Go | ✅ rendu peint, mouvement suivi ; des lettres inventées sur la coque |
+| Remplacement d'objet (gants dorés du boxeur) | SAM 2.1 et VACE | 201 s | 22,1 Go | ✅ gants dorés sur presque toutes les images ; un crochet tendu perd un instant sa couleur |
+| Transfert de mouvement (Pip la grenouille, hip-hop) | Animate-2 distillé | 425 s | 20,4 Go | ✅ danse suivie, identité gardée |
+| Transfert de mouvement (Bolt le robot, danse robot) | idem | 394 s | 19,6 Go | ✅ correct, gardé hors de la vitrine (Pip est plus net) |
+
+**Passe HD 1080p avec RIFE (32 i/s)**. Le soir du 26/10, aucune L4 n'était disponible chez Modal : trois conteneurs sont restés plus de 10 minutes sans GPU. Ils ont été arrêtés (rien n'est facturé sans conteneur) et relancés sur une **A10** (24 Go, comme la L4), choisie par `MONTAGIO_MODAL_GPU=A10` sans reconstruire l'image.
+
+| Passe HD + RIFE (A10, `--smooth`) | Clip d'entrée | Temps | Pic de VRAM |
+|---|---|---|---|
+| Avatar « Montagio » | 832×480, 54 images | 279 s, à froid | 9,2 Go |
+| Traduction en chinois | 832×480, 107 images | 495 s | 8,9 Go |
+| Traduction en espagnol | 832×480, 63 images | 321 s | 9,2 Go |
+| Remix de tendance | 480×832, 96 images | 442 s, à froid | 8,9 Go |
+| Restyle neige, Restyle aquarelle | 832×480, 81 images | 366 et 368 s | 9,6 Go |
+| Remplacement d'objet | 480×832, 81 images | 385 s, à froid | 8,9 Go |
+| Transfert de mouvement | 480×832, 81 images | 368 s | 8,9 Go |
+| Pour la vidéo de démo : la tendance, le boxeur, la référence hip-hop | 480×832, 96 et 81 images | 459, 372 et 375 s | 8,8 à 8,9 Go |
+
+Chaque sortie est en 1080p à 32 i/s, son conservé pour ce qui parle. Les exemples entrent dans la vitrine par `showcase ingest --feature` ([VITRINE.md](VITRINE.md), partie 10) ; les sous-titres karaoké sont incrustés sur le PC comme les exporte l'app (style Pop pour l'anglais, Karaoke pour l'espagnol). La traduction chinoise n'a pas de sous-titres : ils n'existent qu'en alphabet latin. Les versions sources en pleine définition, pour la vidéo, sont dans `s3/validation/vitrine-2026-10-26/video/`, hors dépôt.
+
+**Coût réel : 2,94 $** (relevé par app de Modal), pour un plafond de 5,00 $ ; le mois de montagio-2 passe de 22,71 $ à 25,64 $.
+
+| Lot | Contenu | Coût |
+|---|---|---|
+| Poids et image | S2V, wav2vec2, la LoRA 4 pas de S2V ; image reconstruite (un essai raté sur `tar`) | 0,10 $ |
+| Avatar et traductions | un premier essai arrêté sur la LoRA manquante, puis l'avatar, deux traductions, deux transcriptions | 0,22 $ |
+| Transfert de mouvement | Pip et Bolt | 0,27 $ |
+| Restyle et remplacement d'objet | deux Restyle (édition en étapes complètes), les gants | 0,52 $ |
+| Remix de tendance | squelette et trois plans | 0,15 $ |
+| Passes HD (A10) | onze passes et la transcription espagnole en langue imposée | 1,67 $ |
+
+À la fin, aucune app Modal ne tourne.
