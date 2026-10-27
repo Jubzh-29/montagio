@@ -126,7 +126,7 @@ Conserver le nom de Space `montagio`. Le compte `jubzh` est créé et l'URL pré
 
 - [x] **Step 6: Refaire et contrôler la 16:9**
 
-Remplacer les deux emplacements dans `montagio-demo` par les adresses définitives. Produire `montagio-demo-video_long_en_v5.mp4`, sans écraser `v4`. Vérifier 1920×1080, 30 i/s, environ 80 s, l'audio, la carte de fin et une planche représentative avec les mêmes outils qu'à l'étape 4.
+Remplacer les deux emplacements dans `montagio-demo` par les adresses définitives. La v5 avait été produite avec un compte Hugging Face prévisionnel ; la v6 utilise le compte réel `jubzh`, sans écraser les versions précédentes. Vérifier 1920×1080, 30 i/s, 79,8 s, AAC 48 kHz, -14,3 LUFS, -1,8 dBTP, la carte de fin et le MP4 avec les mêmes outils qu'à l'étape 4.
 
 ### Task 4: Contrôles finaux et reliquat
 
