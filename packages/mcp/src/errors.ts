@@ -10,6 +10,7 @@ const MESSAGES: Record<string, string> = {
   'rights-required':
     'A motion transfer, a restyle or an object swap needs the user\'s word that they hold the rights on its video and its image (and, for a swap, that the people filmed agree). Ask them, then call again with rights: true. Never set it on their behalf.',
   'blocked-name': 'The text names a well-known person. Montagio does not make images of real people without their consent.',
+  'blocked-term': 'The text asks for explicit sexual content. Montagio refuses this request.',
   'extension-disabled': 'This feature, effect or hook is not available on this installation. list_effects_and_hooks shows what is.',
   'invalid-input': 'This request cannot be rendered. Check the text (its length too) and the options, then try again.',
   'invalid-request': 'The request misses a field the app needs.',

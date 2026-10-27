@@ -16,6 +16,7 @@ const REFUSALS: Record<string, MessageKey> = {
   'ffmpeg-unavailable': 'errorFfmpegUnavailable',
   // Photos, effects and extensions (server/jobs.ts, server/guards.ts).
   'blocked-name': 'errorBlockedName',
+  'blocked-term': 'errorBlockedTerm',
   'consent-required': 'errorConsentRequired',
   'extension-disabled': 'errorExtensionDisabled',
   'invalid-input': 'errorInvalidInput',

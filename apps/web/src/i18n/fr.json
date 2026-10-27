@@ -192,6 +192,7 @@
   "demoExampleCaption": "Rendu de démo : aucun modèle n’a tourné ici. Sur un GPU, {model} ({license}) a fait ce clip de la même photo d’exemple · généré par IA",
   "demoMovedCaption": "Rendu de démo : FFmpeg anime la photo, aucun modèle n’a tourné ici. Avec un GPU, {model} ({license}) le fait.",
   "errorBlockedName": "Ce texte nomme une personne connue. Montagio ne fabrique pas d'images de personnes réelles sans leur accord.",
+  "errorBlockedTerm": "Ce texte demande un contenu sexuel explicite. Montagio refuse cette demande.",
   "errorConsentRequired": "Cochez la case pour confirmer que vous êtes la personne sur la photo, ou que vous avez son accord.",
   "errorExtensionDisabled": "Cette fonction n'est pas disponible sur cette installation.",
   "errorInvalidInput": "Cette demande ne peut pas être rendue. Vérifiez le texte et les options, puis réessayez.",

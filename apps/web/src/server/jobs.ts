@@ -478,6 +478,7 @@ const STATUS: Record<JobError['code'], number> = {
   'invalid-input': 400,
   'consent-required': 400,
   'blocked-name': 400,
+  'blocked-term': 400,
   'unknown-image': 400,
   'ffmpeg-missing': 503,
   'speech-too-long': 400,

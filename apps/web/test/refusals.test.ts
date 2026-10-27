@@ -45,6 +45,7 @@ test('a film FFmpeg could not join gets its own message, in English and in Frenc
 test('the photo and effect refusals say what to do, in English and in French', () => {
   const expected = {
     'blocked-name': 'errorBlockedName',
+    'blocked-term': 'errorBlockedTerm',
     'consent-required': 'errorConsentRequired',
     'extension-disabled': 'errorExtensionDisabled',
     'invalid-input': 'errorInvalidInput',
