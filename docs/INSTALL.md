@@ -234,6 +234,7 @@ With `--app-only`, `start` sets no extension list: `MONTAGIO_EXTENSIONS` decides
 | `MONTAGIO_ALLOWED_HOSTS` | other addresses the app answers at, comma list: `192.168.1.20:8080` (that port only), `studio.example` (any port); see [Open the app at another address](#open-the-app-at-another-address) |
 | `MONTAGIO_DATA` | the folder of your clips and of the app's other files, instead of the repository's `data/` |
 | `MONTAGIO_BACKEND` | for an app you start yourself: `demo` (the default) or `local`, which renders through the comfy-api-proxy at `COMFY_BASE_URL` (required with `local`). `start` sets them itself |
+| `MONTAGIO_CONTENT_FILTER` | the explicit-term text filter is on by default. Exact lowercase `off` disables only that filter when `MONTAGIO_BACKEND=local`; it is ignored in demo. Name, consent, rights, host and file checks stay active |
 | `MONTAGIO_URL` | `npm run reproduce` and the MCP server: the app's address, `http://127.0.0.1:3000` by default |
 
 ### Open the app at another address

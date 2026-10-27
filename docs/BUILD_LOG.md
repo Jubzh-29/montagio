@@ -320,3 +320,7 @@ UI/UX audit of 21/10 (score 26/40, no P0, three P1): its action plan, one branch
   - The manifest gets a `features` section (inputs, steps and HD pass by sha256), `showcase ingest --feature` brings a smoke run in (captions are burned as the app's export burns them), `verify` checks every file, and `prepare` writes them into `data.json`; the router answers `GET /api/showcase/features`.
   - `smoke --words-language` imposes the transcription's language, as the captions panel can.
   - The GPU work cost 2.94 $ on Modal (renders on an L4, the HD passes on an A10 when no L4 was free). Details and timings: `docs/VITRINE.md` part 10 and `docs/S2_RESULTATS.md` part 22.
+
+## 2026-10-27
+
+- An explicit-term text filter (`fix/content-filter`) joins the well-known-name guard. `registry/blocked-terms.txt` is checked as whole normalized words or phrases at every existing text checkpoint, including delayed film shots and imported share files, and returns 400 `blocked-term` with Studio and MCP messages. It is on by default; exact lowercase `MONTAGIO_CONTENT_FILTER=off` disables only this filter with `MONTAGIO_BACKEND=local`, never the name, consent, rights, host or file checks. Ordinary words that merely contain a listed string still render. Both lists are good-faith textual guardrails, not complete moderation.

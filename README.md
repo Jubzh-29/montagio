@@ -298,8 +298,9 @@ Do not make videos of real people without their consent, nothing illegal and not
 - The trend remix asks you to confirm that you may use the video and that the people filmed agree, and, for each photo, that its person is you, agreed, or is fictional: that box is ticked every time, never deduced from a file sent. A link is fetched only from TikTok, Instagram or YouTube Shorts, checked by name before anything runs, 60 s and 50 MB at most; it is never written in a recipe. A remix of a trend that is not Montagio's example cannot be shared in the community gallery.
 - A character is fictional: it comes from a text or a ready-made face, never from a photo of someone, and its portrait is always asked fully clothed.
 - A [list of well-known names](registry/blocked-names.txt) is refused in every text typed in the app (prompts, a camera clip's or a film's description of the photo, a remixed move, the edit, the effects, the avatar, a film's music, the motion transfer, Restyle, the object swap, the ads, the characters, the trend remix, the gallery) and in share files. It is a good-faith guardrail, not a complete filter.
+- A [list of explicit sexual terms](registry/blocked-terms.txt) is checked in those same texts, as whole words or phrases, and refused with `blocked-term`. This filter is on by default. On your own local backend only, `MONTAGIO_CONTENT_FILTER=off` turns it off; the name, consent, rights, host and file checks stay active. It is a good-faith textual guardrail, not complete moderation.
 - Every clip, image and sound is tagged "AI-generated" in its metadata, beside its recipe, and the Studio shows the mention under each result with the model and its license. A recipe never gives the consent or the rights.
-- No content filter is imposed on your own machine: what you render locally is your responsibility.
+- What you render locally is your responsibility: these text checks cannot see what an image or a clip contains.
 
 Security issues, and what the local API refuses: [SECURITY.md](SECURITY.md).
 
