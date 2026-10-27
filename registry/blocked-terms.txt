@@ -23,10 +23,6 @@ pornographic
 pornographique
 nsfw
 not safe for work
-adult content
-contenu pour adultes
-adult video
-vidéo pour adultes
 sex video
 vidéo sexuelle
 sex tape
@@ -34,21 +30,17 @@ sextape
 xxx
 
 # Nudity and erotic content
-nude
-nudes
-nudity
-nudité
-nu
-nue
-nus
-nues
+explicit nudity
+nudité explicite
+sexual nudity
+nudité sexuelle
 erotic
 erotica
 érotique
 erotique
-fetish
-fétiche
-fetiche
+sexual fetish
+fétiche sexuel
+fetiche sexuel
 
 # Sexual acts and explicit requests
 orgasm

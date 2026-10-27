@@ -86,6 +86,22 @@ describe('the explicit text guard', () => {
     await expect(assertNoBlockedTerm(undefined, 'a red fox')).resolves.toBeUndefined();
   });
 
+  test('ordinary non-explicit uses of ambiguous words are not refused', async () => {
+    const prompts = [
+      'a beige dress with nude heels',
+      'a classical nude sculpture in a museum',
+      'an adult video tutorial about photography',
+      'an adult educational documentary about wildlife',
+      'a museum display of a ceremonial fetish object',
+      'une statue de nu classique dans un musée',
+      'un fétiche cérémoniel dans un musée',
+      'une étude de la nudité dans l’art classique',
+    ];
+    for (const prompt of prompts) {
+      await expect(assertAllowedText(prompt), prompt).resolves.toBeUndefined();
+    }
+  });
+
   test('the local opt-out disables terms only, never names', async () => {
     process.env.MONTAGIO_BACKEND = 'local';
     process.env.MONTAGIO_CONTENT_FILTER = 'off';
