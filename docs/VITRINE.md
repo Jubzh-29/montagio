@@ -57,10 +57,10 @@ Résultat : `apps/web/out/`, environ 330 Mo, dont 293 Mo pour `showcase/` (le 27
 **Build de publication**, avant le dépôt final :
 
 ```bash
-MONTAGIO_REPO_URL=https://github.com/<compte>/montagio npm run showcase:build -w @montagio/web -- --release
+MONTAGIO_REPO_URL=https://github.com/Jubzh-29/montagio npm run showcase:build -w @montagio/web -- --release
 ```
 
-La syntaxe `VARIABLE=valeur commande` est celle de Git Bash. Sous PowerShell, définir d'abord la variable : `$env:MONTAGIO_REPO_URL = 'https://github.com/<compte>/montagio'`.
+La syntaxe `VARIABLE=valeur commande` est celle de Git Bash. Sous PowerShell, définir d'abord la variable : `$env:MONTAGIO_REPO_URL = 'https://github.com/Jubzh-29/montagio'`.
 
 `--release` change deux choses :
 - **Vérification stricte** : `showcase verify --strict` refuse les photos et les clips provisoires, ainsi qu'un clip dont le workflow a changé depuis son rendu.
@@ -101,7 +101,7 @@ Ouvrir ensuite http://127.0.0.1:3101/ (le serveur de test n'écoute que sur la m
 5. **Envoyer le dossier** :
 
    ```bash
-   hf upload <compte>/montagio apps/web/out . --repo-type=space --commit-message="Montagio showcase"
+   hf upload Jubzh-29/montagio apps/web/out . --repo-type=space --commit-message="Montagio showcase"
    ```
 
    La CLI envoie elle-même les gros fichiers (clips, wasm). Le `README.md` du dossier remplace celui du modèle « Blank » : il déclare `sdk: static` et les dépôts de poids utilisés.
@@ -134,12 +134,12 @@ Si le Space est indisponible, le même dossier peut être servi par GitHub Pages
 1. Construire avec le préfixe :
 
    ```bash
-   MONTAGIO_REPO_URL=https://github.com/<compte>/montagio npm run showcase:build -w @montagio/web -- --release --base-path montagio
+   MONTAGIO_REPO_URL=https://github.com/Jubzh-29/montagio npm run showcase:build -w @montagio/web -- --release --base-path montagio
    ```
 
    Le préfixe s'écrit sans barre initiale (`montagio`) : sous Git Bash, `/montagio` serait converti en chemin Windows. Le script écrit aussi `out/.nojekyll`. Sans ce fichier, GitHub Pages ignore le dossier `_next/`.
 2. Publier le contenu de `apps/web/out/` sur la branche `gh-pages` du dépôt (ou par l'action « Deploy to GitHub Pages »), puis activer Pages dans les réglages du dépôt. Comme sur Hugging Face, c'est vous qui publiez.
-3. Refaire les vérifications de la partie 4 sur `https://<compte>.github.io/montagio/`.
+3. Refaire les vérifications de la partie 4 sur `https://Jubzh-29.github.io/montagio/`.
 
 Le préfixe sert pour toutes les URL de la vitrine (`apps/web/src/showcase/urls.ts`) et pour le `basePath` de Next.
 
@@ -258,7 +258,7 @@ Un exemple d'effet ou de hook passe en HD de la même façon, mais il doit d'abo
 
 **Trois effets écartés.** Cake-ify, Explode et Squish sur la passante (`portrait-a`) sont techniquement réussis, mais montrent un couteau qui tranche une personne, une personne dans une explosion et des mains qui écrasent une personne. Ils ont quitté la vitrine (fichiers et workflows supprimés) et sont listés sous `withheld`, avec leur raison : `ingest`, `ingest --examples` et `ingest --hd` les écartent, et le manifeste refuse qu'un rendu écarté soit aussi listé. Les mêmes effets sur la voiture restent.
 
-**Le poids.** En sortie de SeedVR2, les 43 clips pèsent 346 Mo. L'encodage de la vitrine (`SHOWCASE_X264`) est passé de CRF 18 `veryfast` à **CRF 23 `slow`**, le réglage retenu : environ 5 Mo par clip 1080p au lieu de 10, avec un PSNR de 42 à 43 dB par rapport à la sortie de SeedVR2 (45 à 46 dB pour l'ancien réglage), sans différence visible. Les 43 fichiers font 214 Mo dans le dépôt, et la vitrine construite environ 290 Mo. Le dépôt d'un Space Hugging Face est limité à environ 1 Go, historique compris : chaque envoi de clips modifiés s'y ajoute. Avant un nouvel envoi complet (après une passe de fluidification, par exemple), vérifier la place prise dans les réglages du Space, et au besoin écraser son historique (`HfApi().super_squash_history("<compte>/montagio", repo_type="space")`).
+**Le poids.** En sortie de SeedVR2, les 43 clips pèsent 346 Mo. L'encodage de la vitrine (`SHOWCASE_X264`) est passé de CRF 18 `veryfast` à **CRF 23 `slow`**, le réglage retenu : environ 5 Mo par clip 1080p au lieu de 10, avec un PSNR de 42 à 43 dB par rapport à la sortie de SeedVR2 (45 à 46 dB pour l'ancien réglage), sans différence visible. Les 43 fichiers font 214 Mo dans le dépôt, et la vitrine construite environ 290 Mo. Le dépôt d'un Space Hugging Face est limité à environ 1 Go, historique compris : chaque envoi de clips modifiés s'y ajoute. Avant un nouvel envoi complet (après une passe de fluidification, par exemple), vérifier la place prise dans les réglages du Space, et au besoin écraser son historique (`HfApi().super_squash_history("Jubzh-29/montagio", repo_type="space")`).
 
 **Fluidification.** Pour les clips caméra, les effets et les hooks, la passe HD avec RIFE (`--smooth`, 32 i/s) n'est pas prise en charge : `ingest --hd` et `verify` attendent la cadence du preset (16 i/s). Les exemples de fonctions (partie 10), eux, sont en 32 i/s.
 

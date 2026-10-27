@@ -21,16 +21,16 @@ Montagio is an open-source AI video studio in the spirit of Higgsfield: drop a p
 
 ## Try it
 
-<!-- TODO before submission: replace the two placeholders below with the showcase's *.hf.space URL and the demo video URL. -->
+<!-- TODO before submission: replace the demo video placeholder and verify both links in a private window. -->
 
 | | |
 |---|---|
-| **Showcase** (in your browser, no install) | _TODO: showcase URL_ |
+| **Showcase** (in your browser, no install) | [jubzh-29-montagio.hf.space](https://jubzh-29-montagio.hf.space) |
 | **Demo video** | _TODO: video URL_ |
 | **Your own GPU** | one command, see [Install](#install) |
 | **ComfyUI** | the [node pack](comfy-nodes/README.md) and the [workflows](comfy-hub/README.md), ready to load |
 
-The showcase is a static copy of the real Studio. It plays 43 clips pre-rendered with Montagio on open weights, in 1080p: the 11 camera moves on 3 sample photos, 9 clips of the six effects and the Ignite hook. You can assemble a 2–3 shot film in your browser (FFmpeg compiled to WebAssembly), remix a preset and check it, download any clip's ComfyUI workflow and read a camera clip's recipe. It renders nothing on a GPU, takes no upload, costs nothing to host and collects nothing. How it is built and published: [docs/VITRINE.md](docs/VITRINE.md) (in French).
+The showcase is a static copy of the real Studio. It plays 43 clips pre-rendered with Montagio on open weights, in 1080p: the 11 camera moves on 3 sample photos, 9 clips of the six effects and the Ignite hook. Its **`/examples`** page adds ten pre-rendered results: a trend remix, a motion transfer, two Restyles, an object swap, a talking avatar, its translation into Chinese and Spanish, and captions in English and Spanish, each with its inputs and models. You can assemble a 2–3 shot film in your browser (FFmpeg compiled to WebAssembly), remix a preset and check it, download any clip's ComfyUI workflow and read a camera clip's recipe. It renders nothing on a GPU, takes no upload, costs nothing to host and collects nothing. How it is built and published: [docs/VITRINE.md](docs/VITRINE.md) (in French).
 
 ### From an MCP client
 
@@ -107,7 +107,7 @@ Montagio shows only what a GPU session rendered well. What it keeps out:
 | A **moodboard** for text to image, and a **palette taken from a photo** in the edit | On the GPU the moodboard lost the tones of its board, and the palette from a photo copied the photo's content instead of its colours. Both stay behind `MONTAGIO_EXPERIMENTAL`; the eight ready-made palettes are shown. |
 | Tilt Down and a Dutch angle | Fun Camera barely moves vertically and does not roll: Tilt Down stayed still even at twice the speed, so it left the library; Tilt Up became Crane Up. |
 | In the **12 GB profile**: Quality (20 steps) and every extension but the effects | Only what ran within 12 GB is offered: Turbo, Fast, text to image and the effects. |
-| In the **showcase**: uploads and everything that needs them (Characters, Ads, Avatar, Motion, Voice change, Translation, Trend remix, Draw, publishing) | The showcase renders nothing: it plays clips made beforehand. Three effect renders on a person were also kept out of it for what they show. |
+| In the **showcase**: uploads and the interactive tools that need them (Characters, Ads, Avatar, Motion, Voice change, Translation, Trend remix, Draw, publishing) | The showcase renders nothing and takes no upload. Its **`/examples`** page still shows pre-rendered results for the trend remix, motion transfer, Restyle, object swap, avatar, translation and captions. Three effect renders on a person were also kept out of it for what they show. |
 | The trend remix's **link import** outside an install of your own | It runs only in the app on your machine, never in the demo mode nor the showcase. |
 
 A first local install fetches the camera models and the effects pack only; `--extensions all` fetches the rest, and the next installs keep that choice ([Install](#install)).
@@ -128,7 +128,7 @@ The other pipelines, as plain ComfyUI graphs with their build notes (models and 
 GPU session S2 ran on 2026-10-21 on an NVIDIA L4 with 24 GB of VRAM, the memory of the RTX 4090 that Montagio targets. It was the first time anything rendered: before it, every workflow had only been checked by a real ComfyUI with empty model files. Every feature added since that runs a model was rendered the same way before it was shown. The full report, with every verdict: [docs/S2_RESULTATS.md](docs/S2_RESULTATS.md) (in French).
 
 - **687 node classes loaded, 0 partner nodes.** ComfyUI always starts with `--disable-partner-nodes`, and the installer stops everything if `/object_info` shows a partner node.
-- **Every weight checked against its sha256.** The lock holds 64 entries, 40 under Apache-2.0 and 24 under MIT, 254 GB in all ([registry/models.lock.yaml](registry/models.lock.yaml)). The downloader refuses a file whose sha256 or size differs; S2 downloaded and checked the 45 entries the lock held then, with no failure.
+- **Every weight checked against its sha256.** The lock holds 65 entries, 40 under Apache-2.0 and 25 under MIT, 254 GB in all ([registry/models.lock.yaml](registry/models.lock.yaml)). The downloader refuses a file whose sha256 or size differs; S2 downloaded and checked the 45 entries the lock held then, with no failure.
 - **Licenses read at the source.** The license that counts is the one of the source repository, not the one a mirror declares. [allowed-sources.yaml](tools/check-open-stack/allowed-sources.yaml) lists every repository a weight may come from, with the revision read, and refuses the repositories that official templates use but that carry non-commercial or territory-restricted files.
 - **Cheap to prove.** S2, the first GPU session, cost $12.94 of rented compute. Each feature added since was validated in a short run, from a few cents (the captions, $0.016) to a few dollars for the largest (the 30 s motion series, $1.70). A 5 s camera clip costs about $0.35–0.40 on a rented L4 in Quality, an effect about $0.05. On your own GPU it costs electricity.
 

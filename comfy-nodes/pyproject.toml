@@ -8,18 +8,16 @@ dependencies = ["PyYAML>=6.0", "numpy>=1.25.0"]
 classifiers = ["Operating System :: OS Independent"]
 
 [project.urls]
-# Placeholder: replace OWNER with the GitHub account that hosts the repository before
-# publishing (README, "Publishing"); the publish workflow refuses to run while it is there.
-Repository = "https://github.com/OWNER/montagio"
-Documentation = "https://github.com/OWNER/montagio/tree/main/comfy-nodes#readme"
-"Bug Tracker" = "https://github.com/OWNER/montagio/issues"
+Repository = "https://github.com/Jubzh-29/montagio"
+Documentation = "https://github.com/Jubzh-29/montagio/tree/main/comfy-nodes#readme"
+"Bug Tracker" = "https://github.com/Jubzh-29/montagio/issues"
 
 [tool.comfy]
 # Placeholder: the publisher id created on https://registry.comfy.org (README, "Publishing").
 PublisherId = "YOUR-PUBLISHER-ID"
 DisplayName = "Montagio Camera Presets"
-# Square SVG, the Montagio mark; the same OWNER placeholder.
-Icon = "https://raw.githubusercontent.com/OWNER/montagio/main/docs/brand/montagio-mark.svg"
+# Square SVG, the Montagio mark.
+Icon = "https://raw.githubusercontent.com/Jubzh-29/montagio/main/docs/brand/montagio-mark.svg"
 requires-comfyui = ">=0.41.0"
 
 [tool.pytest.ini_options]

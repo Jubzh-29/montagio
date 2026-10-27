@@ -216,14 +216,11 @@ Three tests of `tests/test_camera.py` run Montagio Camera Embedding beside the c
 
 ## Publishing
 
-Nothing is published automatically. `pyproject.toml` holds two placeholders, and the publish workflow refuses to run while either is left:
-
-- `PublisherId = "YOUR-PUBLISHER-ID"` in `[tool.comfy]`;
-- `OWNER` in the `Repository`, `Documentation` and `"Bug Tracker"` URLs of `[project.urls]` and in the `Icon` URL.
+Nothing is published automatically. The GitHub URLs in `pyproject.toml` point to `Jubzh-29/montagio`. The publish workflow refuses to run while `PublisherId = "YOUR-PUBLISHER-ID"` is left in `[tool.comfy]`, and also guards against an `OWNER` placeholder in the repository or icon URLs.
 
 To publish:
 
-1. Push the repository to GitHub, then replace `OWNER` with its account in `pyproject.toml`.
+1. Push the repository to GitHub.
 2. On [registry.comfy.org](https://registry.comfy.org), sign in, create a publisher and put its id in `PublisherId`. Create an API key for that publisher.
 3. In the GitHub repository's settings, add the key as the secret `REGISTRY_ACCESS_TOKEN`.
 4. From the Actions tab, run **Publish ComfyUI node pack** (`.github/workflows/publish-comfy-nodes.yml`, `workflow_dispatch` only). It checks the placeholders, then runs `comfy node publish` from the `comfy-nodes` folder with comfy-cli 1.22.0, telemetry off.
