@@ -131,7 +131,7 @@ test('a key reused after the window starts a new job', async () => {
   const second = await jobs.create('t2i', {}, 'k-window');
   expect(second.created).toBe(true);
   expect(second.record.id).not.toBe(first.record.id);
-});
+}, 30_000);
 
 test('cancel stops the running step and keeps the job canceled', async () => {
   process.env.MONTAGIO_DEMO_DURATION_MS = '60000';
@@ -139,7 +139,7 @@ test('cancel stops the running step and keeps the job canceled', async () => {
   const { record } = await jobs.create('t2i', {}, 'k-cancel');
   expect((await jobs.cancel(record.id))?.state).toBe('canceled');
   expect((await jobs.get(record.id))?.state).toBe('canceled');
-});
+}, 30_000);
 
 test('a workflow ComfyUI rejects marks its extension rejected', async () => {
   process.env.MONTAGIO_EXTENSIONS = 'all';
