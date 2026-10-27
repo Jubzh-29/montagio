@@ -2,7 +2,7 @@ import { POST as postImport } from '@/app/api/community/import/route';
 import { GET as getGeneration } from '@/app/api/generations/[id]/route';
 import { POST as postGenerations } from '@/app/api/generations/route';
 import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
-import type { GenerationRecord } from '@/server/generations';
+import type { GenerationRecord } from '@/server/store';
 import { generationRequest, params, setupTempData } from './helpers';
 
 setupTempData();
