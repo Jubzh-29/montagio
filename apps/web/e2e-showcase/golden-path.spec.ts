@@ -4,10 +4,11 @@ const result = (page: Page) => page.locator('video[data-testid=result]');
 
 /**
  * The jury's golden path in the showcase, the static export with no server: it opens on a viral effect, then a camera
- * move with its 9:16 to post, a film assembled by FFmpeg in the browser, and the Open Stack, each step to its clip in
- * one visit, as a juror goes through them. It runs several times in a row.
+ * move with its 9:16 to post, a film assembled by FFmpeg in the browser, the examples of Genjutsu, the trend remix and
+ * the captions, and the Open Stack, each step to its clip in one visit, as a juror goes through them. It runs several
+ * times in a row.
  */
-test('golden path: effect, camera move and its share, film, open stack', async ({ page }) => {
+test('golden path: effect, camera move and its share, film, the examples of the other functions, open stack', async ({ page }) => {
   test.setTimeout(240_000);
 
   await test.step('the arrival plays a viral effect', async () => {
@@ -36,6 +37,18 @@ test('golden path: effect, camera move and its share, film, open stack', async (
     await page.getByRole('button', { name: /^Assemble film/ }).click();
     await expect(result(page)).toHaveAttribute('src', /^blob:/, { timeout: 90_000 });
     await expect(page.getByRole('link', { name: 'Download 9:16' })).toHaveAttribute('href', /^blob:/);
+  });
+
+  await test.step('Genjutsu, the trend remix and the captions, rendered on a GPU, from Explore', async () => {
+    const features = ((await (await page.request.get('/showcase/data.json')).json()) as { features?: { id: string; feature: string; url: string }[] }).features ?? [];
+    // What the jury looks for beyond the Studio: each is rendered once, and plays here.
+    for (const feature of ['restyle', 'swap', 'motion', 'remix', 'avatar', 'captions']) expect(features.map((example) => example.feature)).toContain(feature);
+    await page.goto('/explore/');
+    await page.getByRole('link', { name: 'See every function at work' }).click();
+    await expect(page.getByRole('heading', { name: 'Every function, rendered', level: 1 })).toBeVisible();
+    for (const example of features) {
+      await expect(page.getByTestId(`example-${example.id}`).locator('video').last()).toHaveAttribute('src', new RegExp(`/showcase/${example.url.replace(/[.]/g, '[.]')}$`));
+    }
   });
 
   await test.step('the open stack: every model and its licence', async () => {
