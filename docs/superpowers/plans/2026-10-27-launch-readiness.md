@@ -14,7 +14,7 @@
 
 - Aucun push, aucune fusion, aucune création de compte et aucune publication sans accord explicite.
 - Aucun commit git sans demande de l'utilisateur.
-- Le nom du concurrent lié au concours n'apparaît que dans `#OpenSourceHiggsfield` dans les contenus vidéo et sociaux concernés.
+- Le nom du concurrent lié au concours n'apparaît que dans le hashtag du concours dans les contenus vidéo et sociaux concernés.
 - Ne pas mentionner les assistants de code dans le formulaire sans décision de l'utilisateur.
 - Ne pas déclarer la case « personnes réelles » vérifiée sans inspection des rendus et de leurs sources.
 - Conserver les MP4 existants ; produire de nouvelles versions plutôt que les écraser.
@@ -77,7 +77,7 @@ Rechercher dans `README.md` et `apps/web/showcase-space/README.md` les anciennes
 
 - [x] **Step 1: Corriger la mention du concours dans le texte YouTube**
 
-Remplacer la phrase qui cite le concours en toutes lettres par une formulation n'utilisant que `#OpenSourceHiggsfield`. Adapter la note explicative pour qu'elle décrive exactement le texte restant.
+Remplacer la phrase qui cite le concours en toutes lettres par une formulation n'utilisant que le hashtag du concours. Adapter la note explicative pour qu'elle décrive exactement le texte restant.
 
 - [x] **Step 2: Actualiser les consignes après les corrections**
 
