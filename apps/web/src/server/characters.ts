@@ -6,7 +6,7 @@ import { FACE_KEY_PREFIX, faceById } from '@/lib/character-bank';
 import { CHARACTER_KINDS, CHARACTER_TYPES, knownTraits } from '@/lib/characters';
 import { getEnv } from './env';
 import { JobError } from './errors';
-import { assertNoBlockedName } from './guards';
+import { assertAllowedText } from './guards';
 import { writeAtomic } from './store';
 import { readUploadMeta } from './uploads';
 
@@ -128,7 +128,7 @@ export async function createCharacter(body: Record<string, unknown>): Promise<Ch
   const faceId = body.faceId === undefined ? undefined : typeof body.faceId === 'string' ? faceById(body.faceId)?.id : undefined;
   if (!name || !description || !type || !kind || !traits || (body.faceId !== undefined && !faceId)) throw new JobError('invalid-input');
   const imageRef = await assertFictionalPhoto(body.imageRef);
-  await assertNoBlockedName(name, description);
+  await assertAllowedText(name, description);
   const jobId = typeof body.jobId === 'string' && SAFE_ID.test(body.jobId) ? body.jobId : undefined;
   const record: CharacterRecord = {
     id: randomUUID(),

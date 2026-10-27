@@ -3,7 +3,7 @@ import { basename } from 'node:path';
 import { compileMotion, type ComposeRole } from '@montagio/presets';
 import { JobError } from '../errors';
 import { motionModel, requireExtension } from '../extensions';
-import { assertNoBlockedName } from '../guards';
+import { assertAllowedText } from '../guards';
 import type { StepPlan, TaskDef } from '../jobs';
 import { readUploadMeta, readVideoMeta } from '../uploads';
 import { composeOf, composeStep } from './compose';
@@ -41,7 +41,7 @@ export const motionTask: TaskDef = {
     const character = typeof body.character === 'string' ? body.character.trim() : '';
     const motion = typeof body.motion === 'string' ? body.motion.trim() : '';
     if (character.length > max || motion.length > max) throw new JobError('invalid-input');
-    await assertNoBlockedName(`${character} ${motion}`);
+    await assertAllowedText(`${character} ${motion}`);
     return {
       inputs: {
         imageRef,

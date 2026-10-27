@@ -3,7 +3,7 @@ import { basename } from 'node:path';
 import { compileEffect } from '@montagio/presets';
 import { JobError } from '../errors';
 import { requireExtension, visibleEffects } from '../extensions';
-import { assertConsent, assertNoBlockedName } from '../guards';
+import { assertConsent, assertAllowedText } from '../guards';
 import type { TaskDef } from '../jobs';
 import { readUploadMeta } from '../uploads';
 import { composeOf, composeStep } from './compose';
@@ -31,7 +31,7 @@ export const effectTask: TaskDef = {
     if (subject.length > (model.limits.max_chars ?? SUBJECT_MAX)) throw new JobError('invalid-input');
     // Every reference someone imported asks for consent, as both photos of a hook do.
     for (const meta of compose?.metas ?? [photo]) assertConsent(meta, body.consent);
-    await assertNoBlockedName(subject);
+    await assertAllowedText(subject);
     const personal = (compose?.metas ?? [photo]).some((meta) => meta.personal);
     return {
       inputs: { imageRef, effectId: preset.id, subject, personal, ...(compose ? { compose: compose.refs } : {}) },

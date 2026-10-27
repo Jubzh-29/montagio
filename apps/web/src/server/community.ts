@@ -14,7 +14,7 @@ import { JobError } from './errors';
 import { extensionsInfo } from './extensions';
 import { galleryOrder, presetPosterUrl, presetPreviewUrl } from './gallery';
 import { mediaFileFor, mediaUrlFor } from './generations';
-import { assertNoBlockedName } from './guards';
+import { assertAllowedText } from './guards';
 import { listHistory } from './history';
 import { getServices } from './services';
 import { readPresetText, writeAtomic } from './store';
@@ -134,7 +134,7 @@ async function credits(body: Record<string, unknown>): Promise<{ title: string; 
   const title = text(body.title, COMMUNITY_TITLE_MAX);
   const author = body.author === undefined || body.author === '' ? undefined : text(body.author, COMMUNITY_AUTHOR_MAX);
   if (!title || (body.author !== undefined && body.author !== '' && !author)) throw new JobError('invalid-input');
-  await assertNoBlockedName(title, author ?? '');
+  await assertAllowedText(title, author ?? '');
   return { title, ...(author ? { author } : {}) };
 }
 
@@ -189,7 +189,7 @@ export async function publishToCommunity(body: Record<string, unknown>): Promise
 export async function importShared(shared: SharedEntry): Promise<CommunityEntry> {
   const shots = (shared.reprise.shots ?? []).map((shot) => shot.prompt);
   // A remixed move's text is checked whole: its name, its prompts, what it says of itself.
-  await assertNoBlockedName(shared.title, shared.author, shared.name, shared.reprise.prompt, shared.reprise.motion, ...shots, shared.presetYaml);
+  await assertAllowedText(shared.title, shared.author, shared.name, shared.reprise.prompt, shared.reprise.motion, ...shots, shared.presetYaml);
   const id = randomUUID();
   const example = (await examples()).find(
     (entry) => (shared.reprise.presetId && entry.reprise.presetId === shared.reprise.presetId) || (shared.reprise.effectId && entry.reprise.effectId === shared.reprise.effectId),

@@ -4,7 +4,7 @@ import { compileAvatar, compileSpeech, type Library } from '@montagio/presets';
 import { probeAudio } from '@montagio/sequence';
 import { JobError } from '../errors';
 import { avatarModels, requireExtension } from '../extensions';
-import { assertConsent, assertNoBlockedName } from '../guards';
+import { assertConsent, assertAllowedText } from '../guards';
 import type { StepPlan, TaskDef } from '../jobs';
 import { readUploadMeta, readVoiceMeta } from '../uploads';
 import { extensionFile, uploadPath, voicePath } from './files';
@@ -70,7 +70,7 @@ export const avatarTask: TaskDef = {
       if (body.voiceConsent !== true) throw new JobError('consent-required');
       voiceRef = sample.voiceRef;
     }
-    await assertNoBlockedName(text);
+    await assertAllowedText(text);
     return {
       inputs: { imageRef, text, language, personal: photo.personal, ...(voiceRef ? { voiceRef } : {}) },
       label: { name: 'Avatar' },

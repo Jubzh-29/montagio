@@ -6,7 +6,7 @@ import { moodboardSheet } from '@montagio/sequence';
 import { MOODBOARD_INSTRUCTION, MOODBOARD_REFS_MAX } from '@/lib/image-style';
 import { JobError } from '../errors';
 import { requireExperimental, requireExtension } from '../extensions';
-import { assertConsent, assertNoBlockedName } from '../guards';
+import { assertConsent, assertAllowedText } from '../guards';
 import { jobDir, type TaskDef } from '../jobs';
 import { readUploadMeta, type UploadMeta } from '../uploads';
 import { extensionFile, uploadPath } from './files';
@@ -52,7 +52,7 @@ export const moodboardTask: TaskDef = {
     const refs = await referencesOf(body.refs);
     // A reference someone imported asks for consent, as the photos of a composition do.
     for (const meta of refs) assertConsent(meta, body.consent);
-    await assertNoBlockedName(prompt);
+    await assertAllowedText(prompt);
     const t2i = lib.models.get(T2I_MODEL);
     if (!t2i) throw new Error(`the core model ${T2I_MODEL} is missing from registry/models`);
     const { model } = editModelOf(lib);

@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto';
 import { compileImage, IMAGE_PROMPT_MAX, parseImageStyle, type Aspect, type ImageStyle } from '@montagio/presets';
 import { JobError } from '../errors';
-import { assertNoBlockedName } from '../guards';
+import { assertAllowedText } from '../guards';
 import type { TaskDef } from '../jobs';
 import { replaySeed } from '../inputs';
 
@@ -17,7 +17,7 @@ export const t2iTask: TaskDef = {
     // The cinematography chips (camera, lens, film, light, palette): known choices only.
     const style = parseImageStyle(body.style);
     if (!prompt || !aspect || !style) throw new JobError('invalid-input');
-    await assertNoBlockedName(prompt);
+    await assertAllowedText(prompt);
     const model = lib.models.get(T2I_MODEL);
     if (!model) throw new Error(`the core model ${T2I_MODEL} is missing from registry/models`);
     const seed = replaySeed(body.seed) ?? randomInt(0, 2 ** 32);

@@ -5,7 +5,7 @@ import { compileEdit, compileRestyle, restyleInstruction, type ComposeRole, type
 import { extractFirstFrame } from '@montagio/sequence';
 import { JobError } from '../errors';
 import { requireExtension, restyleModel, visibleExtensions } from '../extensions';
-import { assertNoBlockedName } from '../guards';
+import { assertAllowedText } from '../guards';
 import type { StepPlan, TaskDef } from '../jobs';
 import { readUploadMeta, readVideoMeta } from '../uploads';
 import { composeOf, composeStep } from './compose';
@@ -47,7 +47,7 @@ export const restyleTask: TaskDef = {
     const max = model.limits.max_chars ?? TEXT_MAX;
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
     if (!prompt || prompt.length > max) throw new JobError('invalid-input');
-    await assertNoBlockedName(prompt);
+    await assertAllowedText(prompt);
     const firstFrame = !look && !compose && (await visibleExtensions()).includes('edit');
     const personal = (compose?.metas ?? (look ? [look] : [])).some((meta) => meta.personal);
     return {

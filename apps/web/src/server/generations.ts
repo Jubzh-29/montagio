@@ -7,7 +7,7 @@ import { DEMO_MOVE_METADATA, ensureTools, probe, tagClip } from '@montagio/seque
 import { MAX_PRESET_YAML_BYTES, MAX_REQUEST_BYTES } from '@/lib/limits';
 import { demoExampleModel, demoKindOf } from './demo-render';
 import { getEnv } from './env';
-import { assertNoBlockedName } from './guards';
+import { assertAllowedText } from './guards';
 import { slotsOf } from './inputs';
 import { offeredModel, presetModel } from './profile';
 import { getServices } from './services';
@@ -100,7 +100,7 @@ async function resolveJob(input: Omit<CreateGenerationInput, 'idempotencyKey'>, 
   if (!preset) throw new GenerationError('unknown-preset');
   // What the user typed, and the texts of a remixed move (pasted, or from a share file someone sent).
   const remixed = input.presetYaml !== undefined ? [preset.name, preset.description, preset.author, preset.prompt.suffix, preset.prompt.negative] : [];
-  await assertNoBlockedName(input.userPrompt, input.negative, ...remixed);
+  await assertAllowedText(input.userPrompt, input.negative, ...remixed);
   const upload = await readUploadMeta(input.imageRef);
   if (!upload) throw new GenerationError('unknown-image');
   // Only a model this install's memory profile offers: a 12 GB card would run out of memory on the others.

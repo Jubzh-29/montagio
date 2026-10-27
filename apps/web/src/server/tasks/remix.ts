@@ -23,7 +23,7 @@ import { demoKindOf } from '../demo-render';
 import { JobError } from '../errors';
 import { markSkeletonRejected, motionModel, requireExtension, skeletonModel, skeletonRejected, swapModel } from '../extensions';
 import { mediaUrlFor } from '../generations';
-import { assertNoBlockedName } from '../guards';
+import { assertAllowedText } from '../guards';
 import { jobDir, type JobRecord, type StepPlan, type TaskDef } from '../jobs';
 import { cutsOf, readRemixMeta, remixPath, remixShots, REMIX_MOTION_SHOT_MAX_S, REMIX_SCENE_SHOT_MAX_S, type RemixSourceMeta } from '../remix';
 import { readUploadMeta } from '../uploads';
@@ -111,7 +111,7 @@ export const remixSkeletonTask: TaskDef = {
     const language = body.language ?? 'en';
     if (!isLanguage(language)) throw new JobError('language-unsupported');
     const character = textOf(body.character, REMIX_CHARACTER_MAX);
-    await assertNoBlockedName(character);
+    await assertAllowedText(character);
     return {
       inputs: { remixRef: meta.remixRef, cuts, language, ...(character ? { character } : {}) },
       label: { name: model.name },
@@ -204,7 +204,7 @@ export const remixTask: TaskDef = {
     const language = body.language ?? 'en';
     if (!isLanguage(language)) throw new JobError('language-unsupported');
     const post = postOf(body.post);
-    await assertNoBlockedName(character, motion, prompt, onscreen, post?.caption, post?.hashtags.join(' '));
+    await assertAllowedText(character, motion, prompt, onscreen, post?.caption, post?.hashtags.join(' '));
     return {
       inputs: {
         remixRef: meta.remixRef,

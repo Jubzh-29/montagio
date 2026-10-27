@@ -5,7 +5,7 @@ import { exportVertical, mixMusic, overlayImage } from '@montagio/sequence';
 import { JobError } from '../errors';
 import { musicModel, requireExtension, visibleEffects } from '../extensions';
 import { mediaUrlFor } from '../generations';
-import { assertConsent, assertNoBlockedName } from '../guards';
+import { assertConsent, assertAllowedText } from '../guards';
 import type { TaskDef } from '../jobs';
 import { readUploadMeta } from '../uploads';
 import { extensionFile, uploadPath } from './files';
@@ -51,7 +51,7 @@ export const adTask: TaskDef = {
       overlayRef = overlay.imageRef;
     }
     for (const meta of character ? [product, character] : [product]) assertConsent(meta, body.consent);
-    await assertNoBlockedName(tagline);
+    await assertAllowedText(tagline);
     const model = lib.extensionModels.get(effect.models.preferred);
     if (!model) throw new Error(`ad: unknown effect model ${effect.models.preferred}`);
     return {

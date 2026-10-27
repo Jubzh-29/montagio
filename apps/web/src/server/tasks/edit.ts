@@ -3,7 +3,7 @@ import { compileEdit, EDIT_LOOK_IDS, type EditLook, type Library } from '@montag
 import type { ExtensionModel } from '@montagio/registry';
 import { JobError } from '../errors';
 import { requireExperimental, requireExtension } from '../extensions';
-import { assertConsent, assertNoBlockedName } from '../guards';
+import { assertConsent, assertAllowedText } from '../guards';
 import type { TaskDef } from '../jobs';
 import { readUploadMeta, type UploadMeta } from '../uploads';
 import { extensionFile, uploadPath } from './files';
@@ -52,7 +52,7 @@ export const editTask: TaskDef = {
     // What the result shows, when the caller knows it (a character's photodump): the Studio's description later.
     const scene = typeof body.scene === 'string' ? body.scene.trim().slice(0, SCENE_MAX) : '';
     for (const meta of second ? [photo, second] : [photo]) assertConsent(meta, body.consent);
-    await assertNoBlockedName(instruction, scene);
+    await assertAllowedText(instruction, scene);
     const personal = photo.personal || second?.personal === true;
     const fictional = photo.fictional === true && (!second || second.fictional === true);
     return {

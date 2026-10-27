@@ -7,7 +7,7 @@ import { AI_METADATA, captionFrame, RECIPE_TAG, renderVertical } from '@montagio
 import type { CaptionExportSummary, CaptionsInfo, Transcript } from '@/lib/api-types';
 import { copyCaptionFonts } from './caption-fonts';
 import { JobError } from './errors';
-import { assertNoBlockedName } from './guards';
+import { assertAllowedText } from './guards';
 import { mediaFileFor, mediaUrlFor } from './generations';
 import { jobDir, jobs, updateJob, type JobRecord } from './jobs';
 import { writeAtomic } from './store';
@@ -58,7 +58,7 @@ export async function readTranscript(jobId: string): Promise<{ record: JobRecord
 async function captionsRequest(body: unknown, transcript: Transcript): Promise<CaptionsRequest> {
   if (!isCaptionLanguage(transcript.language)) throw new JobError('language-unsupported');
   const request = { ...readExportRequest(body), language: transcript.language };
-  await assertNoBlockedName(request.text);
+  await assertAllowedText(request.text);
   return request;
 }
 

@@ -3,7 +3,7 @@ import { basename } from 'node:path';
 import { compileSwap, dimensionsFor, framePoint, MAX_SWAP_POINTS, type SwapInputs, type SwapPoint } from '@montagio/presets';
 import { JobError } from '../errors';
 import { requireExtension, swapModel } from '../extensions';
-import { assertNoBlockedName } from '../guards';
+import { assertAllowedText } from '../guards';
 import type { TaskDef } from '../jobs';
 import { readUploadMeta, readVideoMeta } from '../uploads';
 import { extensionFile, uploadPath, videoPath } from './files';
@@ -44,7 +44,7 @@ export const swapTask: TaskDef = {
     const max = model.limits.max_chars ?? TEXT_MAX;
     const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
     if (!prompt || prompt.length > max) throw new JobError('invalid-input');
-    await assertNoBlockedName(prompt);
+    await assertAllowedText(prompt);
     const points = pointsOf(body.points, MAX_SWAP_POINTS);
     const exclude = pointsOf(body.exclude, MAX_SWAP_POINTS);
     if (!points || points.length === 0 || !exclude) throw new JobError('invalid-input');
