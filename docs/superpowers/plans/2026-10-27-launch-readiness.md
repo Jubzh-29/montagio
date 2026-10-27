@@ -120,9 +120,9 @@ Remplacer dans la composition et sa carte de fin `github.com/<owner>/montagio` p
 
 Vérifier avec ffprobe 1080×1920, 30 i/s et environ 38 s, contrôler l'audio avec le script existant, inspecter la carte de fin et une planche représentative. Rechercher les anciens emplacements dans la composition active.
 
-- [ ] **Step 5: Demander le compte Hugging Face et calculer l'URL du Space**
+- [x] **Step 5: Demander le compte Hugging Face et calculer l'URL du Space**
 
-Conserver le nom de Space `montagio`. Le compte `Jubzh-29` et l'URL prévisionnelle `jubzh-29-montagio.hf.space` sont choisis, mais le compte et le Space restent à créer. La vérification publique de disponibilité n'a pas abouti (401) : contrôler l'URL active après déploiement.
+Conserver le nom de Space `montagio`. Le compte `jubzh` est créé et l'URL prévisionnelle est `jubzh-montagio.hf.space`. Le Space reste à créer : contrôler l'URL active après déploiement.
 
 - [x] **Step 6: Refaire et contrôler la 16:9**
 

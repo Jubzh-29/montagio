@@ -13,8 +13,8 @@ Documentation = "https://github.com/Jubzh-29/montagio/tree/main/comfy-nodes#read
 "Bug Tracker" = "https://github.com/Jubzh-29/montagio/issues"
 
 [tool.comfy]
-# Placeholder: the publisher id created on https://registry.comfy.org (README, "Publishing").
-PublisherId = "YOUR-PUBLISHER-ID"
+# Publisher id created on https://registry.comfy.org (README, "Publishing").
+PublisherId = "jubzh-29"
 DisplayName = "Montagio Camera Presets"
 # Square SVG, the Montagio mark.
 Icon = "https://raw.githubusercontent.com/Jubzh-29/montagio/main/docs/brand/montagio-mark.svg"

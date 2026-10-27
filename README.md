@@ -25,7 +25,7 @@ Montagio is an open-source AI video studio in the spirit of Higgsfield: drop a p
 
 | | |
 |---|---|
-| **Showcase** (in your browser, no install) | [jubzh-29-montagio.hf.space](https://jubzh-29-montagio.hf.space) |
+| **Showcase** (in your browser, no install) | [jubzh-montagio.hf.space](https://jubzh-montagio.hf.space) |
 | **Demo video** | _TODO: video URL_ |
 | **Your own GPU** | one command, see [Install](#install) |
 | **ComfyUI** | the [node pack](comfy-nodes/README.md) and the [workflows](comfy-hub/README.md), ready to load |

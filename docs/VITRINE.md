@@ -101,7 +101,7 @@ Ouvrir ensuite http://127.0.0.1:3101/ (le serveur de test n'écoute que sur la m
 5. **Envoyer le dossier** :
 
    ```bash
-   hf upload Jubzh-29/montagio apps/web/out . --repo-type=space --commit-message="Montagio showcase"
+   hf upload jubzh/montagio apps/web/out . --repo-type=space --commit-message="Montagio showcase"
    ```
 
    La CLI envoie elle-même les gros fichiers (clips, wasm). Le `README.md` du dossier remplace celui du modèle « Blank » : il déclare `sdk: static` et les dépôts de poids utilisés.

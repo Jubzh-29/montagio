@@ -216,7 +216,7 @@ Three tests of `tests/test_camera.py` run Montagio Camera Embedding beside the c
 
 ## Publishing
 
-Nothing is published automatically. The GitHub URLs in `pyproject.toml` point to `Jubzh-29/montagio`. The publish workflow refuses to run while `PublisherId = "YOUR-PUBLISHER-ID"` is left in `[tool.comfy]`, and also guards against an `OWNER` placeholder in the repository or icon URLs.
+Nothing is published automatically. The GitHub URLs in `pyproject.toml` point to `Jubzh-29/montagio`, and `PublisherId = "jubzh-29"` is filled in `[tool.comfy]`. The publish workflow refuses to run if the publisher id is missing, and also guards against an `OWNER` placeholder in the repository or icon URLs.
 
 To publish:
 
