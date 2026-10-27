@@ -1,0 +1,94 @@
+# Explicit sexual terms Montagio refuses in every text checked by the server's text guard
+# (400 blocked-term). A good-faith guardrail, not a complete filter: it cannot understand
+# every request, and it cannot see what is in an image or a clip.
+# One term or phrase per line; case and accents do not matter; whole words only.
+# Lines starting with # are comments.
+
+# General explicit content
+sex
+sexe
+sexual
+sexuel
+sexuelle
+sexuels
+sexuelles
+explicit sexual content
+contenu sexuel
+contenu sexuel explicite
+porn
+porno
+pornography
+pornographie
+pornographic
+pornographique
+nsfw
+not safe for work
+adult content
+contenu pour adultes
+adult video
+vidéo pour adultes
+sex video
+vidéo sexuelle
+sex tape
+sextape
+xxx
+
+# Nudity and erotic content
+nude
+nudes
+nudity
+nudité
+nu
+nue
+nus
+nues
+erotic
+erotica
+érotique
+erotique
+fetish
+fétiche
+fetiche
+
+# Sexual acts and explicit requests
+orgasm
+orgasme
+orgasmic
+orgasmique
+masturbate
+masturbating
+masturbation
+masturber
+se masturber
+handjob
+blowjob
+fellation
+cunnilingus
+anal sex
+sexe anal
+oral sex
+sexe oral
+vaginal sex
+sexe vaginal
+sexual penetration
+pénétration sexuelle
+penetration sexuelle
+intercourse
+rapport sexuel
+rapports sexuels
+sex act
+acte sexuel
+sex toy
+sex toys
+sextoy
+sextoys
+jouet sexuel
+jouets sexuels
+dildo
+vibromasseur
+godemichet
+gode
+striptease
+strip tease
+strip-tease
+camgirl

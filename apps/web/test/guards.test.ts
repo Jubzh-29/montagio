@@ -1,5 +1,15 @@
 import { JobError } from '@/server/errors';
-import { assertConsent, assertNoBlockedName, blockedNames, findBlockedName, normalizeForMatch } from '@/server/guards';
+import {
+  assertAllowedText,
+  assertConsent,
+  assertNoBlockedName,
+  assertNoBlockedTerm,
+  blockedNames,
+  blockedTerms,
+  findBlockedName,
+  findBlockedTerm,
+  normalizeForMatch,
+} from '@/server/guards';
 import type { UploadMeta } from '@/server/uploads';
 import { setupTempData } from './helpers';
 
@@ -34,6 +44,60 @@ test('the repository list is read once, with its comments left out', async () =>
 test('assertNoBlockedName refuses with blocked-name, ignores missing texts', async () => {
   await expect(assertNoBlockedName('a fox', undefined)).resolves.toBeUndefined();
   await expect(assertNoBlockedName('a fox', 'Taylor Swift dancing')).rejects.toMatchObject({ code: 'blocked-name' });
+});
+
+describe('the explicit text guard', () => {
+  let contentFilter: string | undefined;
+
+  beforeEach(() => {
+    contentFilter = process.env.MONTAGIO_CONTENT_FILTER;
+    delete process.env.MONTAGIO_CONTENT_FILTER;
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    if (contentFilter === undefined) delete process.env.MONTAGIO_CONTENT_FILTER;
+    else process.env.MONTAGIO_CONTENT_FILTER = contentFilter;
+    process.env.MONTAGIO_BACKEND = 'demo';
+    vi.restoreAllMocks();
+  });
+
+  test('a listed term is found with folded case and punctuation, as a whole phrase', () => {
+    expect(findBlockedTerm('EXPLICIT, SEXUAL content', ['explicit sexual content'])).toBe('explicit sexual content');
+  });
+
+  test('a listed string inside an ordinary word is not found', () => {
+    expect(findBlockedTerm('a historic house in Sussex', ['sex'])).toBeNull();
+    expect(findBlockedTerm('un renard roux dans la neige', ['nu', 'nue'])).toBeNull();
+  });
+
+  test('the repository term list is read once, with its comments left out', async () => {
+    const list = await blockedTerms();
+    expect(list).toContain('explicit sexual content');
+    expect(list).toContain('sex');
+    expect(list.some((term) => term.startsWith('#'))).toBe(false);
+    expect(await blockedTerms()).toBe(list);
+  });
+
+  test('assertAllowedText checks names first, then terms, and accepts ordinary text', async () => {
+    await expect(assertAllowedText('a red fox in the snow', undefined)).resolves.toBeUndefined();
+    await expect(assertAllowedText('Taylor Swift, explicit sexual content')).rejects.toMatchObject({ code: 'blocked-name' });
+    await expect(assertAllowedText('explicit sexual content')).rejects.toMatchObject({ code: 'blocked-term' });
+    await expect(assertNoBlockedTerm(undefined, 'a red fox')).resolves.toBeUndefined();
+  });
+
+  test('the local opt-out disables terms only, never names', async () => {
+    process.env.MONTAGIO_BACKEND = 'local';
+    process.env.MONTAGIO_CONTENT_FILTER = 'off';
+    await expect(assertAllowedText('explicit sexual content')).resolves.toBeUndefined();
+    await expect(assertAllowedText('Taylor Swift dancing')).rejects.toMatchObject({ code: 'blocked-name' });
+  });
+
+  test('the opt-out is ignored outside a local backend', async () => {
+    process.env.MONTAGIO_BACKEND = 'demo';
+    process.env.MONTAGIO_CONTENT_FILTER = 'off';
+    await expect(assertAllowedText('explicit sexual content')).rejects.toMatchObject({ code: 'blocked-term' });
+  });
 });
 
 const photo = (personal: boolean): UploadMeta => ({ imageRef: 'uploads/x.png', width: 4, height: 3, aspect: '1:1', origin: personal ? 'upload' : 'sample', personal });

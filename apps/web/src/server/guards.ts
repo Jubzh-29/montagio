@@ -50,6 +50,49 @@ export async function assertNoBlockedName(...texts: (string | undefined)[]): Pro
   }
 }
 
+/** The first listed term `text` contains as whole words, or null. */
+export function findBlockedTerm(text: string, terms: readonly string[]): string | null {
+  const haystack = ` ${normalizeForMatch(text)} `;
+  return terms.find((term) => haystack.includes(` ${normalizeForMatch(term)} `)) ?? null;
+}
+
+// The list of registry/blocked-terms.txt, read once per repository root.
+const termHolder = globalThis as typeof globalThis & { __montagioBlockedTerms?: { root: string; terms: Promise<readonly string[]> } };
+
+export function blockedTerms(): Promise<readonly string[]> {
+  const { root } = getEnv();
+  if (termHolder.__montagioBlockedTerms?.root !== root) {
+    const terms = readFile(join(root, 'registry', 'blocked-terms.txt'), 'utf8').then((text) =>
+      text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('#')),
+    );
+    termHolder.__montagioBlockedTerms = { root, terms };
+  }
+  return termHolder.__montagioBlockedTerms!.terms;
+}
+
+/** Refuse explicit sexual text unless the term filter is explicitly off on a local backend. */
+export async function assertNoBlockedTerm(...texts: (string | undefined)[]): Promise<void> {
+  if (process.env.MONTAGIO_BACKEND === 'local' && process.env.MONTAGIO_CONTENT_FILTER?.trim() === 'off') return;
+  const terms = await blockedTerms();
+  for (const text of texts) {
+    if (!text) continue;
+    const term = findBlockedTerm(text, terms);
+    if (term) {
+      console.warn(`[montagio] a request contains a listed explicit term (${term}): refused`);
+      throw new JobError('blocked-term');
+    }
+  }
+}
+
+/** Every text typed in the app meets both the well-known-name and explicit-term guardrails. */
+export async function assertAllowedText(...texts: (string | undefined)[]): Promise<void> {
+  await assertNoBlockedName(...texts);
+  await assertNoBlockedTerm(...texts);
+}
+
 /**
  * A photo that is, or derives from, an imported one may show a real person: an edit, an
  * effect, a hook or an avatar on it needs the box "I am the person in this photo, or I have
