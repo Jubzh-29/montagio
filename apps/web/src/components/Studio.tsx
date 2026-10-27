@@ -471,7 +471,8 @@ export function Studio() {
       const res = await apiFetch('/api/uploads/video/library', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: motion.id }) });
       if (!res.ok) throw new Error(String(res.status));
       const meta = (await res.json()) as { videoRef: string; url: string; duration_s: number; sourceDuration_s: number };
-      next = { status: 'ready', videoRef: meta.videoRef, url: meta.url, duration_s: meta.duration_s, sourceDuration_s: meta.sourceDuration_s };
+      // A motion of the library is Montagio's own, like the sample dance: no rights box on a photo nobody imported.
+      next = { status: 'ready', videoRef: meta.videoRef, url: meta.url, duration_s: meta.duration_s, sourceDuration_s: meta.sourceDuration_s, sample: true, library: true };
     } catch {
       next = { status: 'error', message: t('motionVideoRefused') };
     }
@@ -527,7 +528,7 @@ export function Studio() {
       setSpeechText(SAMPLE_SPEECH);
       setSpeechLanguage('en');
     }
-    if (tab === 'motion' && !(motionVideo.status === 'ready' && !motionVideo.sample) && motionVideo.status !== 'uploading') {
+    if (tab === 'motion' && !(motionVideo.status === 'ready' && (!motionVideo.sample || motionVideo.library)) && motionVideo.status !== 'uploading') {
       void loadSampleVideo();
     }
     await copyStartPhoto(sample.forTab ? `/api/uploads/sample?for=${sample.forTab}` : '/api/uploads/sample', localUrl, token);

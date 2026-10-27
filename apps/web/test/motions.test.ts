@@ -34,7 +34,8 @@ test('a motion picked is kept as a sent clip would be: 16 fps, its length, ready
   const meta = (await res.json()) as { videoRef: string; duration_s: number; url: string };
   expect(meta.duration_s).toBeGreaterThan(29.5);
   expect(meta.url).toMatch(/^\/media\/data\/uploads\/videos\//);
-  expect(await readVideoMeta(meta.videoRef)).toMatchObject({ aspect: '9:16', width: 480, height: 832 });
+  // Made by Montagio from fictional characters: no rights to confirm on it, as on the sample dance.
+  expect(await readVideoMeta(meta.videoRef)).toMatchObject({ aspect: '9:16', width: 480, height: 832, origin: 'sample' });
 }, 60_000);
 
 test('an unknown motion is not found; without motion and restyle the library is empty and closed', async () => {

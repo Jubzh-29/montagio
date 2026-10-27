@@ -10,6 +10,8 @@ import { refusalMessageKey } from '@/lib/refusals';
 import { TRANSLATE_CHOICES, type TranslateChoice } from '@/lib/translate';
 import { useExtensions } from '@/lib/use-extensions';
 import { useJob } from '@/lib/use-job';
+import { useStackModel } from '@/lib/use-stack-model';
+import { AiCaption } from './AiCaption';
 import { CaptionsPanel } from './CaptionsPanel';
 import { ConsentCheck } from './ConsentCheck';
 import { FeatureExamples, useFeatureExamples } from './FeatureExamples';
@@ -100,6 +102,7 @@ export function VoicePage({ mode = 'change' }: { mode?: 'change' | 'translate' }
   const done = job?.state === 'succeeded' && job.outputUrl ? job : null;
   const failed = job?.state === 'failed' || job?.state === 'canceled';
   const percent = job ? Math.round(job.progress * 100) : 0;
+  const model = useStackModel(done?.modelId);
 
   const make = () => {
     if (!canStart) return;
@@ -276,7 +279,7 @@ export function VoicePage({ mode = 'change' }: { mode?: 'change' | 'translate' }
                   <a className={studio.buttonSecondary} href={done.outputUrl} download={translating ? `montagio-${language}.mp4` : 'montagio-voice.mp4'}>
                     {t('voiceChangeDownload')}
                   </a>
-                  <p className={studio.hint}>{t('adCaption')}</p>
+                  {model ? <AiCaption model={model} testId="voice-caption" {...(done.demo ? { demoKind: done.demo } : {})} /> : <p className={studio.hint}>{t('adCaption')}</p>}
                   {!IS_SHOWCASE && info?.captions && <CaptionsPanel key={done.id} parentJobId={done.id} parentTask={translating ? 'translate' : 'voice-change'} estimate_s={info.captions.estimate_s} model={info.captions.model} />}
                 </>
               ) : (

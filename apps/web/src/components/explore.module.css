@@ -175,10 +175,9 @@
   font-weight: 650;
 }
 
+/* Sentence case, as every tile name (DESIGN.md): the size alone says these lead. */
 .feature .cardName {
   font-size: var(--text-l);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .cardDescription {
@@ -207,7 +206,7 @@
 }
 
 .stackText {
-  max-width: 760px;
+  max-width: 70ch;
   font-size: var(--text-m);
   line-height: 1.45;
 }

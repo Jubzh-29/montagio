@@ -8,6 +8,8 @@ import { formatDuration } from '@/lib/duration';
 import { refusalMessageKey } from '@/lib/refusals';
 import { useExtensions } from '@/lib/use-extensions';
 import { useJob } from '@/lib/use-job';
+import { useStackModel } from '@/lib/use-stack-model';
+import { AiCaption } from './AiCaption';
 import { ConsentCheck } from './ConsentCheck';
 import { Header } from './Header';
 import { ShowcaseFooter } from './ShowcaseFooter';
@@ -130,6 +132,7 @@ export function AdsPage() {
   const done = job?.state === 'succeeded' && job.outputUrl ? job : null;
   const failed = job?.state === 'failed' || job?.state === 'canceled';
   const percent = job ? Math.round(job.progress * 100) : 0;
+  const model = useStackModel(done?.modelId);
 
   const make = async () => {
     if (!canStart || !product || !effect) return;
@@ -264,7 +267,7 @@ export function AdsPage() {
                   <a className={studio.buttonSecondary} href={done.outputUrl} download="montagio-ad.mp4">
                     {t('adDownload')}
                   </a>
-                  <p className={studio.hint}>{t('adCaption')}</p>
+                  {model ? <AiCaption model={model} testId="ad-caption" {...(done.demo ? { demoKind: done.demo } : {})} /> : <p className={studio.hint}>{t('adCaption')}</p>}
                 </>
               ) : (
                 !busy && <p className={styles.empty}>{t('adEmpty')}</p>

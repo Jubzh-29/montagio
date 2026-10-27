@@ -21,7 +21,9 @@
   font-weight: 650;
 }
 
+/* A readable measure: about 70 characters a line, not the width of the page. */
 .lead {
+  max-width: 70ch;
   color: var(--ink-muted);
   line-height: 1.45;
 }

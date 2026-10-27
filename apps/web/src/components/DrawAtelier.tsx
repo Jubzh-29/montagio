@@ -7,6 +7,8 @@ import type { ExtensionsInfo } from '@/lib/api-types';
 import { formatDuration } from '@/lib/duration';
 import { refusalMessageKey } from '@/lib/refusals';
 import { useJob } from '@/lib/use-job';
+import { useStackModel } from '@/lib/use-stack-model';
+import { AiCaption } from './AiCaption';
 import { ConsentCheck } from './ConsentCheck';
 import type { AtelierPhoto } from './PhotoAtelier';
 import styles from './studio.module.css';
@@ -101,6 +103,10 @@ export function DrawAtelier({
   const failed = job?.state === 'failed' || job?.state === 'canceled';
   const canStart = painted && text.trim().length > 0 && consent && !busy;
   const percent = job ? Math.round(job.progress * 100) : 0;
+  const model = useStackModel(done?.modelId);
+
+  // The photo lands under the sheet: once it has its height, the focus goes to Use this photo, which brings both into view.
+  const use = useRef<HTMLButtonElement>(null);
 
   const run = async () => {
     const element = canvas.current;
@@ -207,7 +213,8 @@ export function DrawAtelier({
       <ConsentCheck id="draw-consent" checked={consent} onChange={setConsent} label="drawConsent" />
 
       <div className={styles.atelierActions}>
-        <button type="button" className={styles.buttonPrimary} disabled={!canStart} onClick={() => void run()}>
+        {/* One accent button: once the photo is made, using it is the next step, not making another. */}
+        <button type="button" className={done ? styles.buttonSecondary : styles.buttonPrimary} disabled={!canStart} onClick={() => void run()}>
           {t('drawMake', { d: formatDuration(estimates.edit ?? 15) })}
         </button>
         {busy && job && (
@@ -232,12 +239,16 @@ export function DrawAtelier({
           <div className={styles.atelierImages}>
             <figure>
               {/* eslint-disable-next-line @next/next/no-img-element -- the photo made from the drawing */}
-              <img src={done.outputUrl} alt="" />
-              <figcaption>{t('drawResult')}</figcaption>
+              <img src={done.outputUrl} alt="" onLoad={() => use.current?.focus()} />
+              {model ? (
+                <AiCaption as="figcaption" prefix={`${t('drawResult')} · `} model={model} testId="draw-caption" {...(done.demo ? { demoKind: done.demo } : {})} />
+              ) : (
+                <figcaption>{t('drawResult')}</figcaption>
+              )}
             </figure>
           </div>
           <div className={styles.atelierActions}>
-            <button type="button" className={styles.buttonSecondary} onClick={() => onUse({ imageRef: done.outputImageRef!, url: done.outputUrl!, personal: done.personal ?? true, prompt: text.trim() })}>
+            <button ref={use} type="button" className={styles.buttonPrimary} onClick={() => onUse({ imageRef: done.outputImageRef!, url: done.outputUrl!, personal: done.personal ?? true, prompt: text.trim() })}>
               {t('photoUse')}
             </button>
           </div>

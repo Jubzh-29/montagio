@@ -110,7 +110,7 @@ export type VideoMeta = {
   width: number;
   height: number;
   aspect: Aspect;
-  /** The sample dance of demo-assets (made by Montagio, no one's rights at stake); absent for an import. */
+  /** The sample dance of demo-assets or a motion of the library (made by Montagio, no one's rights at stake); absent for an import. */
   origin?: 'sample';
 };
 
@@ -321,6 +321,8 @@ export async function saveLibraryVideo(clip: string): Promise<VideoMeta> {
       width: prepared.width,
       height: prepared.height,
       aspect: pickAspect(prepared.width, prepared.height),
+      // Generated from fictional characters, as the library says: like the sample dance, no rights to confirm on it.
+      origin: 'sample',
     };
     await writeFile(metaFile, JSON.stringify(meta));
     return meta;

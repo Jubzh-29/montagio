@@ -10,6 +10,9 @@ import { MAX_VIDEO_BYTES } from '@/lib/limits';
 import { refusalMessageKey } from '@/lib/refusals';
 import { useExtensions } from '@/lib/use-extensions';
 import { useJob } from '@/lib/use-job';
+import { reveal } from '@/lib/reveal';
+import { useStackModel } from '@/lib/use-stack-model';
+import { AiCaption } from './AiCaption';
 import { ConsentCheck } from './ConsentCheck';
 import { FacePicker } from './FacePicker';
 import { FeatureExamples, useFeatureExamples } from './FeatureExamples';
@@ -298,6 +301,15 @@ export function RemixPage() {
   const done = remix.job?.state === 'succeeded' && remix.job.outputUrl ? remix.job : null;
   const failed = remix.job?.state === 'failed' || remix.job?.state === 'canceled';
   const percent = remix.job ? Math.round(remix.job.progress * 100) : 0;
+  const model = useStackModel(done?.modelId);
+
+  // The remix starts at the foot of a long form, its progress and its 9:16 at the top of the other column:
+  // that column comes into view when it starts, and again when it is done.
+  const resultRef = useRef<HTMLElement>(null);
+  const remixState = remix.job ? `${remix.job.id}:${remix.job.state === 'succeeded' ? 'done' : 'on'}` : undefined;
+  useEffect(() => {
+    if (remixState) reveal(resultRef.current);
+  }, [remixState]);
   const tags = hashtagsOf(hashtags);
   const post = [caption.trim(), tags.map((tag) => `#${tag}`).join(' ')].filter(Boolean).join('\n\n');
 
@@ -680,7 +692,7 @@ export function RemixPage() {
               {!canStart && !busy && <p className={studio.hint}>{t('trendNeeds')}</p>}
             </section>
 
-            <section className={page.result} aria-labelledby="trend-result" aria-live="polite">
+            <section ref={resultRef} className={page.result} aria-labelledby="trend-result" aria-live="polite">
               <h2 id="trend-result" className={studio.sectionTitle}>
                 {t('trendResult')}
               </h2>
@@ -714,7 +726,7 @@ export function RemixPage() {
                     </div>
                   )}
                   {soundLink}
-                  <p className={studio.hint}>{t('adCaption')}</p>
+                  {model ? <AiCaption model={model} testId="trend-caption" {...(done.demo ? { demoKind: done.demo } : {})} /> : <p className={studio.hint}>{t('adCaption')}</p>}
                 </>
               ) : (
                 !remix.busy && <p className={page.empty}>{t('trendEmpty')}</p>

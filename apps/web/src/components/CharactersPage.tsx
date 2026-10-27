@@ -33,9 +33,12 @@ import {
 } from '@/lib/characters';
 import { formatDuration } from '@/lib/duration';
 import { refusalMessageKey } from '@/lib/refusals';
+import { reveal } from '@/lib/reveal';
 import { visibleTabs, type Tab } from '@/lib/tabs';
 import { useExtensions } from '@/lib/use-extensions';
 import { useJob } from '@/lib/use-job';
+import { useStackModel } from '@/lib/use-stack-model';
+import { AiCaption } from './AiCaption';
 import { FacePicker } from './FacePicker';
 import { Header } from './Header';
 import { PhotoHd } from './PhotoHd';
@@ -131,6 +134,11 @@ function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (charac
       : null;
   const failed = job?.state === 'failed' || job?.state === 'canceled';
   const percent = job ? Math.round(job.progress * 100) : 0;
+  const portraitModel = useStackModel(done?.modelId);
+
+  // A new portrait (made, or a face picked) lands under the form: once its picture has its height, it comes into
+  // view with its name and Save.
+  const portraitRef = useRef<HTMLDivElement>(null);
 
   const create = () => {
     if (!details.trim() || busy) return;
@@ -229,7 +237,8 @@ function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (charac
       />
       <p className={studio.counter}>{t('charCount', { n: details.length, max: DETAILS_MAX })}</p>
 
-      <button type="button" className={studio.buttonPrimary} disabled={!details.trim() || busy} onClick={create}>
+      {/* One accent button: once there is a portrait, keeping it (Save) is the next step, not making another. */}
+      <button type="button" className={portrait ? studio.buttonSecondary : studio.buttonPrimary} disabled={!details.trim() || busy} onClick={create}>
         {portrait ? t('characterAgain', { d: formatDuration(estimate) }) : t('characterCreate', { d: formatDuration(estimate) })}
       </button>
 
@@ -245,9 +254,10 @@ function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (charac
       )}
 
       {portrait && (
-        <>
+        <div ref={portraitRef} className={styles.portraitBlock}>
           {/* eslint-disable-next-line @next/next/no-img-element -- the portrait just made, or the face picked */}
-          <img className={styles.portrait} src={portrait.url} alt="" />
+          <img className={styles.portrait} src={portrait.url} alt="" onLoad={() => reveal(portraitRef.current)} />
+          {done && portraitModel && <AiCaption model={portraitModel} testId="portrait-caption" {...(done.demo ? { demoKind: done.demo } : {})} />}
           {!done && picked && (
             <p className={studio.hint} role="status">
               {t('facePicked', { name: picked.face.name })}
@@ -265,7 +275,7 @@ function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (charac
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
-          <button type="button" className={studio.buttonSecondary} disabled={!name.trim() || saving} onClick={() => void save()}>
+          <button type="button" className={studio.buttonPrimary} disabled={!name.trim() || saving} onClick={() => void save()}>
             {t('characterSave')}
           </button>
           {saveError && (
@@ -273,7 +283,7 @@ function CreatePanel({ estimate, onSaved }: { estimate: number; onSaved: (charac
               {t(refusalMessageKey(saveError))}
             </p>
           )}
-        </>
+        </div>
       )}
     </section>
   );
