@@ -17,6 +17,7 @@ import { ConsentCheck } from './ConsentCheck';
 import { FacePicker } from './FacePicker';
 import { FeatureExamples, useFeatureExamples } from './FeatureExamples';
 import { Header } from './Header';
+import { SharePanel } from './SharePanel';
 import { ShowcaseFooter } from './ShowcaseFooter';
 import page from './ads.module.css';
 import styles from './remix.module.css';
@@ -727,6 +728,7 @@ export function RemixPage() {
                   )}
                   {soundLink}
                   {model ? <AiCaption model={model} testId="trend-caption" {...(done.demo ? { demoKind: done.demo } : {})} /> : <p className={studio.hint}>{t('adCaption')}</p>}
+                  {!IS_SHOWCASE && <SharePanel key={`share-${done.id}`} source="job" id={done.id} kind="remix" {...(model && done.demo !== 'moved' ? { model } : {})} {...(post ? { caption: post } : {})} />}
                 </>
               ) : (
                 !remix.busy && <p className={page.empty}>{t('trendEmpty')}</p>

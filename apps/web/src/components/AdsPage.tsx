@@ -12,6 +12,7 @@ import { useStackModel } from '@/lib/use-stack-model';
 import { AiCaption } from './AiCaption';
 import { ConsentCheck } from './ConsentCheck';
 import { Header } from './Header';
+import { SharePanel } from './SharePanel';
 import { ShowcaseFooter } from './ShowcaseFooter';
 import styles from './ads.module.css';
 import studio from './studio.module.css';
@@ -268,6 +269,7 @@ export function AdsPage() {
                     {t('adDownload')}
                   </a>
                   {model ? <AiCaption model={model} testId="ad-caption" {...(done.demo ? { demoKind: done.demo } : {})} /> : <p className={studio.hint}>{t('adCaption')}</p>}
+                  {!IS_SHOWCASE && <SharePanel key={`share-${done.id}`} source="job" id={done.id} kind="ad" {...(model && done.demo !== 'moved' ? { model } : {})} />}
                 </>
               ) : (
                 !busy && <p className={styles.empty}>{t('adEmpty')}</p>

@@ -25,6 +25,7 @@ import { formatClock, formatDuration, remainingSeconds } from '@/lib/duration';
 import { FACE_KEY_PREFIX, faceById, facePhoto, faceScene, faceSubject, STARTING_FACES, type BankFace } from '@/lib/character-bank';
 import { entryAsHistoryItem, type CommunityEntry } from '@/lib/community';
 import { recipeUrlOf } from '@/lib/recipe-url';
+import { shareKindOfTask } from '@/lib/share';
 import { applyReprise, replayOn, repriseHref, reproducedRecipeUrl, reproducibleResult, type Replay } from '@/lib/reprise';
 import { presetTextUrl, resultRemixAction } from '@/lib/remix';
 import { primaryLabelKey, showcaseArrival, showcaseNoteKeys, studioCapabilities } from '@/lib/showcase-ui';
@@ -55,6 +56,7 @@ import { MotionModeSwitch, RestyleFields, type MotionMode } from './RestyleField
 import { MusicPanel } from './MusicPanel';
 import { pointsOfMask, SwapFields } from './SwapFields';
 import { RecipePanel } from './RecipePanel';
+import { SharePanel } from './SharePanel';
 import { ShowcaseTextAtelier } from './ShowcaseTextAtelier';
 import { EffectFields } from './EffectFields';
 import { OutfitSource } from './OutfitSource';
@@ -1321,6 +1323,27 @@ export function Studio() {
         ? (models.find((model) => model.id === tracked.record.shots[0]?.modelId) ?? selectedModel)
         : undefined;
 
+  // A finished clip or film goes out in 9:16 with a caption to paste; a clip FFmpeg moved in the demo names no model.
+  // The showcase has no server: Share shows only where a 9:16 was prepared (a camera clip, a film).
+  const shareResult =
+    tracked?.record.state === 'succeeded' &&
+    (tracked.kind === 'sequence' || tracked.record.outputUrl?.endsWith('.mp4')) &&
+    (!IS_SHOWCASE || (tracked.kind !== 'job' && tracked.record.verticalUrl)) ? (
+      <SharePanel
+        key={`share-${tracked.kind}-${tracked.record.id}`}
+        source={tracked.kind}
+        id={tracked.record.id}
+        kind={tracked.kind === 'generation' ? 'camera' : tracked.kind === 'sequence' ? 'film' : shareKindOfTask(tracked.record.task)}
+        {...(tracked.kind === 'generation'
+          ? { title: catalogName(lang, tracked.record.presetId, presets.find((preset) => preset.id === tracked.record.presetId)?.name ?? tracked.record.presetId) }
+          : tracked.kind === 'job' && (wallItemOfResult || tracked.record.label.name)
+            ? { title: wallItemOfResult ? catalogName(lang, wallItemOfResult.id, wallItemOfResult.name) : tracked.record.label.name! }
+            : {})}
+        {...(resultModel && (tracked.kind === 'sequence' || tracked.record.demo !== 'moved') ? { model: resultModel } : {})}
+        {...(tracked.kind !== 'job' && tracked.record.verticalUrl ? { showcaseVertical: tracked.record.verticalUrl } : {})}
+      />
+    ) : null;
+
   return (
     <>
       <Suspense fallback={null}>
@@ -1832,6 +1855,7 @@ export function Studio() {
                   )}
                 </div>
               )}
+              {tracked?.kind !== 'sequence' && shareResult}
               {!IS_SHOWCASE &&
                 (tracked?.kind === 'generation' || tracked?.kind === 'job') &&
                 tracked.record.state === 'succeeded' &&
@@ -1868,6 +1892,7 @@ export function Studio() {
                   )}
                 </div>
               )}
+              {tracked?.kind === 'sequence' && shareResult}
               {!IS_SHOWCASE && tracked?.kind === 'sequence' && tracked.record.state === 'succeeded' && extensions?.extensions.includes('music') && (
                 <MusicPanel
                   key={tracked.record.id}

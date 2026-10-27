@@ -259,6 +259,7 @@ export function createShowcaseRouter(data: ShowcaseData, deps: { montage: Montag
       workflowUrl: showcaseUrl(shot.clip.workflowUrl),
       // A rendered clip's recipe, a file of the showcase: its Recipe panel reads it as it is.
       ...(shot.clip.recipeUrl ? { recipeUrl: showcaseUrl(shot.clip.recipeUrl) } : {}),
+      verticalUrl: showcaseUrl(shot.clip.verticalUrl),
       placeholder: shot.clip.placeholder,
       ...(shot.clip.hd ? { hdModel: shot.clip.hd } : {}),
     };

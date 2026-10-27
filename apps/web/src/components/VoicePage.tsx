@@ -16,6 +16,7 @@ import { CaptionsPanel } from './CaptionsPanel';
 import { ConsentCheck } from './ConsentCheck';
 import { FeatureExamples, useFeatureExamples } from './FeatureExamples';
 import { Header } from './Header';
+import { SharePanel } from './SharePanel';
 import { ShowcaseFooter } from './ShowcaseFooter';
 import page from './ads.module.css';
 import studio from './studio.module.css';
@@ -280,6 +281,7 @@ export function VoicePage({ mode = 'change' }: { mode?: 'change' | 'translate' }
                     {t('voiceChangeDownload')}
                   </a>
                   {model ? <AiCaption model={model} testId="voice-caption" {...(done.demo ? { demoKind: done.demo } : {})} /> : <p className={studio.hint}>{t('adCaption')}</p>}
+                  {!IS_SHOWCASE && <SharePanel key={`share-${done.id}`} source="job" id={done.id} kind={translating ? 'translate' : 'voice'} {...(model && done.demo !== 'moved' ? { model } : {})} />}
                   {!IS_SHOWCASE && info?.captions && <CaptionsPanel key={done.id} parentJobId={done.id} parentTask={translating ? 'translate' : 'voice-change'} estimate_s={info.captions.estimate_s} model={info.captions.model} />}
                 </>
               ) : (

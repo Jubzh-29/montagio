@@ -7,9 +7,11 @@ import { apiFetch } from '@/lib/api';
 import type { CaptionExportSummary, CaptionsInfo, DemoKind } from '@/lib/api-types';
 import { canExport, CAPTION_LANGUAGE_CHOICES, CAPTION_TEXT_MAX, languageLabel, STYLE_LABEL } from '@/lib/captions';
 import { refusalMessageKey } from '@/lib/refusals';
+import { shareKindOfTask } from '@/lib/share';
 import { useJob } from '@/lib/use-job';
 import { AiCaption } from './AiCaption';
 import { RecipePanel } from './RecipePanel';
+import { SharePanel } from './SharePanel';
 import captions from './captions.module.css';
 import styles from './studio.module.css';
 
@@ -345,6 +347,10 @@ export function CaptionsPanel({
             {done && <p className={styles.note}>{t('captionsCredit', { model: model.name, license: model.license })}</p>}
           </div>
         </div>
+      )}
+
+      {done && info && (
+        <SharePanel key={`share-${done.url}`} source="job" id={info.jobId} kind={shareKindOfTask('captions', parentTask)} {...(clip && clip.demoKind !== 'moved' ? { model: clip.model } : {})} />
       )}
 
       {done && info && (

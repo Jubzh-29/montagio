@@ -1,0 +1,26 @@
+/* Share 9:16: the caption to paste beside the 9:16 frame; on a phone, the frame under the text. */
+.panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 200px);
+  gap: var(--space-4);
+  align-items: start;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .frame {
+    width: min(220px, 100%);
+  }
+}

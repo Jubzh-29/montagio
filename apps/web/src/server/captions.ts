@@ -98,8 +98,8 @@ const writeState = (dir: string, state: CaptionExportSummary) => writeAtomic(joi
 const holder = globalThis as typeof globalThis & { __montagioCaptionExports?: { queue: Promise<unknown>; running: Set<string> } };
 const exportsInFlight = (holder.__montagioCaptionExports ??= { queue: Promise.resolve(), running: new Set() });
 
-/** Run `work` once the exports before it are done; a failure of one never stops the next. */
-function enqueue<T>(work: () => Promise<T>): Promise<T> {
+/** Run `work` once the 9:16 renders before it are done (caption exports and shares); a failure of one never stops the next. */
+export function enqueueVerticalRender<T>(work: () => Promise<T>): Promise<T> {
   const turn = exportsInFlight.queue.then(work);
   exportsInFlight.queue = turn.catch(() => undefined);
   return turn;
@@ -118,7 +118,7 @@ export async function startExport(jobId: string, body: unknown): Promise<Caption
   await writeState(dir, state);
   const key = `${jobId}/${id}`;
   exportsInFlight.running.add(key);
-  void enqueue(async () => {
+  void enqueueVerticalRender(async () => {
     try {
       const url = mediaUrlFor(await renderExport(read.record, read.transcript, request, dir))!;
       // The job's result is its last export finished, recorded before the export says so: a client that reads
@@ -176,7 +176,7 @@ export async function exportNow(record: JobRecord, transcript: Transcript, body:
   const id = newExportId();
   const dir = exportDir(record.id, id);
   // In its turn, as an export asked from the panel: one encode at a time.
-  const url = mediaUrlFor(await enqueue(() => renderExport(record, transcript, request, dir)))!;
+  const url = mediaUrlFor(await enqueueVerticalRender(() => renderExport(record, transcript, request, dir)))!;
   await writeState(dir, { id, style: request.style, state: 'succeeded', url, createdAt: new Date().toISOString() });
   return { url };
 }

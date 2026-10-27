@@ -60,6 +60,8 @@ export type GenerationRecord = {
   workflowUrl?: string;
   /** The showcase's recipe; elsewhere the Studio asks /api/recipes/generation/:id. */
   recipeUrl?: string;
+  /** Showcase: the clip's 9:16 cut, prepared with it, that Share offers. */
+  verticalUrl?: string;
   /** A showcase clip whose camera move FFmpeg simulated, waiting for the GPU session. */
   placeholder?: boolean;
   /** Showcase: the model that restored the clip to 1080p (its HD pass), named in its caption. */
@@ -293,6 +295,9 @@ export type Transcript = {
 
 /** A 9:16 export with burned-in captions, running or done. */
 export type CaptionExportSummary = { id: string; style: CaptionStyleId; state: 'running' | 'succeeded' | 'failed'; url?: string; error?: string; createdAt: string };
+
+/** The 9:16 clip of a finished result for TikTok, Reels and Shorts (POST /api/share), running or done. */
+export type ShareSummary = { id: string; endCard: boolean; state: 'running' | 'succeeded' | 'failed'; url?: string; error?: string; createdAt: string };
 
 /** A transcription job, its transcript and its exports. */
 export type CaptionsInfo = { jobId: string; parentId: string; transcript: Transcript; exports: CaptionExportSummary[] };

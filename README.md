@@ -74,6 +74,7 @@ The 11 camera presets are Crash Push, Slow Push, Pull Back Reveal, Pan Left, Pan
 | **Remix a preset** | Edit a preset's YAML in the Studio, check it line by line, render it, download it. "Open in ComfyUI", under a finished clip, downloads the exact workflow that ran. | — |
 | **Community gallery** | Publish a result from History with a title, remix an entry back into the Studio, or pass it on as a share file: the settings only, never a photo or a clip. | — |
 | **Recipe and Reproduce** | Every result carries its recipe: the preset, the exact ComfyUI workflow of each step and its sha256, the weight files with their licences, the seed, the settings and the sha256 of each input, never the photo. A Recipe panel shows it under each result and in History, and a compact copy rides in each exported MP4 and PNG. Reproduce renders a clip or a film again with the same seed and says whether the workflow matches, in the Studio, from a terminal (`npm run reproduce`) or from an MCP client. Ads, voice changes and a film's music keep their recipe without the button. | — |
+| **Share 9:16** | Under each finished clip, film, ad, voice change, remix or captions export: a 1080×1920 cut ready for TikTok, Reels and Shorts, with a discreet "Made with Montagio" end card you can untick, and a caption to copy, written on your machine from what the result is (no service is asked). The file keeps its "AI-generated" mention and its recipe, and the caption says it too. | FFmpeg and libass |
 | **History** | Every photo, clip and film made on this machine, with download, reuse, publish and its recipe. | — |
 | **Open Stack** | One page lists the 19 models and 65 weight files Montagio can run, by what they make, each weight linked to the repository its licence was read from, with the latest open-stack check. Every caption under a result links to its model's line. | — |
 
@@ -249,7 +250,6 @@ The next steps follow the same rule as everything above: an open model enters th
 
 | Area | Next step |
 |---|---|
-| Sharing | a Share button on each result: the 9:16 cut ready for vertical feeds, a caption to copy, an optional "Made with Montagio" end card, the "AI-generated" mention kept (today a result is passed on as a share file through the Community gallery) |
 | Photo description | fill in "What the photo shows" automatically with a small open captioning model (Florence-2 is the candidate, its weights and node to be read at the source), the field staying editable |
 | Hooks | Iris Dive with an intermediate keyframe, a stronger Figurine, Earth Zoom Out in five keyframes, all on the edit and FLF2V already in the lock |
 | Camera moves | orbits and bullet time from keyframes: Edit-2511 viewpoints, then Wan 2.2 FLF2V; Quality in the 12 GB profile once a render there validates it |

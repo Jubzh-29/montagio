@@ -47,6 +47,7 @@ Two opposite viewfinder corners around the tally dot (the mark: thick corners, t
 - **Open-stack badge**: pill with a tally mark; cyan when the check passed, red when it failed.
 - **Model choice** (Camera and Film): on a large screen, by Generate, a pill with one segment per tier (Quality, Turbo, Fast) and its time, and under it what the chosen tier buys; on a phone, in the fields, one row per model with its tier, name, licence, time and what it buys.
 - **Recipe panel**: a disclosure under a result and on each History card, facts in rows, sha256s in mono. After a reproduction its verdict is cyan when the workflow is the same, amber when the workflow or its input files differ.
+- **Share panel**: under a finished result, a secondary button that opens it in place: the caption to paste (editable, with Copy), the end-card checkbox, Make the 9:16 video, then the 9:16 frame with viewfinder marks in two corners and its Download. The end card is drawn by libass: "Made with Montagio" in Poppins, the name in the lime, on one soft dark box in the blurred band above a 16:9 picture.
 - **Captions panel**: under a talking clip, the words, a row of style swatches (each a word in the export's own type and colours, never the interface's) and the exact 9:16 frame of the export, with viewfinder marks in two corners.
 
 ## Motion
