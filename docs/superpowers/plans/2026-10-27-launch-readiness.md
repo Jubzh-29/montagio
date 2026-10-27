@@ -126,7 +126,7 @@ Conserver le nom de Space `montagio`. Le compte `jubzh` est créé et l'URL pré
 
 - [x] **Step 6: Refaire et contrôler la 16:9**
 
-Remplacer les deux emplacements dans `montagio-demo` par les adresses définitives. La v5 avait été produite avec un compte Hugging Face prévisionnel ; la v6 utilise le compte réel `jubzh`, sans écraser les versions précédentes. Vérifier 1920×1080, 30 i/s, 79,8 s, AAC 48 kHz, -14,3 LUFS, -1,8 dBTP, la carte de fin et le MP4 avec les mêmes outils qu'à l'étape 4.
+Remplacer les deux emplacements dans `montagio-demo` par les adresses définitives. La v5 avait été produite avec un compte Hugging Face prévisionnel ; la v6 utilise le compte réel `jubzh`, sans écraser les versions précédentes. Après écoute utilisateur, la v7 remonte la voix de 3,5 dB, baisse la musique de 2,5 dB et les 57 SFX de 12 dB. Vérifier 1920×1080, 30 i/s, 79,8 s, AAC 48 kHz, -14,4 LUFS, -1,8 dBTP, la carte de fin et le MP4 avec les mêmes outils qu'à l'étape 4.
 
 ### Task 4: Contrôles finaux et reliquat
 
