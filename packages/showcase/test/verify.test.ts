@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { AI_METADATA, normalizeClip, PLACEHOLDER_METADATA } from '@montagio/sequence';
 import { runCli } from '../src/cli';
 import { verifyShowcase } from '../src/verify';
-import { addRenderedClip, FFMPEG_TIMEOUT_MS, makeRoot, rawRender, removeRoot, sha256Of, showcasePath } from './helpers';
+import { addRenderedClip, FFMPEG_TIMEOUT_MS, makeRoot, rawRender, removeRoot, repoRoot, sha256Of, showcasePath } from './helpers';
 
 const raws = mkdtempSync(join(tmpdir(), 'montagio-raw-'));
 const rawA = join(raws, 'a.mp4');
@@ -47,6 +47,20 @@ test('a tampered clip fails on its sha256', async () => {
   appendFileSync(file, Buffer.from([0]));
   const report = await verifyShowcase(root, { strict: false });
   expect(report.errors).toContainEqual(expect.stringMatching(/^clips\/crash-push--landscape-a\.mp4: sha256 is [0-9a-f]{64}, the manifest says/));
+}, FFMPEG_TIMEOUT_MS);
+
+test('the tracked manifest accepts only the Montagio metadata hashes in strict mode', async () => {
+  const source = showcasePath(repoRoot, 'clips', 'crash-push--landscape-a.mp4');
+  const reference = join(raws, 'montagio-metadata.mp4');
+  execFileSync('ffmpeg', [
+    '-loglevel', 'error', '-y', '-i', source, '-map', '0', '-c', 'copy', '-map_metadata', '-1',
+    ...Object.entries(AI_METADATA).flatMap(([key, value]) => ['-metadata', `${key}=${value}`]), reference,
+  ]);
+  const { loadManifest } = await import('../src/manifest');
+  const manifest = await loadManifest(repoRoot);
+  const entry = manifest.clips.find((clip) => clip.preset === 'crash-push' && clip.sample === 'landscape-a')!;
+  expect(entry.sha256).toBe(sha256Of(reference));
+  expect((await verifyShowcase(repoRoot, { strict: true })).errors).toEqual([]);
 }, FFMPEG_TIMEOUT_MS);
 
 test('a changed preset camera fails on workflow_sha256 in strict mode, but a changed description does not', async () => {

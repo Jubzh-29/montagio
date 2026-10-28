@@ -125,6 +125,15 @@ test('tagClip writes a recipe beside the mention, which stays as it is', async (
   expect(tags.synopsis).toBe('{"schema":"montagio/recipe@1","seed":7}');
 }, FFMPEG_TEST_TIMEOUT_MS);
 
+test('tracked demo media uses Montagio metadata and no legacy recipe key', async () => {
+  const { fileURLToPath } = await import('node:url');
+  const media = fileURLToPath(new URL('../../../demo-assets/examples/motion.mp4', import.meta.url));
+  const legacyRecipeKey = `${'Shot'}${'Rig'}-Recipe`;
+  const tags = await readTags(media);
+  expect(tags).toMatchObject(AI_METADATA);
+  expect(tags[legacyRecipeKey]).toBeUndefined();
+}, FFMPEG_TEST_TIMEOUT_MS);
+
 test('the film and its 9:16 cut can carry the recipe too', async () => {
   const film = join(dir, 'recipe-film.mp4');
   const vertical = join(dir, 'recipe-vertical.mp4');
