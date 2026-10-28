@@ -37,6 +37,11 @@ vi.mock('@montagio/sequence', async (importOriginal) => {
 
 const dataDir = setupTempData();
 
+test('the web workspace is named @montagio/web', () => {
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { name: string };
+  expect(manifest.name).toBe('@montagio/web');
+});
+
 async function uploadedImageRef(): Promise<string> {
   const res = await postUpload(uploadRequest(pngFile(1920, 1080)));
   return ((await res.json()) as { imageRef: string }).imageRef;

@@ -37,6 +37,12 @@ const full: InstallState = { ...emptyState(), mode: 'full', gpuIndex: 0 };
 const specsOf = (state: InstallState, baseEnv: NodeJS.ProcessEnv = {}, extra: string[] = []) =>
   serviceSpecs({ os, layout: L, repoRoot: '/repo dir', state, nodePath: '/bin/node', baseEnv, extraComfyArgs: extra });
 
+test('no service environment uses the old MONTAGIO_ prefix', () => {
+  for (const spec of specsOf(full)) {
+    expect(Object.keys(spec.env).filter((name) => name.startsWith('MONTAGIO_'))).toEqual([]);
+  }
+});
+
 test('ComfyUI listens on 127.0.0.1 with partner nodes disabled, its frontend kept off the internet', () => {
   const comfy = specsOf(full).find((s) => s.name === 'comfyui')!;
   expect(comfy.cmd).toBe(L.comfyPython);
