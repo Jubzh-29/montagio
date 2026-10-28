@@ -12,7 +12,13 @@ describe('compactRecipe', () => {
     expect(text).toMatch(/^[\x20-\x7e]*$/);
     expect(text).not.toContain('class_type');
     const parsed = JSON.parse(text);
-    expect(parsed).toMatchObject({ schema: 'montagio/recipe@1', compact: true, name: 'Création « été »', seed: 42 });
+    expect(parsed).toMatchObject({
+      schema: 'montagio/recipe@1',
+      compact: true,
+      name: 'Création « été »',
+      seed: 42,
+      stack: { montagio: { version: '0.1.0', commit: '4ac55b6f0000000000000000000000000000beef' } },
+    });
     expect(parsed.request.body.userPrompt).toBe('Café 🌅');
     expect(parsed.steps[0]).toEqual({
       name: 'camera',

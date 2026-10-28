@@ -1,7 +1,7 @@
 import { CaptionsError, parseWordsDoc, WORDS_SCHEMA, wordsFromChunks } from '../src';
 
 const doc = {
-  schema: WORDS_SCHEMA,
+  schema: 'montagio/words@1',
   model: 'whisper-large-v3-turbo',
   language: 'fr',
   detected: true,
@@ -17,6 +17,7 @@ const doc = {
 
 describe('parseWordsDoc', () => {
   it('reads the document the node writes', () => {
+    expect(WORDS_SCHEMA).toBe('montagio/words@1');
     expect(parseWordsDoc(structuredClone(doc))).toEqual(doc);
   });
 

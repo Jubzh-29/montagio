@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { crc32 } from 'node:zlib';
-import { AI_IMAGE_METADATA, ImageTagError, readImageTags, tagImage } from '../src/index';
+import { AI_IMAGE_METADATA, ImageTagError, readImageTags, RECIPE_TAG, tagImage } from '../src/index';
 
 // A real 1x1 RGBA PNG (signature, IHDR, IDAT, IEND).
 const PNG_1X1 = Buffer.from(
@@ -28,6 +28,14 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'montagio-image-tags-'));
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+test('a PNG export writes its recipe under the Montagio key', async () => {
+  const input = join(dir, 'in.png');
+  const out = join(dir, 'recipe.png');
+  writeFileSync(input, PNG_1X1);
+  await tagImage(input, out, { [RECIPE_TAG.image]: '{"schema":"montagio/recipe@1"}' });
+  expect(await readImageTags(out)).toEqual({ 'Montagio-Recipe': '{"schema":"montagio/recipe@1"}' });
+});
 
 test('a tagged PNG reads back AI-generated, its pixels untouched', async () => {
   const input = join(dir, 'in.png');

@@ -2,9 +2,17 @@ import { buildRecipe, compactRecipe, parseRecipe } from '../src';
 import { cameraDraft, CONTEXT } from './fixtures';
 
 describe('parseRecipe', () => {
-  it('reads back a recipe written as JSON', () => {
+  it('reads back a recipe written as JSON with the Montagio schema and stack', () => {
     const recipe = buildRecipe(cameraDraft(), CONTEXT);
+    expect(recipe.schema).toBe('montagio/recipe@1');
+    expect(recipe.stack.montagio).toEqual({ version: '0.1.0', commit: '4ac55b6f0000000000000000000000000000beef' });
     expect(parseRecipe(JSON.parse(JSON.stringify(recipe)))).toEqual({ ok: true, recipe });
+  });
+
+  it('accepts a full recipe using the new schema and stack', () => {
+    const recipe = JSON.parse(JSON.stringify(buildRecipe(cameraDraft(), CONTEXT)));
+    recipe.schema = 'montagio/recipe@1';
+    expect(parseRecipe(recipe)).toEqual({ ok: true, recipe });
   });
 
   it('reads a compact recipe', () => {
