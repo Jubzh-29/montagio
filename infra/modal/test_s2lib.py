@@ -93,6 +93,15 @@ def test_run_dir_is_dated_in_utc_and_slugged() -> None:
     assert s2lib.run_dir("***", now) == "/results/runs/20261021-073005-smoke"
 
 
+def test_modal_comfyui_environment_matches_the_camera_consumer() -> None:
+    root = Path(__file__).resolve().parents[2]
+    producer = (root / "infra" / "modal" / "montagio_s2.py").read_text(encoding="utf-8")
+    consumer = (root / "comfy-nodes" / "tests" / "test_camera.py").read_text(encoding="utf-8")
+    for name in ("MONTAGIO_COMFYUI_DIR", "MONTAGIO_COMFYUI_PYTHON"):
+        assert f"{name}=" in producer
+        assert f'os.environ.get("{name}")' in consumer
+
+
 def test_smoke_command_quotes_and_owns_out() -> None:
     command = s2lib.smoke_command('--extension edit --text "ajoute de la neige"', "/results/runs/x")
     assert command == (

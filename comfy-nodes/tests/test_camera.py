@@ -347,6 +347,11 @@ print(json.dumps(result))
 """
 
 
+def test_comfyui_python_reads_the_montagio_environment(monkeypatch):
+    monkeypatch.setenv("MONTAGIO_COMFYUI_PYTHON", "/workspace/venvs/comfyui/bin/python")
+    assert comfyui_python() == "/workspace/venvs/comfyui/bin/python"
+
+
 def comfyui_python():
     """MONTAGIO_COMFYUI_PYTHON (the pod's /workspace/venvs/comfyui/bin/python), else a .venv inside the checkout."""
     explicit = os.environ.get("MONTAGIO_COMFYUI_PYTHON")

@@ -75,6 +75,7 @@ def request(host, origin=None):
 
 def test_install_puts_the_check_in_front_of_every_route_of_comfyui(monkeypatch):
     app = fake_comfyui(monkeypatch, "127.0.0.1")
+    monkeypatch.setenv("MONTAGIO_ALLOWED_HOSTS", "gpu-box")
     assert install()
     [guard] = app.middlewares
 
@@ -82,6 +83,7 @@ def test_install_puts_the_check_in_front_of_every_route_of_comfyui(monkeypatch):
         return "ran"
 
     assert asyncio.run(guard(request("127.0.0.1:8188"), handler)) == "ran"
+    assert asyncio.run(guard(request("gpu-box:8188"), handler)) == "ran"
     assert asyncio.run(guard(request("rebind.example:8188"), handler)) == (403, {"error": "host-not-allowed"})
     assert asyncio.run(guard(request("localhost:8188", "https://evil.example"), handler)) == (403, {"error": "host-not-allowed"})
 

@@ -86,6 +86,10 @@ def test_bridge_unavailable_without_tsx(monkeypatch, tmp_path):
         run_bridge({"root": "x", "cases": [], "compile": []})
 
 
+def test_find_monorepo_recognizes_the_montagio_root():
+    assert bridge.find_monorepo() == bridge.TESTS_DIR.parents[1]
+
+
 @pytest.mark.parametrize("value,required", [("1", True), ("0", False), ("", False), ("true", False)])
 def test_require_parity_reads_the_environment(monkeypatch, value, required):
     monkeypatch.setenv("MONTAGIO_REQUIRE_TS_PARITY", value)
