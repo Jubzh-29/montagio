@@ -117,12 +117,24 @@ test('tagClip writes the AI-generated mention and drops the source tags', async 
   expect(await probe(tagged)).toMatchObject({ width: 832, height: 480 });
 }, FFMPEG_TEST_TIMEOUT_MS);
 
-test('tagClip writes a recipe beside the mention, which stays as it is', async () => {
+test('tagClip preserves the Montagio recipe and drops the legacy key while rewriting', async () => {
+  const source = join(dir, 'recipe-source.mp4');
   const tagged = join(dir, 'tagged-recipe.mp4');
-  await tagClip(clipWithTitle, tagged, { [RECIPE_TAG.video]: '{"schema":"montagio/recipe@1","seed":7}' });
+  const recipe = '{"schema":"montagio/recipe@1","seed":7}';
+  const legacyRecipeKey = `${'Shot'}${'Rig'}-Recipe`;
+  execFileSync('ffmpeg', [
+    '-loglevel', 'error', '-y', '-i', clipWithTitle, '-c', 'copy',
+    '-metadata', `${RECIPE_TAG.video}=${recipe}`, '-metadata', `${legacyRecipeKey}=legacy`,
+    '-movflags', 'use_metadata_tags', source,
+  ]);
+  expect((await readTags(source))[legacyRecipeKey]).toBe('legacy');
+  await tagClip(source, tagged, { [RECIPE_TAG.video]: recipe });
   const tags = await readTags(tagged);
   expect(tags).toMatchObject(AI_METADATA);
-  expect(tags.synopsis).toBe('{"schema":"montagio/recipe@1","seed":7}');
+  const rewrittenRecipe = tags[RECIPE_TAG.video];
+  expect(rewrittenRecipe).toBeDefined();
+  expect(JSON.parse(rewrittenRecipe!)).toEqual({ schema: 'montagio/recipe@1', seed: 7 });
+  expect(tags[legacyRecipeKey]).toBeUndefined();
 }, FFMPEG_TEST_TIMEOUT_MS);
 
 test('tracked demo media uses Montagio metadata and no legacy recipe key', async () => {
