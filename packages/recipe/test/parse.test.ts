@@ -22,7 +22,7 @@ describe('parseRecipe', () => {
 
   it('refuses another schema, a short sha256 and a seed out of range', () => {
     const recipe = JSON.parse(JSON.stringify(buildRecipe(cameraDraft(), CONTEXT)));
-    expect(parseRecipe({ ...recipe, schema: 'montagio/recipe@0.1' }).ok).toBe(false);
+    expect(parseRecipe({ ...recipe, schema: 'montagio/recipe@1' }).ok).toBe(false);
     expect(parseRecipe({ ...recipe, seed: 2 ** 32 }).ok).toBe(false);
     expect(parseRecipe({ ...recipe, seed: -1 }).ok).toBe(false);
     const short = structuredClone(recipe);
