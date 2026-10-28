@@ -32,7 +32,7 @@ The download URLs and sha256 of every file are in [`registry/models.lock.yaml`](
 | `102` | KSampler (Advanced) | `noise_seed` |
 | `106` | Save Video | the clip, MP4 H.264 |
 
-The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node, with two differences: node `200`, the preset node, is an addition (the app writes the preset's values into node `108` itself), and node `106` saves under `montagio/camera-preset`, where the app's job saves under `montagio/clip`. To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
+The node ids are those of the API workflow the Montagio app compiles, so this graph and the app's jobs match node for node, with two differences: node `200`, the preset node, is an addition (the app writes the preset's values into node `108` itself), and the output prefixes remain distinct: node `106` saves under `montagio/camera-preset`, while the app's job saves under `montagio/clip`. To keep a change, save the graph from ComfyUI (this format), or export it as API JSON for a script.
 
 ## Measured
 

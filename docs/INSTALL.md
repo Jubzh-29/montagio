@@ -101,7 +101,7 @@ Everything except the app goes into one folder:
 | Inside the folder | What |
 |---|---|
 | `ComfyUI/` | ComfyUI v0.41.0 (commit `98cc0bf8`), cloned into `ComfyUI.tmp/` first and renamed once its commit is checked |
-| `ComfyUI/.montagio` | a marker that says this ComfyUI was installed by Montagio (it keeps the project's former name) |
+| `ComfyUI/.montagio` | a marker that says this ComfyUI was installed by Montagio |
 | `ComfyUI/models/` | the weights |
 | `ComfyUI/custom_nodes/montagio` | a link (a junction on Windows) to the repository's `comfy-nodes` |
 | `ComfyUI/custom_nodes/ComfyUI-Chatterbox` | with `avatar`: the voice node pack, patched (see [Extensions](#extensions)) |
@@ -119,13 +119,13 @@ With `--app-only`, the folder holds only `tools/`, `logs/`, `run/` and `install-
 
 The app stays in the repository folder (its dependencies in `node_modules/`, its build in `apps/web/.next/`). Your clips go to the repository's `data/` folder, or to the folder the `MONTAGIO_DATA` variable names.
 
-### An install made before the name Montagio
+### An install made before the current Montagio identifiers
 
-Montagio was first called Montagio. An install made under that name lives in `%LOCALAPPDATA%\Montagio` on Windows, or `~/.local/share/montagio` (or `$XDG_DATA_HOME/montagio`) on Linux, and its link to the node pack is `ComfyUI/custom_nodes/montagio`. The installer does not look there and moves nothing: a plain `install` makes a new install in the new folder, and downloads the weights again.
+An older install can use a different data folder and a different node-pack link under `ComfyUI/custom_nodes/`. The current installer does not migrate those names: a plain `install` creates a separate install in the default Montagio folder and downloads the weights again.
 
-To keep using the old folder, remove its old link first, the way step 2 of [Uninstall](#uninstall) does: `cmd /c rmdir "%LOCALAPPDATA%\Montagio\ComfyUI\custom_nodes\montagio"` on Windows, `rm ~/.local/share/montagio/ComfyUI/custom_nodes/montagio` on Linux. Otherwise it stays beside the new `custom_nodes/montagio` link, and ComfyUI loads the node pack twice. Then give the folder to every command, for example `./montagio.sh install --dir ~/.local/share/montagio`, and the same `--dir` with `start`, `stop` and `status`. The installer recognises the folder as one it installed.
+To keep using an older folder, stop it first with `./montagio.sh stop --dir <old folder>` (or the PowerShell equivalent). Remove only its obsolete node-pack link, so ComfyUI cannot load two copies of the pack beside the new `custom_nodes/montagio` link. Then run `./montagio.sh install --dir <old folder>` and pass the same `--dir` to `start`, `stop` and `status`.
 
-To remove the old install instead: stop it (`./montagio.sh stop --dir <old folder>`), remove the old link as above, then delete the folder.
+To remove the older install instead, stop it with the same `--dir`, remove its obsolete node-pack link, then delete the folder.
 
 ## Everyday use
 
