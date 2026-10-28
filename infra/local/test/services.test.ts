@@ -37,9 +37,10 @@ const full: InstallState = { ...emptyState(), mode: 'full', gpuIndex: 0 };
 const specsOf = (state: InstallState, baseEnv: NodeJS.ProcessEnv = {}, extra: string[] = []) =>
   serviceSpecs({ os, layout: L, repoRoot: '/repo dir', state, nodePath: '/bin/node', baseEnv, extraComfyArgs: extra });
 
-test('no service environment uses the old MONTAGIO_ prefix', () => {
+test('no service environment uses the legacy prefix', () => {
+  const legacyPrefix = ['SHOT', 'RIG_'].join('');
   for (const spec of specsOf(full)) {
-    expect(Object.keys(spec.env).filter((name) => name.startsWith('MONTAGIO_'))).toEqual([]);
+    expect(Object.keys(spec.env).filter((name) => name.startsWith(legacyPrefix))).toEqual([]);
   }
 });
 

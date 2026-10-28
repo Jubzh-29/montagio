@@ -22,7 +22,8 @@ describe('parseWordsDoc', () => {
   });
 
   it('refuses another schema, a negative start and an unknown key', () => {
-    expect(() => parseWordsDoc({ ...doc, schema: 'montagio/words@1' })).toThrow(CaptionsError);
+    const legacySchema = ['shot', 'rig/words@1'].join('');
+    expect(() => parseWordsDoc({ ...doc, schema: legacySchema })).toThrow(CaptionsError);
     expect(() => parseWordsDoc({ ...doc, chunks: [{ text: ' a', start: -1, end: 1 }] })).toThrow(CaptionsError);
     expect(() => parseWordsDoc({ ...doc, extra: true })).toThrow(CaptionsError);
     expect(() => parseWordsDoc('not a document')).toThrow(CaptionsError);

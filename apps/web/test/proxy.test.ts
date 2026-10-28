@@ -39,7 +39,7 @@ test('a page of another site is refused by its Origin, even with the right Host'
 });
 
 test('MONTAGIO_ALLOWED_HOSTS opens the app to an address of the local network or a domain', () => {
-  process.env.MONTAGIO_ALLOWED_HOSTS = '192.168.1.20:3000, montagio.Home.Example ,https://studio.example/';
+  process.env.MONTAGIO_ALLOWED_HOSTS = '192.168.1.20:3000, Montagio.Home.Example ,https://studio.example/';
   expect(call('192.168.1.20:3000', { origin: 'http://192.168.1.20:3000' })).toBeUndefined();
   // A listed port is the only one; a name without a port, behind a reverse proxy, takes any port.
   expect(call('192.168.1.20:4000')?.status).toBe(403);
