@@ -20,6 +20,7 @@ export type GenerationRecord = {
   state: JobState;
   progress: number;
   backendKind: string;
+  backendOrigin?: string;
   backendJobId: string;
   outputUrl?: string;
   error?: string;

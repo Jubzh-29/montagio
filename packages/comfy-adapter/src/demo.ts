@@ -113,6 +113,8 @@ export class DemoBackend implements GenerationBackend {
     if (job && job.canceledAt === undefined) job.canceledAt = this.now();
   }
 
+  async purge(_backendJobIds: readonly string[]): Promise<void> {}
+
   private progressAt(job: DemoJob, time: number): number {
     return Math.min(1, Math.max(0, (time - job.startedAt) / this.opts.durationMs));
   }

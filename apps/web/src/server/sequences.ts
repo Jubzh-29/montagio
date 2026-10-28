@@ -12,6 +12,7 @@ import {
   probe,
   SequenceToolError,
 } from '@montagio/sequence';
+import { withDataWrite } from './data-purge';
 import { getEnv } from './env';
 import { JobError } from './errors';
 import {
@@ -118,7 +119,7 @@ export async function readSequence(id: string): Promise<SequenceRecord | null> {
 export async function createSequence(input: CreateSequenceInput): Promise<CreateResult> {
   const pending = creations.get(input.idempotencyKey);
   if (pending) return { record: (await pending).record, created: false };
-  const creation = createSequenceOnce(input).finally(() => creations.delete(input.idempotencyKey));
+  const creation = withDataWrite(() => createSequenceOnce(input)).finally(() => creations.delete(input.idempotencyKey));
   creations.set(input.idempotencyKey, creation);
   return creation;
 }

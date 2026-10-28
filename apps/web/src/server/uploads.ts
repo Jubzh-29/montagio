@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { access, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { pickAspect, type Aspect } from '@montagio/presets';
-import { prepareMotionClip, prepareSpeechVideo, prepareVoiceSample, probe } from '@montagio/sequence';
+import { normalizeUploadedImage, prepareMotionClip, prepareSpeechVideo, prepareVoiceSample, probe, SequenceToolError } from '@montagio/sequence';
 import { imageSize } from 'image-size';
 import { MAX_VIDEO_BYTES, MAX_VOICE_BYTES } from '@/lib/limits';
+import { assertDataWritable, DataPurgeError, withDataWrite } from './data-purge';
 import { getEnv } from './env';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -30,10 +31,19 @@ export type UploadMeta = { imageRef: string; width: number; height: number; aspe
 
 export class UploadError extends Error {
   constructor(
-    readonly status: 400 | 413 | 415,
+    readonly status: 400 | 409 | 413 | 415,
     message: string,
   ) {
     super(message);
+  }
+}
+
+export function assertUploadWritable(): void {
+  try {
+    assertDataWritable();
+  } catch (error) {
+    if (error instanceof DataPurgeError) throw new UploadError(409, error.code);
+    throw error;
   }
 }
 
@@ -41,7 +51,7 @@ export async function saveUpload(file: File): Promise<UploadMeta> {
   const ext = EXTENSIONS[file.type];
   if (!ext) throw new UploadError(415, 'only PNG, JPEG and WebP images are accepted');
   if (file.size > MAX_UPLOAD_BYTES) throw new UploadError(413, 'images are limited to 10 MB');
-  return storeImage(new Uint8Array(await file.arrayBuffer()), ext, { origin: 'upload', personal: true });
+  return withDataWrite(async () => storeImage(new Uint8Array(await file.arrayBuffer()), ext, { origin: 'upload', personal: true }, true));
 }
 
 /**
@@ -51,10 +61,11 @@ export async function saveUpload(file: File): Promise<UploadMeta> {
 export async function saveUploadFromFile(path: string, provenance: Provenance = { origin: 'frame', personal: false }): Promise<UploadMeta> {
   const ext = FILE_EXTENSIONS[extname(path).toLowerCase()];
   if (!ext) throw new UploadError(415, `unsupported image file ${path}`);
-  return storeImage(new Uint8Array(await readFile(path)), ext, provenance);
+  return withDataWrite(async () => storeImage(new Uint8Array(await readFile(path)), ext, provenance));
 }
 
-async function storeImage(bytes: Uint8Array, ext: 'png' | 'jpg' | 'webp', provenance: Provenance): Promise<UploadMeta> {
+async function storeImage(bytes: Uint8Array, ext: 'png' | 'jpg' | 'webp', provenance: Provenance, normalize = false): Promise<UploadMeta> {
+  assertUploadWritable();
   let width: number | undefined;
   let height: number | undefined;
   let sniffed: string | undefined;
@@ -72,7 +83,25 @@ async function storeImage(bytes: Uint8Array, ext: 'png' | 'jpg' | 'webp', proven
 
   const id = randomUUID();
   const dir = join(getEnv().data, 'uploads');
+  assertUploadWritable();
   await mkdir(dir, { recursive: true });
+  if (normalize) {
+    const source = join(dir, `${id}.source.${ext}`);
+    const output = join(dir, `${id}.png`);
+    try {
+      await writeFile(source, bytes);
+      await normalizeUploadedImage(source, output);
+      const meta: UploadMeta = { imageRef: `uploads/${id}.png`, width, height, aspect: pickAspect(width, height), ...provenance };
+      await writeFile(join(dir, `${id}.json`), JSON.stringify(meta));
+      return meta;
+    } catch (error) {
+      await rm(output, { force: true });
+      if (error instanceof SequenceToolError && error.code === 'tool-missing') throw error;
+      throw new UploadError(400, 'the file is not a readable image');
+    } finally {
+      await rm(source, { force: true });
+    }
+  }
   const meta: UploadMeta = { imageRef: `uploads/${id}.${ext}`, width, height, aspect: pickAspect(width, height), ...provenance };
   await writeFile(join(dir, `${id}.${ext}`), bytes);
   await writeFile(join(dir, `${id}.json`), JSON.stringify(meta));
@@ -118,25 +147,28 @@ const videosDir = () => join(getEnv().data, 'uploads', 'videos');
 
 /** The sample reference clip, already prepared (5 s, 16 fps, silent): copied as it is, so the demo knows it. */
 export async function saveSampleVideo(): Promise<VideoMeta> {
-  const sample = join(getEnv().root, 'demo-assets', 'videos', 'sample-dance.mp4');
-  const id = randomUUID();
-  const dir = videosDir();
-  await mkdir(dir, { recursive: true });
-  const out = join(dir, `${id}.mp4`);
-  await copyFile(sample, out);
-  const info = await probe(out);
-  const meta: VideoMeta = {
-    videoRef: `videos/${id}.mp4`,
-    duration_s: info.duration_s,
-    sourceDuration_s: info.duration_s,
-    frames: Math.round(info.duration_s * info.fps),
-    width: info.width,
-    height: info.height,
-    aspect: pickAspect(info.width, info.height),
-    origin: 'sample',
-  };
-  await writeFile(join(dir, `${id}.json`), JSON.stringify(meta));
-  return meta;
+  return withDataWrite(async () => {
+    const sample = join(getEnv().root, 'demo-assets', 'videos', 'sample-dance.mp4');
+    const id = randomUUID();
+    const dir = videosDir();
+    assertUploadWritable();
+    await mkdir(dir, { recursive: true });
+    const out = join(dir, `${id}.mp4`);
+    await copyFile(sample, out);
+    const info = await probe(out);
+    const meta: VideoMeta = {
+      videoRef: `videos/${id}.mp4`,
+      duration_s: info.duration_s,
+      sourceDuration_s: info.duration_s,
+      frames: Math.round(info.duration_s * info.fps),
+      width: info.width,
+      height: info.height,
+      aspect: pickAspect(info.width, info.height),
+      origin: 'sample',
+    };
+    await writeFile(join(dir, `${id}.json`), JSON.stringify(meta));
+    return meta;
+  });
 }
 
 /**
@@ -145,12 +177,14 @@ export async function saveSampleVideo(): Promise<VideoMeta> {
  * shorter than 1 s, is refused.
  */
 export async function saveVideoUpload(file: File): Promise<VideoMeta> {
-  const ext = VIDEO_TYPES[file.type];
-  if (!ext) throw new UploadError(415, 'only MP4, WebM and QuickTime videos are accepted');
-  if (file.size > MAX_VIDEO_BYTES) throw new UploadError(413, 'videos are limited to 50 MB');
-  const id = randomUUID();
-  const dir = videosDir();
-  await mkdir(dir, { recursive: true });
+  return withDataWrite(async () => {
+    const ext = VIDEO_TYPES[file.type];
+    if (!ext) throw new UploadError(415, 'only MP4, WebM and QuickTime videos are accepted');
+    if (file.size > MAX_VIDEO_BYTES) throw new UploadError(413, 'videos are limited to 50 MB');
+    const id = randomUUID();
+    const dir = videosDir();
+    assertUploadWritable();
+    await mkdir(dir, { recursive: true });
   const source = join(dir, `${id}.source.${ext}`);
   const out = join(dir, `${id}.mp4`);
   const metaFile = join(dir, `${id}.json`);
@@ -181,8 +215,9 @@ export async function saveVideoUpload(file: File): Promise<VideoMeta> {
     await Promise.all([rm(out, { force: true }), rm(metaFile, { force: true })]);
     throw error;
   } finally {
-    await rm(source, { force: true });
-  }
+      await rm(source, { force: true });
+    }
+  });
 }
 
 /** A prepared reference clip, or null when its ref is not one or its clip or meta is gone. */
@@ -223,12 +258,14 @@ const voicesDir = () => join(getEnv().data, 'uploads', 'voices');
  * uploads. A file that is not readable audio, or shorter than 3 s, is refused and leaves nothing.
  */
 export async function saveVoiceUpload(file: File): Promise<VoiceMeta> {
-  const ext = VOICE_TYPES[file.type];
-  if (!ext) throw new UploadError(415, 'only WAV, MP3, M4A, FLAC, OGG and WebM audio is accepted');
-  if (file.size > MAX_VOICE_BYTES) throw new UploadError(413, 'voice samples are limited to 10 MB');
-  const id = randomUUID();
-  const dir = voicesDir();
-  await mkdir(dir, { recursive: true });
+  return withDataWrite(async () => {
+    const ext = VOICE_TYPES[file.type];
+    if (!ext) throw new UploadError(415, 'only WAV, MP3, M4A, FLAC, OGG and WebM audio is accepted');
+    if (file.size > MAX_VOICE_BYTES) throw new UploadError(413, 'voice samples are limited to 10 MB');
+    const id = randomUUID();
+    const dir = voicesDir();
+    assertUploadWritable();
+    await mkdir(dir, { recursive: true });
   const source = join(dir, `${id}.source.${ext}`);
   const out = join(dir, `${id}.flac`);
   const metaFile = join(dir, `${id}.json`);
@@ -248,8 +285,9 @@ export async function saveVoiceUpload(file: File): Promise<VoiceMeta> {
     await Promise.all([rm(out, { force: true }), rm(metaFile, { force: true })]);
     throw error;
   } finally {
-    await rm(source, { force: true });
-  }
+      await rm(source, { force: true });
+    }
+  });
 }
 
 /** A prepared voice sample, or null when its ref is not one or its file or meta is gone. */
@@ -271,8 +309,10 @@ const speechDir = () => join(getEnv().data, 'uploads', 'speech');
 
 /** Keep a clip's first 30 s with its sound, and that sound as mono FLAC; a clip without sound is refused. */
 async function storeSpeech(source: string): Promise<SpeechMeta> {
-  const id = randomUUID();
-  const dir = speechDir();
+  return withDataWrite(async () => {
+    const id = randomUUID();
+    const dir = speechDir();
+  assertUploadWritable();
   await mkdir(dir, { recursive: true });
   const video = join(dir, `${id}.mp4`);
   const audio = join(dir, `${id}.flac`);
@@ -296,9 +336,10 @@ async function storeSpeech(source: string): Promise<SpeechMeta> {
     await writeFile(metaFile, JSON.stringify(meta));
     return meta;
   } catch (error) {
-    await Promise.all([rm(video, { force: true }), rm(audio, { force: true }), rm(metaFile, { force: true })]);
-    throw error;
-  }
+      await Promise.all([rm(video, { force: true }), rm(audio, { force: true }), rm(metaFile, { force: true })]);
+      throw error;
+    }
+  });
 }
 
 /**
@@ -306,30 +347,33 @@ async function storeSpeech(source: string): Promise<SpeechMeta> {
  * and silent), so that the motion transfer and the restyle read it as any other.
  */
 export async function saveLibraryVideo(clip: string): Promise<VideoMeta> {
-  const id = randomUUID();
-  const dir = videosDir();
-  await mkdir(dir, { recursive: true });
-  const out = join(dir, `${id}.mp4`);
-  const metaFile = join(dir, `${id}.json`);
-  try {
-    const prepared = await prepareMotionClip(clip, out, { max_s: MAX_REFERENCE_S });
-    const meta: VideoMeta = {
-      videoRef: `videos/${id}.mp4`,
-      duration_s: prepared.duration_s,
-      sourceDuration_s: prepared.duration_s,
-      frames: prepared.frames,
-      width: prepared.width,
-      height: prepared.height,
-      aspect: pickAspect(prepared.width, prepared.height),
-      // Generated from fictional characters, as the library says: like the sample dance, no rights to confirm on it.
-      origin: 'sample',
-    };
-    await writeFile(metaFile, JSON.stringify(meta));
-    return meta;
-  } catch (error) {
-    await Promise.all([rm(out, { force: true }), rm(metaFile, { force: true })]);
-    throw error;
-  }
+  return withDataWrite(async () => {
+    const id = randomUUID();
+    const dir = videosDir();
+    assertUploadWritable();
+    await mkdir(dir, { recursive: true });
+    const out = join(dir, `${id}.mp4`);
+    const metaFile = join(dir, `${id}.json`);
+    try {
+      const prepared = await prepareMotionClip(clip, out, { max_s: MAX_REFERENCE_S });
+      const meta: VideoMeta = {
+        videoRef: `videos/${id}.mp4`,
+        duration_s: prepared.duration_s,
+        sourceDuration_s: prepared.duration_s,
+        frames: prepared.frames,
+        width: prepared.width,
+        height: prepared.height,
+        aspect: pickAspect(prepared.width, prepared.height),
+        // Generated from fictional characters, as the library says: like the sample dance, no rights to confirm on it.
+        origin: 'sample',
+      };
+      await writeFile(metaFile, JSON.stringify(meta));
+      return meta;
+    } catch (error) {
+      await Promise.all([rm(out, { force: true }), rm(metaFile, { force: true })]);
+      throw error;
+    }
+  });
 }
 
 /** A video sent for a voice change (MP4, WebM or QuickTime, 50 MB at most). */
@@ -338,6 +382,7 @@ export async function saveSpeechUpload(file: File): Promise<SpeechMeta> {
   if (!ext) throw new UploadError(415, 'only MP4, WebM and QuickTime videos are accepted');
   if (file.size > MAX_VIDEO_BYTES) throw new UploadError(413, 'videos are limited to 50 MB');
   const dir = speechDir();
+  assertUploadWritable();
   await mkdir(dir, { recursive: true });
   const source = join(dir, `${randomUUID()}.source.${ext}`);
   try {

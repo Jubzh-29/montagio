@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { CharacterKind, CharacterSummary, CharacterTraits, CharacterType } from '@/lib/api-types';
 import { FACE_KEY_PREFIX, faceById } from '@/lib/character-bank';
 import { CHARACTER_KINDS, CHARACTER_TYPES, knownTraits } from '@/lib/characters';
+import { withDataWrite } from './data-purge';
 import { getEnv } from './env';
 import { JobError } from './errors';
 import { assertAllowedText } from './guards';
@@ -117,7 +118,8 @@ export async function getCharacter(id: string): Promise<CharacterSummary | null>
 }
 
 export async function createCharacter(body: Record<string, unknown>): Promise<CharacterSummary> {
-  const name = text(body.name, CHARACTER_NAME_MAX);
+  return withDataWrite(async () => {
+    const name = text(body.name, CHARACTER_NAME_MAX);
   const description = text(body.description, CHARACTER_DESCRIPTION_MAX);
   const type = CHARACTER_TYPES.find((value) => value === body.type);
   // A person when nothing says otherwise; an unknown kind is refused.
@@ -144,7 +146,8 @@ export async function createCharacter(body: Record<string, unknown>): Promise<Ch
   };
   await mkdir(dir(), { recursive: true });
   await writeAtomic(fileOf(record.id), JSON.stringify(record, null, 2));
-  return summary(record);
+    return summary(record);
+  });
 }
 
 /**
@@ -164,20 +167,22 @@ function serialized<T>(id: string, change: () => Promise<T>): Promise<T> {
 
 /** Add a photo of the character (a photodump result); the same photo twice is kept once. */
 export async function addCharacterPhoto(id: string, body: Record<string, unknown>): Promise<CharacterSummary | null> {
-  if (!SAFE_ID.test(id)) return null;
-  const scene = text(body.scene, CHARACTER_SCENE_MAX);
-  const imageRef = await assertFictionalPhoto(body.imageRef);
-  const jobId = typeof body.jobId === 'string' && SAFE_ID.test(body.jobId) ? body.jobId : undefined;
-  return serialized(id, async () => {
-    const record = await read(id);
-    if (!record) return null;
-    if (!scene) throw new JobError('invalid-input');
-    if (!record.photos.some((photo) => photo.imageRef === imageRef)) {
-      if (record.photos.length >= CHARACTER_PHOTOS_MAX) throw new JobError('invalid-input');
-      record.photos.push({ imageRef, scene, ...(jobId ? { jobId } : {}), createdAt: new Date().toISOString() });
-      await writeAtomic(fileOf(id), JSON.stringify(record, null, 2));
-    }
-    return summary(record);
+  return withDataWrite(async () => {
+    if (!SAFE_ID.test(id)) return null;
+    const scene = text(body.scene, CHARACTER_SCENE_MAX);
+    const imageRef = await assertFictionalPhoto(body.imageRef);
+    const jobId = typeof body.jobId === 'string' && SAFE_ID.test(body.jobId) ? body.jobId : undefined;
+    return serialized(id, async () => {
+      const record = await read(id);
+      if (!record) return null;
+      if (!scene) throw new JobError('invalid-input');
+      if (!record.photos.some((photo) => photo.imageRef === imageRef)) {
+        if (record.photos.length >= CHARACTER_PHOTOS_MAX) throw new JobError('invalid-input');
+        record.photos.push({ imageRef, scene, ...(jobId ? { jobId } : {}), createdAt: new Date().toISOString() });
+        await writeAtomic(fileOf(id), JSON.stringify(record, null, 2));
+      }
+      return summary(record);
+    });
   });
 }
 

@@ -6,6 +6,7 @@ import { compactRecipe } from '@montagio/recipe';
 import { AI_METADATA, captionFrame, RECIPE_TAG, renderVertical } from '@montagio/sequence';
 import type { CaptionExportSummary, CaptionsInfo, Transcript } from '@/lib/api-types';
 import { copyCaptionFonts } from './caption-fonts';
+import { withDataWrite } from './data-purge';
 import { JobError } from './errors';
 import { assertAllowedText } from './guards';
 import { mediaFileFor, mediaUrlFor } from './generations';
@@ -107,7 +108,8 @@ export function enqueueVerticalRender<T>(work: () => Promise<T>): Promise<T> {
 
 /** POST /api/captions/:id/export: an export starts (or waits its turn); its state is polled. */
 export async function startExport(jobId: string, body: unknown): Promise<CaptionExportSummary> {
-  const read = await readTranscript(jobId);
+  return withDataWrite(async () => {
+    const read = await readTranscript(jobId);
   if (!read) throw new CaptionsNotFound(jobId);
   const request = await captionsRequest(body, read.transcript);
   const id = newExportId();
@@ -132,7 +134,8 @@ export async function startExport(jobId: string, body: unknown): Promise<Caption
       exportsInFlight.running.delete(key);
     }
   }).catch((error: unknown) => console.error(`[montagio] captions ${jobId}: the export ${id} could not record its end`, error));
-  return state;
+    return state;
+  });
 }
 
 /** GET /api/captions/:id/export/:exportId; null for an unknown export. */
@@ -172,13 +175,15 @@ export async function captionsInfo(jobId: string): Promise<CaptionsInfo | null> 
 
 /** Burn the captions in at once (a recipe replayed, inside the job's delivery): the 9:16 clip's URL. */
 export async function exportNow(record: JobRecord, transcript: Transcript, body: { text: string; style: CaptionStyleId }): Promise<{ url: string }> {
-  const request = await captionsRequest(body, transcript);
-  const id = newExportId();
-  const dir = exportDir(record.id, id);
-  // In its turn, as an export asked from the panel: one encode at a time.
-  const url = mediaUrlFor(await enqueueVerticalRender(() => renderExport(record, transcript, request, dir)))!;
-  await writeState(dir, { id, style: request.style, state: 'succeeded', url, createdAt: new Date().toISOString() });
-  return { url };
+  return withDataWrite(async () => {
+    const request = await captionsRequest(body, transcript);
+    const id = newExportId();
+    const dir = exportDir(record.id, id);
+    // In its turn, as an export asked from the panel: one encode at a time.
+    const url = mediaUrlFor(await enqueueVerticalRender(() => renderExport(record, transcript, request, dir)))!;
+    await writeState(dir, { id, style: request.style, state: 'succeeded', url, createdAt: new Date().toISOString() });
+    return { url };
+  });
 }
 
 // Previews being made, by file: two requests for the same frame share one FFmpeg.
@@ -190,7 +195,8 @@ const previews = (previewHolder.__montagioCaptionPreviews ??= new Map());
  * middle of the first line of captions, 540x960. Kept per text and style: the same request answers at once.
  */
 export async function previewFrame(jobId: string, body: unknown): Promise<string> {
-  const read = await readTranscript(jobId);
+  return withDataWrite(async () => {
+    const read = await readTranscript(jobId);
   if (!read) throw new CaptionsNotFound(jobId);
   const request = await captionsRequest(body, read.transcript);
   const key = createHash('sha256').update(`${request.style}\n${request.language}\n${request.text}`).digest('hex').slice(0, 16);
@@ -207,5 +213,6 @@ export async function previewFrame(jobId: string, body: unknown): Promise<string
     })().finally(() => previews.delete(png));
     previews.set(png, made);
   }
-  return made;
+    return made;
+  });
 }

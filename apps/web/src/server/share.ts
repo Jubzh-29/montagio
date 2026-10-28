@@ -7,6 +7,7 @@ import type { ShareSummary } from '@/lib/api-types';
 import { isRecipeSource, type RecipeSource } from '@/lib/recipe-url';
 import { copyCaptionFonts } from './caption-fonts';
 import { enqueueVerticalRender } from './captions';
+import { withDataWrite } from './data-purge';
 import { getEnv } from './env';
 import { JobError } from './errors';
 import { mediaFileFor, mediaUrlFor } from './generations';
@@ -80,7 +81,8 @@ async function renderShare(input: string, request: ShareRequest, dir: string): P
 
 /** POST /api/share: the 9:16 clip of a finished result starts rendering (after the exports before it); its state is polled. */
 export async function startShare(body: unknown): Promise<ShareSummary> {
-  const request = readShareRequest(body);
+  return withDataWrite(async () => {
+    const request = readShareRequest(body);
   const input = await shareInput(request.source, request.id);
   if (!input) throw new ShareSourceNotFound(`${request.source} ${request.id}`);
   try {
@@ -105,7 +107,8 @@ export async function startShare(body: unknown): Promise<ShareSummary> {
       running.delete(id);
     }
   }).catch((error: unknown) => console.error(`[montagio] share ${id}: could not record its end`, error));
-  return state;
+    return state;
+  });
 }
 
 /** GET /api/share/:id; null for an unknown share. */

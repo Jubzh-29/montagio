@@ -38,6 +38,7 @@ export type FakeProxy = {
   assets: Map<string, FakeAsset>;
   setJob(id: string, patch: Partial<FakeJobState>): void;
   rejectNextSubmit(status: number, code: string): void;
+  rejectNextDelete(status: number): void;
   nextJobId(id: string): void;
   /** The next request (whose path starts with `pathPrefix`, if given) answers `status` to the same path on `origin`. */
   redirectNext(status: number, origin: string, pathPrefix?: string): void;
@@ -89,6 +90,7 @@ export async function startFakeProxy(
   const audio = opts.autoRun?.audio ? readFileSync(opts.autoRun.audio) : clip;
   const words = opts.autoRun?.words ? readFileSync(opts.autoRun.words) : clip;
   let rejection: { status: number; code: string } | null = null;
+  let deleteRejection: number | null = null;
   let forcedId: string | null = null;
   let redirect: { status: number; origin: string; pathPrefix: string } | null = null;
   let base = '';
@@ -207,6 +209,18 @@ export async function startFakeProxy(
       return send(res, 200, assetJson(found[0], found[1], false));
     }
 
+    if (method === 'DELETE' && (match = /^\/api\/v2\/assets\/([^/]+)$/.exec(path))) {
+      if (deleteRejection !== null) {
+        const status = deleteRejection;
+        deleteRejection = null;
+        return send(res, status, envelope('delete_failed', `fake delete failed with ${status}`));
+      }
+      const id = decodeURIComponent(match[1]!);
+      if (!assets.has(id)) return send(res, 404, envelope('asset_not_found', 'no such asset'));
+      assets.delete(id);
+      return send(res, 204);
+    }
+
     if (method === 'GET' && (match = /^\/api\/v2\/assets\/([^/]+)\/content$/.exec(path))) {
       const asset = assets.get(decodeURIComponent(match[1]!));
       if (!asset) return send(res, 404, envelope('asset_not_found', 'no such asset'));
@@ -233,6 +247,12 @@ export async function startFakeProxy(
       jobs.set(id, job);
       createdAt.set(id, new Date().toISOString());
       return send(res, 201, jobJson(id, job));
+    }
+
+    if (method === 'GET' && (match = /^\/api\/v2\/jobs\/([^/]+)\/workflow$/.exec(path))) {
+      const job = jobs.get(decodeURIComponent(match[1]!));
+      if (!job) return send(res, 404, envelope('job_not_found', 'no such job'));
+      return send(res, 200, { format: 'api', workflow: job.workflow });
     }
 
     if ((match = /^\/api\/v2\/jobs\/([^/]+)(\/cancel)?$/.exec(path))) {
@@ -273,6 +293,9 @@ export async function startFakeProxy(
     },
     rejectNextSubmit(status, code) {
       rejection = { status, code };
+    },
+    rejectNextDelete(status) {
+      deleteRejection = status;
     },
     nextJobId(id) {
       forcedId = id;

@@ -6,7 +6,7 @@ One command checks your machine, installs everything Montagio needs and opens it
 - [comfy-api-proxy](https://github.com/Comfy-Org/comfy-api-proxy) 0.1.6 (MIT), which gives the app the Comfy API in front of that ComfyUI;
 - the Montagio node pack (`comfy-nodes`), linked into ComfyUI;
 - the open weights of [`registry/models.lock.yaml`](../registry/models.lock.yaml), each checked against its sha256: by default those of the camera presets (about 72 GB, all Apache-2.0) and of the effects pack (about 21 GB, Apache-2.0 and MIT), more with [`--extensions`](#extensions);
-- yt-dlp 2026.10.21, checked against its sha256, for the trend remix's import by link;
+- yt-dlp 2026.10.26, checked against its sha256, for the trend remix's import by link;
 - the Montagio app, built and served on `127.0.0.1`.
 
 The install downloads from GitHub, PyPI, the PyTorch index, npm and Hugging Face. Once installed, Montagio runs on your machine: every service listens on `127.0.0.1` only, there is no account, no key and no paid API, and your images and clips never leave it (unless you render on a remote GPU with `--proxy-url`: they then go to that GPU). The app sends one kind of request outside your machine, and only when you ask for it: the trend remix's import by link, where yt-dlp fetches the video you pasted from TikTok, Instagram or YouTube.
@@ -109,7 +109,7 @@ Everything except the app goes into one folder:
 | `ComfyUI/.montagio-build/` | where a node pack is made before it moves into `custom_nodes/` whole |
 | `venvs/comfyui/` | Python for ComfyUI, with PyTorch 2.14.1 (CUDA 13.0) or 2.11.0 (CUDA 12.8), and the voice pack's packages with `avatar` |
 | `venvs/comfy-api-proxy/` | Python for comfy-api-proxy |
-| `tools/yt-dlp` (`yt-dlp.exe` on Windows) | yt-dlp 2026.10.21 (Unlicense), the release binary checked by its sha256, for the trend remix's import by link; installed in both modes, handed to the app as `MONTAGIO_YTDLP` unless you set that variable |
+| `tools/yt-dlp` (`yt-dlp.exe` on Windows) | yt-dlp 2026.10.26 (Unlicense), the release binary checked by its sha256, for the trend remix's import by link; installed in both modes, handed to the app as `MONTAGIO_YTDLP` unless you set that variable |
 | `logs/` | `comfyui.log`, `proxy.log`, `app.log`, and the download report `weights/weights-report.json` |
 | `run/` | the pid file of each service started |
 | `cache/` | `torch-constraints.txt`, which keeps pip from replacing the CUDA build of PyTorch |
@@ -150,6 +150,12 @@ git pull
 Running `install` again only does what changed: a new ComfyUI or PyTorch version, a new weight in the lock, new npm dependencies, new app code. Running services are stopped first and started again at the end. A weight that leaves the lock stays on the disk; delete it from `ComfyUI/models/` if you need the space.
 
 The next runs keep the ports, `--proxy-url`, `--low-vram` (until a GPU of 22 GiB or more, see above) and `--extensions`: an install made with `--extensions all` is updated with a plain `./montagio.sh install`, and `start` opens the Studio with every extension. The report's `Extensions:` line says which ones the run takes, and why. A `MONTAGIO_EXTENSIONS` set in your environment counts as `--extensions` when the command line has none, and is kept the same way. `--extensions default` forgets the choice and goes back to the effects pack alone: the weights and node packs of the other extensions stay on the disk, and the Studio hides them. A run with `--app-only` leaves the choice for the next full install. `--ignore-vram` is not kept: pass it again.
+
+## Delete local data
+
+In **History**, **Delete my data** removes uploads, generations, jobs, films, characters, the local community gallery, shares and Montagio's caches. Wait for every render and export to finish first. The app asks the authenticated proxy to delete the recorded input and output assets before deleting the local folders. If the proxy is unreachable or any remote asset cannot be checked, it answers `remote-purge-incomplete` and keeps local records for a later retry; it never reports a partial purge as complete. Unlisted files and model weights are left alone. SSD snapshots, filesystem journals, backups and a remote provider's own copies are outside this operation.
+
+New photo uploads need no separate EXIF cleanup: the app decodes them with autorotation and stores only a normalized PNG, not the original JPEG/PNG/WebP bytes or their source metadata.
 
 ## Reproduce a recipe
 
@@ -199,7 +205,9 @@ Without a GPU of 12 GB at least, `install --app-only` installs the app alone: no
   ./montagio.sh install --app-only --proxy-url http://127.0.0.1:9189
   ```
 
-  The URL is kept: the next `install --app-only` uses it again. `install --app-only --demo` forgets it and goes back to demo mode. The rented GPU's comfy-api-proxy has no token: keep the tunnel open for the time you render (see [SECURITY.md](../SECURITY.md)).
+  Set `MONTAGIO_PROXY_TOKEN` in the app's environment to the token of that proxy before running the command. On a Montagio GPU session, `source /workspace/montagio.env` exports it; it is also in `/workspace/run/proxy-token`, readable by its owner only. The app refuses to contact a proxy without a token. Loopback HTTP is for a local proxy or an SSH tunnel like this one; a non-loopback proxy URL must use HTTPS. Keep the tunnel open only for the time you render (see [SECURITY.md](../SECURITY.md)).
+
+  The URL is kept: the next `install --app-only` uses it again. `install --app-only --demo` forgets it and goes back to demo mode.
 
 With `--app-only`, `start` sets no extension list: `MONTAGIO_EXTENSIONS` decides what the Studio shows (unset: every extension a GPU session validated), and `MONTAGIO_VRAM_PROFILE=12gb` gives the choices of the 12 GB profile, for a remote GPU of 12 GB.
 
@@ -234,6 +242,7 @@ With `--app-only`, `start` sets no extension list: `MONTAGIO_EXTENSIONS` decides
 | `MONTAGIO_ALLOWED_HOSTS` | other addresses the app answers at, comma list: `192.168.1.20:8080` (that port only), `studio.example` (any port); see [Open the app at another address](#open-the-app-at-another-address) |
 | `MONTAGIO_DATA` | the folder of your clips and of the app's other files, instead of the repository's `data/` |
 | `MONTAGIO_BACKEND` | for an app you start yourself: `demo` (the default) or `local`, which renders through the comfy-api-proxy at `COMFY_BASE_URL` (required with `local`). `start` sets them itself |
+| `MONTAGIO_PROXY_TOKEN` | the proxy's bearer token, required with `MONTAGIO_BACKEND=local`; sent only to `COMFY_BASE_URL`'s origin. Non-loopback proxy URLs also require HTTPS |
 | `MONTAGIO_CONTENT_FILTER` | the explicit-term text filter is on by default. Exact lowercase `off` disables only that filter when `MONTAGIO_BACKEND=local`; it is ignored in demo. Name, consent, rights, host and file checks stay active |
 | `MONTAGIO_URL` | `npm run reproduce` and the MCP server: the app's address, `http://127.0.0.1:3000` by default |
 

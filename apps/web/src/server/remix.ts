@@ -3,11 +3,12 @@ import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promise
 import { join } from 'node:path';
 import { pickAspect, type Aspect } from '@montagio/presets';
 import { concatClips, cutShot, detectShots, framesAt, prepareRemixSource, shotRanges } from '@montagio/sequence';
+import { withDataWrite } from './data-purge';
 import { getEnv } from './env';
 import { mediaUrlFor } from './generations';
 import { libraryMotionPath } from './motions';
 import { remixFile } from './tasks/files';
-import { MAX_VIDEO_BYTES, UploadError } from './uploads';
+import { assertUploadWritable, MAX_VIDEO_BYTES, UploadError } from './uploads';
 
 /** The longest trend a remix takes: its first 60 s are kept. */
 export const REMIX_MAX_S = 60;
@@ -64,36 +65,39 @@ export async function saveRemixSource(
   origin: RemixOrigin,
   extra: { link?: RemixSourceMeta['link']; sound?: RemixSound; cuts?: number[] } = {},
 ): Promise<RemixSourceMeta> {
-  const id = randomUUID();
-  await mkdir(remixDir(), { recursive: true });
-  const out = join(remixDir(), `${id}.mp4`);
-  const metaFile = join(remixDir(), `${id}.json`);
-  try {
-    const prepared = await prepareRemixSource(input, out, { max_s: REMIX_MAX_S });
-    if (prepared.duration_s < 1 || prepared.frames < 2) throw new UploadError(400, 'invalid-input');
-    // Cuts known in advance (the sample's) are kept; else FFmpeg finds them.
-    const cuts = extra.cuts ?? (await detectShots(out)).cuts;
-    const meta: RemixSourceMeta = {
-      remixRef: `remix/${id}.mp4`,
-      duration_s: prepared.duration_s,
-      fps: prepared.fps,
-      frames: prepared.frames,
-      width: prepared.width,
-      height: prepared.height,
-      aspect: pickAspect(prepared.width, prepared.height),
-      audio: prepared.audio,
-      origin,
-      ...(extra.link ? { link: extra.link } : {}),
-      ...(extra.sound ? { sound: extra.sound } : {}),
-      cuts: cuts.slice(0, REMIX_MAX_SHOTS - 1),
-    };
-    await writeFile(metaFile, JSON.stringify(meta));
-    return meta;
-  } catch (error) {
-    // A refused or half-made trend leaves nothing behind.
-    await Promise.all([rm(out, { force: true }), rm(metaFile, { force: true })]);
-    throw error;
-  }
+  return withDataWrite(async () => {
+    assertUploadWritable();
+    const id = randomUUID();
+    await mkdir(remixDir(), { recursive: true });
+    const out = join(remixDir(), `${id}.mp4`);
+    const metaFile = join(remixDir(), `${id}.json`);
+    try {
+      const prepared = await prepareRemixSource(input, out, { max_s: REMIX_MAX_S });
+      if (prepared.duration_s < 1 || prepared.frames < 2) throw new UploadError(400, 'invalid-input');
+      // Cuts known in advance (the sample's) are kept; else FFmpeg finds them.
+      const cuts = extra.cuts ?? (await detectShots(out)).cuts;
+      const meta: RemixSourceMeta = {
+        remixRef: `remix/${id}.mp4`,
+        duration_s: prepared.duration_s,
+        fps: prepared.fps,
+        frames: prepared.frames,
+        width: prepared.width,
+        height: prepared.height,
+        aspect: pickAspect(prepared.width, prepared.height),
+        audio: prepared.audio,
+        origin,
+        ...(extra.link ? { link: extra.link } : {}),
+        ...(extra.sound ? { sound: extra.sound } : {}),
+        cuts: cuts.slice(0, REMIX_MAX_SHOTS - 1),
+      };
+      await writeFile(metaFile, JSON.stringify(meta));
+      return meta;
+    } catch (error) {
+      // A refused or half-made trend leaves nothing behind.
+      await Promise.all([rm(out, { force: true }), rm(metaFile, { force: true })]);
+      throw error;
+    }
+  });
 }
 
 /** A trend sent from this browser: MP4, WebM or QuickTime, 50 MB at most. */

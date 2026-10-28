@@ -1,5 +1,7 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { deflateSync } from 'node:zlib';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resetServicesForTests } from '@/server/services';
@@ -14,13 +16,17 @@ export function setupTempData(): () => string {
     process.env.MONTAGIO_ROOT = repoRoot;
     process.env.MONTAGIO_DATA = dir;
     process.env.MONTAGIO_BACKEND = 'demo';
+    process.env.MONTAGIO_PROXY_TOKEN = 'test-proxy-token';
     process.env.MONTAGIO_DEMO_DURATION_MS = '60000';
     // The pre-rendered files of demo-assets/, not a render of each test photo (demo-render.test.ts turns it on).
     process.env.MONTAGIO_DEMO_RENDER = 'off';
     resetServicesForTests();
   });
   // Retries: on Windows a clip FFmpeg just closed can stay locked for a moment.
-  afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5 }));
+  afterEach(() => {
+    delete process.env.MONTAGIO_PROXY_TOKEN;
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5 });
+  });
   return () => dir;
 }
 
@@ -40,17 +46,38 @@ export function undateLibrary(root: string): void {
   }
 }
 
-/** Minimal PNG: signature + IHDR chunk, enough for dimension sniffing. */
+/** A valid RGBA PNG, padded to a requested size when a size-limit test needs one. */
 export function pngBytes(width: number, height: number, totalSize = 33): Uint8Array<ArrayBuffer> {
-  const bytes = new Uint8Array(new ArrayBuffer(Math.max(totalSize, 33)));
-  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
-  const view = new DataView(bytes.buffer);
-  view.setUint32(8, 13);
-  bytes.set([0x49, 0x48, 0x44, 0x52], 12); // "IHDR"
-  view.setUint32(16, width);
-  view.setUint32(20, height);
-  bytes.set([8, 6, 0, 0, 0], 24);
-  return bytes;
+  const crc = (bytes: Buffer): number => {
+    let value = 0xffffffff;
+    for (const byte of bytes) {
+      for (let bit = 0; bit < 8; bit++) value = (value >>> 1) ^ ((value ^ byte) & 1 ? 0xedb88320 : 0);
+    }
+    return (value ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type: string, data: Buffer): Buffer => {
+    const out = Buffer.alloc(12 + data.length);
+    out.writeUInt32BE(data.length, 0);
+    out.write(type, 4, 'latin1');
+    data.copy(out, 8);
+    out.writeUInt32BE(crc(out.subarray(4, 8 + data.length)), 8 + data.length);
+    return out;
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr.set([8, 6, 0, 0, 0], 8);
+  const raw = Buffer.alloc((width * 4 + 1) * height);
+  const png = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+  if (totalSize <= png.length + 20) return png;
+  const padding = Buffer.alloc(totalSize - png.length - 12);
+  padding.write('Comment\0', 0, 'latin1');
+  return Buffer.concat([png.subarray(0, -12), chunk('tEXt', padding), png.subarray(-12)]);
 }
 
 export const pngFile = (width: number, height: number, name = 'photo.png') =>
@@ -78,19 +105,21 @@ export function seedRecordFile(dataDir: string, record: Record<string, unknown>)
   writeFileSync(join(dir, 'record.json'), JSON.stringify(record));
 }
 
-/** Minimal JPEG: SOI + APP1 Exif (orientation) + SOF0 (size) + EOI. */
+/** A real JPEG with an EXIF orientation tag, encoded by FFmpeg. */
 export function jpegWithOrientation(width: number, height: number, orientation: number, name = 'phone.jpg'): File {
-  const bytes = new Uint8Array(new ArrayBuffer(59));
-  const view = new DataView(bytes.buffer);
-  bytes.set([0xff, 0xd8, 0xff, 0xe1, 0x00, 0x22], 0); // SOI, APP1 (length 34)
-  bytes.set([0x45, 0x78, 0x69, 0x66, 0x00, 0x00], 6); // "Exif\0\0"
-  bytes.set([0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08], 12); // TIFF, big-endian, IFD0 at 8
-  bytes.set([0x00, 0x01, 0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01], 20); // 1 entry: Orientation, SHORT x1
-  view.setUint16(30, orientation);
-  bytes.set([0xff, 0xc0, 0x00, 0x11, 0x08], 38); // SOF0 (length 17), 8-bit
-  view.setUint16(43, height);
-  view.setUint16(45, width);
-  bytes.set([0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01], 47);
-  bytes.set([0xff, 0xd9], 57); // EOI
-  return new File([bytes], name, { type: 'image/jpeg' });
+  const dir = mkdtempSync(join(tmpdir(), 'montagio-jpeg-'));
+  const path = join(dir, 'photo.jpg');
+  try {
+    execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', `testsrc2=size=${width}x${height}`, '-frames:v', '1', path]);
+    const jpeg = readFileSync(path);
+    const app1 = new Uint8Array(new ArrayBuffer(36));
+    app1.set([0xff, 0xe1, 0x00, 0x22], 0);
+    app1.set([0x45, 0x78, 0x69, 0x66, 0x00, 0x00], 4);
+    app1.set([0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08], 10);
+    app1.set([0x00, 0x01, 0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01], 18);
+    new DataView(app1.buffer).setUint16(28, orientation);
+    return new File([Buffer.concat([jpeg.subarray(0, 2), app1, jpeg.subarray(2)])], name, { type: 'image/jpeg' });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }

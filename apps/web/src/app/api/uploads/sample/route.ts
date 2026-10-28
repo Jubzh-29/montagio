@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { namesThisSite } from '@/server/body';
 import { getEnv } from '@/server/env';
+import { jobFailureResponse } from '@/server/jobs';
 import { saveUploadFromFile } from '@/server/uploads';
 
 /**
@@ -19,5 +20,11 @@ export async function POST(request?: Request) {
   const forTab = request ? new URL(request.url).searchParams.get('for') : null;
   const file = (forTab && SAMPLES[forTab]) || 'sample-16x9.png';
   const sample = join(getEnv().root, 'demo-assets', 'images', file);
-  return Response.json(await saveUploadFromFile(sample, { origin: 'sample', personal: false }), { status: 201 });
+  try {
+    return Response.json(await saveUploadFromFile(sample, { origin: 'sample', personal: false }), { status: 201 });
+  } catch (error) {
+    const failure = jobFailureResponse(error);
+    if (failure) return failure;
+    throw error;
+  }
 }

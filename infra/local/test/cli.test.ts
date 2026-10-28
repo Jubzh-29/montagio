@@ -65,10 +65,12 @@ test('start, stop and status refuse the options only install reads', () => {
   expect(parseArgs(['status', '--dir', 'D:\\S']).command).toBe('status');
 });
 
-test('--proxy-url needs --app-only and an http(s) URL', () => {
+test('--proxy-url needs --app-only and an http(s) URL, with HTTPS beyond loopback', () => {
   expect(() => parseArgs(['install', '--proxy-url', 'http://127.0.0.1:8189'])).toThrow(/--app-only/);
   expect(() => parseArgs(['install', '--app-only', '--proxy-url', 'ftp://x'])).toThrow(/http/);
+  expect(() => parseArgs(['install', '--app-only', '--proxy-url', 'http://gpu.example'])).toThrow(/HTTPS/);
   expect(parseArgs(['install', '--app-only', '--proxy-url', 'http://127.0.0.1:9189']).options).toMatchObject({ appOnly: true, proxyUrl: 'http://127.0.0.1:9189' });
+  expect(parseArgs(['install', '--app-only', '--proxy-url', 'https://gpu.example']).options).toMatchObject({ appOnly: true, proxyUrl: 'https://gpu.example' });
 });
 
 test('--demo goes with --app-only, never with --proxy-url', () => {

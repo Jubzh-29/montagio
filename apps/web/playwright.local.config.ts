@@ -32,6 +32,7 @@ export default defineConfig({
       env: {
         MONTAGIO_BACKEND: 'local',
         COMFY_BASE_URL: `http://127.0.0.1:${PROXY_PORT}`,
+        MONTAGIO_PROXY_TOKEN: 'e2e-proxy-token',
         MONTAGIO_DATA: join(tmpdir(), `montagio-e2e-local-${Date.now()}`),
       },
     },

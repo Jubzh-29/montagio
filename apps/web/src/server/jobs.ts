@@ -21,6 +21,7 @@ import { failureResponse, mediaFileFor, mediaUrlFor } from './generations';
 import { inputFiles, replaySeed, slotsOf } from './inputs';
 import { withLock } from './lock';
 import { getServices } from './services';
+import { DataPurgeError } from './data-purge';
 import { writeAtomic } from './store';
 import { TASKS } from './tasks';
 import { saveUploadFromFile, type Provenance } from './uploads';
@@ -71,6 +72,8 @@ export type JobRecord = {
   verticalUrl?: string;
   /** The backend that rendered it ("demo", "local"): its recipe says so whatever the app runs later. */
   backendKind?: string;
+  /** The proxy origin that owns the remote assets; required to purge them later. */
+  backendOrigin?: string;
   /** A demo render: what it is, since no model made it. */
   demo?: DemoKind;
   error?: string;
@@ -327,6 +330,7 @@ export function createJobEngine(tasks: Partial<Record<JobTask, TaskDef>>): JobEn
       task,
       ...prepared,
       backendKind: getServices().backend.kind,
+      backendOrigin: getServices().backend.origin,
       steps: [],
       current: 0,
       state: 'queued',
@@ -492,6 +496,7 @@ const STATUS: Record<JobError['code'], number> = {
 /** The HTTP answer for a known failure of a job route, or null for an unexpected error. */
 export function jobFailureResponse(error: unknown): Response | null {
   if (error instanceof JobError) return Response.json({ error: error.code }, { status: STATUS[error.code] });
+  if (error instanceof DataPurgeError) return Response.json({ error: error.code }, { status: error.code === 'remote-purge-incomplete' ? 502 : 409 });
   return failureResponse(error);
 }
 

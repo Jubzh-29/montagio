@@ -38,6 +38,9 @@ const REFUSALS: Record<string, MessageKey> = {
   'link-busy': 'trendLinkBusy',
   'link-import-failed': 'trendLinkFailed',
   'link-import-unavailable': 'trendLinkUnavailable',
+  'data-busy': 'purgeBusy',
+  'data-purging': 'purgeConcurrent',
+  'remote-purge-incomplete': 'purgeRemoteIncomplete',
 };
 
 export function refusalMessageKey(code: string | undefined): MessageKey {

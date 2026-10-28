@@ -30,10 +30,12 @@ export function createBackend(env: Record<string, string | undefined>, opts: { d
             'without it the Comfy SDK would target Comfy Cloud',
         );
       }
-      assertLocalBaseUrl(baseUrl);
-      // MONTAGIO_PROXY_TOKEN: the token the installer starts comfy-api-proxy with, sent on every request to it.
+      const target = assertLocalBaseUrl(baseUrl);
+      // Every proxy needs its token; beyond a loopback tunnel, media also needs TLS.
       const token = env.MONTAGIO_PROXY_TOKEN?.trim();
-      return new ComfyBackend({ baseUrl, outputsDir: join(env.MONTAGIO_DATA ?? join(root, 'data'), 'comfy-outputs'), ...(token ? { token } : {}) });
+      if (!token) throw new Error('MONTAGIO_BACKEND=local needs MONTAGIO_PROXY_TOKEN, the token of your comfy-api-proxy');
+      if (target.url.protocol === 'http:' && !target.loopback) throw new Error('a remote COMFY_BASE_URL must use HTTPS; plain HTTP is allowed only on loopback');
+      return new ComfyBackend({ baseUrl, outputsDir: join(env.MONTAGIO_DATA ?? join(root, 'data'), 'comfy-outputs'), token });
     }
     case 'hosted':
       throw new Error('Backend "hosted" is not available yet: it comes with the demo link');

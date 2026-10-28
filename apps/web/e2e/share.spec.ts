@@ -34,6 +34,7 @@ test('Share 9:16: a caption to copy, then the 9:16 with the Montagio end card, o
   await expect(panel.getByTestId('share-download')).toHaveAttribute('href', /^\/media\/data\/shares\/.+\/montagio-9x16\.mp4$/, { timeout: 60_000 });
   await expect(panel.getByTestId('share-result')).toBeVisible();
   await expect(panel).toContainText('The file says it is AI-generated');
+  await expect(panel).toContainText('The file also carries its recipe: entered text and SHA-256 input hashes, never source media or local paths.');
 
   // Unticked, the 9:16 is made again, without the card.
   await panel.getByTestId('share-end-card').uncheck();

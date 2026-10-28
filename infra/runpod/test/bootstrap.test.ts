@@ -76,6 +76,22 @@ test("ComfyUI's frontend stays off the internet and Pillow is lifted past its kn
   expect(text).toContain(`'pillow>=%s; python_version >= "3.11"\\n' "$PILLOW_MIN"`);
 });
 
+test.runIf(hasBash)('the proxy token is generated once, held owner-only and passed to the proxy', () => {
+  workspace = mkdtempSync(join(tmpdir(), 'montagio-bootstrap-'));
+  const run = spawnSync(
+    'bash',
+    [
+      '-c',
+      'python3() { python "$@"; }; export -f python3; source "$1"; first=$(proxy_token); second=$(proxy_token); [ "$first" = "$second" ] && [ "${#first}" -eq 64 ] && { [ "$(uname -s)" != Linux ] || [ "$(stat -c %a "$RUN_DIR/proxy-token")" = 600 ]; }',
+      'bootstrap-test',
+      posix(script),
+    ],
+    { encoding: 'utf8', env: { ...process.env, MONTAGIO_WORKSPACE: posix(workspace) } },
+  );
+  expect(run.status).toBe(0);
+  expect(readFileSync(script, 'utf8')).toContain('--token "$MONTAGIO_PROXY_TOKEN"');
+});
+
 test('the voice node is installed last, once the proxy, the npm dependencies and the env file are in place', () => {
   const text = readFileSync(script, 'utf8');
   expect(text.match(/install_npm; write_env; install_voice_node; install_segment_node/g)).toHaveLength(2);

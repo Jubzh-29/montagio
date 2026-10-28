@@ -9,6 +9,7 @@ import {
   type CommunityEntry,
   type SharedEntry,
 } from '@/lib/community';
+import { withDataWrite } from './data-purge';
 import { getEnv } from './env';
 import { JobError } from './errors';
 import { extensionsInfo } from './extensions';
@@ -143,7 +144,8 @@ async function credits(body: Record<string, unknown>): Promise<{ title: string; 
  * is cleared), with its settings and, for a remixed move, the preset text it was rendered from.
  */
 export async function publishToCommunity(body: Record<string, unknown>): Promise<CommunityEntry | null> {
-  const key = typeof body.historyKey === 'string' ? body.historyKey : '';
+  return withDataWrite(async () => {
+    const key = typeof body.historyKey === 'string' ? body.historyKey : '';
   const item = (await listHistory()).find((entry) => entry.key === key);
   if (!item) return null;
   // A remix of someone else's trend stays with the user: only one of Montagio's own sample is shared.
@@ -183,36 +185,39 @@ export async function publishToCommunity(body: Record<string, unknown>): Promise
     ...(media ? { media } : {}),
     ...(presetFile ? { presetFile } : {}),
   });
+  });
 }
 
 /** A share file someone sent, added to this gallery; it shows the example of its move or effect, when there is one. */
 export async function importShared(shared: SharedEntry): Promise<CommunityEntry> {
-  const shots = (shared.reprise.shots ?? []).map((shot) => shot.prompt);
-  // A remixed move's text is checked whole: its name, its prompts, what it says of itself.
-  await assertAllowedText(shared.title, shared.author, shared.name, shared.reprise.prompt, shared.reprise.motion, ...shots, shared.presetYaml);
-  const id = randomUUID();
-  const example = (await examples()).find(
-    (entry) => (shared.reprise.presetId && entry.reprise.presetId === shared.reprise.presetId) || (shared.reprise.effectId && entry.reprise.effectId === shared.reprise.effectId),
-  );
-  let presetFile: string | undefined;
-  if (shared.presetYaml) {
-    await mkdir(dir(), { recursive: true });
-    presetFile = presetOf(id);
-    await writeFile(presetFile, shared.presetYaml);
-  }
-  return save({
-    id,
-    source: 'imported',
-    title: shared.title,
-    ...(shared.author ? { author: shared.author } : {}),
-    kind: shared.kind,
-    task: shared.task,
-    name: shared.name,
-    ...(example?.previewUrl ? { previewUrl: example.previewUrl } : {}),
-    ...(example?.posterUrl ? { posterUrl: example.posterUrl } : {}),
-    createdAt: new Date().toISOString(),
-    reprise: { ...shared.reprise, ...(presetFile ? { presetUrl: `/api/community/${id}/preset` } : {}) },
-    ...(presetFile ? { presetFile } : {}),
+  return withDataWrite(async () => {
+    const shots = (shared.reprise.shots ?? []).map((shot) => shot.prompt);
+    // A remixed move's text is checked whole: its name, its prompts, what it says of itself.
+    await assertAllowedText(shared.title, shared.author, shared.name, shared.reprise.prompt, shared.reprise.motion, ...shots, shared.presetYaml);
+    const id = randomUUID();
+    const example = (await examples()).find(
+      (entry) => (shared.reprise.presetId && entry.reprise.presetId === shared.reprise.presetId) || (shared.reprise.effectId && entry.reprise.effectId === shared.reprise.effectId),
+    );
+    let presetFile: string | undefined;
+    if (shared.presetYaml) {
+      await mkdir(dir(), { recursive: true });
+      presetFile = presetOf(id);
+      await writeFile(presetFile, shared.presetYaml);
+    }
+    return save({
+      id,
+      source: 'imported',
+      title: shared.title,
+      ...(shared.author ? { author: shared.author } : {}),
+      kind: shared.kind,
+      task: shared.task,
+      name: shared.name,
+      ...(example?.previewUrl ? { previewUrl: example.previewUrl } : {}),
+      ...(example?.posterUrl ? { posterUrl: example.posterUrl } : {}),
+      createdAt: new Date().toISOString(),
+      reprise: { ...shared.reprise, ...(presetFile ? { presetUrl: `/api/community/${id}/preset` } : {}) },
+      ...(presetFile ? { presetFile } : {}),
+    });
   });
 }
 

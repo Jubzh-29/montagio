@@ -1,6 +1,7 @@
 import { ensureTools } from '@montagio/sequence';
 import { fromThisSite } from '@/server/body';
 import { visibleExtensions } from '@/server/extensions';
+import { jobFailureResponse } from '@/server/jobs';
 import { remixSummary, saveRemixSample } from '@/server/remix';
 
 /**
@@ -15,5 +16,11 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: 'ffmpeg-missing' }, { status: 503 });
   }
-  return Response.json(await remixSummary(await saveRemixSample()), { status: 201 });
+  try {
+    return Response.json(await remixSummary(await saveRemixSample()), { status: 201 });
+  } catch (error) {
+    const failure = jobFailureResponse(error);
+    if (failure) return failure;
+    throw error;
+  }
 }

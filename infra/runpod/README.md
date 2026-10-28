@@ -29,6 +29,9 @@ bash infra/runpod/bootstrap.sh collect
 |---|---|---|
 | `MONTAGIO_WORKSPACE` | `/workspace` | where ComfyUI, the venvs, Node.js, the logs and `montagio.env` go (the Modal image sets it too) |
 | `MONTAGIO_RESULTS` | `<repo>/s1-results` | the folder `collect` packs; `smoke.ts` and `fetch-weights.ts` write to `<repo>/s1-results` unless given `--out` |
+| `MONTAGIO_PROXY_TOKEN` | a random 32-byte token, generated once | the proxy's bearer token, kept in `/workspace/run/proxy-token` and `/workspace/montagio.env` with owner-only permissions; set the same value in the app-only install's environment |
+
+The proxy refuses every request without its token, apart from `/api/v2/health`. The token is never printed in the logs. A remote app reaches the loopback proxy through an SSH tunnel, or through HTTPS with the same token; plain HTTP is refused beyond loopback.
 
 Give the pod's volume disk room for the weights: 72.1 GB for the camera presets alone (`--extensions none`), 254 GB for every extension, the default of `fetch-weights` (sizes of the lock, in GB of 10^9 bytes). ComfyUI, its venvs and Node.js come on top.
 

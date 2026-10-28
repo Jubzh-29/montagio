@@ -133,13 +133,16 @@ export function parseArgs(argv: string[]): { command: Command; options: CliOptio
   const proxyUrl = typeof values['proxy-url'] === 'string' ? values['proxy-url'] : null;
   if (proxyUrl !== null) {
     if (!values['app-only']) throw new Error('--proxy-url only goes with --app-only (the full install runs its own proxy)');
-    let protocol = '';
+    let url: URL;
     try {
-      protocol = new URL(proxyUrl).protocol;
+      url = new URL(proxyUrl);
     } catch {
-      protocol = '';
+      throw new Error(`--proxy-url must be an http(s) URL, got "${proxyUrl}"`);
     }
-    if (protocol !== 'http:' && protocol !== 'https:') throw new Error(`--proxy-url must be an http(s) URL, got "${proxyUrl}"`);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error(`--proxy-url must be an http(s) URL, got "${proxyUrl}"`);
+    if (url.protocol === 'http:' && !['localhost', '127.0.0.1', '[::1]', '::1'].includes(url.hostname)) {
+      throw new Error('--proxy-url must use HTTPS beyond loopback; plain HTTP is reserved for a local proxy or SSH tunnel');
+    }
   }
   if (values['low-vram'] && values['app-only']) throw new Error('--low-vram is a profile of the full install, not of --app-only');
   if (values.demo) {

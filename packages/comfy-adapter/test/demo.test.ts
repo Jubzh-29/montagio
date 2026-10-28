@@ -141,8 +141,19 @@ test('local refuses a Comfy-hosted URL', () => {
   expect(() => createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: 'https://cloud.comfy.org' })).toThrow(/refused/);
 });
 
+test('local requires a proxy token before any backend is built', () => {
+  for (const COMFY_BASE_URL of ['http://127.0.0.1:8189', 'https://gpu.example']) {
+    expect(() => createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL })).toThrow(/MONTAGIO_PROXY_TOKEN/);
+  }
+});
+
+test('local refuses cleartext HTTP beyond loopback even with a token', () => {
+  expect(() => createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: 'http://gpu.example', MONTAGIO_PROXY_TOKEN: 'token' })).toThrow(/HTTPS/);
+  expect(createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: 'https://gpu.example', MONTAGIO_PROXY_TOKEN: 'token' }).kind).toBe('local');
+});
+
 test('local builds the Comfy backend', () => {
-  expect(createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: 'http://127.0.0.1:8189' }).kind).toBe('local');
+  expect(createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: 'http://127.0.0.1:8189', MONTAGIO_PROXY_TOKEN: 'token' }).kind).toBe('local');
 });
 
 test('local keeps its clips under <MONTAGIO_DATA>/comfy-outputs, else under <MONTAGIO_ROOT>/data/comfy-outputs', async () => {
@@ -151,7 +162,7 @@ test('local keeps its clips under <MONTAGIO_DATA>/comfy-outputs, else under <MON
   try {
     fake.assets.set('clip', { bytes: Buffer.from('clip'), contentType: 'video/mp4', filePath: 'Montagio_00001.mp4' });
     const outputPath = async (env: Record<string, string>) => {
-      const b = createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: fake.url, ...env });
+      const b = createBackend({ MONTAGIO_BACKEND: 'local', COMFY_BASE_URL: fake.url, MONTAGIO_PROXY_TOKEN: 'test-token', ...env });
       const workflow = { '2': { class_type: 'SaveVideo', inputs: {} } };
       const { backendJobId: id } = await b.submit({ workflow, presetId: 'p', idempotencyKey: randomUUID() });
       const outputs = [{ node_id: '2', name: 'Montagio_00001.mp4', type: 'video', content_type: 'video/mp4', assetId: 'clip' }];

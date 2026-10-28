@@ -4,7 +4,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BackendError, ComfyBackend, createBackend, IDEMPOTENCY_WINDOW_MS, isBackendError, type SubmitJob } from '../src/index';
+import { BackendError, ComfyBackend, createBackend, IDEMPOTENCY_WINDOW_MS, isBackendError, RemotePurgeError, type SubmitJob } from '../src/index';
 import { startFakeProxy, type FakeJobState, type FakeProxy } from '../src/testing/fake-proxy';
 
 const sample = fileURLToPath(new URL('../../../demo-assets/images/sample-16x9.png', import.meta.url));
@@ -585,4 +585,37 @@ test('the fake proxy gives a SaveText workflow a file output with the words it w
   for (let i = 0; i < 3; i++) await b.get(id);
   expect(fake.jobs.get(id)!.outputs).toEqual([expect.objectContaining({ node_id: '3', type: 'file', content_type: 'application/json' })]);
   expect(readFileSync(join(outputsDir, `${id}.json`), 'utf8')).toBe('{"schema":"montagio/words@1"}');
+});
+
+
+async function submittedWithOutput(): Promise<{ backend: ComfyBackend; id: string }> {
+  const b = backend();
+  const { backendJobId: id } = await b.submit(job());
+  fake.setJob(id, { status: 'succeeded', outputs: [output('Montagio_00001.mp4', 'video', 'video/mp4')] });
+  return { backend: b, id };
+}
+
+test('purge deletes every input and output asset once and ignores missing jobs', async () => {
+  const { backend: b, id } = await submittedWithOutput();
+  await b.purge([id, id, 'missing-job']);
+  expect([...fake.assets.keys()]).toEqual([]);
+  const deletions = fake.requests.filter((request) => request.method === 'DELETE');
+  expect(deletions).toHaveLength(2);
+  expect(new Set(deletions.map((request) => request.path)).size).toBe(2);
+});
+
+test.each([405, 500])('purge refuses to continue after a delete HTTP %s', async (status) => {
+  const { backend: b, id } = await submittedWithOutput();
+  fake.rejectNextDelete(status);
+  await expect(b.purge([id])).rejects.toBeInstanceOf(RemotePurgeError);
+});
+
+test('purge wraps a proxy network failure', async () => {
+  const { backend: b, id } = await submittedWithOutput();
+  await fake.close();
+  await expect(b.purge([id])).rejects.toBeInstanceOf(RemotePurgeError);
+});
+
+test('demo purge has no remote assets to delete', async () => {
+  await expect(createBackend({}).purge([])).resolves.toBeUndefined();
 });

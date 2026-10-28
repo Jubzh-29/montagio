@@ -1,5 +1,6 @@
 import { MAX_REQUEST_BYTES } from '@/lib/limits';
 import { readJsonBody } from './body';
+import { withDataWrite } from './data-purge';
 import { jobFailureResponse, jobs, jobSummary, type JobTask } from './jobs';
 
 /**
@@ -16,7 +17,7 @@ export function jobCreationRoute(task: JobTask, fromParams?: (params: Record<str
     // The URL's own ids win over the body's (/api/sequences/:id/music names its film).
     const body = fromParams && context ? { ...sent, ...fromParams(await context.params) } : sent;
     try {
-      const { record, created } = await jobs.create(task, body, idempotencyKey.slice(0, 200));
+      const { record, created } = await withDataWrite(() => jobs.create(task, body, idempotencyKey.slice(0, 200)));
       return Response.json(jobSummary(record), { status: created ? 201 : 200 });
     } catch (error) {
       const failure = jobFailureResponse(error);

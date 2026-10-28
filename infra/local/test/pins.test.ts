@@ -33,6 +33,16 @@ test('readVersions takes every pin from infra/runpod/versions.env', () => {
   expect(versions.torchFallback).toEqual({ torch: '2.11.0', torchvision: '0.26.0', cuda: 'cu128', minDriverCuda: [12, 8] });
 });
 
+test('the pinned yt-dlp carries the 2026.10.26 security fixes', () => {
+  expect(readVersions(repoRoot).ytDlp).toEqual({
+    version: '2026.10.26',
+    sha256: {
+      windows: 'f5389d3698ecde4ef06f4e6b1ce0294fe9ac1396228c8990b8d3416d6d177a7d',
+      linux: '767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795',
+    },
+  });
+});
+
 test('a missing pin is named in the error', async () => {
   const { versionsFrom } = await import('../src/pins.ts');
   expect(() => versionsFrom({ COMFYUI_REPO: 'r', COMFYUI_TAG: 't' })).toThrow(/COMFYUI_COMMIT/);

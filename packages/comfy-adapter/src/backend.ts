@@ -39,8 +39,13 @@ export type SubmitJob = {
   outputNode?: string;
 };
 
+export class RemotePurgeError extends Error {
+  override name = 'RemotePurgeError';
+}
+
 export interface GenerationBackend {
   readonly kind: BackendKind;
+  readonly origin?: string;
   submit(job: SubmitJob): Promise<{ backendJobId: string }>;
   /**
    * `want` names the output to deliver; without it, a backend uses what the job
@@ -48,4 +53,5 @@ export interface GenerationBackend {
    */
   get(backendJobId: string, want?: OutputWanted): Promise<BackendJob>;
   cancel(backendJobId: string): Promise<void>;
+  purge(backendJobIds: readonly string[]): Promise<void>;
 }

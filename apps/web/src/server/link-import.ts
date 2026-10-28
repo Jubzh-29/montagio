@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { withDataWrite } from './data-purge';
 import { getEnv } from './env';
 import { REMIX_MAX_S, saveRemixSource, type RemixSound, type RemixSourceMeta } from './remix';
 
@@ -188,26 +189,30 @@ export async function downloadLink(url: string, dir: string, run: YtDlpRun = run
 const holder = globalThis as typeof globalThis & { __montagioLinkImport?: { busy: boolean } };
 const importing = (holder.__montagioLinkImport ??= { busy: false });
 
+export const linkImportBusy = (): boolean => importing.busy;
+
 /**
  * A trend imported from a link: checked, fetched by yt-dlp into a folder of its own, prepared as a file
  * sent is, with the link and the sound its platform names kept beside it (shown to the user, never put
  * in a recipe). The folder is removed whatever happens.
  */
 export async function importLink(raw: unknown, run: YtDlpRun = runYtDlp): Promise<RemixSourceMeta> {
-  const checked = checkImportLink(raw);
-  if (!checked.ok) throw new LinkImportError(checked.reason);
-  if (importing.busy) throw new LinkImportError('link-busy');
-  importing.busy = true;
-  let dir: string | undefined;
-  try {
-    // A fresh install has no data folder yet.
-    await mkdir(getEnv().data, { recursive: true });
-    dir = await mkdtemp(join(getEnv().data, 'remix-link-'));
-    const { file, info } = await downloadLink(checked.url, dir, run);
-    const sound = soundOf(info, checked.platform);
-    return await saveRemixSource(file, 'link', { link: { url: checked.url, host: checked.host }, ...(sound ? { sound } : {}) });
-  } finally {
-    importing.busy = false;
-    if (dir) await rm(dir, { recursive: true, force: true });
-  }
+  return withDataWrite(async () => {
+    const checked = checkImportLink(raw);
+    if (!checked.ok) throw new LinkImportError(checked.reason);
+    if (importing.busy) throw new LinkImportError('link-busy');
+    importing.busy = true;
+    let dir: string | undefined;
+    try {
+      // A fresh install has no data folder yet.
+      await mkdir(getEnv().data, { recursive: true });
+      dir = await mkdtemp(join(getEnv().data, 'remix-link-'));
+      const { file, info } = await downloadLink(checked.url, dir, run);
+      const sound = soundOf(info, checked.platform);
+      return await saveRemixSource(file, 'link', { link: { url: checked.url, host: checked.host }, ...(sound ? { sound } : {}) });
+    } finally {
+      importing.busy = false;
+      if (dir) await rm(dir, { recursive: true, force: true });
+    }
+  });
 }

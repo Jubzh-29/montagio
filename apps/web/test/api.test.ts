@@ -100,6 +100,17 @@ describe('uploads', () => {
     expect(await res.json()).toMatchObject({ width: 4000, height: 6000, aspect: '9:16' });
   });
 
+  test('an uploaded JPEG is stored only as normalized PNG pixels, without its EXIF', async () => {
+    const source = jpegWithOrientation(64, 32, 6);
+    const res = await postUpload(uploadRequest(source));
+    expect(res.status).toBe(200);
+    const result = (await res.json()) as { imageRef: string; width: number; height: number };
+    expect(result).toMatchObject({ imageRef: expect.stringMatching(/\.png$/), width: 32, height: 64 });
+    const stored = readFileSync(join(dataDir(), 'uploads', result.imageRef.split('/').at(-1)!));
+    expect(stored.equals(Buffer.from(await source.arrayBuffer()))).toBe(false);
+    expect(stored.includes(Buffer.from('Exif'))).toBe(false);
+  });
+
   test('an unrotated landscape JPEG keeps its size', async () => {
     const res = await postUpload(uploadRequest(jpegWithOrientation(4032, 3024, 1)));
     expect(await res.json()).toMatchObject({ width: 4032, height: 3024, aspect: '1:1' });
@@ -243,10 +254,10 @@ describe('generations', () => {
   }, 30_000);
 
   test('a missing FFmpeg is refused before any render, and the server log says why', async () => {
+    const imageRef = await uploadedImageRef();
     process.env.MONTAGIO_FFMPEG = 'ffmpeg-does-not-exist';
     const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      const imageRef = await uploadedImageRef();
       const res = await postGenerations(generationRequest({ presetId: 'crash-push', imageRef }, 'noff'));
       expect(res.status).toBe(503);
       expect(await res.json()).toEqual({ error: 'ffmpeg-missing' });

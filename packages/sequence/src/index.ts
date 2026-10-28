@@ -49,3 +49,4 @@ export {
 } from './ffmpeg';
 export { AI_AUDIO_METADATA, AI_IMAGE_METADATA, DEMO_MOVE_METADATA, metadataArgs, PLACEHOLDER_METADATA, RECIPE_TAG, type VideoTags } from './tags';
 export { ImageTagError, readImageTags, tagImage } from './image-tags';
+export { MAX_IMAGE_PIXELS, MAX_NORMALIZED_IMAGE_BYTES, normalizeUploadedImage } from './image-upload';

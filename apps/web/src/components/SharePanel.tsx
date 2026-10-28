@@ -160,6 +160,7 @@ export function SharePanel({
               </button>
             </div>
             <p className={styles.hint}>{t('shareAiNote')}</p>
+            {!IS_SHOWCASE && <p className={styles.hint}>{t('exportRecipeNotice')}</p>}
           </div>
           {download && (
             <figure className={`${captions.frame} ${share.frame}`}>

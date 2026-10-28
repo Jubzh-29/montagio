@@ -2,6 +2,7 @@ import { ensureTools } from '@montagio/sequence';
 import { MAX_REQUEST_BYTES } from '@/lib/limits';
 import { fromThisSite, readJsonBody } from '@/server/body';
 import { visibleExtensions } from '@/server/extensions';
+import { jobFailureResponse } from '@/server/jobs';
 import { importLink, LINK_IMPORT_STATUS, LinkImportError, linkImportOffered, ytDlpVersion } from '@/server/link-import';
 import { remixSummary } from '@/server/remix';
 import { UploadError } from '@/server/uploads';
@@ -47,6 +48,8 @@ export async function POST(request: Request) {
       return Response.json({ error: error.code }, { status: LINK_IMPORT_STATUS[error.code] });
     }
     if (error instanceof UploadError) return Response.json({ error: 'invalid-input' }, { status: 400 });
+    const failure = jobFailureResponse(error);
+    if (failure) return failure;
     throw error;
   }
 }

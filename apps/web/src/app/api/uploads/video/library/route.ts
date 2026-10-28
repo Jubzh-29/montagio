@@ -3,6 +3,7 @@ import { MAX_REQUEST_BYTES } from '@/lib/limits';
 import { fromThisSite, readJsonBody } from '@/server/body';
 import { visibleExtensions } from '@/server/extensions';
 import { mediaUrlFor } from '@/server/generations';
+import { jobFailureResponse } from '@/server/jobs';
 import { libraryMotionPath, libraryMotions } from '@/server/motions';
 import { videoPath } from '@/server/tasks/files';
 import { saveLibraryVideo } from '@/server/uploads';
@@ -25,7 +26,9 @@ export async function POST(request: Request) {
   try {
     const meta = await saveLibraryVideo(libraryMotionPath(motion.id));
     return Response.json({ ...meta, url: mediaUrlFor(videoPath(meta.videoRef)) }, { status: 201 });
-  } catch {
+  } catch (error) {
+    const failure = jobFailureResponse(error);
+    if (failure) return failure;
     return Response.json({ error: 'not-found' }, { status: 404 });
   }
 }

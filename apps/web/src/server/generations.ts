@@ -6,6 +6,7 @@ import { compileJob, CompileError, validatePreset, type Preset } from '@montagio
 import { DEMO_MOVE_METADATA, ensureTools, probe, tagClip } from '@montagio/sequence';
 import { MAX_PRESET_YAML_BYTES, MAX_REQUEST_BYTES } from '@/lib/limits';
 import { demoExampleModel, demoKindOf } from './demo-render';
+import { withDataWrite } from './data-purge';
 import { getEnv } from './env';
 import { assertAllowedText } from './guards';
 import { slotsOf } from './inputs';
@@ -87,7 +88,7 @@ const taggedClips = (holder.__montagioTaggedClips ??= new Map());
 export async function createGeneration(input: CreateGenerationInput): Promise<CreateResult> {
   const pending = inflight.get(input.idempotencyKey);
   if (pending) return { record: (await pending).record, created: false };
-  const creation = createGenerationOnce(input).finally(() => inflight.delete(input.idempotencyKey));
+  const creation = withDataWrite(() => createGenerationOnce(input)).finally(() => inflight.delete(input.idempotencyKey));
   inflight.set(input.idempotencyKey, creation);
   return creation;
 }
@@ -180,6 +181,7 @@ async function createGenerationOnce(input: CreateGenerationInput): Promise<Creat
     state: 'queued',
     progress: 0,
     backendKind: backend.kind,
+    backendOrigin: backend.origin,
     backendJobId,
     idempotencyKey: input.idempotencyKey,
     createdAt: now,

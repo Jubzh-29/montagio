@@ -10,6 +10,7 @@ import { canReproduce, historyFilter, historyName, historySubject, repriseHref, 
 import { refusalMessageKey } from '@/lib/refusals';
 import { useMotionPaused } from '@/lib/use-motion';
 import { Header } from './Header';
+import { PurgeDataControl } from './PurgeDataControl';
 import { RecipePanel } from './RecipePanel';
 import { ShowcaseFooter } from './ShowcaseFooter';
 import styles from './history.module.css';
@@ -206,6 +207,8 @@ export function HistoryPage() {
       <main id="content" tabIndex={-1} className={styles.page}>
         <h1 className={styles.title}>{t('historyTitle')}</h1>
         {IS_SHOWCASE && <p className={styles.note}>{t('historyShowcaseNote')}</p>}
+        {!IS_SHOWCASE && items && items.length > 0 && <p className={styles.note}>{t('exportRecipeNotice')}</p>}
+        {!IS_SHOWCASE && <PurgeDataControl onPurged={() => setItems([])} />}
         {items && items.length > 0 && (
           <div className={styles.filters} role="group" aria-label={t('historyTitle')}>
             {FILTERS.map(([value, key]) => (

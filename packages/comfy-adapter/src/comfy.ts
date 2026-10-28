@@ -18,6 +18,7 @@ import {
   type OutputKind,
   type OutputWanted,
   type SubmitJob,
+  RemotePurgeError,
 } from './backend';
 import { BackendError } from './errors';
 import { assertLocalBaseUrl, guardFetch } from './target';
@@ -63,6 +64,21 @@ function buildClient(base: string, build: () => Comfy): Comfy {
 
 const describe = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+function collectAssetIds(value: unknown, ids: Set<string>): void {
+  if (Array.isArray(value)) {
+    for (const item of value) collectAssetIds(item, ids);
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
+  const record = value as Record<string, unknown>;
+  if (record.__type === 'core/ASSET') {
+    const info = record.info as { id?: unknown } | undefined;
+    if (typeof info?.id === 'string') ids.add(info.id);
+    return;
+  }
+  for (const item of Object.values(record)) collectAssetIds(item, ids);
+}
+
 /**
  * The result of a finished job: an output of `kind`, from `node` first when it is given.
  * comfy-api-proxy types an output by ComfyUI's UI key: audio and images keep their kind
@@ -88,6 +104,7 @@ function pickOutput(outputs: Output[], kind: OutputKind, node?: string): Output 
  */
 export class ComfyBackend implements GenerationBackend {
   readonly kind = 'local' as const;
+  readonly origin: string;
   private readonly client: Comfy;
   /** Submits by idempotency key, kept for the idempotency window and no longer. */
   private readonly submissions = new Map<string, { at: number; pending: Promise<{ backendJobId: string }> }>();
@@ -111,6 +128,7 @@ export class ComfyBackend implements GenerationBackend {
     },
   ) {
     const target = assertLocalBaseUrl(opts.baseUrl);
+    this.origin = target.url.origin;
     this.client = buildClient(target.base, () => new Comfy({ fetch: guardFetch(target.url, opts.fetch, opts.token), clientInfo: 'montagio/0.1' }));
   }
 
@@ -239,6 +257,32 @@ export class ComfyBackend implements GenerationBackend {
       await rm(partial, { force: true });
     }
     return target;
+  }
+
+  async purge(backendJobIds: readonly string[]): Promise<void> {
+    for (const id of new Set(backendJobIds)) {
+      let job: Job;
+      try {
+        job = await this.client.jobs.get(id);
+      } catch (error) {
+        if (error instanceof NotFound) continue;
+        throw new RemotePurgeError('the remote jobs could not be read');
+      }
+      const assetIds = new Set(job.outputs.map((output) => output.id));
+      try {
+        collectAssetIds(await job.getWorkflow(), assetIds);
+      } catch {
+        throw new RemotePurgeError('a remote workflow could not be read');
+      }
+      for (const assetId of assetIds) {
+        try {
+          await this.client.assets.delete(assetId);
+        } catch (error) {
+          if (error instanceof NotFound) continue;
+          throw new RemotePurgeError('a remote asset could not be deleted');
+        }
+      }
+    }
   }
 
   async cancel(id: string): Promise<void> {
