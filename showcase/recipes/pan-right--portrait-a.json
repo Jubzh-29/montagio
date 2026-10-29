@@ -1,0 +1,625 @@
+{
+  "schema": "montagio/recipe@1",
+  "kind": "clip",
+  "task": "camera",
+  "name": "Pan Right",
+  "createdAt": "2026-10-24",
+  "backend": "local",
+  "seed": 7,
+  "preset": {
+    "id": "pan-right",
+    "remix": false,
+    "sha256": "c23ebf91f91f36af66e722cc5f4859dbdaa0378cd70bf4e5d2a332f7f155c1fa"
+  },
+  "presetYaml": "# Checked on a GPU in session S2 (2026-10-21, L4): clean once a description of the photo comes before this text (docs/S2_RESULTATS.md).\nschema: montagio/preset@0.1\nid: pan-right\nname: Pan Right\ndescription: Smooth lateral move to the right.\npreview: previews/pan-right.mp4\nlicense: CC-BY-4.0\nauthor: montagio-community\ncapability: i2v-camera\ncamera:\n  poses: [pan_right]\n  speed: 1.0\nprompt:\n  suffix: \"smooth lateral camera move to the right, cinematic tracking shot\"\n  negative: \"blurry, distorted, warped faces, extra limbs, flicker, low quality\"\ndefaults:\n  duration_s: 5\n  resolution: 480p\n  fps: 16\nmodels:\n  preferred: wan22-i2v-a14b-fun-camera\n  fallback: wan22-ti2v-5b\n# Quality (20 steps) by default: a sideways move, like Pan Left whose 4 steps double a person into a ghost (GPU session of 2026-10-25).\n",
+  "reprise": {
+    "tab": "camera",
+    "presetId": "pan-right",
+    "modelId": "wan22-i2v-a14b-fun-camera",
+    "prompt": "A fictional young woman in a bright yellow raincoat standing still on a rainy city street at night, neon signs and reflections on the wet pavement behind her, full body, looking at the camera. She stays in place in the center of the frame and does not walk away.",
+    "seed": 7
+  },
+  "request": {
+    "route": "/api/generations",
+    "body": {
+      "presetId": "pan-right",
+      "modelId": "wan22-i2v-a14b-fun-camera",
+      "userPrompt": "A fictional young woman in a bright yellow raincoat standing still on a rainy city street at night, neon signs and reflections on the wet pavement behind her, full body, looking at the camera. She stays in place in the center of the frame and does not walk away.",
+      "negative": "blurry, distorted, warped faces, extra limbs, flicker, low quality, person walking away, person leaving the frame, empty street, ghosting, morphing, deformed hands",
+      "seed": 7
+    },
+    "files": [
+      {
+        "field": "imageRef",
+        "sha256": "13d5854580e4abd862791126cbcf262557173e9721376bb2cbf266fc2160d6e7"
+      }
+    ],
+    "then": [
+      {
+        "route": "/api/generations/:parent/upscale",
+        "body": {
+          "smooth": false,
+          "seed": 42
+        },
+        "files": []
+      }
+    ]
+  },
+  "steps": [
+    {
+      "name": "camera",
+      "workflow": {
+        "91": {
+          "class_type": "VAELoader",
+          "inputs": {
+            "vae_name": "wan_2.1_vae.safetensors"
+          }
+        },
+        "92": {
+          "class_type": "UNETLoader",
+          "inputs": {
+            "unet_name": "wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors",
+            "weight_dtype": "default"
+          }
+        },
+        "95": {
+          "class_type": "UNETLoader",
+          "inputs": {
+            "unet_name": "wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors",
+            "weight_dtype": "default"
+          }
+        },
+        "96": {
+          "class_type": "CLIPLoader",
+          "inputs": {
+            "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+            "type": "wan",
+            "device": "default"
+          }
+        },
+        "97": {
+          "class_type": "LoadImage",
+          "inputs": {
+            "image": "<imageRef>"
+          }
+        },
+        "98": {
+          "class_type": "WanCameraImageToVideo",
+          "inputs": {
+            "width": [
+              "108",
+              1
+            ],
+            "height": [
+              "108",
+              2
+            ],
+            "length": [
+              "108",
+              3
+            ],
+            "batch_size": 1,
+            "positive": [
+              "107",
+              0
+            ],
+            "negative": [
+              "99",
+              0
+            ],
+            "vae": [
+              "91",
+              0
+            ],
+            "start_image": [
+              "97",
+              0
+            ],
+            "camera_conditions": [
+              "108",
+              0
+            ]
+          }
+        },
+        "99": {
+          "class_type": "CLIPTextEncode",
+          "inputs": {
+            "text": "blurry, distorted, warped faces, extra limbs, flicker, low quality, person walking away, person leaving the frame, empty street, ghosting, morphing, deformed hands",
+            "clip": [
+              "96",
+              0
+            ]
+          }
+        },
+        "100": {
+          "class_type": "ModelSamplingSD3",
+          "inputs": {
+            "shift": 8,
+            "model": [
+              "92",
+              0
+            ]
+          }
+        },
+        "101": {
+          "class_type": "ModelSamplingSD3",
+          "inputs": {
+            "shift": 8,
+            "model": [
+              "95",
+              0
+            ]
+          }
+        },
+        "102": {
+          "class_type": "KSamplerAdvanced",
+          "inputs": {
+            "add_noise": "enable",
+            "noise_seed": 7,
+            "steps": 20,
+            "cfg": 3.5,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "start_at_step": 0,
+            "end_at_step": 10,
+            "return_with_leftover_noise": "enable",
+            "model": [
+              "100",
+              0
+            ],
+            "positive": [
+              "98",
+              0
+            ],
+            "negative": [
+              "98",
+              1
+            ],
+            "latent_image": [
+              "98",
+              2
+            ]
+          }
+        },
+        "103": {
+          "class_type": "KSamplerAdvanced",
+          "inputs": {
+            "add_noise": "disable",
+            "noise_seed": 0,
+            "steps": 20,
+            "cfg": 3.5,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "start_at_step": 10,
+            "end_at_step": 10000,
+            "return_with_leftover_noise": "disable",
+            "model": [
+              "101",
+              0
+            ],
+            "positive": [
+              "98",
+              0
+            ],
+            "negative": [
+              "98",
+              1
+            ],
+            "latent_image": [
+              "102",
+              0
+            ]
+          }
+        },
+        "104": {
+          "class_type": "VAEDecode",
+          "inputs": {
+            "samples": [
+              "103",
+              0
+            ],
+            "vae": [
+              "91",
+              0
+            ]
+          }
+        },
+        "105": {
+          "class_type": "CreateVideo",
+          "inputs": {
+            "fps": 16,
+            "images": [
+              "104",
+              0
+            ]
+          }
+        },
+        "106": {
+          "class_type": "SaveVideo",
+          "inputs": {
+            "filename_prefix": "montagio/clip",
+            "format": "mp4",
+            "format.codec": "h264",
+            "video": [
+              "105",
+              0
+            ]
+          }
+        },
+        "107": {
+          "class_type": "CLIPTextEncode",
+          "inputs": {
+            "text": "A fictional young woman in a bright yellow raincoat standing still on a rainy city street at night, neon signs and reflections on the wet pavement behind her, full body, looking at the camera. She stays in place in the center of the frame and does not walk away., smooth lateral camera move to the right, cinematic tracking shot",
+            "clip": [
+              "96",
+              0
+            ]
+          }
+        },
+        "108": {
+          "class_type": "WanCameraEmbedding",
+          "inputs": {
+            "camera_pose": "Pan Right",
+            "width": 480,
+            "height": 832,
+            "length": 81,
+            "speed": 1,
+            "fx": 0.5,
+            "fy": 0.5,
+            "cx": 0.5,
+            "cy": 0.5
+          }
+        }
+      },
+      "workflowSha256": "79ebca3d88f0e8d88f19555f8f62ab3210f0609255d0376e9fec9b6076bb633d",
+      "inputs": [
+        {
+          "node": "97",
+          "field": "image",
+          "from": "imageRef",
+          "sha256": "13d5854580e4abd862791126cbcf262557173e9721376bb2cbf266fc2160d6e7"
+        }
+      ],
+      "settings": {
+        "seeds": [
+          7,
+          0
+        ],
+        "texts": [
+          "blurry, distorted, warped faces, extra limbs, flicker, low quality, person walking away, person leaving the frame, empty street, ghosting, morphing, deformed hands",
+          "A fictional young woman in a bright yellow raincoat standing still on a rainy city street at night, neon signs and reflections on the wet pavement behind her, full body, looking at the camera. She stays in place in the center of the frame and does not walk away., smooth lateral camera move to the right, cinematic tracking shot"
+        ],
+        "steps": 20,
+        "cfg": 3.5,
+        "fps": 16,
+        "width": 480,
+        "height": 832,
+        "frames": 81
+      }
+    },
+    {
+      "name": "upscale",
+      "workflow": {
+        "48": {
+          "class_type": "VAEEncodeTiled",
+          "inputs": {
+            "tile_size": 512,
+            "overlap": 128,
+            "temporal_size": 64,
+            "temporal_overlap": 8,
+            "pixels": [
+              "58",
+              0
+            ],
+            "vae": [
+              "51",
+              0
+            ]
+          }
+        },
+        "51": {
+          "class_type": "VAELoader",
+          "inputs": {
+            "vae_name": "seedvr2_ema_vae_fp16.safetensors"
+          }
+        },
+        "52": {
+          "class_type": "UNETLoader",
+          "inputs": {
+            "unet_name": "seedvr2_3b_int8_convrot.safetensors",
+            "weight_dtype": "default"
+          }
+        },
+        "54": {
+          "class_type": "KSampler",
+          "inputs": {
+            "seed": 42,
+            "steps": 1,
+            "cfg": 1,
+            "sampler_name": "euler",
+            "scheduler": "simple",
+            "denoise": 1,
+            "model": [
+              "52",
+              0
+            ],
+            "positive": [
+              "61",
+              0
+            ],
+            "negative": [
+              "61",
+              1
+            ],
+            "latent_image": [
+              "99",
+              0
+            ]
+          }
+        },
+        "55": {
+          "class_type": "VAEDecodeTiled",
+          "inputs": {
+            "tile_size": 512,
+            "overlap": 128,
+            "temporal_size": 64,
+            "temporal_overlap": 8,
+            "samples": [
+              "100",
+              0
+            ],
+            "vae": [
+              "51",
+              0
+            ]
+          }
+        },
+        "57": {
+          "class_type": "ResizeImageMaskNode",
+          "inputs": {
+            "input": [
+              "74",
+              0
+            ],
+            "resize_type": "scale dimensions",
+            "resize_type.width": 1080,
+            "resize_type.height": 1920,
+            "resize_type.crop": "center",
+            "scale_method": "lanczos"
+          }
+        },
+        "58": {
+          "class_type": "SeedVR2Preprocess",
+          "inputs": {
+            "resized_images": [
+              "57",
+              0
+            ]
+          }
+        },
+        "59": {
+          "class_type": "SeedVR2PostProcessing",
+          "inputs": {
+            "images": [
+              "55",
+              0
+            ],
+            "original_resized_images": [
+              "57",
+              0
+            ],
+            "color_correction_method": "lab"
+          }
+        },
+        "61": {
+          "class_type": "SeedVR2Conditioning",
+          "inputs": {
+            "model": [
+              "52",
+              0
+            ],
+            "vae_conditioning": [
+              "99",
+              0
+            ]
+          }
+        },
+        "73": {
+          "class_type": "LoadVideo",
+          "inputs": {
+            "file": "<step:0>"
+          }
+        },
+        "74": {
+          "class_type": "GetVideoComponents",
+          "inputs": {
+            "video": [
+              "73",
+              0
+            ]
+          }
+        },
+        "75": {
+          "class_type": "CreateVideo",
+          "inputs": {
+            "images": [
+              "59",
+              0
+            ],
+            "fps": [
+              "74",
+              2
+            ],
+            "audio": [
+              "74",
+              1
+            ],
+            "bit_depth": [
+              "74",
+              3
+            ],
+            "color_space": "sRGB"
+          }
+        },
+        "76": {
+          "class_type": "SaveVideo",
+          "inputs": {
+            "video": [
+              "75",
+              0
+            ],
+            "filename_prefix": "montagio/upscale",
+            "format": "mp4",
+            "format.codec": "h264"
+          }
+        },
+        "99": {
+          "class_type": "SeedVR2TemporalChunk",
+          "inputs": {
+            "latent": [
+              "48",
+              0
+            ],
+            "temporal_overlap": 3,
+            "chunking_mode": "manual",
+            "chunking_mode.frames_per_chunk": 33
+          }
+        },
+        "100": {
+          "class_type": "SeedVR2TemporalMerge",
+          "inputs": {
+            "latents": [
+              "54",
+              0
+            ],
+            "temporal_overlap": [
+              "99",
+              1
+            ]
+          }
+        }
+      },
+      "workflowSha256": "71d4ba4e47c32296f248fd0afa5106750ac824ce8e6d6dd4a5e974cd242515ae",
+      "inputs": [
+        {
+          "node": "73",
+          "field": "file",
+          "from": "step:0",
+          "sha256": "64fbd077dfa6df2638f99ca6044913dac13ce64c7d87d37cffa586325dc9b6b1"
+        }
+      ],
+      "settings": {
+        "seeds": [
+          42
+        ],
+        "texts": [],
+        "steps": 1,
+        "cfg": 1
+      }
+    }
+  ],
+  "post": [
+    "showcase-encode"
+  ],
+  "models": [
+    {
+      "id": "wan22-i2v-a14b-fun-camera",
+      "name": "Wan 2.2 Fun Camera",
+      "license": "Apache-2.0"
+    },
+    {
+      "id": "seedvr2-upscale",
+      "name": "SeedVR2 3B (1080p upscale)",
+      "license": "Apache-2.0"
+    }
+  ],
+  "weights": [
+    {
+      "id": "wan22-fun-camera-high",
+      "file": "wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors",
+      "sha256": "89a99cb5ab29e388f2e24fddac48eab4d88ca339d236c7a8d96aabacd0f525ae",
+      "size": 15301408048,
+      "license": "Apache-2.0",
+      "source": "https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_fun_camera_high_noise_14B_fp8_scaled.safetensors",
+      "modelId": "wan22-i2v-a14b-fun-camera"
+    },
+    {
+      "id": "wan22-fun-camera-low",
+      "file": "wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors",
+      "sha256": "a2b7b361e3fad907958aa6ad662a3673bad5ffdce14706cffde4baabb98f9020",
+      "size": 15301408048,
+      "license": "Apache-2.0",
+      "source": "https://huggingface.co/alibaba-pai/Wan2.2-Fun-A14B-Control-Camera",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged/resolve/main/split_files/diffusion_models/wan2.2_fun_camera_low_noise_14B_fp8_scaled.safetensors",
+      "modelId": "wan22-i2v-a14b-fun-camera"
+    },
+    {
+      "id": "umt5-xxl-fp8",
+      "file": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "sha256": "c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68",
+      "size": 6735906897,
+      "license": "Apache-2.0",
+      "source": "https://huggingface.co/google/umt5-xxl",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "modelId": "wan22-i2v-a14b-fun-camera"
+    },
+    {
+      "id": "wan21-vae",
+      "file": "wan_2.1_vae.safetensors",
+      "sha256": "2fc39d31359a4b0a64f55876d8ff7fa8d780956ae2cb13463b0223e15148976b",
+      "size": 253815318,
+      "license": "Apache-2.0",
+      "source": "https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P",
+      "url": "https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors",
+      "modelId": "wan22-i2v-a14b-fun-camera"
+    },
+    {
+      "id": "seedvr2-3b-int8",
+      "file": "seedvr2_3b_int8_convrot.safetensors",
+      "sha256": "c3dec8bcc5916843a8a858572970597462e1f2dc598d6dfd818f6cd40f53a157",
+      "size": 3458259704,
+      "license": "Apache-2.0",
+      "source": "https://huggingface.co/ByteDance-Seed/SeedVR2-3B",
+      "url": "https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/diffusion_models/seedvr2_3b_int8_convrot.safetensors",
+      "modelId": "seedvr2-upscale"
+    },
+    {
+      "id": "seedvr2-vae",
+      "file": "seedvr2_ema_vae_fp16.safetensors",
+      "sha256": "20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1",
+      "size": 501324814,
+      "license": "Apache-2.0",
+      "source": "https://huggingface.co/ByteDance-Seed/SeedVR2-3B",
+      "url": "https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/vae/seedvr2_ema_vae_fp16.safetensors",
+      "modelId": "seedvr2-upscale"
+    }
+  ],
+  "stack": {
+    "montagio": {
+      "version": "0.1.0",
+      "commit": "f510b26313bf0afbac02e7457654b19a7807f881"
+    },
+    "comfyui": {
+      "tag": "v0.41.0",
+      "commit": "98cc0bf84b7cb1383654c5b402e7612d875d6d22"
+    },
+    "proxy": "0.1.6",
+    "nodes": [
+      {
+        "name": "montagio",
+        "version": "0.1.0"
+      },
+      {
+        "name": "ComfyUI-Chatterbox",
+        "repo": "https://github.com/wildminder/ComfyUI-Chatterbox.git",
+        "commit": "4597af8f59d4460d441e13533eae24b092e40952"
+      },
+      {
+        "name": "ComfyUI-segment-anything-2",
+        "repo": "https://github.com/kijai/ComfyUI-segment-anything-2.git",
+        "commit": "0c35fff5f382803e2310103357b5e985f5437f32"
+      }
+    ]
+  }
+}

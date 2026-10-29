@@ -1,0 +1,8 @@
+:HL["/montagio/_next/static/chunks/011pd41c0qstr.css","style"]
+:HL["/montagio/_next/static/media/797e433ab948586e-s.p.0r6juujl39pe6.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/montagio/_next/static/media/caa3a2e1cccd8315-s.p.0wgildi0cnwt9.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
+:HL["/montagio/_next/static/chunks/0mwixmd95_brf.css","style"]
+:HL["/montagio/_next/static/chunks/3u9ku3-8rce2c.css","style"]
+2:[["children",{"s":"__PAGE__","h":160}]]
+1:[["children",{"s":"open-stack","h":96,"c":"$Q2"}]]
+0:{"b":"ifrLKdiTDXwiNnVbRp6G1","t":{"t":{"s":"","h":80,"c":"$Q1"}}}

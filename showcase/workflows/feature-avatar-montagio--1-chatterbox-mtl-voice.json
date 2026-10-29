@@ -1,0 +1,34 @@
+{
+  "2": {
+    "class_type": "ChatterboxMTLTTS",
+    "inputs": {
+      "model_pack_name": "resembleai-mtl-v3",
+      "model_version": "t3_mtl23ls_v3.safetensors",
+      "language": "en",
+      "text": "Hello, I am a talking avatar made with Montagio.",
+      "exaggeration": 0.5,
+      "temperature": 0.8,
+      "cfg_weight": 0.5,
+      "repetition_penalty": 1.2,
+      "min_p": 0.05,
+      "top_p": 1,
+      "seed": 42,
+      "use_watermark": false,
+      "device": "default",
+      "dtype": "auto",
+      "attention_mode": "sdpa",
+      "crash_protection_template": ""
+    }
+  },
+  "3": {
+    "class_type": "SaveAudioAdvanced",
+    "inputs": {
+      "filename_prefix": "montagio/voice",
+      "format": "flac",
+      "audio": [
+        "2",
+        0
+      ]
+    }
+  }
+}
