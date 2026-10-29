@@ -36,7 +36,7 @@ function rotatedJpeg(path: string): void {
 }
 
 function oversizedPng(path: string): void {
-  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=size=6401x6250', '-frames:v', '1', path]);
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=size=6402x6250', '-frames:v', '1', path]);
 }
 
 afterEach(() => {

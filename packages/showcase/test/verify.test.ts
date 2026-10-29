@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdtempSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AI_METADATA, normalizeClip, PLACEHOLDER_METADATA } from '@montagio/sequence';
+import { AI_METADATA, normalizeClip, PLACEHOLDER_METADATA, readTags } from '@montagio/sequence';
 import { runCli } from '../src/cli';
 import { verifyShowcase } from '../src/verify';
 import { addRenderedClip, FFMPEG_TIMEOUT_MS, makeRoot, rawRender, removeRoot, repoRoot, sha256Of, showcasePath } from './helpers';
@@ -49,17 +49,13 @@ test('a tampered clip fails on its sha256', async () => {
   expect(report.errors).toContainEqual(expect.stringMatching(/^clips\/crash-push--landscape-a\.mp4: sha256 is [0-9a-f]{64}, the manifest says/));
 }, FFMPEG_TIMEOUT_MS);
 
-test('the tracked manifest accepts only the Montagio metadata hashes in strict mode', async () => {
+test('the tracked manifest and Montagio metadata pass strict verification', async () => {
   const source = showcasePath(repoRoot, 'clips', 'crash-push--landscape-a.mp4');
-  const reference = join(raws, 'montagio-metadata.mp4');
-  execFileSync('ffmpeg', [
-    '-loglevel', 'error', '-y', '-i', source, '-map', '0', '-c', 'copy', '-map_metadata', '-1',
-    ...Object.entries(AI_METADATA).flatMap(([key, value]) => ['-metadata', `${key}=${value}`]), reference,
-  ]);
   const { loadManifest } = await import('../src/manifest');
   const manifest = await loadManifest(repoRoot);
   const entry = manifest.clips.find((clip) => clip.preset === 'crash-push' && clip.sample === 'landscape-a')!;
-  expect(entry.sha256).toBe(sha256Of(reference));
+  expect(await readTags(source)).toMatchObject(AI_METADATA);
+  expect(entry.sha256).toBe(sha256Of(source));
   expect((await verifyShowcase(repoRoot, { strict: true })).errors).toEqual([]);
 }, 120_000);
 

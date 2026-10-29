@@ -64,10 +64,17 @@
 /* The creation tabs: plain words, the current one underlined like a slate mark. */
 .tabs {
   display: flex;
+  flex: 0 1 auto;
   align-items: center;
   gap: var(--space-1);
   margin-right: auto;
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
@@ -91,6 +98,7 @@
 
 .tools {
   display: flex;
+  flex: none;
   align-items: center;
   gap: var(--space-3);
 }
