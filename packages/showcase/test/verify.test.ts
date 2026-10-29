@@ -61,7 +61,7 @@ test('the tracked manifest accepts only the Montagio metadata hashes in strict m
   const entry = manifest.clips.find((clip) => clip.preset === 'crash-push' && clip.sample === 'landscape-a')!;
   expect(entry.sha256).toBe(sha256Of(reference));
   expect((await verifyShowcase(repoRoot, { strict: true })).errors).toEqual([]);
-}, FFMPEG_TIMEOUT_MS);
+}, 120_000);
 
 test('a changed preset camera fails on workflow_sha256 in strict mode, but a changed description does not', async () => {
   await addRenderedClip(root, rawA, 'crash-push');
