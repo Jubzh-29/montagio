@@ -238,4 +238,4 @@ test('keeps the comments of the manifest and replaces an entry ingested again', 
 test('refuses an unknown sample and a folder without smoke.jsonl', async () => {
   await expect(ingestSmoke(root, smoke, 'nowhere', {})).rejects.toThrow(/unknown sample "nowhere"/);
   await expect(ingestSmoke(root, smoke, 'landscape-a', {})).rejects.toThrow(/smoke\.jsonl/);
-});
+}, FFMPEG_TIMEOUT_MS);

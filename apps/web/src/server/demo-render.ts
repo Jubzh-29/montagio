@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
-import { access, mkdir, readFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { extname, join, relative, sep } from 'node:path';
 import type { DemoRender } from '@montagio/comfy-adapter';
 import { dimensionsFor, frameCount, pickAspect, type Library } from '@montagio/presets';
-import { DEMO_MOVE_METADATA, placeholderClip } from '@montagio/sequence';
+import { DEMO_MOVE_METADATA, normalizeUploadedImage, placeholderClip } from '@montagio/sequence';
 import { motionKeyframes, toZoompan, type Keyframe } from '@montagio/showcase/motion';
 import { imageSize } from 'image-size';
 import type { DemoKind } from '@/lib/api-types';
@@ -47,9 +48,11 @@ const MOVED_DIR = () => join(getEnv().data, 'demo-renders');
 
 const holder = globalThis as typeof globalThis & {
   __montagioSampleHashes?: Map<string, Promise<string | null>>;
+  __montagioNormalizedSampleHashes?: Map<string, Promise<string | null>>;
   __montagioDemoMoves?: Map<string, Promise<string>>;
 };
 const sampleHashes = (holder.__montagioSampleHashes ??= new Map());
+const normalizedSampleHashes = (holder.__montagioNormalizedSampleHashes ??= new Map());
 // Moves in flight, by output file: two jobs on the same photo and preset share one FFmpeg run.
 const moves = (holder.__montagioDemoMoves ??= new Map());
 
@@ -72,6 +75,25 @@ function sampleHash(folder: 'images' | 'videos', file: string): Promise<string |
   return known;
 }
 
+function normalizedSampleHash(file: string): Promise<string | null> {
+  const path = join(getEnv().root, 'demo-assets', 'images', file);
+  let known = normalizedSampleHashes.get(path);
+  if (!known) {
+    known = (async () => {
+      const temporary = await mkdtemp(join(tmpdir(), 'montagio-sample-'));
+      try {
+        const normalized = join(temporary, 'sample.png');
+        await normalizeUploadedImage(path, normalized);
+        return sha256(await readFile(normalized));
+      } finally {
+        await rm(temporary, { recursive: true, force: true });
+      }
+    })().catch(() => null);
+    normalizedSampleHashes.set(path, known);
+  }
+  return known;
+}
+
 /** The demo's file for a job: the example of its sample photo, else that photo moved; undefined for a job without a photo or a video. */
 export function demoRender(library: Promise<Library>): DemoRender {
   return async ({ presetId, output, files }) => {
@@ -81,7 +103,8 @@ export function demoRender(library: Promise<Library>): DemoRender {
     const bytes = new Uint8Array(await readFile(photo));
     const hash = sha256(bytes);
     const example = EXAMPLES[presetId];
-    if (example && (await sampleHash('images', example.sample)) === hash && (await sameVideo(example.video, files))) {
+    const sampleMatches = example && ((await sampleHash('images', example.sample)) === hash || (await normalizedSampleHash(example.sample)) === hash);
+    if (sampleMatches && (await sameVideo(example.video, files))) {
       const clip = join(getEnv().root, ...example.clip.split('/'));
       if (await exists(clip)) return clip;
     }

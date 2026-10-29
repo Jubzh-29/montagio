@@ -44,7 +44,9 @@ test('when the server offers no captions, a talking avatar shows no captions pan
     delete info.captions;
     await route.fulfill({ response, json: info });
   });
+  const answered = page.waitForResponse('**/api/extensions');
   await page.goto(AVATAR);
+  await answered;
   await expect(page.getByRole('link', { name: 'Avatar', exact: true })).toHaveAttribute('aria-current', 'page');
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await page.getByRole('textbox', { name: 'What the photo says' }).fill('Welcome to the studio: here is what we make.');

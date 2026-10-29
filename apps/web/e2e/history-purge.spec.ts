@@ -8,7 +8,8 @@ test('History purges personal data only after the exact confirmation, and shows 
   await page.getByRole('button', { name: /^Generate/ }).click();
   await expect(page.locator('video[data-testid=result]')).toBeVisible({ timeout: 15_000 });
   await page.goto('/history');
-  await expect(page.getByTestId('history-reproduce')).toBeVisible();
+  const reproduce = page.getByTestId('history-reproduce').first();
+  await expect(reproduce).toBeVisible();
 
   await page.getByTestId('purge-open').click();
   const dialog = page.getByTestId('purge-dialog');
@@ -25,7 +26,7 @@ test('History purges personal data only after the exact confirmation, and shows 
   });
   await submit.click();
   await expect(page.getByTestId('purge-error')).toContainText('Remote deletion could not be completed');
-  await expect(page.getByTestId('history-reproduce')).toBeVisible();
+  await expect(reproduce).toBeVisible();
 
   await page.unroute('**/api/data/purge');
   await page.route('**/api/data/purge', async (route) => {

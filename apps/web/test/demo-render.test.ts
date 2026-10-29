@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { POST as postGenerations } from '@/app/api/generations/route';
 import { GET as getGeneration } from '@/app/api/generations/[id]/route';
@@ -5,7 +6,7 @@ import { POST as postSampleUpload } from '@/app/api/uploads/sample/route';
 import { demoExampleModel, demoKindOf, demoRender } from '@/server/demo-render';
 import { mediaFileFor } from '@/server/generations';
 import { resetServicesForTests } from '@/server/services';
-import { saveUploadFromFile } from '@/server/uploads';
+import { saveUpload, saveUploadFromFile } from '@/server/uploads';
 import { loadLibrary } from '@montagio/presets';
 import { probe, readTags } from '@montagio/sequence';
 import { generationRequest, params, repoRoot, setupTempData } from './helpers';
@@ -33,6 +34,14 @@ test('the sample photo of a preset the GPU session rendered gets that render', a
   // a 20-step render, whatever model the preset now starts on
   expect(demoExampleModel(out)).toBe('wan22-i2v-a14b-fun-camera');
 });
+
+test('a manually uploaded normalized copy of the sample photo gets that render', async () => {
+  const source = join(repoRoot, 'demo-assets', 'images', 'sample-16x9.png');
+  const { imageRef } = await saveUpload(new File([new Uint8Array(await readFile(source))], 'sample-16x9.png', { type: 'image/png' }));
+  const out = await render({ presetId: 'crash-push', output: 'video', files: files(photoFile(imageRef)) });
+  expect(out).toBe(join(repoRoot, 'presets', 'previews', 'crash-push.mp4'));
+  expect(demoKindOf(out)).toBe('example');
+}, 60_000);
 
 test('any other photo is moved by FFmpeg along the preset, once, and says no model made it', async () => {
   const { imageRef } = await ownPhoto();
