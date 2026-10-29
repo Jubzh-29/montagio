@@ -38,7 +38,7 @@ export async function normalizeUploadedImage(input: string, output: string): Pro
   const tmp = `${output}.tmp`;
   try {
     await run('ffmpeg', [
-      '-loglevel', 'error', '-y', ...IMAGE_INPUT, '-autorotate', '-i', input,
+      '-loglevel', 'error', '-y', ...IMAGE_INPUT, '-i', input,
       '-map', '0:v:0', '-frames:v', '1', '-map_metadata', '-1', '-f', 'image2', '-c:v', 'png', tmp,
     ]);
     if ((await stat(tmp)).size > MAX_NORMALIZED_IMAGE_BYTES) throw new SequenceToolError('normalized images are limited to 25 MiB');
