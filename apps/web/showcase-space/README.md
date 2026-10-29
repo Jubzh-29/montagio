@@ -3,8 +3,8 @@ title: Montagio
 emoji: 🎬
 colorFrom: gray
 colorTo: green
-sdk: static
-app_file: index.html
+sdk: docker
+app_port: 7860
 pinned: false
 license: agpl-3.0
 short_description: Montagio, the open-source Higgsfield alternative

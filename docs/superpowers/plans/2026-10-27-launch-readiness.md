@@ -122,7 +122,7 @@ Vérifier avec ffprobe 1080×1920, 30 i/s et environ 38 s, contrôler l'audio av
 
 - [x] **Step 5: Demander le compte Hugging Face et calculer l'URL du Space**
 
-Conserver le nom de Space `montagio`. Le compte `jubzh` est créé et l'URL prévisionnelle est `jubzh-montagio.hf.space`. Le Space reste à créer : contrôler l'URL active après déploiement.
+Conserver le nom de Space `montagio`. Le compte `jubzh` est créé et l'URL prévisionnelle est `jubzh-29.github.io/montagio/`. Le Space reste à créer : contrôler l'URL active après déploiement.
 
 - [x] **Step 6: Refaire et contrôler la 16:9**
 

@@ -8,7 +8,8 @@
 // 3. ffmpeg.wasm is copied to public/ffmpeg (served from the showcase's own origin);
 // 4. `next build` exports the pages (MONTAGIO_SHOWCASE_EXPORT=1); it builds in apps/web/.next,
 //    so the script refuses to start over a production build there;
-// 5. Next 16.4.2 export fixes (export-fixes.mjs), then the Hugging Face Space card is copied to out/README.md.
+// 5. Next 16.4.2 export fixes (export-fixes.mjs), then the Hugging Face Space card,
+//    Dockerfile and dependency-free static server are copied into the export.
 //
 // A release needs MONTAGIO_REPO_URL, the public repository (source link, AGPL-3.0 §13).
 import { execFileSync } from 'node:child_process';
@@ -92,6 +93,9 @@ run(npx, ['next', 'build'], {
 
 for (const file of flattenSegmentPrefetches(join(web, 'out'))) console.log(`export fix: ${file}`);
 copyFileSync(join(web, 'showcase-space', 'README.md'), join(web, 'out', 'README.md'));
+copyFileSync(join(web, 'showcase-space', 'Dockerfile'), join(web, 'out', 'Dockerfile'));
+copyFileSync(join(web, 'scripts', 'serve-static.mjs'), join(web, 'out', 'serve-static.mjs'));
+copyFileSync(join(web, 'scripts', 'build-options.mjs'), join(web, 'out', 'build-options.mjs'));
 // GitHub Pages runs Jekyll unless told not to, and Jekyll drops the _next/ folder.
 if (basePath) writeFileSync(join(web, 'out', '.nojekyll'), '');
 

@@ -100,3 +100,8 @@ test('the command-line server listens on the loopback interface only', async () 
   expect(address.address).toBe('127.0.0.1');
   expect((await fetch(`http://127.0.0.1:${address.port}/`)).status).toBe(200);
 });
+
+test('the server can listen publicly only when the host is explicit', async () => {
+  server = (await listenStatic(dir, 0, { host: '0.0.0.0' })) as Server;
+  expect((server.address() as AddressInfo).address).toBe('0.0.0.0');
+});

@@ -84,7 +84,7 @@ Ouvrir ensuite http://127.0.0.1:3101/ (le serveur de test n'écoute que sur la m
 2. **Créer le Space** depuis le site : https://huggingface.co/new-space.
    - Nom : `montagio`.
    - Licence : `agpl-3.0`.
-   - SDK : **Static**, modèle « Blank ».
+   - SDK : **Docker**, port `7860`, matériel CPU de base. Le serveur Node inclus ne dépend d'aucun paquet npm et sert `index.html` pour chaque dossier, ce que l'hébergement purement statique ne fait pas pour les routes imbriquées.
    - Visibilité : **Public**. Un Space « Protected » demande un plan payant.
 3. **Installer la CLI et se connecter** :
 
@@ -104,7 +104,7 @@ Ouvrir ensuite http://127.0.0.1:3101/ (le serveur de test n'écoute que sur la m
    hf upload jubzh/montagio apps/web/out . --repo-type=space --commit-message="Montagio showcase"
    ```
 
-   La CLI envoie elle-même les gros fichiers (clips, wasm). Le `README.md` du dossier remplace celui du modèle « Blank » : il déclare `sdk: static` et les dépôts de poids utilisés.
+   La CLI envoie elle-même les gros fichiers (clips, wasm). Le `README.md` du dossier remplace celui du modèle « Blank » : il déclare `sdk: docker`, `app_port: 7860` et les dépôts de poids utilisés.
 6. **Trouver l'URL directe** : sur la page du Space, menu « ⋮ » puis « Embed this Space ». C'est une adresse en `*.hf.space`. **C'est elle qu'on donne au jury** : elle ouvre la vitrine seule, sans l'habillage de huggingface.co.
 
 Pour mettre à jour la vitrine, reconstruire, puis relancer la même commande `hf upload`.
@@ -127,9 +127,9 @@ Pour mettre à jour la vitrine, reconstruire, puis relancer la même commande `h
 
 Vérifications faites le : `__/__/2026`, par : `____`.
 
-## 5. Secours : GitHub Pages
+## 5. GitHub Pages (hébergement retenu)
 
-Si le Space est indisponible, le même dossier peut être servi par GitHub Pages. Il faut seulement un préfixe d'URL : un site de projet GitHub Pages vit sous `/<dépôt>/`.
+Le Space Hugging Face est indisponible faute de quota CPU : **GitHub Pages est donc l'hébergement retenu pour le lancement**, à `https://jubzh-29.github.io/montagio/`. Le même dossier y est servi, avec les routes imbriquées fonctionnelles, sans GPU ni collecte. Il faut seulement un préfixe d'URL : un site de projet GitHub Pages vit sous `/<dépôt>/`.
 
 1. Construire avec le préfixe :
 

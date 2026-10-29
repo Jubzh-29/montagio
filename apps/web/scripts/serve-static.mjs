@@ -3,9 +3,9 @@
 // folder, byte ranges (video seeking needs them), the export's 404.html, and an
 // optional path prefix (a GitHub Pages project site lives under /<repo>/).
 //
-//   node scripts/serve-static.mjs <dir> <port> [--prefix montagio]
+//   node scripts/serve-static.mjs <dir> <port> [--prefix montagio] [--host 0.0.0.0]
 //
-// It listens on 127.0.0.1 only.
+// It listens on 127.0.0.1 unless another host is explicitly requested.
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -100,24 +100,26 @@ export function createStaticServer(dir, { prefix = '' } = {}) {
   });
 }
 
-/** Serve `dir` on `port` of the loopback interface only: a test tool, not reachable from the network. */
+/** Serve `dir` on loopback by default, or on an explicitly requested host. */
 export function listenStatic(dir, port, opts = {}) {
   const server = createStaticServer(dir, opts);
   return new Promise((resolvePromise, reject) => {
     server.once('error', reject);
-    server.listen(port, '127.0.0.1', () => resolvePromise(server));
+    server.listen(port, opts.host ?? '127.0.0.1', () => resolvePromise(server));
   });
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const [dir, port, ...rest] = process.argv.slice(2);
   if (!dir || !port) {
-    console.error('usage: node scripts/serve-static.mjs <dir> <port> [--prefix montagio]');
+    console.error('usage: node scripts/serve-static.mjs <dir> <port> [--prefix montagio] [--host 0.0.0.0]');
     process.exit(2);
   }
   const at = rest.indexOf('--prefix');
   // "montagio" or "/montagio" (Git Bash rewrites an argument that starts with "/").
   const prefix = normalizeBasePath(at === -1 ? '' : rest[at + 1]);
-  await listenStatic(dir, Number(port), { prefix });
-  console.log(`serving ${resolve(dir)} on http://127.0.0.1:${port}${prefix}/`);
+  const hostAt = rest.indexOf('--host');
+  const host = hostAt === -1 ? undefined : rest[hostAt + 1];
+  await listenStatic(dir, Number(port), { prefix, host });
+  console.log(`serving ${resolve(dir)} on http://${host ?? '127.0.0.1'}:${port}${prefix}/`);
 }
